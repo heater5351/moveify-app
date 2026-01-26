@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface Props {
@@ -20,21 +20,17 @@ class ErrorBoundary extends Component<Props, State> {
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    // Update state so the next render will show the fallback UI
     return { hasError: true, error, errorInfo: null };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('🔴 React Error Boundary caught an error:', error);
+    console.error('React Error Boundary caught an error:', error);
     console.error('Component stack:', errorInfo.componentStack);
 
     this.setState({
       error,
       errorInfo
     });
-
-    // You could send error to logging service here
-    // Example: logErrorToService(error, errorInfo);
   }
 
   private handleReload = () => {
@@ -48,12 +44,10 @@ class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
-      // Custom fallback UI
       if (this.props.fallback) {
         return this.props.fallback;
       }
 
-      // Default fallback UI
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8">
@@ -66,10 +60,10 @@ class ErrorBoundary extends Component<Props, State> {
             </h1>
 
             <p className="text-gray-600 text-center mb-6">
-              The application encountered an unexpected error. We've logged the issue and will look into it.
+              The application encountered an unexpected error. Please try reloading the page.
             </p>
 
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <div className="mb-6 p-4 bg-gray-100 rounded-lg overflow-auto max-h-48">
                 <p className="text-sm font-mono text-red-600 mb-2">
                   {this.state.error.toString()}

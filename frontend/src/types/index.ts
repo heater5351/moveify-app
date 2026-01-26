@@ -37,9 +37,11 @@ export type ProgramConfig = {
   trackActualPerformance?: boolean;
   trackRpe?: boolean;
   trackPainLevel?: boolean;
+  blockType?: 'introductory' | 'standard';
 }
 
 export type AssignedProgram = {
+  id?: number;
   config: ProgramConfig;
   exercises: ProgramExercise[];
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Play, Check, TrendingUp, Calendar as CalendarIcon } from 'lucide-react';
-import type { Patient, CompletionData, ProgramExercise } from '../types/index.ts';
+import type { Patient, CompletionData, ProgramExercise, DailyCheckIn } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { ExerciseCompletionModal } from './modals/ExerciseCompletionModal';
 import DailyCheckInModal from './modals/DailyCheckInModal';
@@ -23,7 +23,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
     programIndex: number;
   } | null>(null);
   const [showCheckInModal, setShowCheckInModal] = useState(false);
-  const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
+  const [_hasCheckedInToday, setHasCheckedInToday] = useState(false);
 
   // Check if patient has completed check-in today
   useEffect(() => {
