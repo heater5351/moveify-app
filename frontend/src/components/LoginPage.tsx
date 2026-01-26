@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import type { Patient, UserRole } from '../types/index.ts';
+import type { Patient, UserRole, User } from '../types/index.ts';
 import { API_URL } from '../config';
 
 interface LoginPageProps {
-  onLogin: (role: UserRole, patient?: Patient) => void;
+  onLogin: (role: UserRole, patient?: Patient, user?: User) => void;
 }
 
 export const LoginPage = ({ onLogin }: LoginPageProps) => {
@@ -56,7 +56,14 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
             onLogin('patient', patient);
           }
         } else {
-          onLogin('clinician');
+          // Clinician login - pass user data
+          const clinicianUser: User = {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: 'clinician'
+          };
+          onLogin('clinician', undefined, clinicianUser);
         }
       } else {
         setLoginError(data.error || 'Invalid email or password');

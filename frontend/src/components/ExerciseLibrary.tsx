@@ -1,15 +1,59 @@
-import { useState } from 'react';
-import { Search, Play, Clock } from 'lucide-react';
-import type { ProgramExercise } from '../types/index.ts';
-import { exercises } from '../data/exercises';
+import { useState, useEffect } from 'react';
+import { Search, Play, Clock, Plus } from 'lucide-react';
+import type { ProgramExercise, Exercise } from '../types/index.ts';
+import { exercises as defaultExercises } from '../data/exercises';
+import { AddExerciseModal } from './modals/AddExerciseModal';
+import { API_URL } from '../config';
 
 interface ExerciseLibraryProps {
   onAddToProgram: (exercises: ProgramExercise[]) => void;
+  clinicianId?: number;
 }
 
-export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
+export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibraryProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedExercises, setSelectedExercises] = useState<number[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [customExercises, setCustomExercises] = useState<Exercise[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch custom exercises for this clinician
+  useEffect(() => {
+    if (clinicianId) {
+      fetchCustomExercises();
+    }
+  }, [clinicianId]);
+
+  const fetchCustomExercises = async () => {
+    if (!clinicianId) return;
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/exercises/clinician/${clinicianId}`);
+      if (response.ok) {
+        const data = await response.json();
+        // Map database fields to Exercise type
+        const mapped = data.map((ex: { id: number; name: string; category: string; duration: string; difficulty: string; description: string; video_url?: string }) => ({
+          id: ex.id + 10000, // Offset to avoid ID collision with default exercises
+          name: ex.name,
+          category: ex.category,
+          duration: ex.duration,
+          difficulty: ex.difficulty,
+          description: ex.description,
+          videoUrl: ex.video_url,
+          isCustom: true
+        }));
+        setCustomExercises(mapped);
+      }
+    } catch (error) {
+      console.error('Failed to fetch custom exercises:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Combine default and custom exercises
+  const allExercises = [...defaultExercises, ...customExercises];
 
   const toggleExercise = (exerciseId: number) => {
     if (selectedExercises.includes(exerciseId)) {
@@ -22,7 +66,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
   const handleAddToProgram = () => {
     if (selectedExercises.length === 0) return;
 
-    const newExercises = exercises
+    const newExercises = allExercises
       .filter(ex => selectedExercises.includes(ex.id))
       .map(ex => ({
         ...ex,
@@ -35,7 +79,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
     setSelectedExercises([]);
   };
 
-  const filteredExercises = exercises.filter(exercise =>
+  const filteredExercises = allExercises.filter(exercise =>
     exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     exercise.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -51,10 +95,10 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
         </div>
       )}
 
-      {/* Search Bar */}
+      {/* Search Bar and Actions */}
       <div className="mb-8">
-        <div className="flex gap-3 items-center">
-          <div className="relative flex-1 max-w-md">
+        <div className="flex gap-3 items-center flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
@@ -64,6 +108,15 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
             />
           </div>
+          {clinicianId && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-4 py-3 rounded-lg font-medium whitespace-nowrap bg-white border-2 border-moveify-teal text-moveify-teal hover:bg-moveify-teal hover:text-white transition-colors flex items-center gap-2"
+            >
+              <Plus size={20} />
+              Add Exercise
+            </button>
+          )}
           <button
             onClick={handleAddToProgram}
             disabled={selectedExercises.length === 0}
@@ -78,52 +131,130 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
         </div>
       </div>
 
-      {/* Exercise Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
-        {filteredExercises.map(exercise => {
-          const isSelected = selectedExercises.includes(exercise.id);
-          return (
-            <div
-              key={exercise.id}
-              onClick={() => toggleExercise(exercise.id)}
-              className={`bg-white rounded-xl shadow-sm border-2 overflow-hidden hover:shadow-md transition-all cursor-pointer ${
-                isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-100'
-              }`}
-            >
-              {/* Video Thumbnail */}
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 h-48 flex items-center justify-center relative">
-                <Play className="text-white" size={56} />
-                {isSelected && (
-                  <div className="absolute top-3 left-3 bg-moveify-teal text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">
-                    ✓
+      {/* Loading State */}
+      {isLoading && (
+        <div className="text-center py-4">
+          <p className="text-gray-500">Loading exercises...</p>
+        </div>
+      )}
+
+      {/* Custom Exercises Section */}
+      {customExercises.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">Your Custom Exercises</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+            {customExercises
+              .filter(exercise =>
+                exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                exercise.category.toLowerCase().includes(searchTerm.toLowerCase())
+              )
+              .map(exercise => {
+                const isSelected = selectedExercises.includes(exercise.id);
+                return (
+                  <div
+                    key={exercise.id}
+                    onClick={() => toggleExercise(exercise.id)}
+                    className={`bg-white rounded-xl shadow-sm border-2 overflow-hidden hover:shadow-md transition-all cursor-pointer ${
+                      isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-100'
+                    }`}
+                  >
+                    {/* Video Thumbnail */}
+                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 h-48 flex items-center justify-center relative">
+                      <Play className="text-white" size={56} />
+                      {isSelected && (
+                        <div className="absolute top-3 left-3 bg-moveify-teal text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">
+                          ✓
+                        </div>
+                      )}
+                      <span className="absolute top-3 right-3 bg-white/90 text-purple-600 text-xs font-semibold px-3 py-1 rounded-full">
+                        {exercise.difficulty}
+                      </span>
+                      <span className="absolute bottom-3 left-3 bg-purple-700/80 text-white text-xs font-medium px-2 py-1 rounded">
+                        Custom
+                      </span>
+                    </div>
+
+                    {/* Exercise Info */}
+                    <div className="p-5">
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-semibold text-gray-900 text-lg">{exercise.name}</h3>
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                          {exercise.category}
+                        </span>
+                      </div>
+
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                        {exercise.description}
+                      </p>
+
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Clock size={16} />
+                        <span>{exercise.duration}</span>
+                      </div>
+                    </div>
                   </div>
-                )}
-                <span className="absolute top-3 right-3 bg-white/90 text-moveify-teal text-xs font-semibold px-3 py-1 rounded-full">
-                  {exercise.difficulty}
-                </span>
-              </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
 
-              {/* Exercise Info */}
-              <div className="p-5">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-semibold text-gray-900 text-lg">{exercise.name}</h3>
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                    {exercise.category}
-                  </span>
+      {/* Default Exercises Section */}
+      <div>
+        {customExercises.length > 0 && (
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">Default Exercise Library</h3>
+        )}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+          {defaultExercises
+            .filter(exercise =>
+              exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              exercise.category.toLowerCase().includes(searchTerm.toLowerCase())
+            )
+            .map(exercise => {
+              const isSelected = selectedExercises.includes(exercise.id);
+              return (
+                <div
+                  key={exercise.id}
+                  onClick={() => toggleExercise(exercise.id)}
+                  className={`bg-white rounded-xl shadow-sm border-2 overflow-hidden hover:shadow-md transition-all cursor-pointer ${
+                    isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-100'
+                  }`}
+                >
+                  {/* Video Thumbnail */}
+                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 h-48 flex items-center justify-center relative">
+                    <Play className="text-white" size={56} />
+                    {isSelected && (
+                      <div className="absolute top-3 left-3 bg-moveify-teal text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">
+                        ✓
+                      </div>
+                    )}
+                    <span className="absolute top-3 right-3 bg-white/90 text-moveify-teal text-xs font-semibold px-3 py-1 rounded-full">
+                      {exercise.difficulty}
+                    </span>
+                  </div>
+
+                  {/* Exercise Info */}
+                  <div className="p-5">
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="font-semibold text-gray-900 text-lg">{exercise.name}</h3>
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                        {exercise.category}
+                      </span>
+                    </div>
+
+                    <p className="text-sm text-gray-600 mb-4">
+                      {exercise.description}
+                    </p>
+
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Clock size={16} />
+                      <span>{exercise.duration}</span>
+                    </div>
+                  </div>
                 </div>
-
-                <p className="text-sm text-gray-600 mb-4">
-                  {exercise.description}
-                </p>
-
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Clock size={16} />
-                  <span>{exercise.duration}</span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+        </div>
       </div>
 
       {/* No Results */}
@@ -131,6 +262,15 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
         <div className="text-center py-12">
           <p className="text-gray-500">No exercises found matching "{searchTerm}"</p>
         </div>
+      )}
+
+      {/* Add Exercise Modal */}
+      {showAddModal && clinicianId && (
+        <AddExerciseModal
+          clinicianId={clinicianId}
+          onClose={() => setShowAddModal(false)}
+          onSuccess={fetchCustomExercises}
+        />
       )}
     </>
   );

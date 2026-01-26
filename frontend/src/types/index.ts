@@ -70,6 +70,13 @@ export type NewPatient = {
 
 export type UserRole = 'clinician' | 'patient' | '';
 
+export type User = {
+  id: number;
+  email: string;
+  name: string;
+  role: UserRole;
+}
+
 // Periodization types
 export type BlockType = 'introductory' | 'standard';
 

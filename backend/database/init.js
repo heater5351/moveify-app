@@ -128,6 +128,21 @@ async function initDatabase() {
       )
     `);
 
+    // Custom exercises library (per-clinician)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS exercises (
+        id SERIAL PRIMARY KEY,
+        clinician_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        difficulty TEXT NOT NULL CHECK(difficulty IN ('Beginner', 'Intermediate', 'Advanced')),
+        duration TEXT NOT NULL,
+        description TEXT NOT NULL,
+        video_url TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
     // Exercise progression log (audit trail of adjustments)
     await db.query(`
       CREATE TABLE IF NOT EXISTS exercise_progression_log (

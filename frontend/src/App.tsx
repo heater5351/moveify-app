@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
-import type { Patient, ProgramExercise, ProgramConfig, UserRole, NewPatient, CompletionData } from './types/index.ts';
+import type { Patient, ProgramExercise, ProgramConfig, UserRole, NewPatient, CompletionData, User } from './types/index.ts';
 import { LoginPage } from './components/LoginPage';
 import { SetupPasswordPage } from './components/SetupPasswordPage';
 import { ExerciseLibrary } from './components/ExerciseLibrary';
@@ -23,6 +23,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>('');
   const [loggedInPatient, setLoggedInPatient] = useState<Patient | null>(null);
+  const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
 
   // Navigation state
   const [currentPage, setCurrentPage] = useState('exercises');
@@ -101,11 +102,14 @@ function App() {
   }, [patients]);
 
   // Handlers
-  const handleLogin = (role: UserRole, patient?: Patient) => {
+  const handleLogin = (role: UserRole, patient?: Patient, user?: User) => {
     setIsLoggedIn(true);
     setUserRole(role);
     if (patient) {
       setLoggedInPatient(patient);
+    }
+    if (user) {
+      setLoggedInUser(user);
     }
   };
 
@@ -113,6 +117,7 @@ function App() {
     setIsLoggedIn(false);
     setUserRole('');
     setLoggedInPatient(null);
+    setLoggedInUser(null);
   };
 
   const handleAddToProgram = (exercises: ProgramExercise[]) => {
@@ -631,7 +636,7 @@ function App() {
         <div className="flex flex-1 overflow-hidden">
           {/* Left Side - Exercise Library */}
           <div className="flex-1 overflow-y-auto px-4 py-8">
-            <ExerciseLibrary onAddToProgram={handleAddToProgram} />
+            <ExerciseLibrary onAddToProgram={handleAddToProgram} clinicianId={loggedInUser?.id} />
           </div>
 
           {/* Right Side - Program Tab (only visible on Program Builder page) */}
