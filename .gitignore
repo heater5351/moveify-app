@@ -1,0 +1,22 @@
+# Root level gitignore
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Claude/ngrok temp files
+ngrok.yml
+
+# Old files
+*.tsx.bak

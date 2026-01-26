@@ -1,0 +1,684 @@
+import { useState, useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
+import type { Patient, ProgramExercise, ProgramConfig, UserRole, NewPatient, CompletionData } from './types/index.ts';
+import { LoginPage } from './components/LoginPage';
+import { SetupPasswordPage } from './components/SetupPasswordPage';
+import { ExerciseLibrary } from './components/ExerciseLibrary';
+import { PatientsPage } from './components/PatientsPage';
+import { PatientProfile } from './components/PatientProfile';
+import { PatientPortal } from './components/PatientPortal';
+import { ProgramBuilder } from './components/ProgramBuilder';
+import { AddPatientModal } from './components/modals/AddPatientModal';
+import { EditPatientModal } from './components/modals/EditPatientModal';
+import { PatientSelectionModal } from './components/modals/PatientSelectionModal';
+import { ProgramConfigModal } from './components/modals/ProgramConfigModal';
+import { ProgramDetailsModal } from './components/modals/ProgramDetailsModal';
+import { NotificationModal } from './components/modals/NotificationModal';
+import { ConfirmModal } from './components/modals/ConfirmModal';
+import { API_URL } from './config';
+
+function App() {
+  // Authentication state
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userRole, setUserRole] = useState<UserRole>('');
+  const [loggedInPatient, setLoggedInPatient] = useState<Patient | null>(null);
+
+  // Navigation state
+  const [currentPage, setCurrentPage] = useState('exercises');
+  const [viewingPatient, setViewingPatient] = useState<Patient | null>(null);
+
+  // Patient management
+  const [patients, setPatients] = useState<Patient[]>([]);
+
+  // Program builder state
+  const [programExercises, setProgramExercises] = useState<ProgramExercise[]>([]);
+  const [programName, setProgramName] = useState('');
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+
+  // Modal states
+  const [showAddPatientModal, setShowAddPatientModal] = useState(false);
+  const [showEditPatientModal, setShowEditPatientModal] = useState(false);
+  const [showPatientModal, setShowPatientModal] = useState(false);
+  const [showProgramConfigModal, setShowProgramConfigModal] = useState(false);
+  const [showProgramDetailsModal, setShowProgramDetailsModal] = useState(false);
+  const [viewingProgramIndex, setViewingProgramIndex] = useState<number | null>(null);
+  const [editingProgramIndex, setEditingProgramIndex] = useState<number | null>(null);
+  const [editingProgramId, setEditingProgramId] = useState<number | null>(null);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [showDeletePatientConfirm, setShowDeletePatientConfirm] = useState(false);
+  const [showDeleteProgramConfirm, setShowDeleteProgramConfirm] = useState(false);
+  const [programToDelete, setProgramToDelete] = useState<{ id: number; name: string } | null>(null);
+
+  // Form states
+  const [newPatient, setNewPatient] = useState<NewPatient>({
+    name: '',
+    dob: '',
+    condition: '',
+    email: '',
+    phone: '',
+    address: ''
+  });
+
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+
+  const [programConfig, setProgramConfig] = useState<ProgramConfig>({
+    startDate: 'today',
+    customStartDate: '',
+    frequency: [],
+    duration: '4weeks',
+    customEndDate: ''
+  });
+
+  // Fetch patients from database
+  const fetchPatients = async () => {
+    try {
+      const response = await fetch(`${API_URL}/patients`);
+      const data = await response.json();
+      if (response.ok) {
+        setPatients(data.patients);
+      }
+    } catch (error) {
+      console.error('Failed to fetch patients:', error);
+    }
+  };
+
+  // Load patients when clinician logs in
+  useEffect(() => {
+    if (isLoggedIn && userRole === 'clinician') {
+      fetchPatients();
+    }
+  }, [isLoggedIn, userRole]);
+
+  // Update logged in patient when patients array changes
+  useEffect(() => {
+    if (loggedInPatient) {
+      const updatedPatient = patients.find(p => p.id === loggedInPatient.id);
+      if (updatedPatient) {
+        setLoggedInPatient(updatedPatient);
+      }
+    }
+  }, [patients]);
+
+  // Handlers
+  const handleLogin = (role: UserRole, patient?: Patient) => {
+    setIsLoggedIn(true);
+    setUserRole(role);
+    if (patient) {
+      setLoggedInPatient(patient);
+    }
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setUserRole('');
+    setLoggedInPatient(null);
+  };
+
+  const handleAddToProgram = (exercises: ProgramExercise[]) => {
+    setProgramExercises([...programExercises, ...exercises]);
+  };
+
+  const handleRemoveFromProgram = (index: number) => {
+    setProgramExercises(programExercises.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateExercise = (index: number, field: 'sets' | 'reps', value: number) => {
+    const updated = [...programExercises];
+    updated[index][field] = value;
+    setProgramExercises(updated);
+  };
+
+  const handleAssignToPatient = () => {
+    setShowPatientModal(true);
+  };
+
+  const handleSelectPatient = () => {
+    setShowPatientModal(false);
+    setShowProgramConfigModal(true);
+  };
+
+  const handleConfirmAssignment = async () => {
+    if (!selectedPatient) return;
+
+    if (!programName.trim()) {
+      setNotification({ message: 'Please enter a program name', type: 'error' });
+      return;
+    }
+
+    try {
+      // Check if we're editing or creating
+      const isEditing = editingProgramId !== null;
+
+      let response;
+      if (isEditing) {
+        // Update existing program
+        response = await fetch(`${API_URL}/programs/${editingProgramId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: programName,
+            exercises: programExercises,
+            config: programConfig
+          })
+        });
+      } else {
+        // Create new program
+        response = await fetch(`${API_URL}/programs/patient/${selectedPatient.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: programName,
+            exercises: programExercises,
+            config: programConfig,
+            blockType: (programConfig as any).blockType || 'standard'
+          })
+        });
+      }
+
+      if (response.ok) {
+        // Refresh patient list to get updated program data
+        await fetchPatients();
+
+        // Update viewing patient if needed
+        if (viewingPatient) {
+          const updated = patients.find(p => p.id === viewingPatient.id);
+          if (updated) {
+            setViewingPatient(updated);
+          }
+        }
+
+        // Update logged in patient if they're the one being assigned
+        if (loggedInPatient && loggedInPatient.id === selectedPatient.id) {
+          const updatedPatient = patients.find(p => p.id === selectedPatient.id);
+          if (updatedPatient) {
+            setLoggedInPatient(updatedPatient);
+          }
+        }
+
+        setShowProgramConfigModal(false);
+        setSelectedPatient(null);
+        setProgramExercises([]);
+        setProgramName('');
+        setEditingProgramIndex(null);
+        setEditingProgramId(null);
+        setProgramConfig({
+          startDate: 'today',
+          customStartDate: '',
+          frequency: [],
+          duration: '4weeks',
+          customEndDate: ''
+        });
+        setNotification({
+          message: isEditing ? 'Program updated successfully!' : 'Program assigned successfully!',
+          type: 'success'
+        });
+      } else {
+        const data = await response.json();
+        setNotification({
+          message: `Failed to ${isEditing ? 'update' : 'assign'} program: ${data.error || 'Unknown error'}`,
+          type: 'error'
+        });
+      }
+    } catch (error) {
+      setNotification({
+        message: 'Connection error. Please make sure the server is running.',
+        type: 'error'
+      });
+    }
+  };
+
+  const handleEditProgram = (programIndex: number) => {
+    if (!viewingPatient) return;
+
+    const program = viewingPatient.assignedPrograms[programIndex];
+    setEditingProgramIndex(programIndex);
+    setEditingProgramId(program.config.id || null);
+    setSelectedPatient(viewingPatient);
+    setProgramName(program.config.name || '');
+    setProgramExercises(program.exercises);
+    setProgramConfig({
+      startDate: program.config.startDate,
+      customStartDate: program.config.customStartDate || '',
+      frequency: program.config.frequency,
+      duration: program.config.duration,
+      customEndDate: program.config.customEndDate || ''
+    });
+    // Navigate to Program Builder tab (exercise library)
+    setCurrentPage('exercises');
+    setViewingPatient(null);
+  };
+
+  const handleDeleteProgram = (programId: number, programName: string) => {
+    setProgramToDelete({ id: programId, name: programName });
+    setShowDeleteProgramConfirm(true);
+  };
+
+  const confirmDeleteProgram = async () => {
+    if (!programToDelete) return;
+
+    setShowDeleteProgramConfirm(false);
+
+    try {
+      const response = await fetch(`${API_URL}/programs/${programToDelete.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        await fetchPatients();
+
+        // Update viewing patient by fetching fresh data from API
+        if (viewingPatient) {
+          const patientResponse = await fetch(`${API_URL}/patients/${viewingPatient.id}`);
+          if (patientResponse.ok) {
+            const updatedPatient = await patientResponse.json();
+            setViewingPatient(updatedPatient);
+          }
+        }
+
+        setNotification({ message: 'Program deleted successfully!', type: 'success' });
+      } else {
+        setNotification({ message: 'Failed to delete program', type: 'error' });
+      }
+    } catch (error) {
+      setNotification({ message: 'Connection error. Please make sure the server is running.', type: 'error' });
+    }
+
+    setProgramToDelete(null);
+  };
+
+  const handleAddProgram = () => {
+    if (!viewingPatient) return;
+
+    setSelectedPatient(viewingPatient);
+    setProgramExercises([]);
+    setProgramName('');
+    setEditingProgramIndex(null);
+    setEditingProgramId(null);
+    setProgramConfig({
+      startDate: 'today',
+      customStartDate: '',
+      frequency: [],
+      duration: '4weeks',
+      customEndDate: ''
+    });
+    // No need to set isProgramOpen since it's always visible
+    // Navigate to Program Builder tab (exercise library)
+    setCurrentPage('exercises');
+    setViewingPatient(null);
+  };
+
+  const handleCancelProgramAssignment = () => {
+    // Clear all program-related state (program tab stays visible)
+    setSelectedPatient(null);
+    setProgramExercises([]);
+    setProgramName('');
+    setEditingProgramIndex(null);
+    setEditingProgramId(null);
+    setProgramConfig({
+      startDate: 'today',
+      customStartDate: '',
+      frequency: [],
+      duration: '4weeks',
+      customEndDate: ''
+    });
+  };
+
+  const handleSaveEditPatient = () => {
+    if (!editingPatient || !editingPatient.name || !editingPatient.dob || !editingPatient.email) {
+      setNotification({ message: 'Please fill in required fields: Name, Date of Birth, and Email', type: 'error' });
+      return;
+    }
+
+    const dobDate = new Date(editingPatient.dob);
+    const today = new Date();
+    const age = today.getFullYear() - dobDate.getFullYear();
+
+    const updatedPatients = patients.map(p =>
+      p.id === editingPatient.id
+        ? { ...editingPatient, age: age }
+        : p
+    );
+
+    setPatients(updatedPatients);
+
+    if (viewingPatient && viewingPatient.id === editingPatient.id) {
+      setViewingPatient({ ...editingPatient, age: age });
+    }
+
+    setShowEditPatientModal(false);
+    setEditingPatient(null);
+    setNotification({ message: 'Patient updated successfully!', type: 'success' });
+  };
+
+  const handleDeletePatient = async () => {
+    if (!editingPatient) return;
+    setShowDeletePatientConfirm(true);
+  };
+
+  const confirmDeletePatient = async () => {
+    if (!editingPatient) return;
+
+    setShowDeletePatientConfirm(false);
+
+    try {
+      const response = await fetch(`${API_URL}/patients/${editingPatient.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        // Refresh patient list from database
+        await fetchPatients();
+        setShowEditPatientModal(false);
+        setEditingPatient(null);
+        setViewingPatient(null);
+        setNotification({ message: 'Patient deleted successfully! Their login credentials have been removed.', type: 'success' });
+      } else {
+        const data = await response.json();
+        setNotification({ message: `Failed to delete patient: ${data.error || 'Unknown error'}`, type: 'error' });
+      }
+    } catch (error) {
+      setNotification({ message: 'Connection error. Please make sure the server is running.', type: 'error' });
+    }
+  };
+
+  const handleToggleExerciseComplete = async (
+    exerciseIndex: number,
+    programIndex: number,
+    completionData?: CompletionData
+  ) => {
+    if (userRole === 'patient' && loggedInPatient && loggedInPatient.assignedPrograms.length > programIndex) {
+      const exercise = loggedInPatient.assignedPrograms[programIndex].exercises[exerciseIndex];
+
+      // When completionData is provided, always mark as completed (not toggle)
+      // This handles both new completions and editing existing completions
+      const newCompletedStatus = completionData ? true : !exercise.completed;
+
+      // Optimistic update
+      const updatedPrograms = [...loggedInPatient.assignedPrograms];
+      updatedPrograms[programIndex] = {
+        ...updatedPrograms[programIndex],
+        exercises: [...updatedPrograms[programIndex].exercises]
+      };
+      updatedPrograms[programIndex].exercises[exerciseIndex] = {
+        ...exercise,
+        completed: newCompletedStatus,
+        completionData: completionData
+      };
+      const updatedPatient = { ...loggedInPatient, assignedPrograms: updatedPrograms };
+      setLoggedInPatient(updatedPatient);
+
+      // Save to database if exercise has an ID
+      if (exercise.id) {
+        try {
+          const response = await fetch(`${API_URL}/programs/exercise/${exercise.id}/complete`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              completed: newCompletedStatus,
+              patientId: loggedInPatient.id,
+              setsPerformed: completionData?.setsPerformed,
+              repsPerformed: completionData?.repsPerformed,
+              rpeRating: completionData?.rpeRating,
+              painLevel: completionData?.painLevel,
+              notes: completionData?.notes
+            })
+          });
+
+          if (!response.ok) {
+            // Revert on error
+            updatedPrograms[programIndex].exercises[exerciseIndex].completed = exercise.completed;
+            setLoggedInPatient({ ...loggedInPatient, assignedPrograms: updatedPrograms });
+            console.error('Failed to update exercise completion');
+          }
+        } catch (error) {
+          // Revert on error
+          updatedPrograms[programIndex].exercises[exerciseIndex].completed = exercise.completed;
+          setLoggedInPatient({ ...loggedInPatient, assignedPrograms: updatedPrograms });
+          console.error('Error updating exercise completion:', error);
+        }
+      }
+    }
+  };
+
+  // Router for public pages (login, setup password)
+  if (!isLoggedIn) {
+    return (
+      <Routes>
+        <Route path="/setup-password" element={<SetupPasswordPage />} />
+        <Route path="/" element={<LoginPage onLogin={handleLogin} />} />
+      </Routes>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Program Tab - Permanently visible on right side (removed slide-out) */}
+
+      {/* Modals */}
+      {showPatientModal && (
+        <PatientSelectionModal
+          patients={patients}
+          selectedPatient={selectedPatient}
+          onSelect={setSelectedPatient}
+          onNext={handleSelectPatient}
+          onClose={() => {
+            setShowPatientModal(false);
+            setSelectedPatient(null);
+          }}
+        />
+      )}
+
+      {showProgramConfigModal && (
+        <ProgramConfigModal
+          config={programConfig}
+          onUpdate={setProgramConfig}
+          onConfirm={handleConfirmAssignment}
+          onBack={() => {
+            setShowProgramConfigModal(false);
+            setShowPatientModal(true);
+          }}
+        />
+      )}
+
+      {showProgramDetailsModal && viewingPatient && viewingProgramIndex !== null && (
+        <ProgramDetailsModal
+          program={viewingPatient.assignedPrograms[viewingProgramIndex]}
+          patientName={viewingPatient.name}
+          onClose={() => {
+            setShowProgramDetailsModal(false);
+            setViewingProgramIndex(null);
+          }}
+        />
+      )}
+
+      {showAddPatientModal && (
+        <AddPatientModal
+          newPatient={newPatient}
+          onUpdate={setNewPatient}
+          onSuccess={fetchPatients}
+          onClose={() => {
+            setShowAddPatientModal(false);
+            setNewPatient({
+              name: '',
+              dob: '',
+              condition: '',
+              email: '',
+              phone: '',
+              address: ''
+            });
+          }}
+        />
+      )}
+
+      {showEditPatientModal && editingPatient && (
+        <EditPatientModal
+          patient={editingPatient}
+          onUpdate={setEditingPatient}
+          onSave={handleSaveEditPatient}
+          onDelete={handleDeletePatient}
+          onClose={() => {
+            setShowEditPatientModal(false);
+            setEditingPatient(null);
+          }}
+        />
+      )}
+
+      {/* Notification Modal */}
+      {notification && (
+        <NotificationModal
+          message={notification.message}
+          type={notification.type}
+          onClose={() => setNotification(null)}
+        />
+      )}
+
+      {/* Confirm Delete Patient Modal */}
+      {showDeletePatientConfirm && editingPatient && (
+        <ConfirmModal
+          title="Delete Patient"
+          message={`Are you sure you want to delete ${editingPatient.name}? This will permanently remove their account and they will no longer be able to login.`}
+          confirmText="Delete Patient"
+          cancelText="Cancel"
+          type="danger"
+          onConfirm={confirmDeletePatient}
+          onCancel={() => setShowDeletePatientConfirm(false)}
+        />
+      )}
+
+      {/* Confirm Delete Program Modal */}
+      {showDeleteProgramConfirm && programToDelete && (
+        <ConfirmModal
+          title="Delete Program"
+          message={`Are you sure you want to delete "${programToDelete.name}"? This action cannot be undone.`}
+          confirmText="Delete Program"
+          cancelText="Cancel"
+          type="danger"
+          onConfirm={confirmDeleteProgram}
+          onCancel={() => {
+            setShowDeleteProgramConfirm(false);
+            setProgramToDelete(null);
+          }}
+        />
+      )}
+
+      {/* Header & Navigation */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="px-4">
+          <div className="flex items-center justify-between py-4">
+            <div className="flex items-center gap-6">
+              <img
+                src="/assets/moveify-logo.png"
+                alt="Moveify Logo"
+                className="h-12 w-auto"
+              />
+
+              {/* Navigation Tabs - Only show in Clinician mode */}
+              {userRole === 'clinician' && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage('exercises')}
+                    className={`px-6 py-2 rounded-lg font-medium transition-colors ${currentPage === 'exercises'
+                      ? 'bg-moveify-teal text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                  >
+                    Program Builder
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCurrentPage('patients');
+                      setViewingPatient(null);
+                    }}
+                    className={`px-6 py-2 rounded-lg font-medium transition-colors ${currentPage === 'patients'
+                      ? 'bg-moveify-teal text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                  >
+                    Patients
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-600">
+                {userRole === 'clinician' && '👨‍⚕️ Clinician'}
+                {userRole === 'patient' && `👤 ${loggedInPatient?.name}`}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <LogOut size={20} />
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area - Split layout for clinician */}
+      {userRole === 'patient' && loggedInPatient ? (
+        <div className="flex-1 px-4 py-8">
+          <PatientPortal
+            patient={loggedInPatient}
+            onToggleComplete={handleToggleExerciseComplete}
+          />
+        </div>
+      ) : currentPage === 'exercises' ? (
+        // Program Builder page - show split layout with Program Tab
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left Side - Exercise Library */}
+          <div className="flex-1 overflow-y-auto px-4 py-8">
+            <ExerciseLibrary onAddToProgram={handleAddToProgram} />
+          </div>
+
+          {/* Right Side - Program Tab (only visible on Program Builder page) */}
+          <div className="w-96 border-l border-gray-200 bg-white overflow-y-auto">
+            <ProgramBuilder
+              programExercises={programExercises}
+              programName={programName}
+              selectedPatient={selectedPatient}
+              isEditing={editingProgramIndex !== null}
+              onProgramNameChange={setProgramName}
+              onRemoveExercise={handleRemoveFromProgram}
+              onUpdateExercise={handleUpdateExercise}
+              onAssignToPatient={handleAssignToPatient}
+              onCancelPatientAssignment={handleCancelProgramAssignment}
+            />
+          </div>
+        </div>
+      ) : (
+        // Patients page - full width, no Program Tab
+        <div className="flex-1 overflow-y-auto px-4 py-8">
+          {viewingPatient ? (
+            <PatientProfile
+              patient={viewingPatient}
+              onBack={() => setViewingPatient(null)}
+              onEdit={() => {
+                setEditingPatient(viewingPatient);
+                setShowEditPatientModal(true);
+              }}
+              onViewProgram={(programIndex) => {
+                setViewingProgramIndex(programIndex);
+                setShowProgramDetailsModal(true);
+              }}
+              onEditProgram={handleEditProgram}
+              onDeleteProgram={handleDeleteProgram}
+              onAddProgram={handleAddProgram}
+            />
+          ) : (
+            <PatientsPage
+              patients={patients}
+              onViewPatient={setViewingPatient}
+              onAddPatient={() => setShowAddPatientModal(true)}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default App;

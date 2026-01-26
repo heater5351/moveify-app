@@ -1,0 +1,583 @@
+// Program routes
+const express = require('express');
+const db = require('../database/db');
+const periodizationService = require('../services/periodization-service');
+
+const router = express.Router();
+
+// Get program for a patient
+router.get('/patient/:patientId', async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    // Get the program
+    const program = await db.getOne(
+      'SELECT * FROM programs WHERE patient_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [patientId]
+    );
+
+    if (!program) {
+      return res.json({ program: null });
+    }
+
+    // Get the exercises for this program
+    const exercises = await db.getAll(
+      'SELECT * FROM program_exercises WHERE program_id = $1 ORDER BY exercise_order ASC',
+      [program.id]
+    );
+
+    // Format frequency back to array
+    const frequency = program.frequency ? JSON.parse(program.frequency) : [];
+
+    res.json({
+      program: {
+        id: program.id,
+        patientId: program.patient_id,
+        startDate: program.start_date,
+        frequency: frequency,
+        duration: program.duration,
+        customEndDate: program.custom_end_date,
+        trackActualPerformance: program.track_actual_performance === true,
+        trackRpe: program.track_rpe === true,
+        trackPainLevel: program.track_pain === true,
+        exercises: exercises.map(ex => ({
+          id: ex.id,
+          name: ex.exercise_name,
+          category: ex.exercise_category,
+          sets: ex.sets,
+          reps: ex.reps,
+          holdTime: ex.hold_time,
+          instructions: ex.instructions,
+          image: ex.image_url,
+          completed: ex.completed === 1
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Get program error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Create new program for a patient
+router.post('/patient/:patientId', async (req, res) => {
+  const client = await db.getClient();
+
+  try {
+    const { patientId } = req.params;
+    const { exercises, config, name, blockType } = req.body;
+
+    if (!name || name.trim() === '') {
+      client.release();
+      return res.status(400).json({ error: 'Program name is required' });
+    }
+
+    if (!exercises || exercises.length === 0) {
+      client.release();
+      return res.status(400).json({ error: 'Exercises are required' });
+    }
+
+    await client.query('BEGIN');
+
+    // Create new program
+    const programResult = await client.query(`
+      INSERT INTO programs (patient_id, name, start_date, frequency, duration, custom_end_date, track_actual_performance, track_rpe, track_pain)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING id
+    `, [
+      patientId,
+      name,
+      config?.startDate || 'today',
+      JSON.stringify(config?.frequency || []),
+      config?.duration || '4weeks',
+      config?.customEndDate || null,
+      config?.trackActualPerformance !== undefined ? config.trackActualPerformance : true,
+      config?.trackRpe || false,
+      config?.trackPainLevel || false
+    ]);
+
+    const programId = programResult.rows[0].id;
+
+    // Insert exercises with baseline values
+    for (let index = 0; index < exercises.length; index++) {
+      const exercise = exercises[index];
+      const baselineSets = exercise.sets;
+      const baselineReps = exercise.reps;
+
+      // Calculate initial sets/reps based on block type
+      const cycleBlockType = blockType || 'standard';
+      const calculated = periodizationService.calculateSetsReps(
+        cycleBlockType,
+        1, // Week 1
+        baselineSets,
+        baselineReps
+      );
+
+      await client.query(`
+        INSERT INTO program_exercises (
+          program_id, exercise_name, exercise_category, sets, reps,
+          hold_time, instructions, image_url, exercise_order,
+          baseline_sets, baseline_reps, auto_adjust_enabled
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `, [
+        programId,
+        exercise.name,
+        exercise.category || '',
+        calculated.sets,
+        calculated.reps,
+        exercise.holdTime || '',
+        exercise.instructions || '',
+        exercise.image || '',
+        index,
+        baselineSets,
+        baselineReps,
+        true
+      ]);
+    }
+
+    await client.query('COMMIT');
+    client.release();
+
+    // Initialize periodization cycle
+    try {
+      const cycleBlockType = blockType || 'standard';
+      await periodizationService.initializeCycle(programId, cycleBlockType);
+    } catch (error) {
+      console.error('Failed to initialize cycle:', error);
+    }
+
+    res.json({
+      message: 'Program assigned successfully',
+      programId: programId,
+      blockType: blockType || 'standard'
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    client.release();
+    console.error('Create program error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update existing program
+router.put('/:programId', async (req, res) => {
+  const client = await db.getClient();
+
+  try {
+    const { programId } = req.params;
+    const { exercises, config, name } = req.body;
+
+    if (!name || name.trim() === '') {
+      client.release();
+      return res.status(400).json({ error: 'Program name is required' });
+    }
+
+    if (!exercises || exercises.length === 0) {
+      client.release();
+      return res.status(400).json({ error: 'Exercises are required' });
+    }
+
+    await client.query('BEGIN');
+
+    // Update program metadata
+    await client.query(`
+      UPDATE programs
+      SET name = $1, start_date = $2, frequency = $3, duration = $4, custom_end_date = $5,
+          track_actual_performance = $6, track_rpe = $7, track_pain = $8, updated_at = NOW()
+      WHERE id = $9
+    `, [
+      name,
+      config?.startDate || 'today',
+      JSON.stringify(config?.frequency || []),
+      config?.duration || '4weeks',
+      config?.customEndDate || null,
+      config?.trackActualPerformance !== undefined ? config.trackActualPerformance : true,
+      config?.trackRpe || false,
+      config?.trackPainLevel || false,
+      programId
+    ]);
+
+    // Delete existing exercises
+    await client.query('DELETE FROM program_exercises WHERE program_id = $1', [programId]);
+
+    // Insert new exercises
+    for (let index = 0; index < exercises.length; index++) {
+      const exercise = exercises[index];
+      await client.query(`
+        INSERT INTO program_exercises (
+          program_id, exercise_name, exercise_category, sets, reps,
+          hold_time, instructions, image_url, exercise_order
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `, [
+        programId,
+        exercise.name,
+        exercise.category || '',
+        exercise.sets,
+        exercise.reps,
+        exercise.holdTime || '',
+        exercise.instructions || '',
+        exercise.image || '',
+        index
+      ]);
+    }
+
+    await client.query('COMMIT');
+    client.release();
+
+    res.json({
+      message: 'Program updated successfully',
+      programId: programId
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    client.release();
+    console.error('Update program error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update exercise completion status (daily tracking)
+router.patch('/exercise/:exerciseId/complete', async (req, res) => {
+  try {
+    const { exerciseId } = req.params;
+    const {
+      completed,
+      patientId,
+      setsPerformed,
+      repsPerformed,
+      rpeRating,
+      painLevel,
+      notes
+    } = req.body;
+
+    if (!patientId) {
+      return res.status(400).json({ error: 'Patient ID is required' });
+    }
+
+    // Validation
+    if (rpeRating !== undefined && (rpeRating < 1 || rpeRating > 10)) {
+      return res.status(400).json({ error: 'RPE rating must be between 1 and 10' });
+    }
+    if (painLevel !== undefined && (painLevel < 0 || painLevel > 10)) {
+      return res.status(400).json({ error: 'Pain level must be between 0 and 10' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    if (completed) {
+      // PostgreSQL upsert using ON CONFLICT
+      await db.query(`
+        INSERT INTO exercise_completions (
+          exercise_id, patient_id, completion_date,
+          sets_performed, reps_performed, rpe_rating, pain_level, notes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (exercise_id, patient_id, completion_date)
+        DO UPDATE SET
+          sets_performed = EXCLUDED.sets_performed,
+          reps_performed = EXCLUDED.reps_performed,
+          rpe_rating = EXCLUDED.rpe_rating,
+          pain_level = EXCLUDED.pain_level,
+          notes = EXCLUDED.notes
+      `, [
+        exerciseId,
+        patientId,
+        today,
+        setsPerformed || null,
+        repsPerformed || null,
+        rpeRating || null,
+        painLevel || null,
+        notes || null
+      ]);
+    } else {
+      // Remove today's completion
+      await db.query(
+        'DELETE FROM exercise_completions WHERE exercise_id = $1 AND patient_id = $2 AND completion_date = $3',
+        [exerciseId, patientId, today]
+      );
+    }
+
+    res.json({ message: 'Exercise updated successfully' });
+  } catch (error) {
+    console.error('Update exercise error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get today's completion details for an exercise
+router.get('/exercise/:exerciseId/completion/:patientId/today', async (req, res) => {
+  try {
+    const { exerciseId, patientId } = req.params;
+    const today = new Date().toISOString().split('T')[0];
+
+    const completion = await db.getOne(`
+      SELECT sets_performed, reps_performed, rpe_rating, pain_level, notes
+      FROM exercise_completions
+      WHERE exercise_id = $1 AND patient_id = $2 AND completion_date = $3
+    `, [exerciseId, patientId, today]);
+
+    res.json({ completion: completion || null });
+  } catch (error) {
+    console.error('Get completion details error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get completion analytics for a patient
+router.get('/analytics/patient/:patientId', async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { days = 30 } = req.query;
+
+    // Get all programs for this patient
+    const programs = await db.getAll(
+      'SELECT id, name FROM programs WHERE patient_id = $1 ORDER BY created_at DESC',
+      [patientId]
+    );
+
+    if (programs.length === 0) {
+      return res.json({ programs: [], analytics: {} });
+    }
+
+    const analyticsData = await Promise.all(programs.map(async (program) => {
+      // Get program with creation date
+      const programDetails = await db.getOne(
+        'SELECT id, name, created_at FROM programs WHERE id = $1',
+        [program.id]
+      );
+
+      // Get all exercises for this program
+      const exercises = await db.getAll(
+        'SELECT id FROM program_exercises WHERE program_id = $1',
+        [program.id]
+      );
+
+      const exerciseIds = exercises.map(e => e.id);
+
+      if (exerciseIds.length === 0) {
+        return {
+          programId: program.id,
+          programName: program.name,
+          totalExercises: 0,
+          completions: [],
+          streak: 0,
+          completionRate: 0
+        };
+      }
+
+      // Calculate start date
+      const daysAgoDate = new Date();
+      daysAgoDate.setDate(daysAgoDate.getDate() - days);
+
+      const programCreatedDate = new Date(programDetails.created_at);
+      const startDate = programCreatedDate > daysAgoDate ? programCreatedDate : daysAgoDate;
+      const startDateStr = startDate.toISOString().split('T')[0];
+
+      // Build parameterized query for exercise IDs
+      const placeholders = exerciseIds.map((_, i) => `$${i + 1}`).join(',');
+      const completions = await db.getAll(`
+        SELECT completion_date, COUNT(*) as count
+        FROM exercise_completions
+        WHERE exercise_id IN (${placeholders})
+          AND patient_id = $${exerciseIds.length + 1}
+          AND completion_date >= $${exerciseIds.length + 2}
+        GROUP BY completion_date
+        ORDER BY completion_date ASC
+      `, [...exerciseIds, patientId, startDateStr]);
+
+      // Calculate streak
+      let streak = 0;
+      let checkDate = new Date();
+
+      while (true) {
+        const dateStr = checkDate.toISOString().split('T')[0];
+        const hasCompletion = await db.getOne(`
+          SELECT COUNT(*) as count
+          FROM exercise_completions
+          WHERE exercise_id IN (${placeholders})
+            AND patient_id = $${exerciseIds.length + 1}
+            AND completion_date = $${exerciseIds.length + 2}
+        `, [...exerciseIds, patientId, dateStr]);
+
+        if (parseInt(hasCompletion.count) > 0) {
+          streak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          break;
+        }
+
+        if (streak > 365) break;
+      }
+
+      // Calculate completion rate
+      const now = new Date();
+      const actualDays = Math.ceil((now - programCreatedDate) / (1000 * 60 * 60 * 24));
+      const totalPossibleCompletions = exerciseIds.length * actualDays;
+      const totalActualCompletions = completions.reduce((sum, c) => sum + parseInt(c.count), 0);
+      const completionRate = totalPossibleCompletions > 0
+        ? Math.round((totalActualCompletions / totalPossibleCompletions) * 100)
+        : 0;
+
+      return {
+        programId: program.id,
+        programName: program.name,
+        totalExercises: exerciseIds.length,
+        completions: completions.map(c => ({
+          date: c.completion_date,
+          count: parseInt(c.count)
+        })),
+        streak: streak,
+        completionRate: completionRate
+      };
+    }));
+
+    res.json({ programs: analyticsData });
+  } catch (error) {
+    console.error('Get analytics error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete program
+router.delete('/:programId', async (req, res) => {
+  try {
+    const { programId } = req.params;
+
+    await db.query('DELETE FROM programs WHERE id = $1', [programId]);
+
+    res.json({ message: 'Program deleted successfully' });
+  } catch (error) {
+    console.error('Delete program error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ===== PERIODIZATION ENDPOINTS =====
+
+// Trigger weekly progression for a program
+router.post('/:programId/progress', async (req, res) => {
+  try {
+    const { programId } = req.params;
+
+    const result = await periodizationService.progressProgram(parseInt(programId));
+
+    res.json(result);
+  } catch (error) {
+    console.error('Progress program error:', error);
+    res.status(500).json({ error: error.message || 'Failed to progress program' });
+  }
+});
+
+// Get current periodization cycle for a program
+router.get('/:programId/cycle', async (req, res) => {
+  try {
+    const { programId } = req.params;
+
+    const cycle = await periodizationService.getCurrentCycle(parseInt(programId));
+
+    if (!cycle) {
+      return res.status(404).json({ error: 'No active cycle found' });
+    }
+
+    res.json({
+      id: cycle.id,
+      programId: cycle.program_id,
+      blockType: cycle.block_type,
+      blockNumber: cycle.block_number,
+      blockStartDate: cycle.block_start_date,
+      currentWeek: cycle.current_week,
+      totalWeeks: cycle.total_weeks,
+      intensityMultiplier: cycle.intensity_multiplier,
+      createdAt: cycle.created_at,
+      updatedAt: cycle.updated_at
+    });
+  } catch (error) {
+    console.error('Get cycle error:', error);
+    res.status(500).json({ error: 'Failed to get cycle' });
+  }
+});
+
+// Get progression history for a program
+router.get('/:programId/progression-history', async (req, res) => {
+  try {
+    const { programId } = req.params;
+    const { limit } = req.query;
+
+    const history = await periodizationService.getProgressionHistory(
+      parseInt(programId),
+      limit ? parseInt(limit) : 50
+    );
+
+    res.json(history);
+  } catch (error) {
+    console.error('Get progression history error:', error);
+    res.status(500).json({ error: 'Failed to get progression history' });
+  }
+});
+
+// Get weekly metrics for an exercise
+router.get('/exercise/:exerciseId/metrics', async (req, res) => {
+  try {
+    const { exerciseId } = req.params;
+    const { patientId } = req.query;
+
+    if (!patientId) {
+      return res.status(400).json({ error: 'Patient ID required' });
+    }
+
+    const metrics = await periodizationService.getWeeklyMetrics(
+      parseInt(exerciseId),
+      parseInt(patientId)
+    );
+
+    res.json(metrics);
+  } catch (error) {
+    console.error('Get metrics error:', error);
+    res.status(500).json({ error: 'Failed to get metrics' });
+  }
+});
+
+// Override auto-adjustment for an exercise
+router.patch('/exercise/:exerciseId/override', async (req, res) => {
+  try {
+    const { exerciseId } = req.params;
+    const { sets, reps, autoAdjustEnabled } = req.body;
+
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (sets !== undefined) {
+      updates.push(`sets = $${paramIndex++}`);
+      values.push(sets);
+    }
+
+    if (reps !== undefined) {
+      updates.push(`reps = $${paramIndex++}`);
+      values.push(reps);
+    }
+
+    if (autoAdjustEnabled !== undefined) {
+      updates.push(`auto_adjust_enabled = $${paramIndex++}`);
+      values.push(autoAdjustEnabled);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    values.push(parseInt(exerciseId));
+
+    await db.query(`
+      UPDATE program_exercises
+      SET ${updates.join(', ')}
+      WHERE id = $${paramIndex}
+    `, values);
+
+    res.json({ message: 'Exercise updated successfully' });
+  } catch (error) {
+    console.error('Override exercise error:', error);
+    res.status(500).json({ error: 'Failed to update exercise' });
+  }
+});
+
+module.exports = router;
