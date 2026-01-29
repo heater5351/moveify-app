@@ -271,23 +271,11 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                           <Check size={16} className="sm:w-5 sm:h-5" />
                         </div>
                       )}
-                      {/* Mobile: Show sets/weight overlay on video */}
-                      <div className="sm:hidden absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-                        <span className="text-lg font-bold text-moveify-teal">{exercise.sets}</span>
-                        <span className="text-xs text-gray-600 ml-1">sets</span>
-                        {(exercise.prescribedWeight || 0) > 0 && (
-                          <>
-                            <span className="text-xs text-gray-400 mx-1">•</span>
-                            <span className="text-sm font-bold text-moveify-teal">{exercise.prescribedWeight}</span>
-                            <span className="text-xs text-gray-600 ml-0.5">kg</span>
-                          </>
-                        )}
-                      </div>
                     </div>
 
                     {/* Exercise Details */}
                     <div className="flex-1 p-4 sm:p-5 lg:p-6">
-                      <div className="flex items-start justify-between mb-2 sm:mb-3">
+                      <div className="flex items-start justify-between mb-3 sm:mb-4">
                         <div className="flex-1">
                           <div className="flex flex-wrap items-center gap-2 mb-2">
                             <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{exercise.name}</h3>
@@ -306,28 +294,21 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                             {exercise.category}
                           </span>
                         </div>
-                        {/* Desktop: Sets/weight display */}
-                        <div className="hidden sm:block text-right bg-gradient-to-br from-primary-50 to-primary-100 px-4 py-2 rounded-xl border border-blue-200">
-                          <p className="text-2xl lg:text-3xl font-bold text-moveify-teal">{exercise.sets}</p>
-                          <p className="text-xs lg:text-sm text-blue-700 font-medium">sets</p>
-                          {(exercise.prescribedWeight || 0) > 0 && (
-                            <>
-                              <p className="text-lg lg:text-xl font-bold text-moveify-teal mt-1">{exercise.prescribedWeight}</p>
-                              <p className="text-xs lg:text-sm text-blue-700 font-medium">kg</p>
-                            </>
-                          )}
-                        </div>
+                      </div>
+
+                      {/* Prescribed Sets x Reps @ Weight */}
+                      <div className="mb-3 sm:mb-4 bg-gradient-to-br from-primary-50 to-primary-100 px-4 py-3 rounded-xl border border-blue-200">
+                        <p className="text-base sm:text-lg font-bold text-moveify-teal">
+                          {exercise.sets} × {exercise.reps}
+                          {(exercise.prescribedWeight || 0) > 0 && ` @ ${exercise.prescribedWeight} kg`}
+                        </p>
+                        <p className="text-xs sm:text-sm text-blue-700 font-medium mt-0.5">
+                          {exercise.sets} set{exercise.sets !== 1 ? 's' : ''} of {exercise.reps} rep{exercise.reps !== 1 ? 's' : ''}
+                          {(exercise.prescribedWeight || 0) > 0 && ` with ${exercise.prescribedWeight} kg`}
+                        </p>
                       </div>
 
                       <div className="mb-3 sm:mb-4 space-y-1.5 sm:space-y-2">
-                        <p className="text-sm sm:text-base text-gray-700 font-semibold">
-                          <span className="text-moveify-teal">{exercise.reps}</span> reps per set
-                          {(exercise.prescribedWeight || 0) > 0 && (
-                            <span className="ml-2">
-                              @ <span className="text-moveify-teal">{exercise.prescribedWeight}</span> kg
-                            </span>
-                          )}
-                        </p>
                         <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 sm:line-clamp-none">
                           {exercise.description}
                         </p>
