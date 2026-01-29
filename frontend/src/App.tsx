@@ -128,9 +128,13 @@ function App() {
     setProgramExercises(programExercises.filter((_, i) => i !== index));
   };
 
-  const handleUpdateExercise = (index: number, field: 'sets' | 'reps', value: number) => {
+  const handleUpdateExercise = (index: number, field: 'sets' | 'reps' | 'weight', value: number) => {
     const updated = [...programExercises];
-    updated[index][field] = value;
+    if (field === 'weight') {
+      updated[index].prescribedWeight = value;
+    } else {
+      updated[index][field] = value;
+    }
     setProgramExercises(updated);
   };
 

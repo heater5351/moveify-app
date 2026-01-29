@@ -66,6 +66,7 @@ async function initDatabase() {
         exercise_category TEXT,
         sets INTEGER NOT NULL,
         reps INTEGER NOT NULL,
+        prescribed_weight REAL DEFAULT 0,
         hold_time TEXT,
         instructions TEXT,
         image_url TEXT,
@@ -88,6 +89,7 @@ async function initDatabase() {
         completion_date DATE NOT NULL,
         sets_performed INTEGER,
         reps_performed INTEGER,
+        weight_performed REAL,
         rpe_rating INTEGER CHECK(rpe_rating BETWEEN 1 AND 10),
         pain_level INTEGER CHECK(pain_level BETWEEN 0 AND 10),
         notes TEXT,
@@ -161,6 +163,18 @@ async function initDatabase() {
         adjusted_at TIMESTAMP DEFAULT NOW()
       )
     `);
+
+    // Add weight columns to existing tables (migration for deployed DB)
+    console.log('🔄 Running database migrations...');
+    await db.query(`
+      ALTER TABLE program_exercises
+      ADD COLUMN IF NOT EXISTS prescribed_weight REAL DEFAULT 0
+    `);
+    await db.query(`
+      ALTER TABLE exercise_completions
+      ADD COLUMN IF NOT EXISTS weight_performed REAL
+    `);
+    console.log('✅ Database migrations complete');
 
     console.log('✅ Database tables initialized');
   } catch (error) {

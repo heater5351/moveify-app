@@ -25,6 +25,9 @@ export const ExerciseCompletionModal = ({
   const [repsPerformed, setRepsPerformed] = useState<number>(
     existingCompletion?.repsPerformed || exercise.reps
   );
+  const [weightPerformed, setWeightPerformed] = useState<number>(
+    existingCompletion?.weightPerformed ?? exercise.prescribedWeight ?? 0
+  );
   const [rpeRating, setRpeRating] = useState<number | undefined>(
     existingCompletion?.rpeRating
   );
@@ -38,6 +41,7 @@ export const ExerciseCompletionModal = ({
     onComplete({
       setsPerformed: exercise.sets,
       repsPerformed: exercise.reps,
+      weightPerformed: exercise.prescribedWeight || 0,
       rpeRating,
       painLevel,
       notes: notes || undefined
@@ -48,6 +52,7 @@ export const ExerciseCompletionModal = ({
     onComplete({
       setsPerformed,
       repsPerformed,
+      weightPerformed,
       rpeRating,
       painLevel,
       notes: notes || undefined
@@ -70,7 +75,10 @@ export const ExerciseCompletionModal = ({
           </div>
           <p className="text-base font-semibold text-gray-700">{exercise.name}</p>
           <p className="text-sm text-gray-600 mt-2 bg-white px-3 py-2 rounded-lg inline-block">
-            Prescribed: <span className="font-bold text-moveify-teal">{exercise.sets} sets × {exercise.reps} reps</span>
+            Prescribed: <span className="font-bold text-moveify-teal">
+              {exercise.sets} sets × {exercise.reps} reps
+              {(exercise.prescribedWeight || 0) > 0 && ` @ ${exercise.prescribedWeight} kg`}
+            </span>
           </p>
         </div>
 
@@ -122,6 +130,29 @@ export const ExerciseCompletionModal = ({
                 onChange={(e) => setRepsPerformed(parseInt(e.target.value) || 0)}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-moveify-teal focus:border-moveify-teal shadow-sm transition-all font-medium text-lg"
               />
+            </div>
+
+            {/* Weight Performed */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Weight Used (kg)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={weightPerformed}
+                onChange={(e) => setWeightPerformed(parseFloat(e.target.value) || 0)}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-moveify-teal focus:border-moveify-teal shadow-sm transition-all font-medium text-lg"
+              />
+              <p className="text-xs text-gray-500 mt-1">Enter 0 for bodyweight exercises</p>
+              {(exercise.prescribedWeight || 0) > 0 && weightPerformed !== (exercise.prescribedWeight || 0) && (
+                <p className={`text-xs mt-1 font-medium ${weightPerformed > (exercise.prescribedWeight || 0) ? 'text-green-600' : 'text-orange-600'}`}>
+                  {weightPerformed > (exercise.prescribedWeight || 0)
+                    ? `+${(weightPerformed - (exercise.prescribedWeight || 0)).toFixed(1)} kg above prescribed`
+                    : `${((exercise.prescribedWeight || 0) - weightPerformed).toFixed(1)} kg below prescribed`}
+                </p>
+              )}
             </div>
 
             {/* RPE Rating (if enabled) */}

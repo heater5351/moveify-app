@@ -46,6 +46,7 @@ router.get('/patient/:patientId', async (req, res) => {
           category: ex.exercise_category,
           sets: ex.sets,
           reps: ex.reps,
+          prescribedWeight: ex.prescribed_weight || 0,
           holdTime: ex.hold_time,
           instructions: ex.instructions,
           image: ex.image_url,
@@ -115,16 +116,17 @@ router.post('/patient/:patientId', async (req, res) => {
 
       await client.query(`
         INSERT INTO program_exercises (
-          program_id, exercise_name, exercise_category, sets, reps,
+          program_id, exercise_name, exercise_category, sets, reps, prescribed_weight,
           hold_time, instructions, image_url, exercise_order,
           baseline_sets, baseline_reps, auto_adjust_enabled
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       `, [
         programId,
         exercise.name,
         exercise.category || '',
         calculated.sets,
         calculated.reps,
+        exercise.prescribedWeight || 0,
         exercise.holdTime || '',
         exercise.instructions || '',
         exercise.image || '',
@@ -205,15 +207,16 @@ router.put('/:programId', async (req, res) => {
       const exercise = exercises[index];
       await client.query(`
         INSERT INTO program_exercises (
-          program_id, exercise_name, exercise_category, sets, reps,
+          program_id, exercise_name, exercise_category, sets, reps, prescribed_weight,
           hold_time, instructions, image_url, exercise_order
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `, [
         programId,
         exercise.name,
         exercise.category || '',
         exercise.sets,
         exercise.reps,
+        exercise.prescribedWeight || 0,
         exercise.holdTime || '',
         exercise.instructions || '',
         exercise.image || '',
@@ -245,6 +248,7 @@ router.patch('/exercise/:exerciseId/complete', async (req, res) => {
       patientId,
       setsPerformed,
       repsPerformed,
+      weightPerformed,
       rpeRating,
       painLevel,
       notes
@@ -269,12 +273,13 @@ router.patch('/exercise/:exerciseId/complete', async (req, res) => {
       await db.query(`
         INSERT INTO exercise_completions (
           exercise_id, patient_id, completion_date,
-          sets_performed, reps_performed, rpe_rating, pain_level, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          sets_performed, reps_performed, weight_performed, rpe_rating, pain_level, notes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT (exercise_id, patient_id, completion_date)
         DO UPDATE SET
           sets_performed = EXCLUDED.sets_performed,
           reps_performed = EXCLUDED.reps_performed,
+          weight_performed = EXCLUDED.weight_performed,
           rpe_rating = EXCLUDED.rpe_rating,
           pain_level = EXCLUDED.pain_level,
           notes = EXCLUDED.notes
@@ -284,6 +289,7 @@ router.patch('/exercise/:exerciseId/complete', async (req, res) => {
         today,
         setsPerformed || null,
         repsPerformed || null,
+        weightPerformed || null,
         rpeRating || null,
         painLevel || null,
         notes || null
@@ -310,7 +316,7 @@ router.get('/exercise/:exerciseId/completion/:patientId/today', async (req, res)
     const today = new Date().toISOString().split('T')[0];
 
     const completion = await db.getOne(`
-      SELECT sets_performed, reps_performed, rpe_rating, pain_level, notes
+      SELECT sets_performed, reps_performed, weight_performed, rpe_rating, pain_level, notes
       FROM exercise_completions
       WHERE exercise_id = $1 AND patient_id = $2 AND completion_date = $3
     `, [exerciseId, patientId, today]);

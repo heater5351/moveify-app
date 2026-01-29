@@ -12,6 +12,7 @@ export type Exercise = {
 export type CompletionData = {
   setsPerformed?: number;
   repsPerformed?: number;
+  weightPerformed?: number;
   rpeRating?: number;
   painLevel?: number;
   notes?: string;
@@ -20,6 +21,7 @@ export type CompletionData = {
 export type ProgramExercise = Exercise & {
   sets: number;
   reps: number;
+  prescribedWeight?: number;
   completed: boolean;
   holdTime?: string;
   instructions?: string;

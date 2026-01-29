@@ -8,7 +8,7 @@ interface ProgramBuilderProps {
   isEditing: boolean;
   onProgramNameChange: (name: string) => void;
   onRemoveExercise: (index: number) => void;
-  onUpdateExercise: (index: number, field: 'sets' | 'reps', value: number) => void;
+  onUpdateExercise: (index: number, field: 'sets' | 'reps' | 'weight', value: number) => void;
   onAssignToPatient: () => void;
   onCancelPatientAssignment: () => void;
 }
@@ -82,7 +82,7 @@ export const ProgramBuilder = ({
                   </button>
                 </div>
 
-                <div className="flex gap-4 mb-2">
+                <div className="flex gap-3 mb-2">
                   <div className="flex-1">
                     <label className="text-xs text-gray-600 block mb-1">Sets</label>
                     <input
@@ -101,6 +101,18 @@ export const ProgramBuilder = ({
                       value={exercise.reps}
                       onChange={(e) => onUpdateExercise(index, 'reps', parseInt(e.target.value) || 0)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs text-gray-600 block mb-1">Weight (kg)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={exercise.prescribedWeight || 0}
+                      onChange={(e) => onUpdateExercise(index, 'weight', parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+                      placeholder="0"
                     />
                   </div>
                 </div>
