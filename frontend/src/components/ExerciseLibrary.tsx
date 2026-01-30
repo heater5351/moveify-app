@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Play, Clock, Plus } from 'lucide-react';
+import { Search, Play, Plus } from 'lucide-react';
 import type { ProgramExercise, Exercise } from '../types/index.ts';
 import { exercises as defaultExercises } from '../data/exercises';
 import { AddExerciseModal } from './modals/AddExerciseModal';
@@ -166,9 +166,6 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                           ✓
                         </div>
                       )}
-                      <span className="absolute top-3 right-3 bg-white/90 text-purple-600 text-xs font-semibold px-3 py-1 rounded-full">
-                        {exercise.difficulty}
-                      </span>
                       <span className="absolute bottom-3 left-3 bg-purple-700/80 text-white text-xs font-medium px-2 py-1 rounded">
                         Custom
                       </span>
@@ -183,14 +180,9 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                         </span>
                       </div>
 
-                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                      <p className="text-sm text-gray-600 line-clamp-3">
                         {exercise.description}
                       </p>
-
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Clock size={16} />
-                        <span>{exercise.duration}</span>
-                      </div>
                     </div>
                   </div>
                 );
@@ -228,9 +220,6 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                         ✓
                       </div>
                     )}
-                    <span className="absolute top-3 right-3 bg-white/90 text-moveify-teal text-xs font-semibold px-3 py-1 rounded-full">
-                      {exercise.difficulty}
-                    </span>
                   </div>
 
                   {/* Exercise Info */}
@@ -242,14 +231,9 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                       </span>
                     </div>
 
-                    <p className="text-sm text-gray-600 mb-4">
+                    <p className="text-sm text-gray-600 line-clamp-3">
                       {exercise.description}
                     </p>
-
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Clock size={16} />
-                      <span>{exercise.duration}</span>
-                    </div>
                   </div>
                 </div>
               );
