@@ -333,5 +333,251 @@ export const exercises: Exercise[] = [
     duration: '3 sets x 12 reps',
     difficulty: 'Beginner',
     description: 'Lie on back, arms up toward ceiling, knees at 90 degrees. Lower opposite arm and leg, keeping lower back pressed to floor. Return to start. Breathe out as you extend. Great for stability.'
+  },
+
+  // Additional Upper Body
+  {
+    id: 41,
+    name: 'Face Pull',
+    category: 'Upper Body',
+    duration: '3 sets x 15 reps',
+    difficulty: 'Beginner',
+    description: 'Stand at cable machine with rope attachment at face height. Pull rope toward face, separating handles. Lead with elbows high. Squeeze shoulder blades together. Excellent for rear delts and posture.'
+  },
+  {
+    id: 42,
+    name: 'Lateral Raise',
+    category: 'Upper Body',
+    duration: '3 sets x 12 reps',
+    difficulty: 'Beginner',
+    description: 'Stand with dumbbells at sides. Raise arms out to sides until parallel to floor. Keep slight elbow bend. Lower with control. Targets side delts for shoulder width. Don\'t swing weights.'
+  },
+  {
+    id: 43,
+    name: 'Front Raise',
+    category: 'Upper Body',
+    duration: '3 sets x 12 reps',
+    difficulty: 'Beginner',
+    description: 'Stand with dumbbells in front of thighs. Raise weights forward to shoulder height. Keep arms straight, core braced. Lower slowly. Targets front delts. Can alternate arms or do together.'
+  },
+  {
+    id: 44,
+    name: 'Shrugs',
+    category: 'Upper Body',
+    duration: '3 sets x 15 reps',
+    difficulty: 'Beginner',
+    description: 'Hold heavy dumbbells or barbell at sides. Elevate shoulders straight up toward ears. Hold briefly at top. Lower slowly. Builds trapezius muscles. Keep arms straight throughout.'
+  },
+  {
+    id: 45,
+    name: 'Arnold Press',
+    category: 'Upper Body',
+    duration: '3 sets x 10 reps',
+    difficulty: 'Intermediate',
+    description: 'Start with dumbbells at shoulders, palms facing you. Press up while rotating palms forward. End with palms facing away at top. Reverse on descent. Combines pressing with rotation for complete shoulder work.'
+  },
+  {
+    id: 46,
+    name: 'Upright Row',
+    category: 'Upper Body',
+    duration: '3 sets x 12 reps',
+    difficulty: 'Intermediate',
+    description: 'Hold bar with narrow grip at thighs. Pull bar straight up along body to chest height. Lead with elbows high. Lower with control. Targets shoulders and upper traps. Keep bar close to body.'
+  },
+  {
+    id: 47,
+    name: 'Reverse Fly',
+    category: 'Upper Body',
+    duration: '3 sets x 12 reps',
+    difficulty: 'Beginner',
+    description: 'Bend forward at hips, dumbbells hanging. Raise arms out to sides, squeezing shoulder blades. Keep slight elbow bend. Lower slowly. Excellent for rear delts and upper back. Can do seated or standing.'
+  },
+  {
+    id: 48,
+    name: 'Skull Crusher',
+    category: 'Arms',
+    duration: '3 sets x 12 reps',
+    difficulty: 'Intermediate',
+    description: 'Lie on bench, hold bar or dumbbells overhead. Lower weight toward forehead by bending elbows. Keep upper arms still. Extend back to start. Excellent tricep isolation. Control the weight carefully.'
+  },
+  {
+    id: 49,
+    name: 'Concentration Curl',
+    category: 'Arms',
+    duration: '3 sets x 12 reps per arm',
+    difficulty: 'Beginner',
+    description: 'Sit on bench, elbow braced against inner thigh. Curl dumbbell up toward shoulder. Squeeze bicep at top. Lower slowly. Great for peak contraction and bicep isolation.'
+  },
+  {
+    id: 50,
+    name: 'Preacher Curl',
+    category: 'Arms',
+    duration: '3 sets x 12 reps',
+    difficulty: 'Intermediate',
+    description: 'Arms over preacher bench pad. Curl bar or dumbbells toward shoulders. Keep upper arms pressed to pad. Lower with control. Eliminates momentum, isolates biceps effectively.'
+  },
+  {
+    id: 51,
+    name: 'Zottman Curl',
+    category: 'Arms',
+    duration: '3 sets x 10 reps',
+    difficulty: 'Intermediate',
+    description: 'Curl dumbbells up with palms supinated. At top, rotate palms down. Lower with palms pronated. Rotate back at bottom. Works biceps, forearms, and brachialis in one movement.'
+  },
+  {
+    id: 52,
+    name: 'Diamond Push-Up',
+    category: 'Upper Body',
+    duration: '3 sets x 10 reps',
+    difficulty: 'Advanced',
+    description: 'Push-up position with hands close together forming diamond shape with thumbs and fingers. Lower chest to hands. Push up explosively. Intense tricep and inner chest activation.'
+  },
+
+  // Additional Lower Body
+  {
+    id: 53,
+    name: 'Hack Squat',
+    category: 'Lower Body',
+    duration: '3 sets x 12 reps',
+    difficulty: 'Intermediate',
+    description: 'Stand on hack squat machine, shoulders under pads. Lower until thighs parallel. Drive through heels to stand. Keeps torso more upright than back squat. Great quad builder.'
+  },
+  {
+    id: 54,
+    name: 'Good Morning',
+    category: 'Lower Body',
+    duration: '3 sets x 10 reps',
+    difficulty: 'Intermediate',
+    description: 'Bar on upper back. Hinge at hips, pushing them back. Lower torso until parallel to floor. Keep back flat, slight knee bend. Drive hips forward to stand. Excellent for hamstrings and lower back.'
+  },
+  {
+    id: 55,
+    name: 'Hip Thrust',
+    category: 'Lower Body',
+    duration: '3 sets x 12 reps',
+    difficulty: 'Intermediate',
+    description: 'Upper back on bench, barbell over hips. Drive hips up until body forms straight line. Squeeze glutes at top. Lower with control. Best exercise for glute development. Use pad for comfort.'
+  },
+  {
+    id: 56,
+    name: 'Nordic Hamstring Curl',
+    category: 'Lower Body',
+    duration: '3 sets x 6 reps',
+    difficulty: 'Advanced',
+    description: 'Kneel with ankles secured. Lower body forward with control, keeping hips extended. Use hands to catch yourself. Push back to start. Extremely challenging hamstring exercise. Start with assisted version.'
+  },
+  {
+    id: 57,
+    name: 'Sissy Squat',
+    category: 'Lower Body',
+    duration: '3 sets x 12 reps',
+    difficulty: 'Advanced',
+    description: 'Stand holding support. Lean back while bending knees forward. Keep hips extended, body in line. Lower as far as comfortable. Return to start. Advanced quad exercise. Very knee-intensive.'
+  },
+  {
+    id: 58,
+    name: 'Glute Ham Raise',
+    category: 'Lower Body',
+    duration: '3 sets x 8 reps',
+    difficulty: 'Advanced',
+    description: 'On GHR machine, feet secured. Lower torso toward floor with control. Use hamstrings and glutes to pull back up. One of most effective posterior chain exercises. Very challenging.'
+  },
+  {
+    id: 59,
+    name: 'Reverse Lunge',
+    category: 'Lower Body',
+    duration: '3 sets x 10 reps per leg',
+    difficulty: 'Beginner',
+    description: 'Step backward into lunge position. Back knee nearly touches floor. Drive through front heel to return. Easier on knees than forward lunges. Great for balance and leg strength.'
+  },
+  {
+    id: 60,
+    name: 'Step Down',
+    category: 'Lower Body',
+    duration: '3 sets x 10 reps per leg',
+    difficulty: 'Intermediate',
+    description: 'Stand on box or step. Lower opposite foot toward floor with control. Tap floor lightly. Push through standing leg to return. Great for eccentric quad strength. Keep knee aligned over toes.'
+  },
+  {
+    id: 61,
+    name: 'Seated Calf Raise',
+    category: 'Lower Body',
+    duration: '4 sets x 15 reps',
+    difficulty: 'Beginner',
+    description: 'Sit on machine, balls of feet on platform, weight on knees. Lower heels as far as possible. Raise up onto toes. Targets soleus muscle more than standing version. Use full range of motion.'
+  },
+  {
+    id: 62,
+    name: 'Landmine Squat',
+    category: 'Lower Body',
+    duration: '3 sets x 12 reps',
+    difficulty: 'Beginner',
+    description: 'Hold end of barbell at chest, other end anchored. Squat down keeping torso upright. Drive through heels to stand. Easier to maintain form than traditional squat. Great for beginners.'
+  },
+
+  // Additional Core
+  {
+    id: 63,
+    name: 'Bicycle Crunch',
+    category: 'Core',
+    duration: '3 sets x 20 reps',
+    difficulty: 'Beginner',
+    description: 'Lie on back, hands behind head. Bring opposite elbow to opposite knee while extending other leg. Alternate sides in cycling motion. Engages obliques and rectus abdominis effectively.'
+  },
+  {
+    id: 64,
+    name: 'Mountain Climber',
+    category: 'Core',
+    duration: '3 sets x 30 seconds',
+    difficulty: 'Intermediate',
+    description: 'Start in push-up position. Drive knees toward chest alternating quickly. Keep hips level, core tight. Combines core stability with cardio. Great for conditioning and abs.'
+  },
+  {
+    id: 65,
+    name: 'L-Sit',
+    category: 'Core',
+    duration: '3 sets x 20-30 seconds',
+    difficulty: 'Advanced',
+    description: 'Support on parallel bars or floor. Lift legs straight out in front parallel to floor. Hold position. Intense core and hip flexor exercise. Start with knees bent if needed.'
+  },
+  {
+    id: 66,
+    name: 'Dragon Flag',
+    category: 'Core',
+    duration: '3 sets x 6 reps',
+    difficulty: 'Advanced',
+    description: 'Lie on bench, grip behind head. Lift entire body up, keeping it straight. Lower slowly with control. Stop before lower back touches. Extremely advanced core exercise. Build up gradually.'
+  },
+  {
+    id: 67,
+    name: 'Side Bend',
+    category: 'Core',
+    duration: '3 sets x 15 reps per side',
+    difficulty: 'Beginner',
+    description: 'Stand holding dumbbell in one hand. Bend sideways toward weight side. Return to start. Targets obliques. Don\'t lean forward or back. Can do both sides or alternate.'
+  },
+  {
+    id: 68,
+    name: 'Turkish Get-Up',
+    category: 'Core',
+    duration: '3 sets x 5 reps per side',
+    difficulty: 'Advanced',
+    description: 'Lie on back holding weight overhead. Stand up while keeping arm vertical. Reverse to return. Complex full-body movement. Requires stability, mobility, and core strength. Learn proper sequence.'
+  },
+  {
+    id: 69,
+    name: 'Woodchopper',
+    category: 'Core',
+    duration: '3 sets x 12 reps per side',
+    difficulty: 'Intermediate',
+    description: 'Stand at cable machine. Pull handle diagonally across body from high to low or low to high. Rotate torso. Targets obliques and teaches rotational power. Keep arms relatively straight.'
+  },
+  {
+    id: 70,
+    name: 'Bird Dog Crunch',
+    category: 'Core',
+    duration: '3 sets x 12 reps per side',
+    difficulty: 'Intermediate',
+    description: 'Start in bird dog position with opposite arm and leg extended. Crunch elbow to knee under body. Extend back out. Combines stability with dynamic core work. Keep back flat throughout.'
   }
 ];

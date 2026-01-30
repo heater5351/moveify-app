@@ -17,6 +17,8 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
   const [customExercises, setCustomExercises] = useState<Exercise[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const exercisesPerPage = 20;
 
   // Fetch custom exercises for this clinician
   useEffect(() => {
@@ -118,6 +120,28 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
     exercise.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Separate custom and default filtered exercises
+  const filteredCustom = customExercises.filter(exercise =>
+    exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    exercise.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredDefault = defaultExercises.filter(exercise =>
+    exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    exercise.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Pagination for default exercises only
+  const totalPages = Math.ceil(filteredDefault.length / exercisesPerPage);
+  const startIndex = (currentPage - 1) * exercisesPerPage;
+  const endIndex = startIndex + exercisesPerPage;
+  const paginatedDefaultExercises = filteredDefault.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   return (
     <>
       {/* Selected Count */}
@@ -173,16 +197,11 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
       )}
 
       {/* Custom Exercises Section */}
-      {customExercises.length > 0 && (
+      {filteredCustom.length > 0 && (
         <div className="mb-8">
           <h3 className="text-lg font-semibold text-gray-700 mb-4">Your Custom Exercises</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
-            {customExercises
-              .filter(exercise =>
-                exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                exercise.category.toLowerCase().includes(searchTerm.toLowerCase())
-              )
-              .map(exercise => {
+            {filteredCustom.map(exercise => {
                 const isSelected = selectedExercises.includes(exercise.id);
                 return (
                   <div
@@ -238,13 +257,8 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
         {customExercises.length > 0 && (
           <h3 className="text-lg font-semibold text-gray-700 mb-4">Default Exercise Library</h3>
         )}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
-          {defaultExercises
-            .filter(exercise =>
-              exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              exercise.category.toLowerCase().includes(searchTerm.toLowerCase())
-            )
-            .map(exercise => {
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-6">
+          {paginatedDefaultExercises.map(exercise => {
               const isSelected = selectedExercises.includes(exercise.id);
               return (
                 <div
@@ -281,6 +295,43 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
               );
             })}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-6">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            >
+              Previous
+            </button>
+
+            <div className="flex gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`px-4 py-2 rounded-lg font-medium ${
+                    currentPage === page
+                      ? 'bg-moveify-teal text-white'
+                      : 'border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       {/* No Results */}
