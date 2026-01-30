@@ -296,17 +296,10 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                         </div>
                       </div>
 
-                      {/* Prescribed Sets x Reps @ Weight */}
-                      <div className="mb-3 sm:mb-4 bg-gradient-to-br from-primary-50 to-primary-100 px-4 py-3 rounded-xl border border-blue-200">
-                        <p className="text-base sm:text-lg font-bold text-moveify-teal">
-                          {exercise.sets} × {exercise.reps}
-                          {(exercise.prescribedWeight || 0) > 0 && ` @ ${exercise.prescribedWeight} kg`}
-                        </p>
-                        <p className="text-xs sm:text-sm text-blue-700 font-medium mt-0.5">
-                          {exercise.sets} set{exercise.sets !== 1 ? 's' : ''} of {exercise.reps} rep{exercise.reps !== 1 ? 's' : ''}
-                          {(exercise.prescribedWeight || 0) > 0 && ` with ${exercise.prescribedWeight} kg`}
-                        </p>
-                      </div>
+                      {/* Prescribed Sets | Reps | Weight */}
+                      <p className="text-sm sm:text-base text-gray-700 font-semibold mb-3 sm:mb-4">
+                        {exercise.sets} set{exercise.sets !== 1 ? 's' : ''} | {exercise.reps} rep{exercise.reps !== 1 ? 's' : ''}{(exercise.prescribedWeight || 0) > 0 && ` | ${exercise.prescribedWeight} kg`}
+                      </p>
 
                       <div className="mb-3 sm:mb-4 space-y-1.5 sm:space-y-2">
                         <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 sm:line-clamp-none">
