@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Play, Plus } from 'lucide-react';
+import { Search, Play, Plus, Trash2 } from 'lucide-react';
 import type { ProgramExercise, Exercise } from '../types/index.ts';
 import { exercises as defaultExercises } from '../data/exercises';
 import { AddExerciseModal } from './modals/AddExerciseModal';
@@ -16,6 +16,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
   const [showAddModal, setShowAddModal] = useState(false);
   const [customExercises, setCustomExercises] = useState<Exercise[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   // Fetch custom exercises for this clinician
   useEffect(() => {
@@ -35,6 +36,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
         // Map database fields to Exercise type
         const mapped = data.map((ex: { id: number; name: string; category: string; duration: string; difficulty: string; description: string; video_url?: string }) => ({
           id: ex.id + 10000, // Offset to avoid ID collision with default exercises
+          dbId: ex.id, // Store original DB ID for deletion
           name: ex.name,
           category: ex.category,
           duration: ex.duration,
@@ -49,6 +51,38 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
       console.error('Failed to fetch custom exercises:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDeleteExercise = async (exerciseId: number, dbId: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card selection when clicking delete
+
+    if (!confirm('Are you sure you want to delete this exercise? This cannot be undone.')) {
+      return;
+    }
+
+    setDeletingId(exerciseId);
+    try {
+      const response = await fetch(`${API_URL}/exercises/${dbId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clinicianId })
+      });
+
+      if (response.ok) {
+        // Remove from custom exercises list
+        setCustomExercises(customExercises.filter(ex => ex.id !== exerciseId));
+        // Remove from selected if it was selected
+        setSelectedExercises(selectedExercises.filter(id => id !== exerciseId));
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to delete exercise');
+      }
+    } catch (error) {
+      console.error('Delete exercise error:', error);
+      alert('Failed to delete exercise');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -166,6 +200,14 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                           ✓
                         </div>
                       )}
+                      <button
+                        onClick={(e) => handleDeleteExercise(exercise.id, (exercise as any).dbId, e)}
+                        disabled={deletingId === exercise.id}
+                        className="absolute top-3 right-3 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-colors disabled:opacity-50"
+                        title="Delete exercise"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                       <span className="absolute bottom-3 left-3 bg-purple-700/80 text-white text-xs font-medium px-2 py-1 rounded">
                         Custom
                       </span>
