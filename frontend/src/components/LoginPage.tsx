@@ -133,14 +133,6 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
             {isLoading ? 'Signing in...' : 'Sign In'}
           </button>
         </div>
-
-        <div className="mt-8 text-center bg-gradient-to-r from-gray-50 to-primary-50 rounded-xl p-5 border border-gray-200">
-          <p className="text-sm font-semibold text-gray-700 mb-3">Demo Accounts:</p>
-          <div className="space-y-2 text-sm text-gray-600">
-            <p><span className="font-medium text-gray-800">Clinician:</span> clinician@physitrack.com / clinic123</p>
-            <p><span className="font-medium text-gray-800">Patient:</span> sarah.j@email.com / patient123</p>
-          </div>
-        </div>
       </div>
     </div>
   );
