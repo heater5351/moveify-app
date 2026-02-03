@@ -579,5 +579,55 @@ export const exercises: Exercise[] = [
     duration: '3 sets x 12 reps per side',
     difficulty: 'Intermediate',
     description: 'Start in bird dog position with opposite arm and leg extended. Crunch elbow to knee under body. Extend back out. Combines stability with dynamic core work. Keep back flat throughout.'
+  },
+
+  // Additional Specialized Exercises
+  {
+    id: 71,
+    name: 'Seated Machine Row',
+    category: 'Upper Body',
+    duration: '3 sets x 12 reps',
+    difficulty: 'Beginner',
+    description: 'Sit at rowing machine, chest against pad. Grip handles with neutral or pronated grip. Pull handles toward torso, driving elbows back. Squeeze shoulder blades together at end. Control return. Machine provides stable support for focused back work.'
+  },
+  {
+    id: 72,
+    name: 'Lat Pullover',
+    category: 'Upper Body',
+    duration: '3 sets x 12 reps',
+    difficulty: 'Intermediate',
+    description: 'Lie on bench, dumbbell held overhead with both hands. Keep arms nearly straight with slight elbow bend. Lower weight behind head until stretch in lats. Pull back over chest. Excellent for lat width and serratus. Breathe deeply throughout.'
+  },
+  {
+    id: 73,
+    name: 'Rear Delt Fly',
+    category: 'Upper Body',
+    duration: '3 sets x 15 reps',
+    difficulty: 'Beginner',
+    description: 'Sit on bench bent forward or use pec deck machine facing backward. Start with arms forward, slight bend in elbows. Pull weights out to sides, squeezing shoulder blades. Focus on rear delts, not traps. Control the return. Essential for shoulder balance.'
+  },
+  {
+    id: 74,
+    name: 'Face Pull with 90° External Rotation',
+    category: 'Upper Body',
+    duration: '3 sets x 15 reps',
+    difficulty: 'Intermediate',
+    description: 'Stand at cable with rope at upper chest height. Pull rope toward face, then rotate hands up and back at 90 degrees. Elbows stay high throughout. Hold rotation briefly. Targets rear delts, rotator cuff, and upper back. Critical for shoulder health.'
+  },
+  {
+    id: 75,
+    name: 'Seated Incline Bicep Curl',
+    category: 'Arms',
+    duration: '3 sets x 12 reps',
+    difficulty: 'Intermediate',
+    description: 'Sit on incline bench at 45 degrees, dumbbells hanging. Arms start behind body creating stretch on biceps. Curl weights up keeping upper arms still. Squeeze at top. Lower with control. Emphasizes long head of biceps. Don\'t swing.'
+  },
+  {
+    id: 76,
+    name: 'Overhead Tricep Extension Pronated',
+    category: 'Arms',
+    duration: '3 sets x 12 reps',
+    difficulty: 'Intermediate',
+    description: 'Stand or sit holding dumbbell overhead with palms facing down (pronated grip). Keep elbows close to head pointing forward. Lower weight behind head by bending elbows. Extend back to start. Pronated grip increases difficulty and targets long head. Keep upper arms stationary.'
   }
 ];
