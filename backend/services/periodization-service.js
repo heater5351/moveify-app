@@ -49,26 +49,52 @@ async function getCurrentCycle(programId) {
 
 /**
  * Calculate appropriate sets/reps based on block type and week
+ * SCALES FROM CLINICIAN'S BASELINE PRESCRIPTION
  */
 function calculateSetsReps(blockType, currentWeek, baselineSets, baselineReps) {
+  // Ensure baseline values exist and are valid
+  const targetSets = baselineSets || 3;
+  const targetReps = baselineReps || 10;
+
   if (blockType === 'introductory') {
-    // Introductory block: 1x8 → 2x8 → 2x10 → 2x12
+    // Introductory: gradually build to baseline over 4 weeks
     switch (currentWeek) {
-      case 1: return { sets: 1, reps: 8 };
-      case 2: return { sets: 2, reps: 8 };
-      case 3: return { sets: 2, reps: 10 };
-      case 4: return { sets: 2, reps: 12 };
-      default: return { sets: 1, reps: 8 };
+      case 1: return {
+        sets: Math.max(1, Math.ceil(targetSets * 0.5)),
+        reps: Math.max(6, Math.ceil(targetReps * 0.67))
+      };
+      case 2: return {
+        sets: Math.max(1, Math.ceil(targetSets * 0.67)),
+        reps: Math.max(6, Math.ceil(targetReps * 0.67))
+      };
+      case 3: return {
+        sets: Math.max(1, Math.ceil(targetSets * 0.67)),
+        reps: Math.max(8, Math.ceil(targetReps * 0.83))
+      };
+      case 4: return { sets: targetSets, reps: targetReps };
+      default: return {
+        sets: Math.max(1, Math.ceil(targetSets * 0.5)),
+        reps: Math.max(6, Math.ceil(targetReps * 0.67))
+      };
     }
   } else {
-    // Standard block: Week 1 = 2x8, Week 2 = 3x8, Weeks 3-6 = 3x(8+week-2)
+    // Standard: deload, return to baseline, progressive overreach
     if (currentWeek === 1) {
-      return { sets: 2, reps: 8 };
+      // Deload week: 67% of baseline
+      return {
+        sets: Math.max(1, Math.ceil(targetSets * 0.67)),
+        reps: Math.max(6, Math.ceil(targetReps * 0.67))
+      };
     } else if (currentWeek === 2) {
-      return { sets: 3, reps: 8 };
+      // Return to baseline
+      return { sets: targetSets, reps: targetReps };
     } else {
-      // Weeks 3-6: 3x9, 3x10, 3x11, 3x12
-      return { sets: 3, reps: 8 + (currentWeek - 2) };
+      // Weeks 3-6: Progressive overreach (5% reps per week, cap at 120%)
+      const repIncrease = Math.ceil((currentWeek - 2) * (targetReps * 0.05));
+      return {
+        sets: targetSets,
+        reps: Math.min(Math.ceil(targetReps + repIncrease), Math.ceil(targetReps * 1.2))
+      };
     }
   }
 }
@@ -220,18 +246,32 @@ async function progressProgram(programId) {
         // Block complete - transition
         if (cycle.block_type === 'introductory') {
           // Transition to standard block
-          newSets = 2;
-          newReps = 8;
+          const calculated = calculateSetsReps('standard', 1, exercise.baseline_sets, exercise.baseline_reps);
+          newSets = calculated.sets;
+          newReps = calculated.reps;
           reason = 'Introductory block complete → Standard Block 1, Week 1 (deload)';
         } else {
           // New standard block with intensity increase
-          newSets = 2;
-          newReps = 8;
+          const calculated = calculateSetsReps('standard', 1, exercise.baseline_sets, exercise.baseline_reps);
+          newSets = calculated.sets;
+          newReps = calculated.reps;
           reason = `Block ${cycle.block_number} complete → Block ${cycle.block_number + 1}, Week 1 (deload +10% intensity)`;
         }
       }
+    } else if (metrics.avgExercisePain >= 5 || metrics.avgGeneralPain >= 7) {
+      // HIGH PAIN - Regress to previous week's volume
+      const previousWeek = Math.max(1, cycle.current_week - 1);
+      const calculated = calculateSetsReps(
+        cycle.block_type,
+        previousWeek,
+        exercise.baseline_sets,
+        exercise.baseline_reps
+      );
+      newSets = calculated.sets;
+      newReps = calculated.reps;
+      reason = `Regressing due to high pain (exercise: ${metrics.avgExercisePain}/10, general: ${metrics.avgGeneralPain}/10)`;
     } else {
-      // Gates fail - maintain or regress
+      // Gates fail - maintain current level
       const failedGates = Object.entries(gateCheck.checks)
         .filter(([_, passed]) => !passed)
         .map(([gate]) => gate)
@@ -345,6 +385,68 @@ async function progressProgram(programId) {
 }
 
 /**
+ * Adjust weight based on RPE feedback (RPE-responsive progression)
+ * Only applies to standard blocks (introductory uses fixed progression)
+ */
+async function adjustWeightBasedOnRPE(programId) {
+  const cycle = await getCurrentCycle(programId);
+  if (!cycle || cycle.block_type === 'introductory') {
+    return { success: true, adjustments: [], message: 'Weight adjustment skipped (introductory block)' };
+  }
+
+  const exercises = await db.getAll(`
+    SELECT * FROM program_exercises
+    WHERE program_id = $1
+      AND auto_adjust_enabled = true
+      AND prescribed_weight > 0
+  `, [programId]);
+
+  const program = await db.getOne('SELECT patient_id, track_rpe FROM programs WHERE id = $1', [programId]);
+  if (!program || !program.track_rpe) {
+    return { success: true, adjustments: [], message: 'RPE tracking not enabled' };
+  }
+
+  const adjustments = [];
+
+  for (const exercise of exercises) {
+    const metrics = await getWeeklyMetrics(exercise.id, program.patient_id);
+
+    let newWeight = exercise.prescribed_weight;
+    let reason = '';
+
+    if (metrics.avgRpe <= 6 && metrics.avgRpe > 0) {
+      // Too easy - increase weight 5-7.5%
+      const increasePercent = 0.05 + (Math.random() * 0.025); // 5-7.5%
+      newWeight = Math.round((exercise.prescribed_weight * (1 + increasePercent)) * 2) / 2; // Round to 0.5kg
+      reason = `RPE too low (${metrics.avgRpe}/10) - increasing weight ${Math.round(increasePercent * 100)}%`;
+    } else if (metrics.avgRpe >= 9) {
+      // Too hard - decrease weight 5%
+      newWeight = Math.round((exercise.prescribed_weight * 0.95) * 2) / 2;
+      reason = `RPE too high (${metrics.avgRpe}/10) - decreasing weight 5%`;
+    }
+
+    if (newWeight !== exercise.prescribed_weight && newWeight > 0) {
+      await db.query(`
+        UPDATE program_exercises
+        SET prescribed_weight = $1
+        WHERE id = $2
+      `, [newWeight, exercise.id]);
+
+      adjustments.push({
+        exerciseId: exercise.id,
+        exerciseName: exercise.exercise_name,
+        previousWeight: exercise.prescribed_weight,
+        newWeight,
+        reason,
+        avgRpe: metrics.avgRpe
+      });
+    }
+  }
+
+  return { success: true, adjustments, message: `Adjusted ${adjustments.length} exercise weights based on RPE` };
+}
+
+/**
  * Get progression history for a program
  */
 async function getProgressionHistory(programId, limit = 50) {
@@ -385,5 +487,6 @@ module.exports = {
   checkProgressionGates,
   getWeeklyMetrics,
   progressProgram,
-  getProgressionHistory
+  getProgressionHistory,
+  adjustWeightBasedOnRPE
 };

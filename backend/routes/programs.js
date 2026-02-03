@@ -475,6 +475,18 @@ router.post('/:programId/progress', async (req, res) => {
   }
 });
 
+// Adjust weights based on RPE (called after progressProgram)
+router.post('/:programId/adjust-weight', async (req, res) => {
+  try {
+    const { programId } = req.params;
+    const result = await periodizationService.adjustWeightBasedOnRPE(parseInt(programId));
+    res.json(result);
+  } catch (error) {
+    console.error('Adjust weight error:', error);
+    res.status(500).json({ error: error.message || 'Failed to adjust weight' });
+  }
+});
+
 // Get current periodization cycle for a program
 router.get('/:programId/cycle', async (req, res) => {
   try {
