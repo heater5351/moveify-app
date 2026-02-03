@@ -81,6 +81,24 @@ router.get('/history/:patientId', async (req, res) => {
   }
 });
 
+// Get check-ins for patient (for clinician dashboard)
+router.get('/patient/:patientId', async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { days } = req.query;
+
+    const checkIns = await checkInService.getCheckInHistory(
+      parseInt(patientId),
+      days ? parseInt(days) : 30
+    );
+
+    res.json({ checkIns });
+  } catch (error) {
+    console.error('Error fetching check-ins:', error);
+    res.status(500).json({ error: 'Failed to fetch check-ins' });
+  }
+});
+
 // Get average metrics for a date range
 router.get('/averages/:patientId', async (req, res) => {
   try {

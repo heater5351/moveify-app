@@ -556,6 +556,79 @@ router.get('/exercise/:exerciseId/metrics', async (req, res) => {
   }
 });
 
+// Get exercise completions for a patient (clinician dashboard)
+router.get('/exercise-completions/patient/:patientId', async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { days } = req.query;
+
+    const daysInt = days ? parseInt(days) : 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysInt);
+    const startDateStr = startDate.toISOString().split('T')[0];
+
+    const completions = await db.getAll(`
+      SELECT
+        ec.id,
+        pe.exercise_name as "exerciseName",
+        ec.completion_date as "completionDate",
+        ec.sets_performed as "setsPerformed",
+        ec.reps_performed as "repsPerformed",
+        pe.sets as "prescribedSets",
+        pe.reps as "prescribedReps",
+        ec.rpe_rating as "rpeRating",
+        ec.pain_level as "painLevel",
+        ec.notes
+      FROM exercise_completions ec
+      JOIN program_exercises pe ON ec.exercise_id = pe.id
+      WHERE ec.patient_id = $1
+        AND ec.completion_date >= $2
+      ORDER BY ec.completion_date DESC, ec.created_at DESC
+    `, [patientId, startDateStr]);
+
+    res.json({ completions });
+  } catch (error) {
+    console.error('Get exercise completions error:', error);
+    res.status(500).json({ error: 'Failed to get exercise completions' });
+  }
+});
+
+// Get progression logs for all programs of a patient (clinician dashboard)
+router.get('/progression-logs/patient/:patientId', async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { limit } = req.query;
+
+    const logs = await db.getAll(`
+      SELECT
+        epl.id,
+        pe.exercise_name as "exerciseName",
+        pe.exercise_category as "exerciseCategory",
+        epl.previous_sets as "previousSets",
+        epl.previous_reps as "previousReps",
+        epl.new_sets as "newSets",
+        epl.new_reps as "newReps",
+        epl.adjustment_reason as "adjustmentReason",
+        epl.avg_rpe as "avgRpe",
+        epl.avg_pain as "avgPain",
+        epl.completion_rate as "completionRate",
+        epl.week_in_cycle as "weekInCycle",
+        epl.adjusted_at as "adjustedAt"
+      FROM exercise_progression_log epl
+      JOIN program_exercises pe ON epl.exercise_id = pe.id
+      JOIN programs p ON epl.program_id = p.id
+      WHERE p.patient_id = $1
+      ORDER BY epl.adjusted_at DESC
+      LIMIT $2
+    `, [patientId, limit ? parseInt(limit) : 50]);
+
+    res.json({ logs });
+  } catch (error) {
+    console.error('Get progression logs error:', error);
+    res.status(500).json({ error: 'Failed to get progression logs' });
+  }
+});
+
 // Override auto-adjustment for an exercise
 router.patch('/exercise/:exerciseId/override', async (req, res) => {
   try {
