@@ -132,3 +132,24 @@ export type CheckInWarning = {
   message: string;
   suggestion: string;
 }
+
+export type EducationModule = {
+  id: number;
+  title: string;
+  description: string | null;
+  content: string;
+  category: string | null;
+  estimatedDurationMinutes: number | null;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  createdBy: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PatientEducationModule = EducationModule & {
+  assignmentId: number;
+  assignedDate: string;
+  viewed: boolean;
+  viewedAt: string | null;
+}

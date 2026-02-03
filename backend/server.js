@@ -10,6 +10,7 @@ const patientRoutes = require('./routes/patients');
 const programRoutes = require('./routes/programs');
 const checkInRoutes = require('./routes/check-ins');
 const exerciseRoutes = require('./routes/exercises');
+const educationRoutes = require('./routes/education');
 
 // Import database init
 const { initDatabase } = require('./database/init');
@@ -36,6 +37,7 @@ app.use('/api/patients', patientRoutes);
 app.use('/api/programs', programRoutes);
 app.use('/api/check-ins', checkInRoutes);
 app.use('/api/exercises', exerciseRoutes);
+app.use('/api/education', educationRoutes);
 
 // Test route
 app.get('/', (req, res) => {
