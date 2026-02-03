@@ -138,6 +138,10 @@ function App() {
     setProgramExercises(updated);
   };
 
+  const handleReorderExercises = (newOrder: ProgramExercise[]) => {
+    setProgramExercises(newOrder);
+  };
+
   const handleAssignToPatient = () => {
     setShowPatientModal(true);
   };
@@ -653,6 +657,7 @@ function App() {
               onProgramNameChange={setProgramName}
               onRemoveExercise={handleRemoveFromProgram}
               onUpdateExercise={handleUpdateExercise}
+              onReorderExercises={handleReorderExercises}
               onAssignToPatient={handleAssignToPatient}
               onCancelPatientAssignment={handleCancelProgramAssignment}
             />
