@@ -128,12 +128,14 @@ function App() {
     setProgramExercises(programExercises.filter((_, i) => i !== index));
   };
 
-  const handleUpdateExercise = (index: number, field: 'sets' | 'reps' | 'weight', value: number) => {
+  const handleUpdateExercise = (index: number, field: 'sets' | 'reps' | 'weight' | 'enablePeriodization', value: number | boolean) => {
     const updated = [...programExercises];
     if (field === 'weight') {
-      updated[index].prescribedWeight = value;
+      updated[index].prescribedWeight = value as number;
+    } else if (field === 'enablePeriodization') {
+      updated[index].enablePeriodization = value as boolean;
     } else {
-      updated[index][field] = value;
+      updated[index][field] = value as number;
     }
     setProgramExercises(updated);
   };

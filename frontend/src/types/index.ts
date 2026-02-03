@@ -26,6 +26,7 @@ export type ProgramExercise = Exercise & {
   holdTime?: string;
   instructions?: string;
   completionData?: CompletionData;
+  enablePeriodization?: boolean;
 }
 
 export type ProgramConfig = {

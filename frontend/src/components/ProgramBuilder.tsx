@@ -25,7 +25,7 @@ interface ProgramBuilderProps {
   isEditing: boolean;
   onProgramNameChange: (name: string) => void;
   onRemoveExercise: (index: number) => void;
-  onUpdateExercise: (index: number, field: 'sets' | 'reps' | 'weight', value: number) => void;
+  onUpdateExercise: (index: number, field: 'sets' | 'reps' | 'weight' | 'enablePeriodization', value: number | boolean) => void;
   onReorderExercises: (newOrder: ProgramExercise[]) => void;
   onAssignToPatient: () => void;
   onCancelPatientAssignment: () => void;
@@ -35,7 +35,7 @@ interface SortableExerciseProps {
   exercise: ProgramExercise;
   index: number;
   onRemove: (index: number) => void;
-  onUpdate: (index: number, field: 'sets' | 'reps' | 'weight', value: number) => void;
+  onUpdate: (index: number, field: 'sets' | 'reps' | 'weight' | 'enablePeriodization', value: number | boolean) => void;
 }
 
 const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerciseProps) => {
@@ -111,7 +111,20 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
         </div>
       </div>
 
-      <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded inline-block">
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
+        <input
+          type="checkbox"
+          id={`periodization-${index}`}
+          checked={exercise.enablePeriodization || false}
+          onChange={(e) => onUpdate(index, 'enablePeriodization', e.target.checked)}
+          className="w-4 h-4 text-moveify-teal border-gray-300 rounded focus:ring-moveify-teal"
+        />
+        <label htmlFor={`periodization-${index}`} className="text-sm text-gray-700 cursor-pointer">
+          Enable auto-progression (weekly sets/reps increase)
+        </label>
+      </div>
+
+      <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded inline-block mt-2">
         {exercise.category}
       </span>
     </div>

@@ -50,7 +50,8 @@ router.get('/patient/:patientId', async (req, res) => {
           holdTime: ex.hold_time,
           instructions: ex.instructions,
           image: ex.image_url,
-          completed: ex.completed === 1
+          completed: ex.completed === 1,
+          enablePeriodization: ex.auto_adjust_enabled === true
         }))
       }
     });
@@ -133,7 +134,7 @@ router.post('/patient/:patientId', async (req, res) => {
         index,
         baselineSets,
         baselineReps,
-        true
+        exercise.enablePeriodization !== undefined ? exercise.enablePeriodization : false
       ]);
     }
 
@@ -208,8 +209,8 @@ router.put('/:programId', async (req, res) => {
       await client.query(`
         INSERT INTO program_exercises (
           program_id, exercise_name, exercise_category, sets, reps, prescribed_weight,
-          hold_time, instructions, image_url, exercise_order
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          hold_time, instructions, image_url, exercise_order, auto_adjust_enabled
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       `, [
         programId,
         exercise.name,
@@ -220,7 +221,8 @@ router.put('/:programId', async (req, res) => {
         exercise.holdTime || '',
         exercise.instructions || '',
         exercise.image || '',
-        index
+        index,
+        exercise.enablePeriodization !== undefined ? exercise.enablePeriodization : false
       ]);
     }
 
