@@ -164,6 +164,37 @@ async function initDatabase() {
       )
     `);
 
+    // Education modules table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS education_modules (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        content TEXT NOT NULL,
+        category VARCHAR(100),
+        estimated_duration_minutes INTEGER,
+        image_url TEXT,
+        video_url TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    // Patient education modules table (assignments)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS patient_education_modules (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        module_id INTEGER NOT NULL REFERENCES education_modules(id) ON DELETE CASCADE,
+        assigned_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        viewed BOOLEAN DEFAULT FALSE,
+        viewed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(patient_id, module_id)
+      )
+    `);
+
     // Add weight columns to existing tables (migration for deployed DB)
     console.log('🔄 Running database migrations...');
     await db.query(`
