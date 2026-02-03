@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Edit, User, Trash2, PlusCircle, TrendingUp, Zap } from 'lucide-react';
+import { Edit, User, Trash2, PlusCircle, TrendingUp, Zap, BookOpen } from 'lucide-react';
 import type { Patient } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
+import { PatientEducationModules } from './PatientEducationModules';
+import { AssignEducationModal } from './modals/AssignEducationModal';
 import { API_URL } from '../config';
 
 interface PatientProfileProps {
@@ -15,8 +17,10 @@ interface PatientProfileProps {
 }
 
 export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram }: PatientProfileProps) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'education'>('overview');
   const [progressingProgramId, setProgressingProgramId] = useState<number | null>(null);
+  const [showAssignEducationModal, setShowAssignEducationModal] = useState(false);
+  const [educationModulesRefreshKey, setEducationModulesRefreshKey] = useState(0);
 
   const handleProgressProgram = async (programId: number) => {
     if (!confirm('This will analyze the last week of data and adjust the program based on progression gates. Continue?')) {
@@ -97,6 +101,20 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
             <TrendingUp size={18} className="inline mr-2" />
             Progress Analytics
             {activeTab === 'analytics' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-moveify-teal"></div>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('education')}
+            className={`pb-3 px-2 font-medium transition-colors relative ${
+              activeTab === 'education'
+                ? 'text-moveify-teal'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <BookOpen size={18} className="inline mr-2" />
+            Education
+            {activeTab === 'education' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-moveify-teal"></div>
             )}
           </button>
@@ -230,8 +248,36 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
         </div>
       </div>
         </div>
-      ) : (
+      ) : activeTab === 'analytics' ? (
         <ProgressAnalytics patientId={patient.id} apiUrl={API_URL} />
+      ) : (
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Education Modules</h2>
+            <button
+              onClick={() => setShowAssignEducationModal(true)}
+              className="bg-moveify-teal text-white px-4 py-2 rounded-lg hover:bg-moveify-teal-dark font-medium flex items-center gap-2"
+            >
+              <PlusCircle size={18} />
+              Assign Module
+            </button>
+          </div>
+          <PatientEducationModules
+            key={educationModulesRefreshKey}
+            patientId={patient.id}
+            isPatientView={false}
+          />
+          {showAssignEducationModal && (
+            <AssignEducationModal
+              patientId={patient.id}
+              patientName={patient.name}
+              onClose={() => setShowAssignEducationModal(false)}
+              onAssigned={() => {
+                setEducationModulesRefreshKey(prev => prev + 1);
+              }}
+            />
+          )}
+        </div>
       )}
     </div>
   );

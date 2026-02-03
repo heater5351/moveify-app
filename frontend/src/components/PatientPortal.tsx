@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Play, Check, TrendingUp, Calendar as CalendarIcon } from 'lucide-react';
+import { Play, Check, TrendingUp, Calendar as CalendarIcon, BookOpen } from 'lucide-react';
 import type { Patient, CompletionData, ProgramExercise, DailyCheckIn } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
+import { PatientEducationModules } from './PatientEducationModules';
 import { ExerciseCompletionModal } from './modals/ExerciseCompletionModal';
 import DailyCheckInModal from './modals/DailyCheckInModal';
 import BlockProgressBanner from './BlockProgressBanner';
@@ -15,7 +16,7 @@ interface PatientPortalProps {
 export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps) => {
   const [selectedWeekDay, setSelectedWeekDay] = useState(new Date().getDay());
   const [selectedProgramIndex, setSelectedProgramIndex] = useState(0);
-  const [activeView, setActiveView] = useState<'exercises' | 'progress'>('exercises');
+  const [activeView, setActiveView] = useState<'exercises' | 'progress' | 'education'>('exercises');
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<{
     exercise: ProgramExercise;
@@ -145,11 +146,24 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
             <TrendingUp size={18} className="inline mr-1.5 sm:mr-2" />
             Progress
           </button>
+          <button
+            onClick={() => setActiveView('education')}
+            className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold transition-all shadow-sm text-sm sm:text-base ${
+              activeView === 'education'
+                ? 'bg-gradient-to-r from-moveify-teal to-moveify-ocean text-white shadow-md'
+                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+            }`}
+          >
+            <BookOpen size={18} className="inline mr-1.5 sm:mr-2" />
+            Education
+          </button>
         </div>
       </div>
 
       {activeView === 'progress' ? (
         <ProgressAnalytics patientId={patient.id} apiUrl={API_URL} />
+      ) : activeView === 'education' ? (
+        <PatientEducationModules patientId={patient.id} isPatientView={true} />
       ) : (
         <>
           {/* Block Progress Banner */}

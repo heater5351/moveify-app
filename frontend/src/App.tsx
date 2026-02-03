@@ -9,6 +9,7 @@ import { PatientsPage } from './components/PatientsPage';
 import { PatientProfile } from './components/PatientProfile';
 import { PatientPortal } from './components/PatientPortal';
 import { ProgramBuilder } from './components/ProgramBuilder';
+import { EducationLibrary } from './components/EducationLibrary';
 import { AddPatientModal } from './components/modals/AddPatientModal';
 import { EditPatientModal } from './components/modals/EditPatientModal';
 import { PatientSelectionModal } from './components/modals/PatientSelectionModal';
@@ -612,6 +613,15 @@ function App() {
                   >
                     Patients
                   </button>
+                  <button
+                    onClick={() => setCurrentPage('education')}
+                    className={`px-6 py-2 rounded-lg font-medium transition-colors ${currentPage === 'education'
+                      ? 'bg-moveify-teal text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                  >
+                    Education Library
+                  </button>
                 </div>
               )}
             </div>
@@ -664,6 +674,11 @@ function App() {
               onCancelPatientAssignment={handleCancelProgramAssignment}
             />
           </div>
+        </div>
+      ) : currentPage === 'education' ? (
+        // Education Library page - full width
+        <div className="flex-1 overflow-y-auto px-4 py-8">
+          <EducationLibrary clinicianId={loggedInUser?.id || 0} />
         </div>
       ) : (
         // Patients page - full width, no Program Tab
