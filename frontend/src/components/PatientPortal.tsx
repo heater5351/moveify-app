@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, Check, TrendingUp, Calendar as CalendarIcon, BookOpen } from 'lucide-react';
+import { Play, Check, TrendingUp, Calendar as CalendarIcon, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Patient, CompletionData, ProgramExercise, DailyCheckIn } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
@@ -15,6 +15,7 @@ interface PatientPortalProps {
 
 export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps) => {
   const [selectedWeekDay, setSelectedWeekDay] = useState(new Date().getDay());
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, 1 = next week, -1 = previous week
   const [selectedProgramIndex, setSelectedProgramIndex] = useState(0);
   const [activeView, setActiveView] = useState<'exercises' | 'progress' | 'education'>('exercises');
   const [showCompletionModal, setShowCompletionModal] = useState(false);
@@ -81,22 +82,37 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const today = new Date().getDay();
+  const todayDate = new Date();
 
-  // Generate dates for the current week (Sunday to Saturday)
-  const getDatesForWeek = () => {
+  // Generate dates for the current week + offset (Sunday to Saturday)
+  const getDatesForWeek = (offset: number) => {
     const dates: Date[] = [];
-    const todayDate = new Date();
     const currentDay = todayDate.getDay(); // 0 = Sunday
+    const weekStartOffset = offset * 7; // Days to offset
 
     for (let i = 0; i < 7; i++) {
       const date = new Date(todayDate);
-      date.setDate(todayDate.getDate() - currentDay + i);
+      date.setDate(todayDate.getDate() - currentDay + i + weekStartOffset);
       dates.push(date);
     }
     return dates;
   };
 
-  const weekDates = getDatesForWeek();
+  const weekDates = getDatesForWeek(weekOffset);
+
+  // Check if a date is today
+  const isToday = (date: Date) => {
+    return date.toDateString() === todayDate.toDateString();
+  };
+
+  // Get week label
+  const getWeekLabel = () => {
+    if (weekOffset === 0) return 'This Week';
+    if (weekOffset === 1) return 'Next Week';
+    if (weekOffset === -1) return 'Last Week';
+    if (weekOffset > 1) return `${weekOffset} Weeks Ahead`;
+    return `${Math.abs(weekOffset)} Weeks Ago`;
+  };
   const selectedDayShort = daysOfWeek[selectedWeekDay];
 
   const selectedProgram = patient.assignedPrograms[selectedProgramIndex];
@@ -196,27 +212,66 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
             </div>
           )}
 
-          {/* Week View - Optimized for mobile */}
+          {/* Week View - Optimized for mobile with navigation */}
           <div className="bg-white rounded-xl shadow-md border border-gray-200 p-3 sm:p-6 mb-4 sm:mb-6">
+            {/* Week Navigation Header */}
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <button
+                onClick={() => setWeekOffset(weekOffset - 1)}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                aria-label="Previous week"
+              >
+                <ChevronLeft size={20} className="text-gray-600" />
+              </button>
+              <div className="text-center">
+                <h3 className="text-sm sm:text-base font-semibold text-gray-900">{getWeekLabel()}</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
+              <button
+                onClick={() => setWeekOffset(weekOffset + 1)}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                aria-label="Next week"
+              >
+                <ChevronRight size={20} className="text-gray-600" />
+              </button>
+            </div>
+
+            {/* Week Back to Today Button */}
+            {weekOffset !== 0 && (
+              <div className="mb-3">
+                <button
+                  onClick={() => setWeekOffset(0)}
+                  className="w-full py-1.5 px-3 text-xs sm:text-sm font-medium text-moveify-teal hover:bg-primary-50 rounded-lg transition-colors"
+                >
+                  Jump to This Week
+                </button>
+              </div>
+            )}
+
             <div className="grid grid-cols-7 gap-1 sm:gap-2">
               {daysOfWeek.map((day, index) => {
-                const isToday = index === today;
+                const date = weekDates[index];
+                const isTodayDate = isToday(date);
                 const isSelected = index === selectedWeekDay;
                 const hasDot = selectedProgram.config.frequency.includes(day);
-
-                const date = weekDates[index];
                 const dayNum = date.getDate();
+                const isPast = date < todayDate && !isTodayDate;
 
                 return (
                   <button
-                    key={day}
+                    key={`${day}-${weekOffset}-${index}`}
                     onClick={() => setSelectedWeekDay(index)}
-                    className={`relative p-2 sm:p-4 rounded-lg sm:rounded-xl font-medium transition-all ${isSelected
-                      ? 'bg-gradient-to-br from-moveify-teal to-moveify-ocean text-white shadow-lg'
-                      : isToday
+                    className={`relative p-2 sm:p-4 rounded-lg sm:rounded-xl font-medium transition-all ${
+                      isSelected
+                        ? 'bg-gradient-to-br from-moveify-teal to-moveify-ocean text-white shadow-lg'
+                        : isTodayDate
                         ? 'bg-primary-50 text-blue-700 border-2 border-primary-300 shadow-sm'
+                        : isPast
+                        ? 'bg-gray-100 text-gray-400 border border-gray-200'
                         : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
-                      }`}
+                    }`}
                   >
                     <div className="text-center">
                       {/* Mobile: Single letter, Desktop: 3 letters */}
@@ -225,13 +280,14 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                         <span className="hidden sm:inline">{day}</span>
                       </div>
                       <div className="text-xs sm:text-sm mt-0.5 sm:mt-1 opacity-80">{dayNum}</div>
-                      {isToday && !isSelected && (
+                      {isTodayDate && !isSelected && (
                         <div className="hidden sm:block text-xs mt-1 font-bold">Today</div>
                       )}
                     </div>
                     {hasDot && (
-                      <div className={`absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full shadow-sm ${isSelected ? 'bg-white' : 'bg-green-500'
-                        }`}></div>
+                      <div className={`absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full shadow-sm ${
+                        isSelected ? 'bg-white' : 'bg-green-500'
+                      }`}></div>
                     )}
                   </button>
                 );
@@ -239,7 +295,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
             </div>
             {/* Mobile: Show "Today" indicator below */}
             <div className="sm:hidden mt-2 text-center text-xs text-gray-500">
-              {selectedWeekDay === today ? "Today's exercises" : dayNames[selectedWeekDay]}
+              {isToday(weekDates[selectedWeekDay]) ? "Today's exercises" : dayNames[selectedWeekDay]}
             </div>
           </div>
 
