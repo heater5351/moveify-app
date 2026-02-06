@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
 import type { ProgramExercise, ProgramConfig, CompletionData } from '../../types/index.ts';
 
@@ -22,8 +22,14 @@ export const ExerciseCompletionModal = ({
   const [setsPerformed, setSetsPerformed] = useState<number>(
     existingCompletion?.setsPerformed || exercise.sets
   );
+  const [setsInputValue, setSetsInputValue] = useState<string>(
+    String(existingCompletion?.setsPerformed || exercise.sets)
+  );
   const [repsPerformed, setRepsPerformed] = useState<number>(
     existingCompletion?.repsPerformed || exercise.reps
+  );
+  const [repsInputValue, setRepsInputValue] = useState<string>(
+    String(existingCompletion?.repsPerformed || exercise.reps)
   );
   const [weightPerformed, setWeightPerformed] = useState<number>(
     existingCompletion?.weightPerformed ?? exercise.prescribedWeight ?? 0
@@ -38,6 +44,23 @@ export const ExerciseCompletionModal = ({
     existingCompletion?.painLevel
   );
   const [notes, setNotes] = useState<string>(existingCompletion?.notes || '');
+
+  // Keep input values in sync when exercise or completion data changes
+  useEffect(() => {
+    setSetsInputValue(String(existingCompletion?.setsPerformed || exercise.sets));
+    setSetsPerformed(existingCompletion?.setsPerformed || exercise.sets);
+  }, [exercise.sets, existingCompletion?.setsPerformed]);
+
+  useEffect(() => {
+    setRepsInputValue(String(existingCompletion?.repsPerformed || exercise.reps));
+    setRepsPerformed(existingCompletion?.repsPerformed || exercise.reps);
+  }, [exercise.reps, existingCompletion?.repsPerformed]);
+
+  useEffect(() => {
+    const weight = existingCompletion?.weightPerformed ?? exercise.prescribedWeight ?? 0;
+    setWeightInputValue(String(weight || ''));
+    setWeightPerformed(weight);
+  }, [exercise.prescribedWeight, existingCompletion?.weightPerformed]);
 
   const handleQuickComplete = () => {
     // "Completed as Prescribed" - use prescribed values
@@ -113,10 +136,31 @@ export const ExerciseCompletionModal = ({
                 Sets Performed
               </label>
               <input
-                type="number"
-                min="0"
-                value={setsPerformed}
-                onChange={(e) => setSetsPerformed(parseInt(e.target.value) || 0)}
+                type="text"
+                inputMode="numeric"
+                value={setsInputValue}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow empty string and positive integers only
+                  if (value === '' || /^\d*$/.test(value)) {
+                    setSetsInputValue(value);
+                    const numValue = parseInt(value);
+                    setSetsPerformed(isNaN(numValue) ? 0 : numValue);
+                  }
+                }}
+                onBlur={() => {
+                  // Format on blur to ensure valid number
+                  const numValue = parseInt(setsInputValue);
+                  if (isNaN(numValue) || setsInputValue === '') {
+                    setSetsInputValue('0');
+                    setSetsPerformed(0);
+                  } else {
+                    setSetsInputValue(String(numValue));
+                    setSetsPerformed(numValue);
+                  }
+                }}
+                placeholder={String(exercise.sets)}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-moveify-teal focus:border-moveify-teal shadow-sm transition-all font-medium text-lg"
               />
             </div>
@@ -127,10 +171,31 @@ export const ExerciseCompletionModal = ({
                 Reps Performed
               </label>
               <input
-                type="number"
-                min="0"
-                value={repsPerformed}
-                onChange={(e) => setRepsPerformed(parseInt(e.target.value) || 0)}
+                type="text"
+                inputMode="numeric"
+                value={repsInputValue}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow empty string and positive integers only
+                  if (value === '' || /^\d*$/.test(value)) {
+                    setRepsInputValue(value);
+                    const numValue = parseInt(value);
+                    setRepsPerformed(isNaN(numValue) ? 0 : numValue);
+                  }
+                }}
+                onBlur={() => {
+                  // Format on blur to ensure valid number
+                  const numValue = parseInt(repsInputValue);
+                  if (isNaN(numValue) || repsInputValue === '') {
+                    setRepsInputValue('0');
+                    setRepsPerformed(0);
+                  } else {
+                    setRepsInputValue(String(numValue));
+                    setRepsPerformed(numValue);
+                  }
+                }}
+                placeholder={String(exercise.reps)}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-moveify-teal focus:border-moveify-teal shadow-sm transition-all font-medium text-lg"
               />
             </div>
@@ -144,6 +209,7 @@ export const ExerciseCompletionModal = ({
                 type="text"
                 inputMode="decimal"
                 value={weightInputValue}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => {
                   const value = e.target.value;
                   // Allow empty string, numbers, and decimal point

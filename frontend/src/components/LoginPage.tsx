@@ -17,11 +17,18 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
     setIsLoading(true);
 
     try {
+      // Add timeout for slow networks (30 seconds)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       const data = await response.json();
 
@@ -30,14 +37,18 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
         const user = data.user;
 
         if (user.role === 'patient') {
-          // Fetch patient's full data including assigned program
-          const patientResponse = await fetch(`${API_URL}/patients`);
-          const patientsData = await patientResponse.json();
+          // Fetch THIS patient's full data including assigned program (more efficient)
+          const patientController = new AbortController();
+          const patientTimeoutId = setTimeout(() => patientController.abort(), 30000);
 
-          // Find this patient in the list (which includes their program)
-          const patientWithProgram = patientsData.patients.find((p: Patient) => p.id === user.id);
+          const patientResponse = await fetch(`${API_URL}/patients/${user.id}`, {
+            signal: patientController.signal
+          });
 
-          if (patientWithProgram) {
+          clearTimeout(patientTimeoutId);
+
+          if (patientResponse.ok) {
+            const patientWithProgram = await patientResponse.json();
             onLogin('patient', patientWithProgram);
           } else {
             // Fallback: create patient object without program
@@ -68,9 +79,13 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
       } else {
         setLoginError(data.error || 'Invalid email or password');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
-      setLoginError('Connection error. Please make sure the server is running.');
+      if (error.name === 'AbortError') {
+        setLoginError('Login timed out. Please check your internet connection and try again.');
+      } else {
+        setLoginError('Connection error. Please make sure the server is running.');
+      }
     } finally {
       setIsLoading(false);
     }

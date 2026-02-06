@@ -4,67 +4,93 @@ const db = require('../database/db');
 
 const router = express.Router();
 
-// Helper to format a patient with their programs
+// Helper to format a patient with their programs (OPTIMIZED - reduces N+1 queries)
 async function formatPatientWithPrograms(patient) {
   const today = new Date().toISOString().split('T')[0];
 
-  // Get ALL programs for this patient
+  // Get ALL programs with their data in ONE query
   const programs = await db.getAll(
-    'SELECT id FROM programs WHERE patient_id = $1 ORDER BY created_at DESC',
+    'SELECT * FROM programs WHERE patient_id = $1 ORDER BY created_at DESC',
     [patient.id]
   );
 
-  let assignedPrograms = [];
-
-  if (programs && programs.length > 0) {
-    assignedPrograms = await Promise.all(programs.map(async (program) => {
-      // Get exercises for this program
-      const exercises = await db.getAll(
-        'SELECT * FROM program_exercises WHERE program_id = $1 ORDER BY exercise_order ASC',
-        [program.id]
-      );
-
-      // Get program config
-      const programData = await db.getOne('SELECT * FROM programs WHERE id = $1', [program.id]);
-
-      const exercisesWithCompletion = await Promise.all(exercises.map(async (ex) => {
-        // Check if this exercise was completed TODAY
-        const completedToday = await db.getOne(
-          'SELECT id FROM exercise_completions WHERE exercise_id = $1 AND patient_id = $2 AND completion_date = $3',
-          [ex.id, patient.id, today]
-        );
-
-        return {
-          id: ex.id,
-          name: ex.exercise_name,
-          category: ex.exercise_category,
-          sets: ex.sets,
-          reps: ex.reps,
-          prescribedWeight: ex.prescribed_weight || 0,
-          holdTime: ex.hold_time,
-          instructions: ex.instructions,
-          image: ex.image_url,
-          completed: !!completedToday,
-          enablePeriodization: ex.auto_adjust_enabled !== false
-        };
-      }));
-
-      return {
-        config: {
-          id: programData.id,
-          name: programData.name,
-          startDate: programData.start_date,
-          frequency: programData.frequency ? JSON.parse(programData.frequency) : [],
-          duration: programData.duration,
-          customEndDate: programData.custom_end_date,
-          trackActualPerformance: programData.track_actual_performance === true,
-          trackRpe: programData.track_rpe === true,
-          trackPainLevel: programData.track_pain === true
-        },
-        exercises: exercisesWithCompletion
-      };
-    }));
+  if (!programs || programs.length === 0) {
+    return {
+      id: patient.id,
+      name: patient.name,
+      email: patient.email,
+      dob: patient.dob || '',
+      age: patient.dob ? new Date().getFullYear() - new Date(patient.dob).getFullYear() : 0,
+      condition: patient.condition || '',
+      phone: patient.phone || '',
+      address: patient.address || '',
+      dateAdded: patient.created_at,
+      assignedPrograms: []
+    };
   }
+
+  const programIds = programs.map(p => p.id);
+
+  // Get ALL exercises for ALL programs in ONE query
+  const allExercises = await db.getAll(
+    `SELECT * FROM program_exercises
+     WHERE program_id = ANY($1)
+     ORDER BY program_id, exercise_order ASC`,
+    [programIds]
+  );
+
+  // Get ALL today's completions for this patient in ONE query
+  const exerciseIds = allExercises.map(ex => ex.id);
+  let completions = [];
+  if (exerciseIds.length > 0) {
+    completions = await db.getAll(
+      `SELECT exercise_id FROM exercise_completions
+       WHERE exercise_id = ANY($1)
+       AND patient_id = $2
+       AND completion_date = $3`,
+      [exerciseIds, patient.id, today]
+    );
+  }
+
+  // Create a Set for O(1) lookup
+  const completedExerciseIds = new Set(completions.map(c => c.exercise_id));
+
+  // Group exercises by program
+  const exercisesByProgram = {};
+  allExercises.forEach(ex => {
+    if (!exercisesByProgram[ex.program_id]) {
+      exercisesByProgram[ex.program_id] = [];
+    }
+    exercisesByProgram[ex.program_id].push({
+      id: ex.id,
+      name: ex.exercise_name,
+      category: ex.exercise_category,
+      sets: ex.sets,
+      reps: ex.reps,
+      prescribedWeight: ex.prescribed_weight || 0,
+      holdTime: ex.hold_time,
+      instructions: ex.instructions,
+      image: ex.image_url,
+      completed: completedExerciseIds.has(ex.id),
+      enablePeriodization: ex.auto_adjust_enabled !== false
+    });
+  });
+
+  // Build final program structure
+  const assignedPrograms = programs.map(programData => ({
+    config: {
+      id: programData.id,
+      name: programData.name,
+      startDate: programData.start_date,
+      frequency: programData.frequency ? JSON.parse(programData.frequency) : [],
+      duration: programData.duration,
+      customEndDate: programData.custom_end_date,
+      trackActualPerformance: programData.track_actual_performance === true,
+      trackRpe: programData.track_rpe === true,
+      trackPainLevel: programData.track_pain === true
+    },
+    exercises: exercisesByProgram[programData.id] || []
+  }));
 
   return {
     id: patient.id,
