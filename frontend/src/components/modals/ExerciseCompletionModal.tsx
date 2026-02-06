@@ -28,6 +28,9 @@ export const ExerciseCompletionModal = ({
   const [weightPerformed, setWeightPerformed] = useState<number>(
     existingCompletion?.weightPerformed ?? exercise.prescribedWeight ?? 0
   );
+  const [weightInputValue, setWeightInputValue] = useState<string>(
+    String(existingCompletion?.weightPerformed ?? exercise.prescribedWeight ?? '')
+  );
   const [rpeRating, setRpeRating] = useState<number | undefined>(
     existingCompletion?.rpeRating
   );
@@ -138,14 +141,38 @@ export const ExerciseCompletionModal = ({
                 Weight Used (kg)
               </label>
               <input
-                type="number"
-                min="0"
-                step="0.5"
-                value={weightPerformed}
-                onChange={(e) => setWeightPerformed(parseFloat(e.target.value) || 0)}
+                type="text"
+                inputMode="decimal"
+                value={weightInputValue}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow empty string, numbers, and decimal point
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    setWeightInputValue(value);
+                    // Update the actual weight value
+                    const numValue = parseFloat(value);
+                    setWeightPerformed(isNaN(numValue) ? 0 : numValue);
+                  }
+                }}
+                onBlur={() => {
+                  // Format on blur to ensure valid number
+                  const numValue = parseFloat(weightInputValue);
+                  if (isNaN(numValue) || weightInputValue === '') {
+                    setWeightInputValue('0');
+                    setWeightPerformed(0);
+                  } else {
+                    setWeightInputValue(String(numValue));
+                    setWeightPerformed(numValue);
+                  }
+                }}
+                placeholder={exercise.prescribedWeight ? String(exercise.prescribedWeight) : '0'}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-moveify-teal focus:border-moveify-teal shadow-sm transition-all font-medium text-lg"
               />
-              <p className="text-xs text-gray-500 mt-1">Enter 0 for bodyweight exercises</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {exercise.prescribedWeight && exercise.prescribedWeight > 0
+                  ? `Prescribed: ${exercise.prescribedWeight} kg (Enter 0 for bodyweight)`
+                  : 'Enter 0 for bodyweight exercises'}
+              </p>
               {(exercise.prescribedWeight || 0) > 0 && weightPerformed !== (exercise.prescribedWeight || 0) && (
                 <p className={`text-xs mt-1 font-medium ${weightPerformed > (exercise.prescribedWeight || 0) ? 'text-green-600' : 'text-orange-600'}`}>
                   {weightPerformed > (exercise.prescribedWeight || 0)
