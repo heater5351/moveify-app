@@ -200,30 +200,78 @@ router.put('/:programId', async (req, res) => {
       programId
     ]);
 
-    // Delete existing exercises
-    await client.query('DELETE FROM program_exercises WHERE program_id = $1', [programId]);
+    // Get existing exercises to preserve IDs and completion history
+    const existingExercises = await client.query(
+      'SELECT id, exercise_name FROM program_exercises WHERE program_id = $1 ORDER BY exercise_order ASC',
+      [programId]
+    );
+    const existingExerciseMap = new Map(
+      existingExercises.rows.map(ex => [ex.exercise_name, ex.id])
+    );
 
-    // Insert new exercises
+    // Track which exercise IDs we're keeping
+    const updatedExerciseIds = new Set();
+
+    // Update or insert exercises (preserve existing IDs where possible)
     for (let index = 0; index < exercises.length; index++) {
       const exercise = exercises[index];
-      await client.query(`
-        INSERT INTO program_exercises (
-          program_id, exercise_name, exercise_category, sets, reps, prescribed_weight,
-          hold_time, instructions, image_url, exercise_order, auto_adjust_enabled
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      `, [
-        programId,
-        exercise.name,
-        exercise.category || '',
-        exercise.sets,
-        exercise.reps,
-        exercise.prescribedWeight || 0,
-        exercise.holdTime || '',
-        exercise.instructions || '',
-        exercise.image || '',
-        index,
-        exercise.enablePeriodization !== undefined ? exercise.enablePeriodization : false
-      ]);
+      const existingId = existingExerciseMap.get(exercise.name);
+
+      if (existingId) {
+        // Exercise exists - UPDATE it (preserves ID and completion history)
+        await client.query(`
+          UPDATE program_exercises
+          SET exercise_category = $1, sets = $2, reps = $3, prescribed_weight = $4,
+              hold_time = $5, instructions = $6, image_url = $7, exercise_order = $8,
+              auto_adjust_enabled = $9
+          WHERE id = $10
+        `, [
+          exercise.category || '',
+          exercise.sets,
+          exercise.reps,
+          exercise.prescribedWeight || 0,
+          exercise.holdTime || '',
+          exercise.instructions || '',
+          exercise.image || '',
+          index,
+          exercise.enablePeriodization !== undefined ? exercise.enablePeriodization : false,
+          existingId
+        ]);
+        updatedExerciseIds.add(existingId);
+      } else {
+        // New exercise - INSERT it
+        await client.query(`
+          INSERT INTO program_exercises (
+            program_id, exercise_name, exercise_category, sets, reps, prescribed_weight,
+            hold_time, instructions, image_url, exercise_order, auto_adjust_enabled
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `, [
+          programId,
+          exercise.name,
+          exercise.category || '',
+          exercise.sets,
+          exercise.reps,
+          exercise.prescribedWeight || 0,
+          exercise.holdTime || '',
+          exercise.instructions || '',
+          exercise.image || '',
+          index,
+          exercise.enablePeriodization !== undefined ? exercise.enablePeriodization : false
+        ]);
+      }
+    }
+
+    // Delete exercises that were removed from the program
+    if (updatedExerciseIds.size > 0) {
+      const idsToKeep = Array.from(updatedExerciseIds);
+      const placeholders = idsToKeep.map((_, i) => `$${i + 2}`).join(',');
+      await client.query(
+        `DELETE FROM program_exercises WHERE program_id = $1 AND id NOT IN (${placeholders})`,
+        [programId, ...idsToKeep]
+      );
+    } else {
+      // All exercises removed - delete all
+      await client.query('DELETE FROM program_exercises WHERE program_id = $1', [programId]);
     }
 
     await client.query('COMMIT');
