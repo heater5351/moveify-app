@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Trash2, X, GripVertical } from 'lucide-react';
 import type { ProgramExercise, Patient } from '../types/index.ts';
 import {
@@ -47,6 +48,10 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
     transition,
     isDragging,
   } = useSortable({ id: `exercise-${index}` });
+
+  const [weightInputValue, setWeightInputValue] = useState<string>(
+    String(exercise.prescribedWeight || '')
+  );
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -100,13 +105,30 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
         <div className="flex-1">
           <label className="text-xs text-gray-600 block mb-1">Weight (kg)</label>
           <input
-            type="number"
-            min="0"
-            step="0.5"
-            value={exercise.prescribedWeight || 0}
-            onChange={(e) => onUpdate(index, 'weight', parseFloat(e.target.value) || 0)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+            type="text"
+            inputMode="decimal"
+            value={weightInputValue}
+            onChange={(e) => {
+              const value = e.target.value;
+              // Allow empty string, numbers, and decimal point
+              if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                setWeightInputValue(value);
+                const numValue = parseFloat(value);
+                onUpdate(index, 'weight', isNaN(numValue) ? 0 : numValue);
+              }
+            }}
+            onBlur={() => {
+              // Format on blur to ensure valid number
+              const numValue = parseFloat(weightInputValue);
+              if (isNaN(numValue) || weightInputValue === '') {
+                setWeightInputValue('0');
+                onUpdate(index, 'weight', 0);
+              } else {
+                setWeightInputValue(String(numValue));
+              }
+            }}
             placeholder="0"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
           />
         </div>
       </div>
@@ -115,7 +137,7 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
         <input
           type="checkbox"
           id={`periodization-${index}`}
-          checked={exercise.enablePeriodization || false}
+          checked={exercise.enablePeriodization !== false}
           onChange={(e) => onUpdate(index, 'enablePeriodization', e.target.checked)}
           className="w-4 h-4 text-moveify-teal border-gray-300 rounded focus:ring-moveify-teal"
         />

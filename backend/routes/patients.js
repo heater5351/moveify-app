@@ -40,10 +40,12 @@ async function formatPatientWithPrograms(patient) {
           category: ex.exercise_category,
           sets: ex.sets,
           reps: ex.reps,
+          prescribedWeight: ex.prescribed_weight || 0,
           holdTime: ex.hold_time,
           instructions: ex.instructions,
           image: ex.image_url,
-          completed: !!completedToday
+          completed: !!completedToday,
+          enablePeriodization: ex.auto_adjust_enabled !== false
         };
       }));
 
