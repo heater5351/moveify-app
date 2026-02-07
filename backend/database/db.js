@@ -9,9 +9,11 @@ const pool = new Pool({
   // SSL required for Railway PostgreSQL
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   // Connection pool settings
-  max: 10, // Maximum number of connections
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  max: 20, // Maximum number of connections (increased for production)
+  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+  connectionTimeoutMillis: 10000, // Wait up to 10 seconds for connection (increased from 2s)
+  query_timeout: 15000, // Query timeout of 15 seconds
+  statement_timeout: 15000, // Statement timeout of 15 seconds
 });
 
 // Test connection on startup
