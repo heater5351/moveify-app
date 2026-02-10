@@ -435,6 +435,7 @@ function App() {
               patientId: loggedInPatient.id,
               setsPerformed: completionData?.setsPerformed,
               repsPerformed: completionData?.repsPerformed,
+              weightPerformed: completionData?.weightPerformed,
               rpeRating: completionData?.rpeRating,
               painLevel: completionData?.painLevel,
               notes: completionData?.notes

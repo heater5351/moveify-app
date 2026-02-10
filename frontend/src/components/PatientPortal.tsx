@@ -267,7 +267,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                       isSelected
                         ? 'bg-gradient-to-br from-moveify-teal to-moveify-ocean text-white shadow-lg'
                         : isTodayDate
-                        ? 'bg-primary-50 text-blue-700 border-2 border-primary-300 shadow-sm'
+                        ? 'bg-white text-moveify-teal border-2 border-moveify-teal shadow-sm'
                         : isPast
                         ? 'bg-gray-100 text-gray-400 border border-gray-200'
                         : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
@@ -360,7 +360,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                               </span>
                             )}
                           </div>
-                          <span className="inline-block text-xs sm:text-sm bg-gradient-to-r from-primary-50 to-primary-100 text-moveify-ocean px-3 py-1 rounded-full font-medium border border-blue-200">
+                          <span className="inline-block text-xs sm:text-sm bg-white text-moveify-ocean px-3 py-1 rounded-full font-medium border border-gray-200">
                             {exercise.category}
                           </span>
                         </div>
