@@ -723,4 +723,24 @@ router.patch('/exercise/:exerciseId/override', async (req, res) => {
   }
 });
 
+// ADMIN: Clear all check-in and completion data (for fresh start)
+router.delete('/admin/clear-data', async (req, res) => {
+  try {
+    // Clear all exercise completions
+    const completionsResult = await db.query('DELETE FROM exercise_completions');
+
+    // Clear all daily check-ins
+    const checkInsResult = await db.query('DELETE FROM daily_check_ins');
+
+    res.json({
+      message: 'All check-in and exercise completion data cleared successfully',
+      deletedCompletions: completionsResult.rowCount,
+      deletedCheckIns: checkInsResult.rowCount
+    });
+  } catch (error) {
+    console.error('Clear data error:', error);
+    res.status(500).json({ error: 'Failed to clear data' });
+  }
+});
+
 module.exports = router;
