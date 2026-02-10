@@ -429,10 +429,10 @@ export const ProgressAnalytics = ({ patientId, apiUrl }: ProgressAnalyticsProps)
                       <td className="px-4 py-3 text-sm">
                         {completion.weightPerformed !== null && completion.weightPerformed > 0 ? (
                           <div className="flex items-center gap-1">
-                            <span className={completion.weightPerformed >= completion.prescribedWeight ? 'text-green-700 font-medium' : 'text-gray-700'}>
+                            <span className={completion.weightPerformed >= (completion.prescribedWeight ?? 0) ? 'text-green-700 font-medium' : 'text-gray-700'}>
                               {completion.weightPerformed} kg
                             </span>
-                            {completion.prescribedWeight > 0 && (
+                            {completion.prescribedWeight !== null && completion.prescribedWeight > 0 && (
                               <>
                                 <span className="text-gray-400">/</span>
                                 <span className="text-gray-500">
