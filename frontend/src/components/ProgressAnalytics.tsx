@@ -394,6 +394,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl }: ProgressAnalyticsProps)
                     <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Date</th>
                     <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Exercise</th>
                     <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Volume</th>
+                    <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Weight</th>
                     <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">RPE</th>
                     <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Pain</th>
                     <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Notes</th>
@@ -422,6 +423,25 @@ export const ProgressAnalytics = ({ patientId, apiUrl }: ProgressAnalyticsProps)
                             {completion.prescribedSets}×{completion.prescribedReps}
                           </span>
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {completion.weightPerformed !== null && completion.weightPerformed > 0 ? (
+                          <div className="flex items-center gap-1">
+                            <span className={completion.weightPerformed >= completion.prescribedWeight ? 'text-green-700 font-medium' : 'text-gray-700'}>
+                              {completion.weightPerformed} kg
+                            </span>
+                            {completion.prescribedWeight > 0 && (
+                              <>
+                                <span className="text-gray-400">/</span>
+                                <span className="text-gray-500">
+                                  {completion.prescribedWeight} kg
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-sm">
                         {completion.rpeRating !== null ? (

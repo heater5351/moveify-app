@@ -624,8 +624,10 @@ router.get('/exercise-completions/patient/:patientId', async (req, res) => {
         ec.completion_date as "completionDate",
         ec.sets_performed as "setsPerformed",
         ec.reps_performed as "repsPerformed",
+        ec.weight_performed as "weightPerformed",
         pe.sets as "prescribedSets",
         pe.reps as "prescribedReps",
+        pe.prescribed_weight as "prescribedWeight",
         ec.rpe_rating as "rpeRating",
         ec.pain_level as "painLevel",
         ec.notes
