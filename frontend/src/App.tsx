@@ -69,7 +69,8 @@ function App() {
     customStartDate: '',
     frequency: [],
     duration: '4weeks',
-    customEndDate: ''
+    customEndDate: '',
+    trackRpe: true
   });
 
   // Fetch patients from database

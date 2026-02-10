@@ -39,16 +39,11 @@ async function formatPatientWithPrograms(patient) {
     [programIds]
   );
 
-  // Get completions for the past 7 days and next 7 days (14 day window)
-  // This allows the frontend to show completion status for any day in the calendar
+  // Get ALL completions for the patient (no date window limit)
+  // This allows the frontend to show completion status for any historical date
   const exerciseIds = allExercises.map(ex => ex.id);
   let completions = [];
   if (exerciseIds.length > 0) {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 7); // 7 days ago
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + 7); // 7 days from now
-
     completions = await db.getAll(
       `SELECT
         exercise_id,
@@ -62,9 +57,8 @@ async function formatPatientWithPrograms(patient) {
        FROM exercise_completions
        WHERE exercise_id = ANY($1)
        AND patient_id = $2
-       AND completion_date >= $3
-       AND completion_date <= $4`,
-      [exerciseIds, patient.id, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]
+       ORDER BY completion_date DESC`,
+      [exerciseIds, patient.id]
     );
   }
 
