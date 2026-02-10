@@ -99,7 +99,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl }: ProgressAnalyticsProps)
 
   const fetchExerciseCompletions = async () => {
     try {
-      const response = await fetch(`${apiUrl}/exercise-completions/patient/${patientId}?days=${timeRange}`);
+      const response = await fetch(`${apiUrl}/programs/exercise-completions/patient/${patientId}?days=${timeRange}`);
       if (response.ok) {
         const data = await response.json();
         setExerciseCompletions(data.completions || []);
