@@ -111,7 +111,12 @@ async function formatPatientWithPrograms(patient) {
     completions
       .filter(c => c.exercise_id === ex.id)
       .forEach(c => {
-        allExerciseCompletions[c.completion_date] = {
+        // Convert completion_date to YYYY-MM-DD string format
+        const dateKey = typeof c.completion_date === 'string'
+          ? c.completion_date.split('T')[0]
+          : new Date(c.completion_date).toISOString().split('T')[0];
+
+        allExerciseCompletions[dateKey] = {
           setsPerformed: c.setsPerformed,
           repsPerformed: c.repsPerformed,
           weightPerformed: c.weightPerformed,
