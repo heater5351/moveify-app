@@ -21,8 +21,10 @@ interface ExerciseCompletion {
   completionDate: string;
   setsPerformed: number;
   repsPerformed: number;
+  weightPerformed: number | null;
   prescribedSets: number;
   prescribedReps: number;
+  prescribedWeight: number | null;
   rpeRating: number | null;
   painLevel: number | null;
   notes: string | null;
