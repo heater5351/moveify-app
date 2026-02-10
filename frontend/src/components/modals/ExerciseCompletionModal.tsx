@@ -7,6 +7,7 @@ interface ExerciseCompletionModalProps {
   patientId: number;
   programConfig: ProgramConfig;
   existingCompletion?: CompletionData | null;
+  selectedDate?: Date;
   onComplete: (data: CompletionData) => void;
   onCancel: () => void;
 }
@@ -15,6 +16,7 @@ export const ExerciseCompletionModal = ({
   exercise,
   programConfig,
   existingCompletion,
+  selectedDate,
   onComplete,
   onCancel
 }: ExerciseCompletionModalProps) => {
@@ -70,7 +72,8 @@ export const ExerciseCompletionModal = ({
       weightPerformed: exercise.prescribedWeight || 0,
       rpeRating,
       painLevel,
-      notes: notes || undefined
+      notes: notes || undefined,
+      completionDate: selectedDate?.toISOString().split('T')[0]
     });
   };
 
@@ -81,7 +84,8 @@ export const ExerciseCompletionModal = ({
       weightPerformed,
       rpeRating,
       painLevel,
-      notes: notes || undefined
+      notes: notes || undefined,
+      completionDate: selectedDate?.toISOString().split('T')[0]
     });
   };
 

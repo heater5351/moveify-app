@@ -438,7 +438,8 @@ function App() {
               weightPerformed: completionData?.weightPerformed,
               rpeRating: completionData?.rpeRating,
               painLevel: completionData?.painLevel,
-              notes: completionData?.notes
+              notes: completionData?.notes,
+              completionDate: completionData?.completionDate
             })
           });
 

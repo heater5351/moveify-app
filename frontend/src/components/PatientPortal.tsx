@@ -23,6 +23,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
     exercise: ProgramExercise;
     exerciseIndex: number;
     programIndex: number;
+    selectedDate?: Date;
   } | null>(null);
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [_hasCheckedInToday, setHasCheckedInToday] = useState(false);
@@ -385,7 +386,16 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                         {!isProgramCompleted && (
                           <button
                             onClick={() => {
-                              setSelectedExercise({ exercise, exerciseIndex: index, programIndex: selectedProgramIndex });
+                              // Calculate the actual date for the selected day
+                              const weekDates = getDatesForWeek(weekOffset);
+                              const selectedDate = weekDates[selectedWeekDay];
+
+                              setSelectedExercise({
+                                exercise,
+                                exerciseIndex: index,
+                                programIndex: selectedProgramIndex,
+                                selectedDate
+                              });
                               setShowCompletionModal(true);
                             }}
                             className={`w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold transition-all shadow-md hover:shadow-lg text-sm sm:text-base ${exercise.completed
@@ -413,6 +423,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
           patientId={patient.id}
           programConfig={patient.assignedPrograms[selectedExercise.programIndex].config}
           existingCompletion={selectedExercise.exercise.completionData}
+          selectedDate={selectedExercise.selectedDate}
           onComplete={(data) => {
             onToggleComplete(
               selectedExercise.exerciseIndex,

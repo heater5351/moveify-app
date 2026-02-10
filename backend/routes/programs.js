@@ -301,7 +301,8 @@ router.patch('/exercise/:exerciseId/complete', async (req, res) => {
       weightPerformed,
       rpeRating,
       painLevel,
-      notes
+      notes,
+      completionDate
     } = req.body;
 
     if (!patientId) {
@@ -316,7 +317,8 @@ router.patch('/exercise/:exerciseId/complete', async (req, res) => {
       return res.status(400).json({ error: 'Pain level must be between 0 and 10' });
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    // Use provided completionDate or default to today
+    const dateToUse = completionDate || new Date().toISOString().split('T')[0];
 
     if (completed) {
       // PostgreSQL upsert using ON CONFLICT
@@ -336,7 +338,7 @@ router.patch('/exercise/:exerciseId/complete', async (req, res) => {
       `, [
         exerciseId,
         patientId,
-        today,
+        dateToUse,
         setsPerformed || null,
         repsPerformed || null,
         weightPerformed || null,
@@ -345,10 +347,10 @@ router.patch('/exercise/:exerciseId/complete', async (req, res) => {
         notes || null
       ]);
     } else {
-      // Remove today's completion
+      // Remove completion for the specified date
       await db.query(
         'DELETE FROM exercise_completions WHERE exercise_id = $1 AND patient_id = $2 AND completion_date = $3',
-        [exerciseId, patientId, today]
+        [exerciseId, patientId, dateToUse]
       );
     }
 

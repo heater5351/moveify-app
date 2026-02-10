@@ -16,6 +16,7 @@ export type CompletionData = {
   rpeRating?: number;
   painLevel?: number;
   notes?: string;
+  completionDate?: string; // ISO date string for the scheduled completion date
 }
 
 export type ProgramExercise = Exercise & {
