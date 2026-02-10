@@ -192,7 +192,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
       </div>
 
       {activeView === 'progress' ? (
-        <ProgressAnalytics patientId={patient.id} apiUrl={API_URL} />
+        <ProgressAnalytics patientId={patient.id} apiUrl={API_URL} isPatientView={true} />
       ) : activeView === 'education' ? (
         <PatientEducationModules patientId={patient.id} isPatientView={true} />
       ) : (

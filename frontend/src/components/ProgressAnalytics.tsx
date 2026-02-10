@@ -60,9 +60,10 @@ interface ProgressionLog {
 interface ProgressAnalyticsProps {
   patientId: number;
   apiUrl: string;
+  isPatientView?: boolean;
 }
 
-export const ProgressAnalytics = ({ patientId, apiUrl }: ProgressAnalyticsProps) => {
+export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: ProgressAnalyticsProps) => {
   const [analytics, setAnalytics] = useState<ProgramAnalytics[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<7 | 14 | 30>(30);
@@ -72,6 +73,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl }: ProgressAnalyticsProps)
   const [exerciseCompletions, setExerciseCompletions] = useState<ExerciseCompletion[]>([]);
   const [checkIns, setCheckIns] = useState<DailyCheckIn[]>([]);
   const [progressionLogs, setProgressionLogs] = useState<ProgressionLog[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null); // For filtering by date
 
   useEffect(() => {
     fetchAnalytics();
@@ -389,8 +391,126 @@ export const ProgressAnalytics = ({ patientId, apiUrl }: ProgressAnalyticsProps)
               <p className="text-gray-500">No exercise completions yet</p>
             </div>
           ) : (
-            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              <table className="w-full">
+            <>
+              {/* Date filter for patient view */}
+              {isPatientView && (
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">Filter by Date</label>
+                  <select
+                    value={selectedDate || ''}
+                    onChange={(e) => setSelectedDate(e.target.value || null)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+                  >
+                    <option value="">All Dates</option>
+                    {Array.from(new Set(exerciseCompletions.map(c => c.completionDate)))
+                      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+                      .map(date => (
+                        <option key={date} value={date}>
+                          {new Date(date).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Mobile/Patient Card View */}
+              {isPatientView ? (
+                <div className="space-y-3">
+                  {exerciseCompletions
+                    .filter(c => !selectedDate || c.completionDate === selectedDate)
+                    .map((completion) => (
+                    <div key={completion.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h4 className="font-semibold text-gray-900">{completion.exerciseName}</h4>
+                          <p className="text-sm text-gray-500">
+                            {new Date(completion.completionDate).toLocaleDateString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Volume</p>
+                          <p className="text-sm">
+                            <span className={completion.setsPerformed >= completion.prescribedSets && completion.repsPerformed >= completion.prescribedReps ? 'text-green-700 font-medium' : 'text-gray-700'}>
+                              {completion.setsPerformed}×{completion.repsPerformed}
+                            </span>
+                            <span className="text-gray-400"> / </span>
+                            <span className="text-gray-500">{completion.prescribedSets}×{completion.prescribedReps}</span>
+                          </p>
+                        </div>
+
+                        {(completion.weightPerformed !== null && completion.weightPerformed > 0) && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Weight</p>
+                            <p className="text-sm">
+                              <span className={completion.weightPerformed >= (completion.prescribedWeight ?? 0) ? 'text-green-700 font-medium' : 'text-gray-700'}>
+                                {completion.weightPerformed} kg
+                              </span>
+                              {completion.prescribedWeight !== null && completion.prescribedWeight > 0 && (
+                                <>
+                                  <span className="text-gray-400"> / </span>
+                                  <span className="text-gray-500">{completion.prescribedWeight} kg</span>
+                                </>
+                              )}
+                            </p>
+                          </div>
+                        )}
+
+                        {completion.rpeRating !== null && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">RPE</p>
+                            <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                              completion.rpeRating <= 6
+                                ? 'bg-green-100 text-green-800'
+                                : completion.rpeRating <= 8
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {completion.rpeRating}/10
+                            </span>
+                          </div>
+                        )}
+
+                        {completion.painLevel !== null && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Pain</p>
+                            <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                              completion.painLevel <= 2
+                                ? 'bg-green-100 text-green-800'
+                                : completion.painLevel <= 4
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {completion.painLevel}/10
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {completion.notes && (
+                        <div className="pt-3 border-t border-gray-200">
+                          <p className="text-xs text-gray-500 mb-1">Notes</p>
+                          <p className="text-sm text-gray-700">{completion.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                /* Desktop/Clinician Table View */
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Date</th>
@@ -483,6 +603,8 @@ export const ProgressAnalytics = ({ patientId, apiUrl }: ProgressAnalyticsProps)
                 </tbody>
               </table>
             </div>
+              )}
+            </>
           )}
         </div>
       )}
