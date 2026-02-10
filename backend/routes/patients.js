@@ -60,6 +60,10 @@ async function formatPatientWithPrograms(patient) {
        ORDER BY completion_date DESC`,
       [exerciseIds, patient.id]
     );
+    console.log(`[DEBUG] Loaded ${completions.length} completions for patient ${patient.id}`);
+    if (completions.length > 0) {
+      console.log('[DEBUG] Sample completion:', completions[0]);
+    }
   }
 
   // Create a Map for O(1) lookup with completion data
@@ -116,6 +120,10 @@ async function formatPatientWithPrograms(patient) {
           notes: c.notes
         };
       });
+
+    if (Object.keys(allExerciseCompletions).length > 0) {
+      console.log(`[DEBUG] Exercise ${ex.id} (${ex.exercise_name}) has completions:`, Object.keys(allExerciseCompletions));
+    }
 
     exercisesByProgram[ex.program_id].push({
       id: ex.id,
