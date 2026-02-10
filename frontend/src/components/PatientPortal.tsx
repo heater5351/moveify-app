@@ -115,11 +115,25 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
     return `${Math.abs(weekOffset)} Weeks Ago`;
   };
   const selectedDayShort = daysOfWeek[selectedWeekDay];
+  const selectedDate = weekDates[selectedWeekDay];
+  const selectedDateString = selectedDate.toISOString().split('T')[0];
 
   const selectedProgram = patient.assignedPrograms[selectedProgramIndex];
 
   const hasExercisesToday = selectedProgram.config.frequency.includes(selectedDayShort);
-  const todaysExercises = hasExercisesToday ? selectedProgram.exercises : [];
+
+  // Enrich exercises with completion data for the selected date
+  const todaysExercises = hasExercisesToday
+    ? selectedProgram.exercises.map(ex => {
+        const completionForDate = ex.allCompletions?.[selectedDateString];
+        return {
+          ...ex,
+          completed: !!completionForDate,
+          completionData: completionForDate || null
+        };
+      })
+    : [];
+
   const isProgramCompleted = selectedProgram.config.duration === 'completed';
 
   return (

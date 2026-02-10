@@ -39,13 +39,20 @@ async function formatPatientWithPrograms(patient) {
     [programIds]
   );
 
-  // Get ALL today's completions for this patient in ONE query
+  // Get completions for the past 7 days and next 7 days (14 day window)
+  // This allows the frontend to show completion status for any day in the calendar
   const exerciseIds = allExercises.map(ex => ex.id);
   let completions = [];
   if (exerciseIds.length > 0) {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7); // 7 days ago
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 7); // 7 days from now
+
     completions = await db.getAll(
       `SELECT
         exercise_id,
+        completion_date,
         sets_performed as "setsPerformed",
         reps_performed as "repsPerformed",
         weight_performed as "weightPerformed",
@@ -55,21 +62,40 @@ async function formatPatientWithPrograms(patient) {
        FROM exercise_completions
        WHERE exercise_id = ANY($1)
        AND patient_id = $2
-       AND completion_date = $3`,
-      [exerciseIds, patient.id, today]
+       AND completion_date >= $3
+       AND completion_date <= $4`,
+      [exerciseIds, patient.id, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]
     );
   }
 
   // Create a Map for O(1) lookup with completion data
-  const completionDataMap = new Map(
-    completions.map(c => [c.exercise_id, {
+  // Key format: "exerciseId-date" to support multiple completions per exercise
+  const completionDataMap = new Map();
+  completions.forEach(c => {
+    const key = `${c.exercise_id}-${c.completion_date}`;
+    completionDataMap.set(key, {
       setsPerformed: c.setsPerformed,
       repsPerformed: c.repsPerformed,
       weightPerformed: c.weightPerformed,
       rpeRating: c.rpeRating,
       painLevel: c.painLevel,
-      notes: c.notes
-    }])
+      notes: c.notes,
+      completionDate: c.completion_date
+    });
+  });
+
+  // Also create a map for today's completions for backwards compatibility
+  const todayCompletionMap = new Map(
+    completions
+      .filter(c => c.completion_date === today)
+      .map(c => [c.exercise_id, {
+        setsPerformed: c.setsPerformed,
+        repsPerformed: c.repsPerformed,
+        weightPerformed: c.weightPerformed,
+        rpeRating: c.rpeRating,
+        painLevel: c.painLevel,
+        notes: c.notes
+      }])
   );
 
   // Group exercises by program
@@ -78,7 +104,25 @@ async function formatPatientWithPrograms(patient) {
     if (!exercisesByProgram[ex.program_id]) {
       exercisesByProgram[ex.program_id] = [];
     }
-    const completionData = completionDataMap.get(ex.id);
+
+    // Get today's completion for the completed flag
+    const todayCompletion = todayCompletionMap.get(ex.id);
+
+    // Get all completions for this exercise across all dates
+    const allExerciseCompletions = {};
+    completions
+      .filter(c => c.exercise_id === ex.id)
+      .forEach(c => {
+        allExerciseCompletions[c.completion_date] = {
+          setsPerformed: c.setsPerformed,
+          repsPerformed: c.repsPerformed,
+          weightPerformed: c.weightPerformed,
+          rpeRating: c.rpeRating,
+          painLevel: c.painLevel,
+          notes: c.notes
+        };
+      });
+
     exercisesByProgram[ex.program_id].push({
       id: ex.id,
       name: ex.exercise_name,
@@ -89,8 +133,9 @@ async function formatPatientWithPrograms(patient) {
       holdTime: ex.hold_time,
       instructions: ex.instructions,
       image: ex.image_url,
-      completed: completionDataMap.has(ex.id),
-      completionData: completionData || null,
+      completed: todayCompletionMap.has(ex.id),
+      completionData: todayCompletion || null,
+      allCompletions: allExerciseCompletions, // All completions by date
       enablePeriodization: ex.auto_adjust_enabled !== false
     });
   });

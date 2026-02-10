@@ -27,6 +27,7 @@ export type ProgramExercise = Exercise & {
   holdTime?: string;
   instructions?: string;
   completionData?: CompletionData;
+  allCompletions?: { [date: string]: CompletionData }; // All completions by date (YYYY-MM-DD)
   enablePeriodization?: boolean;
 }
 
