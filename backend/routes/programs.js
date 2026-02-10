@@ -631,7 +631,7 @@ router.get('/exercise-completions/patient/:patientId', async (req, res) => {
       JOIN program_exercises pe ON ec.exercise_id = pe.id
       WHERE ec.patient_id = $1
         AND ec.completion_date >= $2
-      ORDER BY ec.completion_date DESC, ec.created_at DESC
+      ORDER BY ec.completion_date DESC, ec.completed_at DESC
     `, [patientId, startDateStr]);
 
     res.json({ completions });
