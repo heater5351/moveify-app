@@ -44,7 +44,15 @@ async function formatPatientWithPrograms(patient) {
   let completions = [];
   if (exerciseIds.length > 0) {
     completions = await db.getAll(
-      `SELECT exercise_id FROM exercise_completions
+      `SELECT
+        exercise_id,
+        sets_performed as "setsPerformed",
+        reps_performed as "repsPerformed",
+        weight_performed as "weightPerformed",
+        rpe_rating as "rpeRating",
+        pain_level as "painLevel",
+        notes
+       FROM exercise_completions
        WHERE exercise_id = ANY($1)
        AND patient_id = $2
        AND completion_date = $3`,
@@ -52,8 +60,17 @@ async function formatPatientWithPrograms(patient) {
     );
   }
 
-  // Create a Set for O(1) lookup
-  const completedExerciseIds = new Set(completions.map(c => c.exercise_id));
+  // Create a Map for O(1) lookup with completion data
+  const completionDataMap = new Map(
+    completions.map(c => [c.exercise_id, {
+      setsPerformed: c.setsPerformed,
+      repsPerformed: c.repsPerformed,
+      weightPerformed: c.weightPerformed,
+      rpeRating: c.rpeRating,
+      painLevel: c.painLevel,
+      notes: c.notes
+    }])
+  );
 
   // Group exercises by program
   const exercisesByProgram = {};
@@ -61,6 +78,7 @@ async function formatPatientWithPrograms(patient) {
     if (!exercisesByProgram[ex.program_id]) {
       exercisesByProgram[ex.program_id] = [];
     }
+    const completionData = completionDataMap.get(ex.id);
     exercisesByProgram[ex.program_id].push({
       id: ex.id,
       name: ex.exercise_name,
@@ -71,7 +89,8 @@ async function formatPatientWithPrograms(patient) {
       holdTime: ex.hold_time,
       instructions: ex.instructions,
       image: ex.image_url,
-      completed: completedExerciseIds.has(ex.id),
+      completed: completionDataMap.has(ex.id),
+      completionData: completionData || null,
       enablePeriodization: ex.auto_adjust_enabled !== false
     });
   });
