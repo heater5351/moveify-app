@@ -416,10 +416,18 @@ function App() {
         ...updatedPrograms[programIndex],
         exercises: [...updatedPrograms[programIndex].exercises]
       };
+
+      // Update allCompletions with the new completion data
+      const updatedAllCompletions = { ...exercise.allCompletions };
+      if (completionData?.completionDate) {
+        updatedAllCompletions[completionData.completionDate] = completionData;
+      }
+
       updatedPrograms[programIndex].exercises[exerciseIndex] = {
         ...exercise,
         completed: newCompletedStatus,
-        completionData: completionData
+        completionData: completionData,
+        allCompletions: updatedAllCompletions
       };
       const updatedPatient = { ...loggedInPatient, assignedPrograms: updatedPrograms };
       setLoggedInPatient(updatedPatient);
