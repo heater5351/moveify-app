@@ -62,19 +62,28 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
   const [programs, setPrograms] = useState<Array<{ id: number; frequency: string[]; startDate: string }>>([]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchPrograms(); // Fetch program details for frequency data
-    if (activeView === 'completions') {
-      fetchExerciseCompletions();
-    } else if (activeView === 'checkins') {
-      fetchCheckIns();
-    } else if (activeView === 'adjustments') {
-      fetchProgressionLogs();
-    } else if (activeView === 'overview') {
-      // Fetch completions data for overview stats
-      fetchExerciseCompletions();
-    }
-    setLoading(false);
+    const loadData = async () => {
+      setLoading(true);
+
+      // Fetch program details for frequency data
+      await fetchPrograms();
+
+      // Fetch view-specific data
+      if (activeView === 'completions') {
+        await fetchExerciseCompletions();
+      } else if (activeView === 'checkins') {
+        await fetchCheckIns();
+      } else if (activeView === 'adjustments') {
+        await fetchProgressionLogs();
+      } else if (activeView === 'overview') {
+        // Fetch completions data for overview stats
+        await fetchExerciseCompletions();
+      }
+
+      setLoading(false);
+    };
+
+    loadData();
   }, [patientId, timeRange, activeView]);
 
   const fetchPrograms = async () => {
@@ -82,12 +91,16 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       const response = await fetch(`${apiUrl}/programs/patient/${patientId}`);
       if (response.ok) {
         const data = await response.json();
+        console.log('Raw programs data:', data.programs);
+
         // Extract id, frequency, and startDate from programs
         const programDetails = (data.programs || []).map((p: any) => ({
           id: p.id,
           frequency: p.frequency || [],
           startDate: p.startDate || p.start_date
         }));
+
+        console.log('Processed program details:', programDetails);
         setPrograms(programDetails);
       }
     } catch (error) {
@@ -141,6 +154,10 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
 
   // Calculate stats from exercise completions data
   const calculateOverviewStats = () => {
+    console.log('calculateOverviewStats called');
+    console.log('Programs available:', programs);
+    console.log('Exercise completions:', exerciseCompletions.length);
+
     if (exerciseCompletions.length === 0) {
       return {
         totalCompleted: 0,
@@ -261,13 +278,21 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       if (prescribedDays.size > 0) {
         const completedPrescribedDays = Array.from(uniqueDates).filter(date => prescribedDays.has(date)).length;
         consistencyScore = Math.round((completedPrescribedDays / prescribedDays.size) * 100);
+        console.log('Consistency calculation:', {
+          prescribedDaysCount: prescribedDays.size,
+          completedPrescribedDays,
+          consistencyScore,
+          prescribedDays: Array.from(prescribedDays).slice(0, 5)
+        });
       } else {
         // Fallback: if no frequency defined, use simple calculation
         consistencyScore = Math.round((uniqueDates.size / timeRange) * 100);
+        console.log('Consistency fallback (no frequency):', consistencyScore);
       }
     } else {
       // Fallback: if no programs loaded yet, use simple calculation
       consistencyScore = Math.round((uniqueDates.size / timeRange) * 100);
+      console.log('Consistency fallback (no programs):', consistencyScore);
     }
 
     // Weight progression: group by exercise name and track weight over time
