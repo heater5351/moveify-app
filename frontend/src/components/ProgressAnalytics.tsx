@@ -154,6 +154,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       return {
         totalCompleted: 0,
         consistencyScore: 0,
+        streak: 0,
         weightProgression: [],
         weeklyActivity: []
       };
@@ -162,8 +163,31 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
     // Total exercises completed
     const totalCompleted = exerciseCompletions.length;
 
-    // Consistency score: % of days with at least 1 exercise in the time range
+    // Get unique completion dates
     const uniqueDates = new Set(exerciseCompletions.map(c => c.completionDate));
+    const sortedDates = Array.from(uniqueDates).sort((a, b) =>
+      new Date(b).getTime() - new Date(a).getTime()
+    );
+
+    // Calculate streak: count consecutive days with completions going backwards from today
+    let streak = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (let i = 0; i < 365; i++) {
+      const checkDate = new Date(today);
+      checkDate.setDate(checkDate.getDate() - i);
+      const dateStr = checkDate.toISOString().split('T')[0];
+
+      if (sortedDates.includes(dateStr)) {
+        streak++;
+      } else if (i > 0) {
+        // Stop counting if we hit a day without completions (but allow today to be empty)
+        break;
+      }
+    }
+
+    // Consistency score: simple calculation of active days
     const consistencyScore = Math.round((uniqueDates.size / timeRange) * 100);
 
     // Weight progression: group by exercise name and track weight over time
@@ -221,15 +245,13 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
     return {
       totalCompleted,
       consistencyScore,
+      streak,
       weightProgression,
       weeklyActivity
     };
   };
 
   const overviewStats = calculateOverviewStats();
-
-  // Get overall stats across all programs (for backward compatibility)
-  const overallStreak = analytics.length > 0 ? Math.max(...analytics.map(a => a.streak)) : 0;
 
   return (
     <div className="space-y-6">
@@ -350,7 +372,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs sm:text-sm font-medium opacity-90">Current Streak</p>
-                      <p className="text-3xl sm:text-4xl font-bold mt-1">{overallStreak}</p>
+                      <p className="text-3xl sm:text-4xl font-bold mt-1">{overviewStats.streak}</p>
                       <p className="text-xs opacity-80 mt-0.5">days</p>
                     </div>
                     <Flame className="opacity-80" size={isPatientView ? 36 : 40} />
