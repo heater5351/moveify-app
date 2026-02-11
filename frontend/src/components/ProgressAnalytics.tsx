@@ -1,20 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, Flame, Calendar, BarChart3, Activity, Heart, Zap } from 'lucide-react';
 
-interface CompletionData {
-  date: string;
-  count: number;
-}
-
-interface ProgramAnalytics {
-  programId: number;
-  programName: string;
-  totalExercises: number;
-  completions: CompletionData[];
-  streak: number;
-  completionRate: number;
-}
-
 interface ExerciseCompletion {
   id: number;
   exerciseName: string;
