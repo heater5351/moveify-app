@@ -168,115 +168,28 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       new Date(b).getTime() - new Date(a).getTime()
     );
 
-    // Calculate streak: count consecutive PRESCRIBED days with completions going backwards from today
+    // Calculate streak: count consecutive days with completions going backwards from today
     let streak = 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    if (programs.length > 0 && programs.some(p => p.frequency && p.frequency.length > 0)) {
-      // Build set of prescribed days based on program frequencies
-      const dayMap: { [key: string]: number } = {
-        'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
-      };
+    // Simple streak: count backwards from today until we hit a day without completions
+    for (let i = 0; i < 365; i++) {
+      const checkDate = new Date(today);
+      checkDate.setDate(checkDate.getDate() - i);
+      const dateStr = checkDate.toISOString().split('T')[0];
 
-      // Collect all prescribed day indices from all programs
-      const prescribedDayIndices = new Set<number>();
-      for (const program of programs) {
-        if (program.frequency && program.frequency.length > 0) {
-          program.frequency.forEach(day => {
-            const dayIndex = dayMap[day];
-            if (dayIndex !== undefined) {
-              prescribedDayIndices.add(dayIndex);
-            }
-          });
-        }
-      }
-
-      // Count consecutive prescribed days with completions
-      let missedPrescribedDay = false;
-      for (let i = 0; i < 365; i++) {
-        const checkDate = new Date(today);
-        checkDate.setDate(checkDate.getDate() - i);
-        const dateStr = checkDate.toISOString().split('T')[0];
-        const dayOfWeek = checkDate.getDay();
-
-        // Only check prescribed days
-        if (prescribedDayIndices.has(dayOfWeek)) {
-          if (sortedDates.includes(dateStr)) {
-            if (!missedPrescribedDay) {
-              streak++;
-            }
-          } else {
-            // Missed a prescribed day - stop counting
-            if (i > 0) {
-              missedPrescribedDay = true;
-              break;
-            }
-          }
-        }
-        // Non-prescribed days don't break the streak
-      }
-    } else {
-      // Fallback: if no frequency data, count all consecutive days
-      for (let i = 0; i < 365; i++) {
-        const checkDate = new Date(today);
-        checkDate.setDate(checkDate.getDate() - i);
-        const dateStr = checkDate.toISOString().split('T')[0];
-
-        if (sortedDates.includes(dateStr)) {
-          streak++;
-        } else if (i > 0) {
-          // Stop counting if we hit a day without completions (but allow today to be empty)
-          break;
-        }
+      if (sortedDates.includes(dateStr)) {
+        streak++;
+      } else if (i > 0) {
+        // Stop counting if we hit a day without completions (but allow today to be empty)
+        break;
       }
     }
 
-    // Consistency score: calculate based on prescribed frequency days
-    let consistencyScore = 0;
-
-    if (programs.length > 0) {
-      // Calculate total prescribed days based on program frequencies
-      // Reuse the 'today' variable already defined above
-
-      // Get all prescribed days in the time range
-      const prescribedDays = new Set<string>();
-
-      for (const program of programs) {
-        if (program.frequency && program.frequency.length > 0) {
-          // Map day names to day indices (0 = Sunday, 1 = Monday, etc.)
-          const dayMap: { [key: string]: number } = {
-            'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
-          };
-
-          const programDayIndices = program.frequency.map(d => dayMap[d]).filter(i => i !== undefined);
-
-          // Check each day in the time range
-          for (let i = 0; i < timeRange; i++) {
-            const checkDate = new Date(today);
-            checkDate.setDate(checkDate.getDate() - i);
-            const dayOfWeek = checkDate.getDay();
-
-            // If this day matches the program frequency, add it
-            if (programDayIndices.includes(dayOfWeek)) {
-              prescribedDays.add(checkDate.toISOString().split('T')[0]);
-            }
-          }
-        }
-      }
-
-      // Calculate consistency: completed days / prescribed days
-      if (prescribedDays.size > 0) {
-        const completedPrescribedDays = Array.from(uniqueDates).filter(date => prescribedDays.has(date)).length;
-        consistencyScore = Math.round((completedPrescribedDays / prescribedDays.size) * 100);
-      } else {
-        // Fallback: if no frequency defined, use simple calculation
-        consistencyScore = Math.round((uniqueDates.size / timeRange) * 100);
-      }
-    } else {
-      // Fallback: if no programs loaded yet, use simple calculation
-      consistencyScore = Math.round((uniqueDates.size / timeRange) * 100);
-    }
+    // Consistency score: percentage of days with activity in the time range
+    // Simple metric: active days / total days
+    const consistencyScore = Math.round((uniqueDates.size / timeRange) * 100);
 
     // Weight progression: group by exercise name and track weight over time
     const weightByExercise = new Map<string, Array<{date: string, weight: number}>>();
