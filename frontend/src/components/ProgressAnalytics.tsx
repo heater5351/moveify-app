@@ -83,6 +83,9 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       fetchCheckIns();
     } else if (activeView === 'adjustments') {
       fetchProgressionLogs();
+    } else if (activeView === 'overview') {
+      // Fetch completions data for overview stats
+      fetchExerciseCompletions();
     }
   }, [patientId, timeRange, activeView]);
 
@@ -145,14 +148,57 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
     );
   }
 
-  // Get overall stats across all programs
-  const overallStreak = Math.max(...analytics.map(a => a.streak));
-  const averageCompletionRate = Math.round(
-    analytics.reduce((sum, a) => sum + a.completionRate, 0) / analytics.length
-  );
+  // Calculate stats from exercise completions data
+  const calculateOverviewStats = () => {
+    if (exerciseCompletions.length === 0) {
+      return {
+        totalCompleted: 0,
+        consistencyScore: 0,
+        weightProgression: [],
+        weeklyActivity: []
+      };
+    }
 
-  // Prepare chart data
-  const getChartData = (program: ProgramAnalytics) => {
+    // Total exercises completed
+    const totalCompleted = exerciseCompletions.length;
+
+    // Consistency score: % of days with at least 1 exercise in the time range
+    const uniqueDates = new Set(exerciseCompletions.map(c => c.completionDate));
+    const consistencyScore = Math.round((uniqueDates.size / timeRange) * 100);
+
+    // Weight progression: group by exercise name and track weight over time
+    const weightByExercise = new Map<string, Array<{date: string, weight: number}>>();
+    exerciseCompletions.forEach(c => {
+      if (c.weightPerformed && c.weightPerformed > 0) {
+        if (!weightByExercise.has(c.exerciseName)) {
+          weightByExercise.set(c.exerciseName, []);
+        }
+        weightByExercise.get(c.exerciseName)!.push({
+          date: c.completionDate,
+          weight: c.weightPerformed
+        });
+      }
+    });
+
+    // Calculate weight progression for exercises with weight
+    const weightProgression = Array.from(weightByExercise.entries()).map(([name, data]) => {
+      const sorted = data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const firstWeight = sorted[0]?.weight || 0;
+      const lastWeight = sorted[sorted.length - 1]?.weight || 0;
+      const change = lastWeight - firstWeight;
+      const changePercent = firstWeight > 0 ? Math.round((change / firstWeight) * 100) : 0;
+
+      return {
+        exerciseName: name,
+        startWeight: firstWeight,
+        currentWeight: lastWeight,
+        change,
+        changePercent,
+        dataPoints: sorted
+      };
+    }).filter(ex => ex.change !== 0 || ex.dataPoints.length > 1); // Only show exercises with progression
+
+    // Weekly activity: count completions per day
     const days: Date[] = [];
     const today = new Date();
     for (let i = timeRange - 1; i >= 0; i--) {
@@ -161,17 +207,32 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       days.push(date);
     }
 
-    return days.map(day => {
+    const weeklyActivity = days.map(day => {
       const dateStr = day.toISOString().split('T')[0];
-      const completion = program.completions.find(c => c.date === dateStr);
+      const count = exerciseCompletions.filter(c => c.completionDate === dateStr).length;
       return {
         date: dateStr,
         dayLabel: day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        count: completion?.count || 0,
-        maxCount: program.totalExercises
+        weekday: day.toLocaleDateString('en-US', { weekday: 'short' }),
+        count
       };
     });
+
+    return {
+      totalCompleted,
+      consistencyScore,
+      weightProgression,
+      weeklyActivity
+    };
   };
+
+  const overviewStats = calculateOverviewStats();
+
+  // Get overall stats across all programs (for backward compatibility)
+  const overallStreak = analytics.length > 0 ? Math.max(...analytics.map(a => a.streak)) : 0;
+  const averageCompletionRate = analytics.length > 0
+    ? Math.round(analytics.reduce((sum, a) => sum + a.completionRate, 0) / analytics.length)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -266,118 +327,168 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       {/* OVERVIEW VIEW */}
       {activeView === 'overview' && (
         <>
-          {analytics.length === 0 ? (
+          {exerciseCompletions.length === 0 ? (
             <div className="text-center py-12">
               <BarChart3 className="mx-auto text-gray-400 mb-4" size={48} />
               <p className="text-gray-500">No progress data yet</p>
               <p className="text-gray-400 text-sm mt-2">Start completing exercises to see your progress</p>
             </div>
           ) : (
-            <>
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-          <div className="flex items-center gap-3">
-            <Flame className="text-orange-600" size={32} />
-            <div>
-              <p className="text-sm text-orange-700 font-medium">Current Streak</p>
-              <p className="text-2xl font-bold text-orange-900">{overallStreak} days</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center gap-3">
-            <TrendingUp className="text-green-600" size={32} />
-            <div>
-              <p className="text-sm text-green-700 font-medium">Completion Rate</p>
-              <p className="text-2xl font-bold text-green-900">{averageCompletionRate}%</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-primary-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center gap-3">
-            <Calendar className="text-moveify-teal" size={32} />
-            <div>
-              <p className="text-sm text-blue-700 font-medium">Active Programs</p>
-              <p className="text-2xl font-bold text-blue-900">{analytics.length}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Progress Charts by Program */}
-      {analytics.map((program) => {
-        const chartData = getChartData(program);
-        const maxHeight = 100; // pixels
-
-        return (
-          <div key={program.programId} className="bg-white border border-gray-200 rounded-lg p-6">
-            <div className="mb-4">
-              <h4 className="font-semibold text-gray-900">{program.programName}</h4>
-              <div className="flex items-center gap-4 mt-2 text-sm">
-                <span className="text-gray-600">
-                  <span className="font-medium text-gray-900">{program.streak}</span> day streak
-                </span>
-                <span className="text-gray-600">
-                  <span className="font-medium text-gray-900">{program.completionRate}%</span> completion rate
-                </span>
-              </div>
-            </div>
-
-            {/* Bar Chart */}
-            <div className="relative">
-              <div className="flex items-end justify-between gap-1 h-32">
-                {chartData.map((day, index) => {
-                  const heightPercent = day.maxCount > 0 ? (day.count / day.maxCount) * 100 : 0;
-                  const barHeight = (heightPercent / 100) * maxHeight;
-
-                  return (
-                    <div
-                      key={index}
-                      className="flex-1 flex flex-col items-center group relative"
-                    >
-                      {/* Tooltip */}
-                      {day.count > 0 && (
-                        <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
-                          {day.dayLabel}: {day.count}/{day.maxCount} exercises
-                        </div>
-                      )}
-
-                      {/* Bar */}
-                      <div
-                        className={`w-full rounded-t transition-all ${
-                          day.count > 0
-                            ? 'bg-primary-500 hover:bg-blue-600'
-                            : 'bg-gray-200'
-                        }`}
-                        style={{ height: `${barHeight}px`, minHeight: day.count > 0 ? '8px' : '4px' }}
-                      />
-
-                      {/* Day Label (show fewer on mobile) */}
-                      {(index % Math.ceil(timeRange / 7) === 0 || timeRange === 7) && (
-                        <span className="text-xs text-gray-500 mt-1 rotate-0">
-                          {day.dayLabel.split(' ')[1]}
-                        </span>
-                      )}
+            <div className="space-y-4">
+              {/* Key Metrics - Mobile Friendly */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                {/* Total Exercises Completed */}
+                <div className="bg-gradient-to-br from-moveify-teal to-moveify-ocean rounded-xl p-4 sm:p-5 text-white shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs sm:text-sm font-medium opacity-90">Exercises Completed</p>
+                      <p className="text-3xl sm:text-4xl font-bold mt-1">{overviewStats.totalCompleted}</p>
                     </div>
-                  );
-                })}
+                    <Activity className="opacity-80" size={isPatientView ? 36 : 40} />
+                  </div>
+                </div>
+
+                {/* Current Streak */}
+                <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-4 sm:p-5 text-white shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs sm:text-sm font-medium opacity-90">Current Streak</p>
+                      <p className="text-3xl sm:text-4xl font-bold mt-1">{overallStreak}</p>
+                      <p className="text-xs opacity-80 mt-0.5">days</p>
+                    </div>
+                    <Flame className="opacity-80" size={isPatientView ? 36 : 40} />
+                  </div>
+                </div>
+
+                {/* Consistency Score */}
+                <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-4 sm:p-5 text-white shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs sm:text-sm font-medium opacity-90">Consistency</p>
+                      <p className="text-3xl sm:text-4xl font-bold mt-1">{overviewStats.consistencyScore}%</p>
+                      <p className="text-xs opacity-80 mt-0.5">active days</p>
+                    </div>
+                    <Calendar className="opacity-80" size={isPatientView ? 36 : 40} />
+                  </div>
+                </div>
               </div>
 
-              {/* Y-axis label */}
-              <div className="absolute -left-8 top-0 text-xs text-gray-500">
-                {program.totalExercises}
+              {/* Activity Chart - Simple Bar Chart */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6">
+                <h4 className="font-semibold text-gray-900 mb-4 text-sm sm:text-base">Activity Overview</h4>
+                <div className="space-y-3">
+                  {/* Weekly summary */}
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
+                    <span className="text-gray-600">Last {timeRange} days</span>
+                    <span className="font-medium text-gray-900">
+                      {overviewStats.weeklyActivity.filter(d => d.count > 0).length} active days
+                    </span>
+                  </div>
+
+                  {/* Simple bar visualization */}
+                  <div className="relative h-24 sm:h-32">
+                    <div className="absolute inset-0 flex items-end justify-between gap-0.5 sm:gap-1">
+                      {overviewStats.weeklyActivity.map((day, index) => {
+                        const maxCount = Math.max(...overviewStats.weeklyActivity.map(d => d.count), 1);
+                        const heightPercent = (day.count / maxCount) * 100;
+
+                        return (
+                          <div
+                            key={index}
+                            className="flex-1 flex flex-col items-center group relative"
+                            style={{ minWidth: '8px' }}
+                          >
+                            {/* Tooltip */}
+                            {day.count > 0 && (
+                              <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10 pointer-events-none">
+                                {day.dayLabel}: {day.count} {day.count === 1 ? 'exercise' : 'exercises'}
+                              </div>
+                            )}
+
+                            {/* Bar */}
+                            <div
+                              className={`w-full rounded-t transition-all ${
+                                day.count > 0
+                                  ? 'bg-moveify-teal hover:bg-moveify-ocean'
+                                  : 'bg-gray-200'
+                              }`}
+                              style={{
+                                height: day.count > 0 ? `${heightPercent}%` : '4px',
+                                minHeight: day.count > 0 ? '8px' : '4px'
+                              }}
+                            />
+
+                            {/* Day label - show less on mobile */}
+                            {(timeRange === 7 || index % Math.ceil(timeRange / 7) === 0) && (
+                              <span className="text-xs text-gray-500 mt-1 hidden sm:block">
+                                {day.dayLabel.split(' ')[1]}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Legend for mobile */}
+                  <div className="flex items-center justify-center gap-4 text-xs text-gray-500 pt-2 border-t border-gray-200">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded bg-moveify-teal"></div>
+                      <span>Active day</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded bg-gray-200"></div>
+                      <span>Rest day</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="absolute -left-8 bottom-0 text-xs text-gray-500">
-                0
-              </div>
+
+              {/* Weight Progression */}
+              {overviewStats.weightProgression.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2 text-sm sm:text-base">
+                    <TrendingUp size={18} className="text-green-600" />
+                    Weight Progression
+                  </h4>
+                  <div className="space-y-3">
+                    {overviewStats.weightProgression.slice(0, 5).map((exercise, index) => (
+                      <div key={index} className="border-b border-gray-100 last:border-0 pb-3 last:pb-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs sm:text-sm font-medium text-gray-900 truncate pr-2">
+                            {exercise.exerciseName}
+                          </p>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className={`text-xs sm:text-sm font-bold ${
+                              exercise.change > 0 ? 'text-green-600' : exercise.change < 0 ? 'text-red-600' : 'text-gray-600'
+                            }`}>
+                              {exercise.change > 0 ? '+' : ''}{exercise.change} kg
+                            </span>
+                            {exercise.changePercent !== 0 && (
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                exercise.change > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                              }`}>
+                                {exercise.changePercent > 0 ? '+' : ''}{exercise.changePercent}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <span>{exercise.startWeight} kg</span>
+                          <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full ${exercise.change > 0 ? 'bg-green-500' : 'bg-gray-400'}`}
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                          <span className="font-medium text-gray-900">{exercise.currentWeight} kg</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        );
-      })}
-            </>
           )}
         </>
       )}
