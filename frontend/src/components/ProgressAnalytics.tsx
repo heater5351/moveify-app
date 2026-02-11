@@ -230,9 +230,6 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
 
   // Get overall stats across all programs (for backward compatibility)
   const overallStreak = analytics.length > 0 ? Math.max(...analytics.map(a => a.streak)) : 0;
-  const averageCompletionRate = analytics.length > 0
-    ? Math.round(analytics.reduce((sum, a) => sum + a.completionRate, 0) / analytics.length)
-    : 0;
 
   return (
     <div className="space-y-6">
