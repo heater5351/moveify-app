@@ -188,44 +188,61 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       }
     }
 
-    // Completion rate: completed exercises / prescribed exercises
-    // Calculate how many exercises were prescribed in the time range
+    // ============================================================
+    // COMPLETION RATE CALCULATION
+    // Formula: (Exercises Completed / Exercises Prescribed) × 100%
+    //
+    // Example: If 3 exercises are assigned on Mon/Wed/Fri (9 total per week),
+    // and patient completes 6 exercises that week, rate = (6/9) × 100 = 67%
+    // ============================================================
     let completionRate = 0;
 
-    if (programs.length > 0 && programs[0].frequency.length > 0 && programs[0].exerciseCount > 0) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    // Step 1: Check if we have the required program data
+    const hasValidProgram = programs.length > 0 &&
+                            programs[0].frequency &&
+                            programs[0].frequency.length > 0 &&
+                            programs[0].exerciseCount > 0;
 
-      // Map day names to indices
-      const dayMap: { [key: string]: number } = {
+    if (hasValidProgram) {
+      // Step 2: Map day abbreviations to JavaScript day indices (0=Sunday, 6=Saturday)
+      const dayNameToIndex: { [key: string]: number } = {
         'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
       };
 
+      // Step 3: Convert frequency array (e.g., ['Mon', 'Wed', 'Fri']) to day indices (e.g., [1, 3, 5])
       const prescribedDayIndices = programs[0].frequency
-        .map(d => dayMap[d])
-        .filter(i => i !== undefined);
+        .map(dayName => dayNameToIndex[dayName])
+        .filter(index => index !== undefined);
 
-      // Count how many prescribed days are in the time range
-      let prescribedDaysCount = 0;
-      for (let i = 0; i < timeRange; i++) {
-        const checkDate = new Date(today);
-        checkDate.setDate(checkDate.getDate() - i);
-        const dayOfWeek = checkDate.getDay();
+      // Step 4: Count how many prescribed days fall within the time range
+      let prescribedDaysInRange = 0;
+      const referenceDate = new Date();
+      referenceDate.setHours(0, 0, 0, 0);
+
+      for (let daysAgo = 0; daysAgo < timeRange; daysAgo++) {
+        const checkDate = new Date(referenceDate);
+        checkDate.setDate(checkDate.getDate() - daysAgo);
+        const dayOfWeek = checkDate.getDay(); // 0-6
 
         if (prescribedDayIndices.includes(dayOfWeek)) {
-          prescribedDaysCount++;
+          prescribedDaysInRange++;
         }
       }
 
-      // Total prescribed exercises = prescribed days × exercises per day
-      const totalPrescribedExercises = prescribedDaysCount * programs[0].exerciseCount;
+      // Step 5: Calculate total prescribed exercises
+      // Total = (number of prescribed days) × (exercises per day)
+      const exercisesPerDay = programs[0].exerciseCount;
+      const totalPrescribedExercises = prescribedDaysInRange * exercisesPerDay;
 
-      // Completion rate = exercises completed / exercises prescribed
+      // Step 6: Calculate completion rate
+      // Rate = (completed / prescribed) × 100, capped at 100%
       if (totalPrescribedExercises > 0) {
-        completionRate = Math.round((totalCompleted / totalPrescribedExercises) * 100);
+        const rawRate = (totalCompleted / totalPrescribedExercises) * 100;
+        completionRate = Math.min(Math.round(rawRate), 100); // Cap at 100%
       }
     } else {
-      // Fallback: if no program data, just show activity percentage
+      // Fallback when no program data: show percentage of days with any activity
+      // This is less accurate but provides some metric when program info is unavailable
       completionRate = Math.round((uniqueDates.size / timeRange) * 100);
     }
 
