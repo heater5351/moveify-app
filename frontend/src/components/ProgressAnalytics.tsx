@@ -64,7 +64,6 @@ interface ProgressAnalyticsProps {
 }
 
 export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: ProgressAnalyticsProps) => {
-  const [analytics, setAnalytics] = useState<ProgramAnalytics[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<7 | 14 | 30>(30);
   const [activeView, setActiveView] = useState<'overview' | 'completions' | 'checkins' | 'adjustments'>('overview');
@@ -77,7 +76,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
   const [programs, setPrograms] = useState<Array<{ id: number; frequency: string[]; startDate: string }>>([]);
 
   useEffect(() => {
-    fetchAnalytics();
+    setLoading(true);
     fetchPrograms(); // Fetch program details for frequency data
     if (activeView === 'completions') {
       fetchExerciseCompletions();
@@ -89,22 +88,8 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       // Fetch completions data for overview stats
       fetchExerciseCompletions();
     }
+    setLoading(false);
   }, [patientId, timeRange, activeView]);
-
-  const fetchAnalytics = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${apiUrl}/programs/analytics/patient/${patientId}?days=${timeRange}`);
-      if (response.ok) {
-        const data = await response.json();
-        setAnalytics(data.programs || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch analytics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchPrograms = async () => {
     try {
@@ -258,8 +243,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
 
     if (programs.length > 0) {
       // Calculate total prescribed days based on program frequencies
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Reuse the 'today' variable already defined above
 
       // Get all prescribed days in the time range
       const prescribedDays = new Set<string>();
@@ -334,7 +318,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
 
     // Weekly activity: count completions per day
     const days: Date[] = [];
-    const today = new Date();
+    // Reuse the 'today' variable already defined above
     for (let i = timeRange - 1; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
