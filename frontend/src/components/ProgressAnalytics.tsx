@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, Flame, Calendar, BarChart3, Activity, Heart, Zap } from 'lucide-react';
 
 interface ExerciseCompletion {
@@ -157,8 +157,8 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
     );
   }
 
-  // Calculate stats from exercise completions data
-  const calculateOverviewStats = () => {
+  // Calculate stats from exercise completions data using useMemo
+  const overviewStats = useMemo(() => {
     console.log('calculateOverviewStats called');
     console.log('Programs available:', programs);
     console.log('Exercise completions:', exerciseCompletions.length);
@@ -359,9 +359,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       weightProgression,
       weeklyActivity
     };
-  };
-
-  const overviewStats = calculateOverviewStats();
+  }, [exerciseCompletions, programs, timeRange]); // Only recalculate when these change
 
   return (
     <div className="space-y-6">
