@@ -59,7 +59,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
   const [checkIns, setCheckIns] = useState<DailyCheckIn[]>([]);
   const [progressionLogs, setProgressionLogs] = useState<ProgressionLog[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null); // For filtering by date
-  const [programs, setPrograms] = useState<Array<{ id: number; frequency: string[]; startDate: string }>>([]);
+  const [programs, setPrograms] = useState<Array<{ id: number; frequency: string[]; startDate: string; exerciseCount: number }>>([]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -97,7 +97,8 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
           const programDetails = [{
             id: data.program.id,
             frequency: data.program.frequency || [],
-            startDate: data.program.startDate || data.program.start_date
+            startDate: data.program.startDate || data.program.start_date,
+            exerciseCount: data.program.exercises?.length || 0
           }];
 
           setPrograms(programDetails);
@@ -187,9 +188,48 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       }
     }
 
-    // Consistency score: percentage of days with activity in the time range
-    // Simple metric: active days / total days
-    const consistencyScore = Math.round((uniqueDates.size / timeRange) * 100);
+    // Completion rate: completed exercises / prescribed exercises
+    // Calculate how many exercises were prescribed in the time range
+    let completionRate = 0;
+
+    if (programs.length > 0 && programs[0].frequency.length > 0 && programs[0].exerciseCount > 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Map day names to indices
+      const dayMap: { [key: string]: number } = {
+        'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
+      };
+
+      const prescribedDayIndices = programs[0].frequency
+        .map(d => dayMap[d])
+        .filter(i => i !== undefined);
+
+      // Count how many prescribed days are in the time range
+      let prescribedDaysCount = 0;
+      for (let i = 0; i < timeRange; i++) {
+        const checkDate = new Date(today);
+        checkDate.setDate(checkDate.getDate() - i);
+        const dayOfWeek = checkDate.getDay();
+
+        if (prescribedDayIndices.includes(dayOfWeek)) {
+          prescribedDaysCount++;
+        }
+      }
+
+      // Total prescribed exercises = prescribed days × exercises per day
+      const totalPrescribedExercises = prescribedDaysCount * programs[0].exerciseCount;
+
+      // Completion rate = exercises completed / exercises prescribed
+      if (totalPrescribedExercises > 0) {
+        completionRate = Math.round((totalCompleted / totalPrescribedExercises) * 100);
+      }
+    } else {
+      // Fallback: if no program data, just show activity percentage
+      completionRate = Math.round((uniqueDates.size / timeRange) * 100);
+    }
+
+    const consistencyScore = completionRate;
 
     // Weight progression: group by exercise name and track weight over time
     const weightByExercise = new Map<string, Array<{date: string, weight: number}>>();
@@ -382,13 +422,13 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
                   </div>
                 </div>
 
-                {/* Consistency Score */}
+                {/* Completion Rate */}
                 <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-4 sm:p-5 text-white shadow-lg">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs sm:text-sm font-medium opacity-90">Consistency</p>
+                      <p className="text-xs sm:text-sm font-medium opacity-90">Completion Rate</p>
                       <p className="text-3xl sm:text-4xl font-bold mt-1">{overviewStats.consistencyScore}%</p>
-                      <p className="text-xs opacity-80 mt-0.5">active days</p>
+                      <p className="text-xs opacity-80 mt-0.5">of prescribed</p>
                     </div>
                     <Calendar className="opacity-80" size={isPatientView ? 36 : 40} />
                   </div>
