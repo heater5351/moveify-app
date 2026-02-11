@@ -91,17 +91,22 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       const response = await fetch(`${apiUrl}/programs/patient/${patientId}`);
       if (response.ok) {
         const data = await response.json();
-        console.log('Raw programs data:', data.programs);
+        console.log('Raw program data:', data.program);
 
-        // Extract id, frequency, and startDate from programs
-        const programDetails = (data.programs || []).map((p: any) => ({
-          id: p.id,
-          frequency: p.frequency || [],
-          startDate: p.startDate || p.start_date
-        }));
+        // The API returns a single program object, not an array
+        if (data.program) {
+          const programDetails = [{
+            id: data.program.id,
+            frequency: data.program.frequency || [],
+            startDate: data.program.startDate || data.program.start_date
+          }];
 
-        console.log('Processed program details:', programDetails);
-        setPrograms(programDetails);
+          console.log('Processed program details:', programDetails);
+          setPrograms(programDetails);
+        } else {
+          console.log('No program found for patient');
+          setPrograms([]);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch programs:', error);
