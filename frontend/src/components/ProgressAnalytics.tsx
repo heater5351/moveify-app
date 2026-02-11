@@ -91,7 +91,6 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       const response = await fetch(`${apiUrl}/programs/patient/${patientId}`);
       if (response.ok) {
         const data = await response.json();
-        console.log('Raw program data:', data.program);
 
         // The API returns a single program object, not an array
         if (data.program) {
@@ -101,10 +100,8 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
             startDate: data.program.startDate || data.program.start_date
           }];
 
-          console.log('Processed program details:', programDetails);
           setPrograms(programDetails);
         } else {
-          console.log('No program found for patient');
           setPrograms([]);
         }
       }
@@ -149,20 +146,9 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
     }
   };
 
-  if (loading && activeView === 'overview') {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">Loading analytics...</p>
-      </div>
-    );
-  }
-
   // Calculate stats from exercise completions data using useMemo
+  // This runs during every render but only recalculates when dependencies change
   const overviewStats = useMemo(() => {
-    console.log('calculateOverviewStats called');
-    console.log('Programs available:', programs);
-    console.log('Exercise completions:', exerciseCompletions.length);
-
     if (exerciseCompletions.length === 0) {
       return {
         totalCompleted: 0,
@@ -283,21 +269,13 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       if (prescribedDays.size > 0) {
         const completedPrescribedDays = Array.from(uniqueDates).filter(date => prescribedDays.has(date)).length;
         consistencyScore = Math.round((completedPrescribedDays / prescribedDays.size) * 100);
-        console.log('Consistency calculation:', {
-          prescribedDaysCount: prescribedDays.size,
-          completedPrescribedDays,
-          consistencyScore,
-          prescribedDays: Array.from(prescribedDays).slice(0, 5)
-        });
       } else {
         // Fallback: if no frequency defined, use simple calculation
         consistencyScore = Math.round((uniqueDates.size / timeRange) * 100);
-        console.log('Consistency fallback (no frequency):', consistencyScore);
       }
     } else {
       // Fallback: if no programs loaded yet, use simple calculation
       consistencyScore = Math.round((uniqueDates.size / timeRange) * 100);
-      console.log('Consistency fallback (no programs):', consistencyScore);
     }
 
     // Weight progression: group by exercise name and track weight over time
@@ -454,7 +432,11 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       {/* OVERVIEW VIEW */}
       {activeView === 'overview' && (
         <>
-          {exerciseCompletions.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">Loading analytics...</p>
+            </div>
+          ) : exerciseCompletions.length === 0 ? (
             <div className="text-center py-12">
               <BarChart3 className="mx-auto text-gray-400 mb-4" size={48} />
               <p className="text-gray-500">No progress data yet</p>
@@ -623,7 +605,11 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       {/* EXERCISE COMPLETIONS VIEW */}
       {activeView === 'completions' && (
         <div className="space-y-4">
-          {exerciseCompletions.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">Loading exercise completions...</p>
+            </div>
+          ) : exerciseCompletions.length === 0 ? (
             <div className="text-center py-12">
               <Activity className="mx-auto text-gray-400 mb-4" size={48} />
               <p className="text-gray-500">No exercise completions yet</p>
@@ -850,7 +836,11 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       {/* DAILY CHECK-INS VIEW */}
       {activeView === 'checkins' && (
         <div className="space-y-4">
-          {checkIns.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">Loading check-ins...</p>
+            </div>
+          ) : checkIns.length === 0 ? (
             <div className="text-center py-12">
               <Heart className="mx-auto text-gray-400 mb-4" size={48} />
               <p className="text-gray-500">No daily check-ins yet</p>
@@ -941,7 +931,11 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       {activeView === 'adjustments' && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">Periodization Auto-Adjustments</h3>
-          {progressionLogs.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">Loading adjustments...</p>
+            </div>
+          ) : progressionLogs.length === 0 ? (
             <div className="text-center py-12">
               <Zap className="mx-auto text-gray-400 mb-4" size={48} />
               <p className="text-gray-500">No auto-adjustments yet</p>
