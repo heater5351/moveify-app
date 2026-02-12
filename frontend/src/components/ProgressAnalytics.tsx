@@ -214,17 +214,22 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
         .map(dayName => dayNameToIndex[dayName])
         .filter(index => index !== undefined);
 
-      // Step 4: Count how many prescribed days fall within the time range
+      // Step 4: Count how many prescribed days fall within the time range AND after program start
       let prescribedDaysInRange = 0;
       const referenceDate = new Date();
       referenceDate.setHours(0, 0, 0, 0);
+
+      // Parse program start date
+      const programStartDate = new Date(programs[0].startDate);
+      programStartDate.setHours(0, 0, 0, 0);
 
       for (let daysAgo = 0; daysAgo < timeRange; daysAgo++) {
         const checkDate = new Date(referenceDate);
         checkDate.setDate(checkDate.getDate() - daysAgo);
         const dayOfWeek = checkDate.getDay(); // 0-6
 
-        if (prescribedDayIndices.includes(dayOfWeek)) {
+        // Only count days that are (1) prescribed AND (2) on or after program start
+        if (prescribedDayIndices.includes(dayOfWeek) && checkDate >= programStartDate) {
           prescribedDaysInRange++;
         }
       }
