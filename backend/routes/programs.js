@@ -81,6 +81,33 @@ router.post('/patient/:patientId', async (req, res) => {
 
     await client.query('BEGIN');
 
+    // Convert startDate string to actual date
+    const getActualStartDate = (startDateValue, customStartDate) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (startDateValue === 'today') {
+        return today.toISOString().split('T')[0];
+      } else if (startDateValue === 'tomorrow') {
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow.toISOString().split('T')[0];
+      } else if (startDateValue === 'nextweek') {
+        const nextWeek = new Date(today);
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        return nextWeek.toISOString().split('T')[0];
+      } else if (startDateValue === 'custom' && customStartDate) {
+        return customStartDate;
+      } else if (startDateValue && startDateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // Already a date string
+        return startDateValue;
+      }
+      // Default to today
+      return today.toISOString().split('T')[0];
+    };
+
+    const actualStartDate = getActualStartDate(config?.startDate, config?.customStartDate);
+
     // Create new program
     const programResult = await client.query(`
       INSERT INTO programs (patient_id, name, start_date, frequency, duration, custom_end_date, track_actual_performance, track_rpe, track_pain)
@@ -89,7 +116,7 @@ router.post('/patient/:patientId', async (req, res) => {
     `, [
       patientId,
       name,
-      config?.startDate || 'today',
+      actualStartDate,
       JSON.stringify(config?.frequency || []),
       config?.duration || '4weeks',
       config?.customEndDate || null,
@@ -182,6 +209,33 @@ router.put('/:programId', async (req, res) => {
 
     await client.query('BEGIN');
 
+    // Convert startDate string to actual date
+    const getActualStartDate = (startDateValue, customStartDate) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (startDateValue === 'today') {
+        return today.toISOString().split('T')[0];
+      } else if (startDateValue === 'tomorrow') {
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow.toISOString().split('T')[0];
+      } else if (startDateValue === 'nextweek') {
+        const nextWeek = new Date(today);
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        return nextWeek.toISOString().split('T')[0];
+      } else if (startDateValue === 'custom' && customStartDate) {
+        return customStartDate;
+      } else if (startDateValue && startDateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // Already a date string
+        return startDateValue;
+      }
+      // Default to today
+      return today.toISOString().split('T')[0];
+    };
+
+    const actualStartDate = getActualStartDate(config?.startDate, config?.customStartDate);
+
     // Update program metadata
     await client.query(`
       UPDATE programs
@@ -190,7 +244,7 @@ router.put('/:programId', async (req, res) => {
       WHERE id = $9
     `, [
       name,
-      config?.startDate || 'today',
+      actualStartDate,
       JSON.stringify(config?.frequency || []),
       config?.duration || '4weeks',
       config?.customEndDate || null,

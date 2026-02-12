@@ -120,7 +120,33 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
 
   const selectedProgram = patient.assignedPrograms[selectedProgramIndex];
 
-  const hasExercisesToday = selectedProgram.config.frequency.includes(selectedDayShort);
+  // Parse program start date (handles both date strings and legacy 'today'/'tomorrow' values)
+  const getProgramStartDate = (): Date | null => {
+    const startDateValue = selectedProgram.config.startDate;
+    if (!startDateValue) return null;
+
+    // If it's already a date string (YYYY-MM-DD format)
+    if (typeof startDateValue === 'string' && startDateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const parsed = new Date(startDateValue);
+      parsed.setHours(0, 0, 0, 0);
+      return !isNaN(parsed.getTime()) ? parsed : null;
+    }
+
+    // Legacy values - can't determine actual date, return null (show all days)
+    return null;
+  };
+
+  const programStartDate = getProgramStartDate();
+
+  // Check if a date is on or after program start date
+  const isDateAfterProgramStart = (date: Date): boolean => {
+    if (!programStartDate) return true; // If no valid start date, show all
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+    return checkDate >= programStartDate;
+  };
+
+  const hasExercisesToday = selectedProgram.config.frequency.includes(selectedDayShort) && isDateAfterProgramStart(selectedDate);
 
   // Enrich exercises with completion data for the selected date
   const todaysExercises = hasExercisesToday
@@ -270,7 +296,8 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                 const date = weekDates[index];
                 const isTodayDate = isToday(date);
                 const isSelected = index === selectedWeekDay;
-                const hasDot = selectedProgram.config.frequency.includes(day);
+                // Only show green dot if day matches frequency AND date is >= program start date
+                const hasDot = selectedProgram.config.frequency.includes(day) && isDateAfterProgramStart(date);
                 const dayNum = date.getDate();
                 const isPast = date < todayDate && !isTodayDate;
 
