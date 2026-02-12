@@ -214,36 +214,55 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
         .map(dayName => dayNameToIndex[dayName])
         .filter(index => index !== undefined);
 
-      // Step 4: Count how many prescribed days fall within the time range AND after program start
+      // Step 4: Parse and validate program start date
+      // If startDate is missing or invalid, we'll count all matching days in the range
+      let programStartDate: Date | null = null;
+      const rawStartDate = programs[0].startDate;
+
+      if (rawStartDate && typeof rawStartDate === 'string' && rawStartDate.trim() !== '') {
+        const parsedDate = new Date(rawStartDate);
+        // Check if the parsed date is valid (not NaN)
+        if (!isNaN(parsedDate.getTime())) {
+          programStartDate = parsedDate;
+          programStartDate.setHours(0, 0, 0, 0);
+        }
+      }
+
+      // Step 5: Count how many prescribed days fall within the time range
+      // If we have a valid start date, only count days on or after that date
       let prescribedDaysInRange = 0;
       const referenceDate = new Date();
       referenceDate.setHours(0, 0, 0, 0);
-
-      // Parse program start date
-      const programStartDate = new Date(programs[0].startDate);
-      programStartDate.setHours(0, 0, 0, 0);
 
       for (let daysAgo = 0; daysAgo < timeRange; daysAgo++) {
         const checkDate = new Date(referenceDate);
         checkDate.setDate(checkDate.getDate() - daysAgo);
         const dayOfWeek = checkDate.getDay(); // 0-6
 
-        // Only count days that are (1) prescribed AND (2) on or after program start
-        if (prescribedDayIndices.includes(dayOfWeek) && checkDate >= programStartDate) {
-          prescribedDaysInRange++;
+        // Check if this day matches the prescribed frequency
+        if (prescribedDayIndices.includes(dayOfWeek)) {
+          // If we have a valid start date, only count days on or after it
+          // If no valid start date, count all matching days in the range
+          if (programStartDate === null || checkDate >= programStartDate) {
+            prescribedDaysInRange++;
+          }
         }
       }
 
-      // Step 5: Calculate total prescribed exercises
+      // Step 6: Calculate total prescribed exercises
       // Total = (number of prescribed days) × (exercises per day)
       const exercisesPerDay = programs[0].exerciseCount;
       const totalPrescribedExercises = prescribedDaysInRange * exercisesPerDay;
 
-      // Step 6: Calculate completion rate
+      // Step 7: Calculate completion rate
       // Rate = (completed / prescribed) × 100, capped at 100%
       if (totalPrescribedExercises > 0) {
         const rawRate = (totalCompleted / totalPrescribedExercises) * 100;
         completionRate = Math.min(Math.round(rawRate), 100); // Cap at 100%
+      } else {
+        // Edge case: no prescribed days in range (program starts in future or no matching days)
+        // Show 100% if they've completed any exercises, 0% otherwise
+        completionRate = totalCompleted > 0 ? 100 : 0;
       }
     } else {
       // Fallback when no program data: show percentage of days with any activity
