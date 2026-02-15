@@ -409,15 +409,68 @@ router.get('/exercise/:exerciseId/completion/:patientId/today', async (req, res)
   }
 });
 
+// Helper: Check if a date is a scheduled day based on program frequency
+function isScheduledDay(date, frequency) {
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  return frequency.includes(dayNames[date.getDay()]);
+}
+
+// Helper: Calculate schedule-aware streak (LENIENT MODE)
+// Any activity on a scheduled day counts - only zero completions breaks streak
+function calculateScheduleAwareStreak(completionsByDate, frequency, programStartDate) {
+  if (!frequency || frequency.length === 0) return 0;
+
+  let streak = 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Grace period: if today is scheduled but has no activity yet, start from yesterday
+  const todayStr = today.toISOString().split('T')[0];
+  const todayCompletions = completionsByDate[todayStr] || 0;
+  const startFromYesterday = isScheduledDay(today, frequency) && todayCompletions === 0;
+
+  const checkDate = new Date(today);
+  if (startFromYesterday) {
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
+
+  // Walk backwards through days
+  for (let i = 0; i < 365; i++) {
+    const dateStr = checkDate.toISOString().split('T')[0];
+
+    // Don't count days before program started
+    if (programStartDate && checkDate < programStartDate) {
+      break;
+    }
+
+    if (isScheduledDay(checkDate, frequency)) {
+      const completionCount = completionsByDate[dateStr] || 0;
+
+      if (completionCount > 0) {
+        // Any activity counts (lenient mode)
+        streak++;
+      } else {
+        // Zero completions on a scheduled day - streak breaks
+        break;
+      }
+    }
+    // Non-scheduled days are skipped (don't break streak)
+
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
+
+  return streak;
+}
+
 // Get completion analytics for a patient
 router.get('/analytics/patient/:patientId', async (req, res) => {
   try {
     const { patientId } = req.params;
     const { days = 30 } = req.query;
 
-    // Get all programs for this patient
+    // Get all programs for this patient with frequency data
     const programs = await db.getAll(
-      'SELECT id, name FROM programs WHERE patient_id = $1 ORDER BY created_at DESC',
+      'SELECT id, name, frequency, start_date, created_at FROM programs WHERE patient_id = $1 ORDER BY created_at DESC',
       [patientId]
     );
 
@@ -426,11 +479,8 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
     }
 
     const analyticsData = await Promise.all(programs.map(async (program) => {
-      // Get program with creation date
-      const programDetails = await db.getOne(
-        'SELECT id, name, created_at FROM programs WHERE id = $1',
-        [program.id]
-      );
+      // Parse frequency from JSON
+      const frequency = program.frequency ? JSON.parse(program.frequency) : [];
 
       // Get all exercises for this program
       const exercises = await db.getAll(
@@ -451,13 +501,23 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
         };
       }
 
-      // Calculate start date
+      // Parse program start date
+      let programStartDate = null;
+      if (program.start_date && program.start_date.trim() !== '') {
+        const parsedDate = new Date(program.start_date);
+        if (!isNaN(parsedDate.getTime())) {
+          programStartDate = parsedDate;
+          programStartDate.setHours(0, 0, 0, 0);
+        }
+      }
+
+      // Calculate start date for query window
       const daysAgoDate = new Date();
       daysAgoDate.setDate(daysAgoDate.getDate() - days);
 
-      const programCreatedDate = new Date(programDetails.created_at);
-      const startDate = programCreatedDate > daysAgoDate ? programCreatedDate : daysAgoDate;
-      const startDateStr = startDate.toISOString().split('T')[0];
+      const programCreatedDate = new Date(program.created_at);
+      const queryStartDate = programCreatedDate > daysAgoDate ? programCreatedDate : daysAgoDate;
+      const queryStartDateStr = queryStartDate.toISOString().split('T')[0];
 
       // Build parameterized query for exercise IDs
       const placeholders = exerciseIds.map((_, i) => `$${i + 1}`).join(',');
@@ -469,50 +529,59 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
           AND completion_date >= $${exerciseIds.length + 2}
         GROUP BY completion_date
         ORDER BY completion_date ASC
-      `, [...exerciseIds, patientId, startDateStr]);
+      `, [...exerciseIds, patientId, queryStartDateStr]);
 
-      // Calculate streak - fetch all completion dates in ONE query instead of N queries
+      // Fetch ALL completion dates for streak calculation
       const allCompletionDates = await db.getAll(`
-        SELECT DISTINCT completion_date
+        SELECT completion_date, COUNT(*) as count
         FROM exercise_completions
         WHERE exercise_id IN (${placeholders})
           AND patient_id = $${exerciseIds.length + 1}
+        GROUP BY completion_date
         ORDER BY completion_date DESC
       `, [...exerciseIds, patientId]);
 
-      // Create a Set of date strings for O(1) lookup
-      const completionDateSet = new Set(
-        allCompletionDates.map(row => {
-          const date = row.completion_date;
-          return typeof date === 'string'
-            ? date.split('T')[0]
-            : new Date(date).toISOString().split('T')[0];
-        })
+      // Build completions by date map for streak calculation
+      const completionsByDate = {};
+      allCompletionDates.forEach(row => {
+        const dateStr = typeof row.completion_date === 'string'
+          ? row.completion_date.split('T')[0]
+          : new Date(row.completion_date).toISOString().split('T')[0];
+        completionsByDate[dateStr] = parseInt(row.count);
+      });
+
+      // Calculate schedule-aware streak
+      const streak = calculateScheduleAwareStreak(
+        completionsByDate,
+        frequency,
+        programStartDate
       );
 
-      // Calculate streak by checking consecutive days from today backwards
-      let streak = 0;
-      let checkDate = new Date();
-      checkDate.setHours(0, 0, 0, 0);
+      // Calculate completion rate based on scheduled days only
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const effectiveStartDate = programStartDate || programCreatedDate;
+      effectiveStartDate.setHours(0, 0, 0, 0);
 
-      for (let i = 0; i < 365; i++) {
-        const dateStr = checkDate.toISOString().split('T')[0];
-
-        if (completionDateSet.has(dateStr)) {
-          streak++;
-          checkDate.setDate(checkDate.getDate() - 1);
-        } else {
-          break;
+      // Count scheduled days between start and now
+      let scheduledDays = 0;
+      const countDate = new Date(effectiveStartDate);
+      while (countDate <= now) {
+        if (isScheduledDay(countDate, frequency)) {
+          scheduledDays++;
         }
+        countDate.setDate(countDate.getDate() + 1);
       }
 
-      // Calculate completion rate
-      const now = new Date();
-      const actualDays = Math.ceil((now - programCreatedDate) / (1000 * 60 * 60 * 24));
-      const totalPossibleCompletions = exerciseIds.length * actualDays;
-      const totalActualCompletions = completions.reduce((sum, c) => sum + parseInt(c.count), 0);
-      const completionRate = totalPossibleCompletions > 0
-        ? Math.round((totalActualCompletions / totalPossibleCompletions) * 100)
+      // Count days with any completions
+      const daysWithCompletions = Object.keys(completionsByDate).filter(dateStr => {
+        const date = new Date(dateStr);
+        date.setHours(0, 0, 0, 0);
+        return date >= effectiveStartDate && date <= now && isScheduledDay(date, frequency);
+      }).length;
+
+      const completionRate = scheduledDays > 0
+        ? Math.round((daysWithCompletions / scheduledDays) * 100)
         : 0;
 
       return {

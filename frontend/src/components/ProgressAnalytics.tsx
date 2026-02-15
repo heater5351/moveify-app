@@ -49,6 +49,104 @@ interface ProgressAnalyticsProps {
   isPatientView?: boolean;
 }
 
+// ============================================================
+// SCHEDULE-AWARE STREAK UTILITIES
+// ============================================================
+
+// Check if a date is a scheduled day based on program frequency
+function isScheduledDay(date: Date, frequency: string[]): boolean {
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  return frequency.includes(dayNames[date.getDay()]);
+}
+
+// Calculate schedule-aware streak (LENIENT MODE)
+// Any activity on a scheduled day counts - only zero completions breaks streak
+function calculateScheduleAwareStreak(
+  completions: ExerciseCompletion[],
+  frequency: string[],
+  programStartDate: Date | null
+): number {
+  if (!frequency || frequency.length === 0) return 0;
+
+  let streak = 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Build a map of date -> completion count
+  const completionsByDate = new Map<string, number>();
+  completions.forEach(c => {
+    const count = completionsByDate.get(c.completionDate) || 0;
+    completionsByDate.set(c.completionDate, count + 1);
+  });
+
+  // Grace period: if today is scheduled but has no activity yet, start from yesterday
+  const todayStr = today.toISOString().split('T')[0];
+  const todayCompletions = completionsByDate.get(todayStr) || 0;
+  const startFromYesterday = isScheduledDay(today, frequency) && todayCompletions === 0;
+
+  const checkDate = new Date(today);
+  if (startFromYesterday) {
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
+
+  // Walk backwards through days
+  for (let i = 0; i < 365; i++) {
+    const dateStr = checkDate.toISOString().split('T')[0];
+
+    // Don't count days before program started
+    if (programStartDate && checkDate < programStartDate) {
+      break;
+    }
+
+    if (isScheduledDay(checkDate, frequency)) {
+      const completionCount = completionsByDate.get(dateStr) || 0;
+
+      if (completionCount > 0) {
+        // Any activity counts (lenient mode)
+        streak++;
+      } else {
+        // Zero completions on a scheduled day - streak breaks
+        break;
+      }
+    }
+    // Non-scheduled days are skipped (don't break streak)
+
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
+
+  return streak;
+}
+
+// Get day completion status for activity chart
+type DayStatus = 'full' | 'partial' | 'missed' | 'rest' | 'future';
+
+function getDayStatus(
+  date: Date,
+  completions: ExerciseCompletion[],
+  frequency: string[],
+  totalExercises: number,
+  programStartDate: Date | null
+): DayStatus {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const checkDate = new Date(date);
+  checkDate.setHours(0, 0, 0, 0);
+
+  if (checkDate > today) return 'future';
+
+  // Don't show status for days before program started
+  if (programStartDate && checkDate < programStartDate) return 'rest';
+
+  if (!isScheduledDay(date, frequency)) return 'rest';
+
+  const dateStr = date.toISOString().split('T')[0];
+  const dayCompletions = completions.filter(c => c.completionDate === dateStr);
+
+  if (dayCompletions.length === 0) return 'missed';
+  if (dayCompletions.length >= totalExercises) return 'full';
+  return 'partial';
+}
+
 export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: ProgressAnalyticsProps) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -171,28 +269,45 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
 
     // Get unique completion dates
     const uniqueDates = new Set(exerciseCompletions.map(c => c.completionDate));
-    const sortedDates = Array.from(uniqueDates).sort((a, b) =>
-      new Date(b).getTime() - new Date(a).getTime()
-    );
 
-    // Calculate streak: count consecutive days with completions going backwards from today
-    let streak = 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Simple streak: count backwards from today until we hit a day without completions
-    for (let i = 0; i < 365; i++) {
-      const checkDate = new Date(today);
-      checkDate.setDate(checkDate.getDate() - i);
-      const dateStr = checkDate.toISOString().split('T')[0];
+    // ============================================================
+    // SCHEDULE-AWARE STREAK CALCULATION (Lenient Mode)
+    // - Only counts scheduled days (based on program frequency)
+    // - Any activity on a scheduled day counts toward streak
+    // - Only zero completions on a scheduled day breaks streak
+    // - Rest days (non-scheduled) are skipped and don't break streak
+    // ============================================================
 
-      if (sortedDates.includes(dateStr)) {
-        streak++;
-      } else if (i > 0) {
-        // Stop counting if we hit a day without completions (but allow today to be empty)
-        break;
+    // Step 1: Check if we have the required program data
+    const hasValidProgram = programs.length > 0 &&
+                            programs[0].frequency &&
+                            programs[0].frequency.length > 0 &&
+                            programs[0].exerciseCount > 0;
+
+    // Step 2: Parse program start date
+    let programStartDate: Date | null = null;
+    if (hasValidProgram) {
+      const rawStartDate = programs[0].startDate;
+      if (rawStartDate && typeof rawStartDate === 'string' && rawStartDate.trim() !== '') {
+        const parsedDate = new Date(rawStartDate);
+        if (!isNaN(parsedDate.getTime())) {
+          programStartDate = parsedDate;
+          programStartDate.setHours(0, 0, 0, 0);
+        }
       }
     }
+
+    // Step 3: Calculate schedule-aware streak
+    const streak = hasValidProgram
+      ? calculateScheduleAwareStreak(
+          exerciseCompletions,
+          programs[0].frequency,
+          programStartDate
+        )
+      : 0;
 
     // ============================================================
     // COMPLETION RATE CALCULATION
@@ -203,38 +318,18 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
     // ============================================================
     let completionRate = 0;
 
-    // Step 1: Check if we have the required program data
-    const hasValidProgram = programs.length > 0 &&
-                            programs[0].frequency &&
-                            programs[0].frequency.length > 0 &&
-                            programs[0].exerciseCount > 0;
-
     if (hasValidProgram) {
-      // Step 2: Map day abbreviations to JavaScript day indices (0=Sunday, 6=Saturday)
+      // Map day abbreviations to JavaScript day indices (0=Sunday, 6=Saturday)
       const dayNameToIndex: { [key: string]: number } = {
         'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
       };
 
-      // Step 3: Convert frequency array (e.g., ['Mon', 'Wed', 'Fri']) to day indices (e.g., [1, 3, 5])
+      // Convert frequency array (e.g., ['Mon', 'Wed', 'Fri']) to day indices (e.g., [1, 3, 5])
       const prescribedDayIndices = programs[0].frequency
         .map(dayName => dayNameToIndex[dayName])
         .filter(index => index !== undefined);
 
-      // Step 4: Parse and validate program start date
-      // If startDate is missing or invalid, we'll count all matching days in the range
-      let programStartDate: Date | null = null;
-      const rawStartDate = programs[0].startDate;
-
-      if (rawStartDate && typeof rawStartDate === 'string' && rawStartDate.trim() !== '') {
-        const parsedDate = new Date(rawStartDate);
-        // Check if the parsed date is valid (not NaN)
-        if (!isNaN(parsedDate.getTime())) {
-          programStartDate = parsedDate;
-          programStartDate.setHours(0, 0, 0, 0);
-        }
-      }
-
-      // Step 5: Count how many prescribed days fall within the time range
+      // Count how many prescribed days fall within the time range
       // If we have a valid start date, only count days on or after that date
       let prescribedDaysInRange = 0;
       const referenceDate = new Date();
@@ -783,16 +878,39 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
                     </span>
                   </div>
 
-                  {/* Bar visualization with color coding */}
+                  {/* Bar visualization with schedule-aware color coding */}
                   <div className="relative h-24 sm:h-32">
                     <div className="absolute inset-0 flex items-end justify-between gap-0.5 sm:gap-1">
                       {overviewStats.weeklyActivity.map((day, index) => {
                         const maxCount = Math.max(...overviewStats.weeklyActivity.map(d => d.count), 1);
                         const heightPercent = (day.count / maxCount) * 100;
-                        // Color based on completion: green for full, yellow for partial, gray for none
+
+                        // Use schedule-aware status
+                        const dayDate = new Date(day.date);
+                        const frequency = programs[0]?.frequency || [];
                         const exerciseTarget = programs[0]?.exerciseCount || 3;
-                        const isFullCompletion = day.count >= exerciseTarget;
-                        const isPartialCompletion = day.count > 0 && day.count < exerciseTarget;
+
+                        // Parse program start date
+                        let progStartDate: Date | null = null;
+                        const rawStart = programs[0]?.startDate;
+                        if (rawStart && typeof rawStart === 'string' && rawStart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                          progStartDate = new Date(rawStart);
+                          progStartDate.setHours(0, 0, 0, 0);
+                        }
+
+                        const status = getDayStatus(dayDate, exerciseCompletions, frequency, exerciseTarget, progStartDate);
+
+                        // Color mapping based on status
+                        const getBarColor = () => {
+                          switch (status) {
+                            case 'full': return 'bg-green-500 hover:bg-green-600';
+                            case 'partial': return 'bg-yellow-500 hover:bg-yellow-600';
+                            case 'missed': return 'bg-red-400 hover:bg-red-500';
+                            case 'rest': return 'bg-gray-200';
+                            case 'future': return 'bg-gray-100 border border-dashed border-gray-300';
+                            default: return 'bg-gray-200';
+                          }
+                        };
 
                         return (
                           <div
@@ -800,23 +918,18 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
                             className="flex-1 flex flex-col items-center group relative"
                             style={{ minWidth: '8px' }}
                           >
-                            {day.count > 0 && (
+                            {(status !== 'rest' && status !== 'future') && (
                               <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10 pointer-events-none">
                                 {day.dayLabel}: {day.count} {day.count === 1 ? 'exercise' : 'exercises'}
-                                {isFullCompletion && ' ✓'}
+                                {status === 'full' && ' ✓'}
+                                {status === 'missed' && ' (missed)'}
                               </div>
                             )}
 
                             <div
-                              className={`w-full rounded-t transition-all ${
-                                isFullCompletion
-                                  ? 'bg-green-500 hover:bg-green-600'
-                                  : isPartialCompletion
-                                  ? 'bg-yellow-500 hover:bg-yellow-600'
-                                  : 'bg-gray-200'
-                              }`}
+                              className={`w-full rounded-t transition-all ${getBarColor()}`}
                               style={{
-                                height: day.count > 0 ? `${heightPercent}%` : '4px',
+                                height: day.count > 0 ? `${heightPercent}%` : (status === 'missed' ? '8px' : '4px'),
                                 minHeight: day.count > 0 ? '8px' : '4px'
                               }}
                             />
@@ -840,6 +953,10 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
                     <div className="flex items-center gap-1.5">
                       <div className="w-3 h-3 rounded bg-yellow-500"></div>
                       <span>Partial</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded bg-red-400"></div>
+                      <span>Missed</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <div className="w-3 h-3 rounded bg-gray-200"></div>
