@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, TrendingDown, Minus, Flame, Calendar, BarChart3, Activity, Heart, Zap, Target, Trophy, AlertTriangle, CheckCircle, Moon, Battery } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Flame, BarChart3, Activity, Heart, Zap, Target, Trophy, AlertTriangle, CheckCircle, Moon, Battery } from 'lucide-react';
 
 interface ExerciseCompletion {
   id: number;
