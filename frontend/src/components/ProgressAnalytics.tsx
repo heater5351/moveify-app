@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Flame, Calendar, BarChart3, Activity, Heart, Zap } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Flame, Calendar, BarChart3, Activity, Heart, Zap, Target, Trophy, AlertTriangle, CheckCircle, Moon, Battery } from 'lucide-react';
 
 interface ExerciseCompletion {
   id: number;
@@ -81,6 +81,10 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
         } else if (activeView === 'overview') {
           // Fetch completions data for overview stats
           await fetchExerciseCompletions();
+          // Also fetch check-ins for clinician view (for check-in summary)
+          if (!isPatientView) {
+            await fetchCheckIns();
+          }
         }
       } catch (err) {
         setError('Failed to load analytics data. Please try again.');
@@ -318,14 +322,253 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       };
     });
 
+    // ============================================================
+    // PATIENT-SPECIFIC CALCULATIONS
+    // ============================================================
+
+    // Next Milestone: Calculate the closest achievable goal
+    let nextMilestone: { type: string; value: number; message: string } | null = null;
+
+    if (streak < 7) {
+      // Goal: Reach 7-day streak
+      const daysToGo = 7 - streak;
+      nextMilestone = {
+        type: 'streak',
+        value: daysToGo,
+        message: `${daysToGo} more day${daysToGo > 1 ? 's' : ''} to a 7-day streak!`
+      };
+    } else if (streak < 14) {
+      const daysToGo = 14 - streak;
+      nextMilestone = {
+        type: 'streak',
+        value: daysToGo,
+        message: `${daysToGo} more day${daysToGo > 1 ? 's' : ''} to a 2-week streak!`
+      };
+    } else if (streak < 30) {
+      const daysToGo = 30 - streak;
+      nextMilestone = {
+        type: 'streak',
+        value: daysToGo,
+        message: `${daysToGo} more day${daysToGo > 1 ? 's' : ''} to a 30-day streak!`
+      };
+    } else {
+      // They have a great streak - celebrate it
+      nextMilestone = {
+        type: 'celebration',
+        value: streak,
+        message: `Amazing ${streak}-day streak! Keep it going!`
+      };
+    }
+
+    // Recent Wins: Find achievements to celebrate
+    const recentWins: Array<{ type: string; message: string; date: string }> = [];
+
+    // Check for days with 100% completion
+    const daysWithFullCompletion = Array.from(uniqueDates).filter(dateStr => {
+      const dayCompletions = exerciseCompletions.filter(c => c.completionDate === dateStr);
+      // All exercises met their prescribed sets and reps
+      return dayCompletions.every(c =>
+        c.setsPerformed >= c.prescribedSets && c.repsPerformed >= c.prescribedReps
+      );
+    }).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+    if (daysWithFullCompletion.length > 0) {
+      const mostRecent = daysWithFullCompletion[0];
+      const dateLabel = new Date(mostRecent).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      recentWins.push({
+        type: 'completion',
+        message: `Completed all exercises on ${dateLabel}`,
+        date: mostRecent
+      });
+    }
+
+    // Check for weight increases
+    weightProgression
+      .filter(ex => ex.change > 0)
+      .slice(0, 2) // Limit to top 2 weight increases
+      .forEach(ex => {
+        recentWins.push({
+          type: 'weight',
+          message: `Increased ${ex.exerciseName} by ${ex.change}kg`,
+          date: ex.dataPoints[ex.dataPoints.length - 1]?.date || ''
+        });
+      });
+
+    // Check for streak milestones
+    if (streak >= 7 && streak < 8) {
+      recentWins.push({
+        type: 'streak',
+        message: '7-day streak achieved!',
+        date: today.toISOString().split('T')[0]
+      });
+    } else if (streak >= 14 && streak < 15) {
+      recentWins.push({
+        type: 'streak',
+        message: '2-week streak achieved!',
+        date: today.toISOString().split('T')[0]
+      });
+    } else if (streak >= 30 && streak < 31) {
+      recentWins.push({
+        type: 'streak',
+        message: '30-day streak achieved!',
+        date: today.toISOString().split('T')[0]
+      });
+    }
+
+    // ============================================================
+    // CLINICIAN-SPECIFIC CALCULATIONS
+    // ============================================================
+
+    // Alerts: Identify concerning patterns
+    const alerts: Array<{ severity: 'critical' | 'warning' | 'success'; message: string }> = [];
+
+    // Check for high pain levels
+    const recentCompletionsWithPain = exerciseCompletions.filter(c => c.painLevel !== null && c.painLevel > 0);
+    const highPainCompletions = recentCompletionsWithPain.filter(c => (c.painLevel ?? 0) >= 7);
+
+    if (highPainCompletions.length > 0) {
+      const maxPain = Math.max(...highPainCompletions.map(c => c.painLevel ?? 0));
+      const painDate = highPainCompletions.find(c => c.painLevel === maxPain)?.completionDate;
+      const dateLabel = painDate ? new Date(painDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      alerts.push({
+        severity: 'critical',
+        message: `High pain reported (${maxPain}/10) on ${dateLabel}`
+      });
+    }
+
+    // Check for missed sessions (low completion rate)
+    if (completionRate < 50) {
+      alerts.push({
+        severity: 'warning',
+        message: `Low completion rate (${completionRate}%) - consider follow-up`
+      });
+    } else if (streak === 0 && totalCompleted > 0) {
+      alerts.push({
+        severity: 'warning',
+        message: 'Streak broken - patient may need encouragement'
+      });
+    }
+
+    // All good message
+    if (alerts.length === 0 && totalCompleted > 0) {
+      alerts.push({
+        severity: 'success',
+        message: 'Patient is progressing well'
+      });
+    }
+
+    // Average RPE calculation
+    const completionsWithRpe = exerciseCompletions.filter(c => c.rpeRating !== null && c.rpeRating > 0);
+    let avgRpe: { value: number; trend: 'up' | 'down' | 'stable' } = { value: 0, trend: 'stable' };
+
+    if (completionsWithRpe.length > 0) {
+      const totalRpe = completionsWithRpe.reduce((sum, c) => sum + (c.rpeRating ?? 0), 0);
+      avgRpe.value = Math.round((totalRpe / completionsWithRpe.length) * 10) / 10;
+
+      // Calculate trend by comparing first half vs second half
+      const sortedByDate = [...completionsWithRpe].sort((a, b) =>
+        new Date(a.completionDate).getTime() - new Date(b.completionDate).getTime()
+      );
+      const midpoint = Math.floor(sortedByDate.length / 2);
+
+      if (midpoint > 0) {
+        const firstHalf = sortedByDate.slice(0, midpoint);
+        const secondHalf = sortedByDate.slice(midpoint);
+
+        const firstAvg = firstHalf.reduce((sum, c) => sum + (c.rpeRating ?? 0), 0) / firstHalf.length;
+        const secondAvg = secondHalf.reduce((sum, c) => sum + (c.rpeRating ?? 0), 0) / secondHalf.length;
+
+        if (secondAvg > firstAvg + 0.5) avgRpe.trend = 'up';
+        else if (secondAvg < firstAvg - 0.5) avgRpe.trend = 'down';
+      }
+    }
+
+    // Average Pain calculation
+    let avgPain: { value: number; trend: 'up' | 'down' | 'stable' } = { value: 0, trend: 'stable' };
+
+    if (recentCompletionsWithPain.length > 0) {
+      const totalPain = recentCompletionsWithPain.reduce((sum, c) => sum + (c.painLevel ?? 0), 0);
+      avgPain.value = Math.round((totalPain / recentCompletionsWithPain.length) * 10) / 10;
+
+      // Calculate trend
+      const sortedByDate = [...recentCompletionsWithPain].sort((a, b) =>
+        new Date(a.completionDate).getTime() - new Date(b.completionDate).getTime()
+      );
+      const midpoint = Math.floor(sortedByDate.length / 2);
+
+      if (midpoint > 0) {
+        const firstHalf = sortedByDate.slice(0, midpoint);
+        const secondHalf = sortedByDate.slice(midpoint);
+
+        const firstAvg = firstHalf.reduce((sum, c) => sum + (c.painLevel ?? 0), 0) / firstHalf.length;
+        const secondAvg = secondHalf.reduce((sum, c) => sum + (c.painLevel ?? 0), 0) / secondHalf.length;
+
+        if (secondAvg > firstAvg + 0.5) avgPain.trend = 'up';
+        else if (secondAvg < firstAvg - 0.5) avgPain.trend = 'down';
+      }
+    }
+
+    // Completion trend
+    let completionTrend: 'up' | 'down' | 'stable' = 'stable';
+    if (weeklyActivity.length >= 7) {
+      const firstWeek = weeklyActivity.slice(0, 7);
+      const lastWeek = weeklyActivity.slice(-7);
+
+      const firstWeekTotal = firstWeek.reduce((sum, d) => sum + d.count, 0);
+      const lastWeekTotal = lastWeek.reduce((sum, d) => sum + d.count, 0);
+
+      if (lastWeekTotal > firstWeekTotal + 2) completionTrend = 'up';
+      else if (lastWeekTotal < firstWeekTotal - 2) completionTrend = 'down';
+    }
+
     return {
       totalCompleted,
       consistencyScore,
       streak,
       weightProgression,
-      weeklyActivity
+      weeklyActivity,
+      // Patient-specific
+      nextMilestone,
+      recentWins: recentWins.slice(0, 3), // Limit to 3 wins
+      // Clinician-specific
+      alerts,
+      avgRpe,
+      avgPain,
+      completionTrend
     };
   }, [exerciseCompletions, programs, timeRange]); // Only recalculate when these change
+
+  // Calculate check-in summary for clinician view
+  const checkInSummary = useMemo(() => {
+    if (checkIns.length === 0) return null;
+
+    const avgFeeling = Math.round(
+      (checkIns.reduce((sum, c) => sum + c.overallFeeling, 0) / checkIns.length) * 10
+    ) / 10;
+
+    const checkInsWithPain = checkIns.filter(c => c.generalPainLevel !== null && c.generalPainLevel !== undefined);
+    const avgPain = checkInsWithPain.length > 0
+      ? Math.round((checkInsWithPain.reduce((sum, c) => sum + c.generalPainLevel, 0) / checkInsWithPain.length) * 10) / 10
+      : 0;
+
+    const checkInsWithEnergy = checkIns.filter(c => c.energyLevel !== null && c.energyLevel !== undefined);
+    const avgEnergy = checkInsWithEnergy.length > 0
+      ? Math.round((checkInsWithEnergy.reduce((sum, c) => sum + c.energyLevel, 0) / checkInsWithEnergy.length) * 10) / 10
+      : 0;
+
+    const checkInsWithSleep = checkIns.filter(c => c.sleepQuality !== null && c.sleepQuality !== undefined);
+    const avgSleep = checkInsWithSleep.length > 0
+      ? Math.round((checkInsWithSleep.reduce((sum, c) => sum + c.sleepQuality, 0) / checkInsWithSleep.length) * 10) / 10
+      : 0;
+
+    return {
+      avgFeeling,
+      avgPain,
+      avgEnergy,
+      avgSleep,
+      totalCheckIns: checkIns.length
+    };
+  }, [checkIns]);
 
   // Show error state
   if (error) {
@@ -444,53 +687,87 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
             <div className="text-center py-12">
               <BarChart3 className="mx-auto text-gray-400 mb-4" size={48} />
               <p className="text-gray-500">No progress data yet</p>
-              <p className="text-gray-400 text-sm mt-2">Start completing exercises to see your progress</p>
+              <p className="text-gray-400 text-sm mt-2">
+                {isPatientView ? 'Start completing exercises to see your progress' : 'Patient has not completed any exercises yet'}
+              </p>
             </div>
-          ) : (
+          ) : isPatientView ? (
+            /* ========================================
+               PATIENT OVERVIEW - Motivation & Progress
+               ======================================== */
             <div className="space-y-4">
-              {/* Key Metrics - Mobile Friendly */}
+              {/* Top Row: 3 Key Metrics */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                {/* Total Exercises Completed */}
-                <div className="bg-gradient-to-br from-moveify-teal to-moveify-ocean rounded-xl p-4 sm:p-5 text-white shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs sm:text-sm font-medium opacity-90">Exercises Completed</p>
-                      <p className="text-3xl sm:text-4xl font-bold mt-1">{overviewStats.totalCompleted}</p>
-                    </div>
-                    <Activity className="opacity-80" size={isPatientView ? 36 : 40} />
-                  </div>
-                </div>
-
-                {/* Current Streak */}
+                {/* Current Streak - Prominent */}
                 <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-4 sm:p-5 text-white shadow-lg">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs sm:text-sm font-medium opacity-90">Current Streak</p>
                       <p className="text-3xl sm:text-4xl font-bold mt-1">{overviewStats.streak}</p>
-                      <p className="text-xs opacity-80 mt-0.5">days</p>
+                      <p className="text-xs opacity-90 mt-1">
+                        {overviewStats.streak === 0 && "Start your streak today!"}
+                        {overviewStats.streak >= 1 && overviewStats.streak <= 2 && "Keep it going!"}
+                        {overviewStats.streak >= 3 && overviewStats.streak <= 6 && "You're on a roll!"}
+                        {overviewStats.streak >= 7 && "Amazing consistency!"}
+                      </p>
                     </div>
-                    <Flame className="opacity-80" size={isPatientView ? 36 : 40} />
+                    <Flame className="opacity-80" size={36} />
                   </div>
                 </div>
 
-                {/* Completion Rate */}
+                {/* Completion Rate - Visual */}
                 <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-4 sm:p-5 text-white shadow-lg">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs sm:text-sm font-medium opacity-90">Completion Rate</p>
                       <p className="text-3xl sm:text-4xl font-bold mt-1">{overviewStats.consistencyScore}%</p>
-                      <p className="text-xs opacity-80 mt-0.5">of prescribed</p>
+                      <p className="text-xs opacity-90 mt-1">of prescribed exercises</p>
                     </div>
-                    <Calendar className="opacity-80" size={isPatientView ? 36 : 40} />
+                    <div className="relative">
+                      {/* Circular progress indicator */}
+                      <svg className="w-12 h-12 opacity-80" viewBox="0 0 36 36">
+                        <path
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                          fill="none"
+                          stroke="rgba(255,255,255,0.3)"
+                          strokeWidth="3"
+                        />
+                        <path
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                          fill="none"
+                          stroke="white"
+                          strokeWidth="3"
+                          strokeDasharray={`${overviewStats.consistencyScore}, 100`}
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Next Milestone */}
+                <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 sm:p-5 text-white shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs sm:text-sm font-medium opacity-90">Next Milestone</p>
+                      {overviewStats.nextMilestone ? (
+                        <>
+                          <p className="text-sm sm:text-base font-semibold mt-2 leading-tight">
+                            {overviewStats.nextMilestone.message}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-sm mt-2">Keep going!</p>
+                      )}
+                    </div>
+                    <Target className="opacity-80" size={36} />
                   </div>
                 </div>
               </div>
 
-              {/* Activity Chart - Simple Bar Chart */}
+              {/* Weekly Activity Chart */}
               <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6">
-                <h4 className="font-semibold text-gray-900 mb-4 text-sm sm:text-base">Activity Overview</h4>
+                <h4 className="font-semibold text-gray-900 mb-4 text-sm sm:text-base">Weekly Activity</h4>
                 <div className="space-y-3">
-                  {/* Weekly summary */}
                   <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-gray-600">Last {timeRange} days</span>
                     <span className="font-medium text-gray-900">
@@ -498,7 +775,253 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
                     </span>
                   </div>
 
-                  {/* Simple bar visualization */}
+                  {/* Bar visualization with color coding */}
+                  <div className="relative h-24 sm:h-32">
+                    <div className="absolute inset-0 flex items-end justify-between gap-0.5 sm:gap-1">
+                      {overviewStats.weeklyActivity.map((day, index) => {
+                        const maxCount = Math.max(...overviewStats.weeklyActivity.map(d => d.count), 1);
+                        const heightPercent = (day.count / maxCount) * 100;
+                        // Color based on completion: green for full, yellow for partial, gray for none
+                        const exerciseTarget = programs[0]?.exerciseCount || 3;
+                        const isFullCompletion = day.count >= exerciseTarget;
+                        const isPartialCompletion = day.count > 0 && day.count < exerciseTarget;
+
+                        return (
+                          <div
+                            key={index}
+                            className="flex-1 flex flex-col items-center group relative"
+                            style={{ minWidth: '8px' }}
+                          >
+                            {day.count > 0 && (
+                              <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10 pointer-events-none">
+                                {day.dayLabel}: {day.count} {day.count === 1 ? 'exercise' : 'exercises'}
+                                {isFullCompletion && ' ✓'}
+                              </div>
+                            )}
+
+                            <div
+                              className={`w-full rounded-t transition-all ${
+                                isFullCompletion
+                                  ? 'bg-green-500 hover:bg-green-600'
+                                  : isPartialCompletion
+                                  ? 'bg-yellow-500 hover:bg-yellow-600'
+                                  : 'bg-gray-200'
+                              }`}
+                              style={{
+                                height: day.count > 0 ? `${heightPercent}%` : '4px',
+                                minHeight: day.count > 0 ? '8px' : '4px'
+                              }}
+                            />
+
+                            {(timeRange === 7 || index % Math.ceil(timeRange / 7) === 0) && (
+                              <span className="text-xs text-gray-500 mt-1 hidden sm:block">
+                                {day.dayLabel.split(' ')[1]}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-4 text-xs text-gray-500 pt-2 border-t border-gray-200">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded bg-green-500"></div>
+                      <span>All done</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded bg-yellow-500"></div>
+                      <span>Partial</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded bg-gray-200"></div>
+                      <span>Rest</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Wins - Celebrate achievements */}
+              {overviewStats.recentWins.length > 0 && (
+                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-4 sm:p-6">
+                  <h4 className="font-semibold text-amber-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
+                    <Trophy size={18} className="text-amber-600" />
+                    Recent Wins
+                  </h4>
+                  <div className="space-y-2">
+                    {overviewStats.recentWins.map((win, index) => (
+                      <div key={index} className="flex items-center gap-3 text-sm text-amber-800">
+                        <CheckCircle size={16} className="text-amber-600 flex-shrink-0" />
+                        <span>{win.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Weight Progression */}
+              {overviewStats.weightProgression.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2 text-sm sm:text-base">
+                    <TrendingUp size={18} className="text-green-600" />
+                    Your Progress
+                  </h4>
+                  <div className="space-y-3">
+                    {overviewStats.weightProgression.slice(0, 3).map((exercise, index) => (
+                      <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                        <span className="text-sm text-gray-700 truncate pr-2">{exercise.exerciseName}</span>
+                        <span className={`text-sm font-bold ${exercise.change > 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                          {exercise.change > 0 ? '+' : ''}{exercise.change} kg
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ==========================================
+               CLINICIAN OVERVIEW - Comprehensive Dashboard
+               ========================================== */
+            <div className="space-y-4">
+              {/* Alert Banner */}
+              {overviewStats.alerts.length > 0 && (
+                <div className={`rounded-xl p-4 ${
+                  overviewStats.alerts[0].severity === 'critical'
+                    ? 'bg-red-50 border border-red-200'
+                    : overviewStats.alerts[0].severity === 'warning'
+                    ? 'bg-yellow-50 border border-yellow-200'
+                    : 'bg-green-50 border border-green-200'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    {overviewStats.alerts[0].severity === 'critical' && (
+                      <AlertTriangle className="text-red-600 flex-shrink-0" size={20} />
+                    )}
+                    {overviewStats.alerts[0].severity === 'warning' && (
+                      <AlertTriangle className="text-yellow-600 flex-shrink-0" size={20} />
+                    )}
+                    {overviewStats.alerts[0].severity === 'success' && (
+                      <CheckCircle className="text-green-600 flex-shrink-0" size={20} />
+                    )}
+                    <div>
+                      <p className={`font-medium ${
+                        overviewStats.alerts[0].severity === 'critical'
+                          ? 'text-red-800'
+                          : overviewStats.alerts[0].severity === 'warning'
+                          ? 'text-yellow-800'
+                          : 'text-green-800'
+                      }`}>
+                        {overviewStats.alerts[0].message}
+                      </p>
+                      {overviewStats.alerts.length > 1 && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          +{overviewStats.alerts.length - 1} more alert{overviewStats.alerts.length > 2 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Row 1: Adherence Metrics (2 cards) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                {/* Completion Rate */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-gray-600">Completion Rate</p>
+                    {overviewStats.completionTrend === 'up' && <TrendingUp size={18} className="text-green-500" />}
+                    {overviewStats.completionTrend === 'down' && <TrendingDown size={18} className="text-red-500" />}
+                    {overviewStats.completionTrend === 'stable' && <Minus size={18} className="text-gray-400" />}
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900">{overviewStats.consistencyScore}%</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {overviewStats.completionTrend === 'up' && 'Improving'}
+                    {overviewStats.completionTrend === 'down' && 'Declining'}
+                    {overviewStats.completionTrend === 'stable' && 'Stable'}
+                  </p>
+                </div>
+
+                {/* Consistency Score */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-gray-600">Consistency</p>
+                    <Flame size={18} className={overviewStats.streak > 0 ? 'text-orange-500' : 'text-gray-300'} />
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900">{overviewStats.streak} day{overviewStats.streak !== 1 ? 's' : ''}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {overviewStats.totalCompleted} exercises completed
+                  </p>
+                </div>
+              </div>
+
+              {/* Row 2: Clinical Metrics (2 cards) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                {/* Avg RPE */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-gray-600">Avg RPE</p>
+                    {overviewStats.avgRpe.trend === 'up' && <TrendingUp size={18} className="text-yellow-500" />}
+                    {overviewStats.avgRpe.trend === 'down' && <TrendingDown size={18} className="text-green-500" />}
+                    {overviewStats.avgRpe.trend === 'stable' && <Minus size={18} className="text-gray-400" />}
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {overviewStats.avgRpe.value > 0 ? overviewStats.avgRpe.value : '—'}
+                  </p>
+                  <p className="text-xs mt-1">
+                    {overviewStats.avgRpe.value > 0 ? (
+                      <span className={
+                        overviewStats.avgRpe.value >= 6 && overviewStats.avgRpe.value <= 8
+                          ? 'text-green-600'
+                          : 'text-yellow-600'
+                      }>
+                        {overviewStats.avgRpe.value >= 6 && overviewStats.avgRpe.value <= 8 ? 'In target zone (6-8)' : 'Outside target zone'}
+                      </span>
+                    ) : (
+                      <span className="text-gray-500">No RPE data</span>
+                    )}
+                  </p>
+                </div>
+
+                {/* Avg Pain Level */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-gray-600">Avg Pain Level</p>
+                    {overviewStats.avgPain.trend === 'up' && <TrendingUp size={18} className="text-red-500" />}
+                    {overviewStats.avgPain.trend === 'down' && <TrendingDown size={18} className="text-green-500" />}
+                    {overviewStats.avgPain.trend === 'stable' && <Minus size={18} className="text-gray-400" />}
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {overviewStats.avgPain.value > 0 ? overviewStats.avgPain.value : '—'}
+                  </p>
+                  <p className="text-xs mt-1">
+                    {overviewStats.avgPain.value > 0 ? (
+                      <span className={
+                        overviewStats.avgPain.value < 3
+                          ? 'text-green-600'
+                          : overviewStats.avgPain.value <= 5
+                          ? 'text-yellow-600'
+                          : 'text-red-600'
+                      }>
+                        {overviewStats.avgPain.value < 3 ? 'Low' : overviewStats.avgPain.value <= 5 ? 'Moderate' : 'High'}
+                      </span>
+                    ) : (
+                      <span className="text-gray-500">No pain data</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Activity Overview */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6">
+                <h4 className="font-semibold text-gray-900 mb-4 text-sm sm:text-base">Activity Overview</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
+                    <span className="text-gray-600">Last {timeRange} days</span>
+                    <span className="font-medium text-gray-900">
+                      {overviewStats.weeklyActivity.filter(d => d.count > 0).length} active days
+                    </span>
+                  </div>
+
                   <div className="relative h-24 sm:h-32">
                     <div className="absolute inset-0 flex items-end justify-between gap-0.5 sm:gap-1">
                       {overviewStats.weeklyActivity.map((day, index) => {
@@ -511,14 +1034,12 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
                             className="flex-1 flex flex-col items-center group relative"
                             style={{ minWidth: '8px' }}
                           >
-                            {/* Tooltip */}
                             {day.count > 0 && (
                               <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10 pointer-events-none">
                                 {day.dayLabel}: {day.count} {day.count === 1 ? 'exercise' : 'exercises'}
                               </div>
                             )}
 
-                            {/* Bar */}
                             <div
                               className={`w-full rounded-t transition-all ${
                                 day.count > 0
@@ -531,7 +1052,6 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
                               }}
                             />
 
-                            {/* Day label - show less on mobile */}
                             {(timeRange === 7 || index % Math.ceil(timeRange / 7) === 0) && (
                               <span className="text-xs text-gray-500 mt-1 hidden sm:block">
                                 {day.dayLabel.split(' ')[1]}
@@ -542,20 +1062,65 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
                       })}
                     </div>
                   </div>
+                </div>
+              </div>
 
-                  {/* Legend for mobile */}
-                  <div className="flex items-center justify-center gap-4 text-xs text-gray-500 pt-2 border-t border-gray-200">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 rounded bg-moveify-teal"></div>
-                      <span>Active day</span>
+              {/* Check-In Summary */}
+              {checkInSummary && (
+                <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2 text-sm sm:text-base">
+                    <Heart size={18} className="text-red-500" />
+                    Check-In Summary
+                    <span className="text-xs font-normal text-gray-500">({checkInSummary.totalCheckIns} check-ins)</span>
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {/* Overall Feeling */}
+                    <div className="text-center">
+                      <div className="text-2xl mb-1">
+                        {checkInSummary.avgFeeling >= 4 ? '😊' : checkInSummary.avgFeeling >= 3 ? '😐' : '😔'}
+                      </div>
+                      <p className="text-lg font-bold text-gray-900">{checkInSummary.avgFeeling}/5</p>
+                      <p className="text-xs text-gray-500">Overall Feeling</p>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 rounded bg-gray-200"></div>
-                      <span>Rest day</span>
+
+                    {/* General Pain */}
+                    <div className="text-center">
+                      <div className="flex justify-center mb-1">
+                        <Activity size={24} className={
+                          checkInSummary.avgPain < 3 ? 'text-green-500' :
+                          checkInSummary.avgPain <= 5 ? 'text-yellow-500' : 'text-red-500'
+                        } />
+                      </div>
+                      <p className="text-lg font-bold text-gray-900">{checkInSummary.avgPain}/10</p>
+                      <p className="text-xs text-gray-500">General Pain</p>
+                    </div>
+
+                    {/* Energy */}
+                    <div className="text-center">
+                      <div className="flex justify-center mb-1">
+                        <Battery size={24} className={
+                          checkInSummary.avgEnergy >= 4 ? 'text-green-500' :
+                          checkInSummary.avgEnergy >= 3 ? 'text-yellow-500' : 'text-red-500'
+                        } />
+                      </div>
+                      <p className="text-lg font-bold text-gray-900">{checkInSummary.avgEnergy}/5</p>
+                      <p className="text-xs text-gray-500">Energy Level</p>
+                    </div>
+
+                    {/* Sleep */}
+                    <div className="text-center">
+                      <div className="flex justify-center mb-1">
+                        <Moon size={24} className={
+                          checkInSummary.avgSleep >= 4 ? 'text-green-500' :
+                          checkInSummary.avgSleep >= 3 ? 'text-yellow-500' : 'text-red-500'
+                        } />
+                      </div>
+                      <p className="text-lg font-bold text-gray-900">{checkInSummary.avgSleep}/5</p>
+                      <p className="text-xs text-gray-500">Sleep Quality</p>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Weight Progression */}
               {overviewStats.weightProgression.length > 0 && (
