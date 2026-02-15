@@ -154,7 +154,15 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
         consistencyScore: 0,
         streak: 0,
         weightProgression: [],
-        weeklyActivity: []
+        weeklyActivity: [],
+        // Patient-specific
+        nextMilestone: null,
+        recentWins: [],
+        // Clinician-specific
+        alerts: [],
+        avgRpe: { value: 0, trend: 'stable' as const },
+        avgPain: { value: 0, trend: 'stable' as const },
+        completionTrend: 'stable' as const
       };
     }
 
