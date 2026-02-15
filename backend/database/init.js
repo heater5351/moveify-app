@@ -205,6 +205,77 @@ async function initDatabase() {
       ALTER TABLE exercise_completions
       ADD COLUMN IF NOT EXISTS weight_performed REAL
     `);
+
+    // Fix legacy start_date values ('today', 'tomorrow', etc.) by converting to created_at date
+    console.log('🔄 Fixing legacy start_date values...');
+    await db.query(`
+      UPDATE programs
+      SET start_date = TO_CHAR(created_at, 'YYYY-MM-DD')
+      WHERE start_date IN ('today', 'tomorrow', 'nextweek')
+         OR start_date IS NULL
+         OR start_date = ''
+    `);
+
+    // Create indexes for performance (IF NOT EXISTS for idempotency)
+    console.log('🔄 Creating performance indexes...');
+
+    // exercise_completions indexes - heavily queried for analytics
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_exercise_completions_exercise_id
+      ON exercise_completions(exercise_id)
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_exercise_completions_patient_id
+      ON exercise_completions(patient_id)
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_exercise_completions_date
+      ON exercise_completions(completion_date)
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_exercise_completions_patient_date
+      ON exercise_completions(patient_id, completion_date)
+    `);
+
+    // programs index - queried by patient
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_programs_patient_id
+      ON programs(patient_id)
+    `);
+
+    // program_exercises index - queried by program
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_program_exercises_program_id
+      ON program_exercises(program_id)
+    `);
+
+    // daily_check_ins indexes - queried for analytics
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_daily_check_ins_patient_id
+      ON daily_check_ins(patient_id)
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_daily_check_ins_patient_date
+      ON daily_check_ins(patient_id, check_in_date)
+    `);
+
+    // periodization_cycles index
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_periodization_cycles_program_id
+      ON periodization_cycles(program_id)
+    `);
+
+    // exercise_progression_log indexes
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_progression_log_program_id
+      ON exercise_progression_log(program_id)
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_progression_log_exercise_id
+      ON exercise_progression_log(exercise_id)
+    `);
+
+    console.log('✅ Database indexes created');
     console.log('✅ Database migrations complete');
 
     console.log('✅ Database tables initialized');

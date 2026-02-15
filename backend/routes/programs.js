@@ -5,6 +5,31 @@ const periodizationService = require('../services/periodization-service');
 
 const router = express.Router();
 
+// Utility: Convert startDate string ('today', 'tomorrow', etc.) to actual date
+function getActualStartDate(startDateValue, customStartDate) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (startDateValue === 'today') {
+    return today.toISOString().split('T')[0];
+  } else if (startDateValue === 'tomorrow') {
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  } else if (startDateValue === 'nextweek') {
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    return nextWeek.toISOString().split('T')[0];
+  } else if (startDateValue === 'custom' && customStartDate) {
+    return customStartDate;
+  } else if (startDateValue && startDateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    // Already a date string
+    return startDateValue;
+  }
+  // Default to today
+  return today.toISOString().split('T')[0];
+}
+
 // Get program for a patient
 router.get('/patient/:patientId', async (req, res) => {
   try {
@@ -80,31 +105,6 @@ router.post('/patient/:patientId', async (req, res) => {
     }
 
     await client.query('BEGIN');
-
-    // Convert startDate string to actual date
-    const getActualStartDate = (startDateValue, customStartDate) => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (startDateValue === 'today') {
-        return today.toISOString().split('T')[0];
-      } else if (startDateValue === 'tomorrow') {
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        return tomorrow.toISOString().split('T')[0];
-      } else if (startDateValue === 'nextweek') {
-        const nextWeek = new Date(today);
-        nextWeek.setDate(nextWeek.getDate() + 7);
-        return nextWeek.toISOString().split('T')[0];
-      } else if (startDateValue === 'custom' && customStartDate) {
-        return customStartDate;
-      } else if (startDateValue && startDateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        // Already a date string
-        return startDateValue;
-      }
-      // Default to today
-      return today.toISOString().split('T')[0];
-    };
 
     const actualStartDate = getActualStartDate(config?.startDate, config?.customStartDate);
 
@@ -208,31 +208,6 @@ router.put('/:programId', async (req, res) => {
     }
 
     await client.query('BEGIN');
-
-    // Convert startDate string to actual date
-    const getActualStartDate = (startDateValue, customStartDate) => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (startDateValue === 'today') {
-        return today.toISOString().split('T')[0];
-      } else if (startDateValue === 'tomorrow') {
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        return tomorrow.toISOString().split('T')[0];
-      } else if (startDateValue === 'nextweek') {
-        const nextWeek = new Date(today);
-        nextWeek.setDate(nextWeek.getDate() + 7);
-        return nextWeek.toISOString().split('T')[0];
-      } else if (startDateValue === 'custom' && customStartDate) {
-        return customStartDate;
-      } else if (startDateValue && startDateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        // Already a date string
-        return startDateValue;
-      }
-      // Default to today
-      return today.toISOString().split('T')[0];
-    };
 
     const actualStartDate = getActualStartDate(config?.startDate, config?.customStartDate);
 
@@ -496,28 +471,39 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
         ORDER BY completion_date ASC
       `, [...exerciseIds, patientId, startDateStr]);
 
-      // Calculate streak
+      // Calculate streak - fetch all completion dates in ONE query instead of N queries
+      const allCompletionDates = await db.getAll(`
+        SELECT DISTINCT completion_date
+        FROM exercise_completions
+        WHERE exercise_id IN (${placeholders})
+          AND patient_id = $${exerciseIds.length + 1}
+        ORDER BY completion_date DESC
+      `, [...exerciseIds, patientId]);
+
+      // Create a Set of date strings for O(1) lookup
+      const completionDateSet = new Set(
+        allCompletionDates.map(row => {
+          const date = row.completion_date;
+          return typeof date === 'string'
+            ? date.split('T')[0]
+            : new Date(date).toISOString().split('T')[0];
+        })
+      );
+
+      // Calculate streak by checking consecutive days from today backwards
       let streak = 0;
       let checkDate = new Date();
+      checkDate.setHours(0, 0, 0, 0);
 
-      while (true) {
+      for (let i = 0; i < 365; i++) {
         const dateStr = checkDate.toISOString().split('T')[0];
-        const hasCompletion = await db.getOne(`
-          SELECT COUNT(*) as count
-          FROM exercise_completions
-          WHERE exercise_id IN (${placeholders})
-            AND patient_id = $${exerciseIds.length + 1}
-            AND completion_date = $${exerciseIds.length + 2}
-        `, [...exerciseIds, patientId, dateStr]);
 
-        if (parseInt(hasCompletion.count) > 0) {
+        if (completionDateSet.has(dateStr)) {
           streak++;
           checkDate.setDate(checkDate.getDate() - 1);
         } else {
           break;
         }
-
-        if (streak > 365) break;
       }
 
       // Calculate completion rate
@@ -780,8 +766,17 @@ router.patch('/exercise/:exerciseId/override', async (req, res) => {
 });
 
 // ADMIN: Clear all check-in and completion data (for fresh start)
+// SECURITY: Requires admin secret header to prevent unauthorized data deletion
 router.delete('/admin/clear-data', async (req, res) => {
   try {
+    // Check for admin authorization
+    const adminSecret = req.headers['x-admin-secret'];
+    const expectedSecret = process.env.ADMIN_SECRET || 'moveify-admin-2024';
+
+    if (!adminSecret || adminSecret !== expectedSecret) {
+      return res.status(403).json({ error: 'Unauthorized: Invalid or missing admin secret' });
+    }
+
     // Clear all exercise completions
     const completionsResult = await db.query('DELETE FROM exercise_completions');
 

@@ -51,6 +51,7 @@ interface ProgressAnalyticsProps {
 
 export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: ProgressAnalyticsProps) => {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<7 | 14 | 30>(30);
   const [activeView, setActiveView] = useState<'overview' | 'completions' | 'checkins' | 'adjustments'>('overview');
 
@@ -64,20 +65,26 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
+      setError(null);
 
-      // Fetch program details for frequency data
-      await fetchPrograms();
+      try {
+        // Fetch program details for frequency data
+        await fetchPrograms();
 
-      // Fetch view-specific data
-      if (activeView === 'completions') {
-        await fetchExerciseCompletions();
-      } else if (activeView === 'checkins') {
-        await fetchCheckIns();
-      } else if (activeView === 'adjustments') {
-        await fetchProgressionLogs();
-      } else if (activeView === 'overview') {
-        // Fetch completions data for overview stats
-        await fetchExerciseCompletions();
+        // Fetch view-specific data
+        if (activeView === 'completions') {
+          await fetchExerciseCompletions();
+        } else if (activeView === 'checkins') {
+          await fetchCheckIns();
+        } else if (activeView === 'adjustments') {
+          await fetchProgressionLogs();
+        } else if (activeView === 'overview') {
+          // Fetch completions data for overview stats
+          await fetchExerciseCompletions();
+        }
+      } catch (err) {
+        setError('Failed to load analytics data. Please try again.');
+        console.error('Analytics load error:', err);
       }
 
       setLoading(false);
@@ -87,64 +94,51 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
   }, [patientId, timeRange, activeView]);
 
   const fetchPrograms = async () => {
-    try {
-      const response = await fetch(`${apiUrl}/programs/patient/${patientId}`);
-      if (response.ok) {
-        const data = await response.json();
+    const response = await fetch(`${apiUrl}/programs/patient/${patientId}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch programs: ${response.status}`);
+    }
+    const data = await response.json();
 
-        // The API returns a single program object, not an array
-        if (data.program) {
-          const programDetails = [{
-            id: data.program.id,
-            frequency: data.program.frequency || [],
-            startDate: data.program.startDate || data.program.start_date,
-            exerciseCount: data.program.exercises?.length || 0
-          }];
-
-          setPrograms(programDetails);
-        } else {
-          setPrograms([]);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch programs:', error);
+    // The API returns a single program object, not an array
+    if (data.program) {
+      const programDetails = [{
+        id: data.program.id,
+        frequency: data.program.frequency || [],
+        startDate: data.program.startDate || data.program.start_date,
+        exerciseCount: data.program.exercises?.length || 0
+      }];
+      setPrograms(programDetails);
+    } else {
+      setPrograms([]);
     }
   };
 
   const fetchExerciseCompletions = async () => {
-    try {
-      const response = await fetch(`${apiUrl}/programs/exercise-completions/patient/${patientId}?days=${timeRange}`);
-      if (response.ok) {
-        const data = await response.json();
-        setExerciseCompletions(data.completions || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch exercise completions:', error);
+    const response = await fetch(`${apiUrl}/programs/exercise-completions/patient/${patientId}?days=${timeRange}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch exercise completions: ${response.status}`);
     }
+    const data = await response.json();
+    setExerciseCompletions(data.completions || []);
   };
 
   const fetchCheckIns = async () => {
-    try {
-      const response = await fetch(`${apiUrl}/check-ins/patient/${patientId}?days=${timeRange}`);
-      if (response.ok) {
-        const data = await response.json();
-        setCheckIns(data.checkIns || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch check-ins:', error);
+    const response = await fetch(`${apiUrl}/check-ins/patient/${patientId}?days=${timeRange}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch check-ins: ${response.status}`);
     }
+    const data = await response.json();
+    setCheckIns(data.checkIns || []);
   };
 
   const fetchProgressionLogs = async () => {
-    try {
-      const response = await fetch(`${apiUrl}/programs/progression-logs/patient/${patientId}?limit=50`);
-      if (response.ok) {
-        const data = await response.json();
-        setProgressionLogs(data.logs || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch progression logs:', error);
+    const response = await fetch(`${apiUrl}/programs/progression-logs/patient/${patientId}?limit=50`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch progression logs: ${response.status}`);
     }
+    const data = await response.json();
+    setProgressionLogs(data.logs || []);
   };
 
   // Calculate stats from exercise completions data using useMemo
@@ -332,6 +326,22 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       weeklyActivity
     };
   }, [exerciseCompletions, programs, timeRange]); // Only recalculate when these change
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+        <div className="text-red-600 font-medium mb-2">Unable to load analytics</div>
+        <p className="text-red-500 text-sm mb-4">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
