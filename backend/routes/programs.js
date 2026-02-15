@@ -550,39 +550,54 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
         completionsByDate[dateStr] = parseInt(row.count);
       });
 
-      // Calculate schedule-aware streak
+      // Calculate schedule-aware streak (LENIENT: any activity counts)
       const streak = calculateScheduleAwareStreak(
         completionsByDate,
         frequency,
         programStartDate
       );
 
-      // Calculate completion rate based on scheduled days only
+      // ============================================================
+      // COMPLETION RATE CALCULATION (STRICT: exercise-based)
+      // Formula: (Total Exercises Completed / Total Exercises Prescribed) × 100%
+      //
+      // Example: If 3 exercises are assigned on Mon/Wed/Fri (9 total per week),
+      // and patient completes 6 exercises that week, rate = (6/9) × 100 = 67%
+      // ============================================================
       const now = new Date();
       now.setHours(0, 0, 0, 0);
       const effectiveStartDate = programStartDate || programCreatedDate;
       effectiveStartDate.setHours(0, 0, 0, 0);
 
-      // Count scheduled days between start and now
-      let scheduledDays = 0;
-      const countDate = new Date(effectiveStartDate);
-      while (countDate <= now) {
-        if (isScheduledDay(countDate, frequency)) {
-          scheduledDays++;
+      // Count scheduled days within the query window (respecting program start date)
+      let scheduledDaysInRange = 0;
+      const countDate = new Date(now);
+      for (let daysAgo = 0; daysAgo < days; daysAgo++) {
+        const checkDate = new Date(countDate);
+        checkDate.setDate(checkDate.getDate() - daysAgo);
+
+        // Only count if on or after program start date
+        if (checkDate >= effectiveStartDate && isScheduledDay(checkDate, frequency)) {
+          scheduledDaysInRange++;
         }
-        countDate.setDate(countDate.getDate() + 1);
       }
 
-      // Count days with any completions
-      const daysWithCompletions = Object.keys(completionsByDate).filter(dateStr => {
-        const date = new Date(dateStr);
-        date.setHours(0, 0, 0, 0);
-        return date >= effectiveStartDate && date <= now && isScheduledDay(date, frequency);
-      }).length;
+      // Total prescribed exercises = scheduled days × exercises per day
+      const exercisesPerDay = exerciseIds.length;
+      const totalPrescribedExercises = scheduledDaysInRange * exercisesPerDay;
 
-      const completionRate = scheduledDays > 0
-        ? Math.round((daysWithCompletions / scheduledDays) * 100)
-        : 0;
+      // Total completed exercises (sum of all completion counts in the query window)
+      const totalCompletedExercises = completions.reduce((sum, c) => sum + parseInt(c.count), 0);
+
+      // Calculate completion rate: (completed / prescribed) × 100, capped at 100%
+      let completionRate = 0;
+      if (totalPrescribedExercises > 0) {
+        const rawRate = (totalCompletedExercises / totalPrescribedExercises) * 100;
+        completionRate = Math.min(Math.round(rawRate), 100); // Cap at 100%
+      } else {
+        // Edge case: no prescribed days in range
+        completionRate = totalCompletedExercises > 0 ? 100 : 0;
+      }
 
       return {
         programId: program.id,
