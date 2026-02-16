@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Patient, UserRole, User } from '../types/index.ts';
 import { API_URL } from '../config';
+import { ForgotPasswordModal } from './modals/ForgotPasswordModal';
 
 interface LoginPageProps {
   onLogin: (role: UserRole, patient?: Patient, user?: User) => void;
@@ -11,6 +12,7 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   // Helper function to retry fetch with exponential backoff
   const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 2) => {
@@ -173,8 +175,22 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
           >
             {isLoading ? 'Signing in...' : 'Sign In'}
           </button>
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => setShowForgotPassword(true)}
+              className="text-moveify-teal hover:text-moveify-teal-dark font-medium text-sm"
+            >
+              Forgot password?
+            </button>
+          </div>
         </div>
       </div>
+
+      {showForgotPassword && (
+        <ForgotPasswordModal onClose={() => setShowForgotPassword(false)} />
+      )}
     </div>
   );
 };

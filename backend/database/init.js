@@ -195,6 +195,18 @@ async function initDatabase() {
       )
     `);
 
+    // Password reset tokens table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(64) UNIQUE NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
     // Add weight columns to existing tables (migration for deployed DB)
     console.log('🔄 Running database migrations...');
     await db.query(`
