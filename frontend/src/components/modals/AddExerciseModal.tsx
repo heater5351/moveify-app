@@ -1,6 +1,31 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Play, ExternalLink } from 'lucide-react';
 import { API_URL } from '../../config';
+
+// Convert YouTube URL to embed format
+const convertToEmbedUrl = (url: string): string | null => {
+  if (!url) return null;
+
+  // Handle youtube.com/watch?v=VIDEO_ID
+  const watchMatch = url.match(/youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/);
+  if (watchMatch) {
+    return `https://www.youtube.com/embed/${watchMatch[1]}`;
+  }
+
+  // Handle youtu.be/VIDEO_ID
+  const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]+)/);
+  if (shortMatch) {
+    return `https://www.youtube.com/embed/${shortMatch[1]}`;
+  }
+
+  // Handle youtube.com/embed/VIDEO_ID (already embed format)
+  const embedMatch = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]+)/);
+  if (embedMatch) {
+    return url;
+  }
+
+  return null;
+};
 
 interface AddExerciseModalProps {
   clinicianId: number;
@@ -45,12 +70,16 @@ export const AddExerciseModal = ({ clinicianId, onClose, onSuccess }: AddExercis
     setIsSubmitting(true);
 
     try {
+      // Convert video URL to embed format if provided
+      const embedUrl = formData.videoUrl ? convertToEmbedUrl(formData.videoUrl) : '';
+
       const response = await fetch(`${API_URL}/exercises`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clinicianId,
-          ...formData
+          ...formData,
+          videoUrl: embedUrl || '' // Save the embed URL format
         })
       });
 
@@ -159,13 +188,36 @@ export const AddExerciseModal = ({ clinicianId, onClose, onSuccess }: AddExercis
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Video URL <span className="text-gray-400">(optional)</span>
             </label>
-            <input
-              type="url"
-              value={formData.videoUrl}
-              onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
-              placeholder="https://youtube.com/watch?v=..."
-            />
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={formData.videoUrl}
+                onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+                placeholder="https://youtube.com/watch?v=..."
+              />
+              {formData.videoUrl && convertToEmbedUrl(formData.videoUrl) && (
+                <a
+                  href={formData.videoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-1 text-gray-600"
+                  title="Preview video"
+                >
+                  <ExternalLink size={18} />
+                </a>
+              )}
+            </div>
+            {formData.videoUrl && !convertToEmbedUrl(formData.videoUrl) && (
+              <p className="text-sm text-amber-600 mt-1">
+                Please use a valid YouTube URL (youtube.com/watch?v=... or youtu.be/...)
+              </p>
+            )}
+            {formData.videoUrl && convertToEmbedUrl(formData.videoUrl) && (
+              <p className="text-sm text-green-600 mt-1 flex items-center gap-1">
+                <Play size={14} /> Valid YouTube URL detected
+              </p>
+            )}
           </div>
         </div>
 

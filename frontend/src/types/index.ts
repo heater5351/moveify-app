@@ -7,6 +7,7 @@ export type Exercise = {
   duration: string;
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   description: string;
+  videoUrl?: string; // YouTube embed URL
 }
 
 export type CompletionData = {

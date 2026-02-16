@@ -1,9 +1,51 @@
 import { useState, useEffect } from 'react';
-import { Search, Play, Plus, Trash2 } from 'lucide-react';
+import { Search, Play, Plus, Trash2, X } from 'lucide-react';
 import type { ProgramExercise, Exercise } from '../types/index.ts';
 import { exercises as defaultExercises } from '../data/exercises';
 import { AddExerciseModal } from './modals/AddExerciseModal';
 import { API_URL } from '../config';
+
+// Video Modal Component
+const VideoModal = ({ videoUrl, exerciseName, onClose }: { videoUrl: string; exerciseName: string; onClose: () => void }) => {
+  // Handle escape key to close
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl max-w-4xl w-full overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="font-semibold text-lg text-gray-900">{exerciseName}</h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X size={20} className="text-gray-500" />
+          </button>
+        </div>
+        <div className="aspect-video bg-black">
+          <iframe
+            src={videoUrl}
+            className="w-full h-full"
+            allowFullScreen
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface ExerciseLibraryProps {
   onAddToProgram: (exercises: ProgramExercise[]) => void;
@@ -18,7 +60,16 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
   const [isLoading, setIsLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [videoModal, setVideoModal] = useState<{ url: string; name: string } | null>(null);
   const exercisesPerPage = 20;
+
+  // Handle video play click
+  const handlePlayVideo = (exercise: Exercise, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card selection
+    if (exercise.videoUrl) {
+      setVideoModal({ url: exercise.videoUrl, name: exercise.name });
+    }
+  };
 
   // Fetch custom exercises for this clinician
   useEffect(() => {
@@ -213,7 +264,17 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                   >
                     {/* Video Thumbnail */}
                     <div className="bg-gradient-to-br from-purple-500 to-purple-600 h-48 flex items-center justify-center relative">
-                      <Play className="text-white" size={56} />
+                      {exercise.videoUrl ? (
+                        <button
+                          onClick={(e) => handlePlayVideo(exercise, e)}
+                          className="bg-white/20 hover:bg-white/30 rounded-full p-4 transition-colors"
+                          title="Watch video demonstration"
+                        >
+                          <Play className="text-white" size={40} fill="white" />
+                        </button>
+                      ) : (
+                        <Play className="text-white/50" size={56} />
+                      )}
                       {isSelected && (
                         <div className="absolute top-3 left-3 bg-moveify-teal text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">
                           ✓
@@ -270,7 +331,17 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                 >
                   {/* Video Thumbnail */}
                   <div className="bg-gradient-to-br from-blue-500 to-blue-600 h-48 flex items-center justify-center relative">
-                    <Play className="text-white" size={56} />
+                    {exercise.videoUrl ? (
+                      <button
+                        onClick={(e) => handlePlayVideo(exercise, e)}
+                        className="bg-white/20 hover:bg-white/30 rounded-full p-4 transition-colors"
+                        title="Watch video demonstration"
+                      >
+                        <Play className="text-white" size={40} fill="white" />
+                      </button>
+                    ) : (
+                      <Play className="text-white/50" size={56} />
+                    )}
                     {isSelected && (
                       <div className="absolute top-3 left-3 bg-moveify-teal text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">
                         ✓
@@ -347,6 +418,15 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
           clinicianId={clinicianId}
           onClose={() => setShowAddModal(false)}
           onSuccess={fetchCustomExercises}
+        />
+      )}
+
+      {/* Video Player Modal */}
+      {videoModal && (
+        <VideoModal
+          videoUrl={videoModal.url}
+          exerciseName={videoModal.name}
+          onClose={() => setVideoModal(null)}
         />
       )}
     </>
