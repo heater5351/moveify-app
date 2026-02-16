@@ -1,13 +1,22 @@
 import { useState, useEffect } from 'react';
-import { Search, Play, Plus, Trash2, X } from 'lucide-react';
+import { Search, Play, Plus, Trash2, X, Check } from 'lucide-react';
 import type { ProgramExercise, Exercise } from '../types/index.ts';
 import { exercises as defaultExercises } from '../data/exercises';
 import { AddExerciseModal } from './modals/AddExerciseModal';
 import { API_URL } from '../config';
 
-// Video Modal Component
-const VideoModal = ({ videoUrl, exerciseName, onClose }: { videoUrl: string; exerciseName: string; onClose: () => void }) => {
-  // Handle escape key to close
+// Exercise Detail Modal Component
+const ExerciseDetailModal = ({
+  exercise,
+  isSelected,
+  onToggleSelect,
+  onClose
+}: {
+  exercise: Exercise;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+  onClose: () => void;
+}) => {
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -22,11 +31,23 @@ const VideoModal = ({ videoUrl, exerciseName, onClose }: { videoUrl: string; exe
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl max-w-4xl w-full overflow-hidden"
+        className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
         onClick={e => e.stopPropagation()}
       >
+        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="font-semibold text-lg text-gray-900">{exerciseName}</h3>
+          <div>
+            <h3 className="font-semibold text-xl text-gray-900">{exercise.name}</h3>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                {exercise.category}
+              </span>
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                {exercise.difficulty}
+              </span>
+              <span className="text-sm text-gray-500">{exercise.duration}</span>
+            </div>
+          </div>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -34,13 +55,37 @@ const VideoModal = ({ videoUrl, exerciseName, onClose }: { videoUrl: string; exe
             <X size={20} className="text-gray-500" />
           </button>
         </div>
-        <div className="aspect-video bg-black">
-          <iframe
-            src={videoUrl}
-            className="w-full h-full"
-            allowFullScreen
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          />
+
+        {/* Video Player (larger) */}
+        {exercise.videoUrl && (
+          <div className="aspect-video bg-black">
+            <iframe
+              src={exercise.videoUrl}
+              className="w-full h-full"
+              allowFullScreen
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            />
+          </div>
+        )}
+
+        {/* Full Description (scrollable) */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <h4 className="font-medium text-gray-900 mb-2">Instructions</h4>
+          <p className="text-gray-700 whitespace-pre-wrap">{exercise.description}</p>
+        </div>
+
+        {/* Footer with Select Button */}
+        <div className="p-4 border-t bg-gray-50">
+          <button
+            onClick={onToggleSelect}
+            className={`w-full py-3 rounded-lg font-medium transition-colors ${
+              isSelected
+                ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                : 'bg-moveify-teal text-white hover:bg-moveify-teal-dark'
+            }`}
+          >
+            {isSelected ? 'Remove from Selection' : 'Add to Selection'}
+          </button>
         </div>
       </div>
     </div>
@@ -60,16 +105,8 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
   const [isLoading, setIsLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [videoModal, setVideoModal] = useState<{ url: string; name: string } | null>(null);
+  const [detailModal, setDetailModal] = useState<Exercise | null>(null);
   const exercisesPerPage = 20;
-
-  // Handle video play click
-  const handlePlayVideo = (exercise: Exercise, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card selection
-    if (exercise.videoUrl) {
-      setVideoModal({ url: exercise.videoUrl, name: exercise.name });
-    }
-  };
 
   // Fetch custom exercises for this clinician
   useEffect(() => {
@@ -257,7 +294,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                 return (
                   <div
                     key={exercise.id}
-                    onClick={() => toggleExercise(exercise.id)}
+                    onClick={() => setDetailModal(exercise)}
                     className={`bg-white rounded-xl shadow-sm border-2 overflow-hidden hover:shadow-md transition-all cursor-pointer ${
                       isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-100'
                     }`}
@@ -265,25 +302,30 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                     {/* Video Thumbnail */}
                     <div className="bg-gradient-to-br from-purple-500 to-purple-600 h-48 flex items-center justify-center relative">
                       {exercise.videoUrl ? (
-                        <button
-                          onClick={(e) => handlePlayVideo(exercise, e)}
-                          className="bg-white/20 hover:bg-white/30 rounded-full p-4 transition-colors"
-                          title="Watch video demonstration"
-                        >
-                          <Play className="text-white" size={40} fill="white" />
-                        </button>
+                        <Play className="text-white" size={40} fill="white" />
                       ) : (
                         <Play className="text-white/50" size={56} />
                       )}
-                      {isSelected && (
-                        <div className="absolute top-3 left-3 bg-moveify-teal text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">
-                          ✓
-                        </div>
-                      )}
+                      {/* Selection Checkbox */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleExercise(exercise.id);
+                        }}
+                        className={`absolute top-3 right-3 w-7 h-7 rounded-md border-2 flex items-center justify-center transition-colors ${
+                          isSelected
+                            ? 'bg-moveify-teal border-moveify-teal text-white'
+                            : 'bg-white/90 border-gray-300 hover:border-moveify-teal'
+                        }`}
+                        title={isSelected ? 'Deselect exercise' : 'Select exercise'}
+                      >
+                        {isSelected && <Check size={16} />}
+                      </button>
+                      {/* Delete Button */}
                       <button
                         onClick={(e) => handleDeleteExercise(exercise.id, (exercise as any).dbId, e)}
                         disabled={deletingId === exercise.id}
-                        className="absolute top-3 right-3 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-colors disabled:opacity-50"
+                        className="absolute top-3 right-12 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-colors disabled:opacity-50"
                         title="Delete exercise"
                       >
                         <Trash2 size={16} />
@@ -324,7 +366,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
               return (
                 <div
                   key={exercise.id}
-                  onClick={() => toggleExercise(exercise.id)}
+                  onClick={() => setDetailModal(exercise)}
                   className={`bg-white rounded-xl shadow-sm border-2 overflow-hidden hover:shadow-md transition-all cursor-pointer ${
                     isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-100'
                   }`}
@@ -332,21 +374,25 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                   {/* Video Thumbnail */}
                   <div className="bg-gradient-to-br from-blue-500 to-blue-600 h-48 flex items-center justify-center relative">
                     {exercise.videoUrl ? (
-                      <button
-                        onClick={(e) => handlePlayVideo(exercise, e)}
-                        className="bg-white/20 hover:bg-white/30 rounded-full p-4 transition-colors"
-                        title="Watch video demonstration"
-                      >
-                        <Play className="text-white" size={40} fill="white" />
-                      </button>
+                      <Play className="text-white" size={40} fill="white" />
                     ) : (
                       <Play className="text-white/50" size={56} />
                     )}
-                    {isSelected && (
-                      <div className="absolute top-3 left-3 bg-moveify-teal text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">
-                        ✓
-                      </div>
-                    )}
+                    {/* Selection Checkbox */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExercise(exercise.id);
+                      }}
+                      className={`absolute top-3 right-3 w-7 h-7 rounded-md border-2 flex items-center justify-center transition-colors ${
+                        isSelected
+                          ? 'bg-moveify-teal border-moveify-teal text-white'
+                          : 'bg-white/90 border-gray-300 hover:border-moveify-teal'
+                      }`}
+                      title={isSelected ? 'Deselect exercise' : 'Select exercise'}
+                    >
+                      {isSelected && <Check size={16} />}
+                    </button>
                   </div>
 
                   {/* Exercise Info */}
@@ -421,12 +467,13 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
         />
       )}
 
-      {/* Video Player Modal */}
-      {videoModal && (
-        <VideoModal
-          videoUrl={videoModal.url}
-          exerciseName={videoModal.name}
-          onClose={() => setVideoModal(null)}
+      {/* Exercise Detail Modal */}
+      {detailModal && (
+        <ExerciseDetailModal
+          exercise={detailModal}
+          isSelected={selectedExercises.includes(detailModal.id)}
+          onToggleSelect={() => toggleExercise(detailModal.id)}
+          onClose={() => setDetailModal(null)}
         />
       )}
     </>
