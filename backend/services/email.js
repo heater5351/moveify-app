@@ -1,56 +1,11 @@
-// Email service using Gmail API with service account
-const { google } = require('googleapis');
+// Email service using Resend
+const { Resend } = require('resend');
 
-// Create Gmail client using service account with domain-wide delegation
-function getGmailClient() {
-  const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-    },
-    scopes: ['https://www.googleapis.com/auth/gmail.send'],
-    clientOptions: {
-      subject: process.env.GMAIL_SENDER_EMAIL // The Workspace user to impersonate
-    }
-  });
-
-  return google.gmail({ version: 'v1', auth });
-}
-
-// Encode email to base64url format for Gmail API
-function createMessage(to, from, subject, htmlBody, textBody) {
-  const messageParts = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    'MIME-Version: 1.0',
-    'Content-Type: multipart/alternative; boundary="boundary"',
-    '',
-    '--boundary',
-    'Content-Type: text/plain; charset="UTF-8"',
-    '',
-    textBody,
-    '',
-    '--boundary',
-    'Content-Type: text/html; charset="UTF-8"',
-    '',
-    htmlBody,
-    '',
-    '--boundary--'
-  ];
-
-  const message = messageParts.join('\n');
-  // Base64url encode
-  return Buffer.from(message)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 async function sendPasswordResetEmail(toEmail, resetToken) {
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-  const fromEmail = process.env.GMAIL_SENDER_EMAIL;
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -68,15 +23,20 @@ async function sendPasswordResetEmail(toEmail, resetToken) {
   const textBody = `Reset your Moveify password\n\nClick this link to reset your password: ${resetUrl}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, ignore this email.`;
 
   try {
-    const gmail = getGmailClient();
-    const raw = createMessage(toEmail, fromEmail, 'Reset your Moveify password', htmlBody, textBody);
-
-    await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: { raw }
+    const { data, error } = await resend.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: 'Reset your Moveify password',
+      html: htmlBody,
+      text: textBody
     });
 
-    console.log(`Password reset email sent to ${toEmail}`);
+    if (error) {
+      console.error('Resend API error:', error);
+      throw error;
+    }
+
+    console.log(`Password reset email sent to ${toEmail}`, data);
     return true;
   } catch (error) {
     console.error('Failed to send password reset email:', error);
