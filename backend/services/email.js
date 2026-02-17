@@ -3,13 +3,17 @@ const { Resend } = require('resend');
 
 // Lazy-load Resend client to avoid initialization errors if API key not set
 function getResendClient() {
-  console.log('DEBUG: Checking RESEND_API_KEY...', process.env.RESEND_API_KEY ? 'Found (length: ' + process.env.RESEND_API_KEY.length + ')' : 'NOT FOUND');
-  console.log('DEBUG: All env vars:', Object.keys(process.env).filter(k => k.includes('RESEND')));
+  const apiKey = process.env.RESEND_API_KEY;
+  console.log('DEBUG: RESEND_API_KEY type:', typeof apiKey);
+  console.log('DEBUG: RESEND_API_KEY value:', apiKey);
+  console.log('DEBUG: RESEND_API_KEY length:', apiKey ? apiKey.length : 'N/A');
+  console.log('DEBUG: RESEND_API_KEY truthiness:', !!apiKey);
+  console.log('DEBUG: All RESEND env vars:', Object.keys(process.env).filter(k => k.includes('RESEND')));
 
-  if (!process.env.RESEND_API_KEY) {
-    throw new Error('RESEND_API_KEY environment variable is not set');
+  if (!apiKey || apiKey.trim() === '') {
+    throw new Error('RESEND_API_KEY environment variable is not set or is empty');
   }
-  return new Resend(process.env.RESEND_API_KEY);
+  return new Resend(apiKey.trim());
 }
 
 async function sendPasswordResetEmail(toEmail, resetToken) {
