@@ -1,7 +1,13 @@
 // Email service using Resend
 const { Resend } = require('resend');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-load Resend client to avoid initialization errors if API key not set
+function getResendClient() {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY environment variable is not set');
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 async function sendPasswordResetEmail(toEmail, resetToken) {
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
@@ -23,6 +29,7 @@ async function sendPasswordResetEmail(toEmail, resetToken) {
   const textBody = `Reset your Moveify password\n\nClick this link to reset your password: ${resetUrl}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, ignore this email.`;
 
   try {
+    const resend = getResendClient();
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: toEmail,
