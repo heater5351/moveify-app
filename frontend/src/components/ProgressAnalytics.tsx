@@ -49,102 +49,22 @@ interface ProgressAnalyticsProps {
   isPatientView?: boolean;
 }
 
-// ============================================================
-// SCHEDULE-AWARE STREAK UTILITIES
-// ============================================================
-
-// Check if a date is a scheduled day based on program frequency
-function isScheduledDay(date: Date, frequency: string[]): boolean {
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  return frequency.includes(dayNames[date.getDay()]);
-}
-
-// Calculate schedule-aware streak (LENIENT MODE)
-// Any activity on a scheduled day counts - only zero completions breaks streak
-function calculateScheduleAwareStreak(
-  completions: ExerciseCompletion[],
-  frequency: string[],
-  programStartDate: Date | null
-): number {
-  if (!frequency || frequency.length === 0) return 0;
-
-  let streak = 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  // Build a map of date -> completion count
-  const completionsByDate = new Map<string, number>();
-  completions.forEach(c => {
-    const count = completionsByDate.get(c.completionDate) || 0;
-    completionsByDate.set(c.completionDate, count + 1);
-  });
-
-  // Grace period: if today is scheduled but has no activity yet, start from yesterday
-  const todayStr = today.toISOString().split('T')[0];
-  const todayCompletions = completionsByDate.get(todayStr) || 0;
-  const startFromYesterday = isScheduledDay(today, frequency) && todayCompletions === 0;
-
-  const checkDate = new Date(today);
-  if (startFromYesterday) {
-    checkDate.setDate(checkDate.getDate() - 1);
-  }
-
-  // Walk backwards through days
-  for (let i = 0; i < 365; i++) {
-    const dateStr = checkDate.toISOString().split('T')[0];
-
-    // Don't count days before program started
-    if (programStartDate && checkDate < programStartDate) {
-      break;
-    }
-
-    if (isScheduledDay(checkDate, frequency)) {
-      const completionCount = completionsByDate.get(dateStr) || 0;
-
-      if (completionCount > 0) {
-        // Any activity counts (lenient mode)
-        streak++;
-      } else {
-        // Zero completions on a scheduled day - streak breaks
-        break;
-      }
-    }
-    // Non-scheduled days are skipped (don't break streak)
-
-    checkDate.setDate(checkDate.getDate() - 1);
-  }
-
-  return streak;
-}
-
-// Get day completion status for activity chart
-type DayStatus = 'full' | 'partial' | 'missed' | 'rest' | 'future';
-
-function getDayStatus(
-  date: Date,
-  completions: ExerciseCompletion[],
-  frequency: string[],
-  totalExercises: number,
-  programStartDate: Date | null
-): DayStatus {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const checkDate = new Date(date);
-  checkDate.setHours(0, 0, 0, 0);
-
-  if (checkDate > today) return 'future';
-
-  // Don't show status for days before program started
-  if (programStartDate && checkDate < programStartDate) return 'rest';
-
-  if (!isScheduledDay(date, frequency)) return 'rest';
-
-  const dateStr = date.toISOString().split('T')[0];
-  const dayCompletions = completions.filter(c => c.completionDate === dateStr);
-
-  if (dayCompletions.length === 0) return 'missed';
-  if (dayCompletions.length >= totalExercises) return 'full';
-  return 'partial';
+interface OverviewData {
+  totalCompleted: number;
+  completionRate: number;
+  completionTrend: 'up' | 'down' | 'stable';
+  streak: number;
+  avgRpe: { value: number; trend: 'up' | 'down' | 'stable' };
+  avgPain: { value: number; trend: 'up' | 'down' | 'stable' };
+  alerts: Array<{ severity: 'critical' | 'warning' | 'success'; message: string }>;
+  weeklyActivity: Array<{ date: string; dayLabel: string; weekday: string; count: number; status: string }>;
+  weightProgression: Array<{
+    exerciseName: string; startWeight: number; currentWeight: number;
+    change: number; changePercent: number; dataPoints: Array<{ date: string; weight: number }>;
+  }>;
+  nextMilestone: { type: string; value: number; message: string } | null;
+  recentWins: Array<{ type: string; message: string; date: string }>;
+  checkInSummary: { avgFeeling: number; avgPain: number; avgEnergy: number; avgSleep: number; totalCheckIns: number } | null;
 }
 
 export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: ProgressAnalyticsProps) => {
@@ -153,12 +73,12 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
   const [timeRange, setTimeRange] = useState<7 | 14 | 30>(30);
   const [activeView, setActiveView] = useState<'overview' | 'completions' | 'checkins' | 'adjustments'>('overview');
 
-  // New state for detailed data
+  // State for detailed data
   const [exerciseCompletions, setExerciseCompletions] = useState<ExerciseCompletion[]>([]);
   const [checkIns, setCheckIns] = useState<DailyCheckIn[]>([]);
   const [progressionLogs, setProgressionLogs] = useState<ProgressionLog[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null); // For filtering by date
-  const [programs, setPrograms] = useState<Array<{ id: number; frequency: string[]; startDate: string; exerciseCount: number }>>([]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [overviewData, setOverviewData] = useState<OverviewData | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -166,23 +86,18 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       setError(null);
 
       try {
-        // Fetch program details for frequency data
-        await fetchPrograms();
-
-        // Fetch view-specific data
-        if (activeView === 'completions') {
+        if (activeView === 'overview') {
+          // Fetch all overview data from the aggregate analytics endpoint
+          const response = await fetch(`${apiUrl}/programs/analytics/patient/${patientId}?days=${timeRange}`);
+          if (!response.ok) throw new Error(`Failed to fetch analytics: ${response.status}`);
+          const data = await response.json();
+          setOverviewData(data.overview);
+        } else if (activeView === 'completions') {
           await fetchExerciseCompletions();
         } else if (activeView === 'checkins') {
           await fetchCheckIns();
         } else if (activeView === 'adjustments') {
           await fetchProgressionLogs();
-        } else if (activeView === 'overview') {
-          // Fetch completions data for overview stats
-          await fetchExerciseCompletions();
-          // Also fetch check-ins for clinician view (for check-in summary)
-          if (!isPatientView) {
-            await fetchCheckIns();
-          }
         }
       } catch (err) {
         setError('Failed to load analytics data. Please try again.');
@@ -194,27 +109,6 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
 
     loadData();
   }, [patientId, timeRange, activeView]);
-
-  const fetchPrograms = async () => {
-    const response = await fetch(`${apiUrl}/programs/patient/${patientId}`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch programs: ${response.status}`);
-    }
-    const data = await response.json();
-
-    // The API returns a single program object, not an array
-    if (data.program) {
-      const programDetails = [{
-        id: data.program.id,
-        frequency: data.program.frequency || [],
-        startDate: data.program.startDate || data.program.start_date,
-        exerciseCount: data.program.exercises?.length || 0
-      }];
-      setPrograms(programDetails);
-    } else {
-      setPrograms([]);
-    }
-  };
 
   const fetchExerciseCompletions = async () => {
     const response = await fetch(`${apiUrl}/programs/exercise-completions/patient/${patientId}?days=${timeRange}`);
@@ -243,406 +137,44 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
     setProgressionLogs(data.logs || []);
   };
 
-  // Calculate stats from exercise completions data using useMemo
-  // This runs during every render but only recalculates when dependencies change
+  // Overview stats from backend analytics endpoint
   const overviewStats = useMemo(() => {
-    if (exerciseCompletions.length === 0) {
-      return {
-        totalCompleted: 0,
-        consistencyScore: 0,
-        streak: 0,
-        weightProgression: [],
-        weeklyActivity: [],
-        // Patient-specific
-        nextMilestone: null,
-        recentWins: [],
-        // Clinician-specific
-        alerts: [],
-        avgRpe: { value: 0, trend: 'stable' as const },
-        avgPain: { value: 0, trend: 'stable' as const },
-        completionTrend: 'stable' as const
-      };
-    }
+    const empty = {
+      totalCompleted: 0,
+      consistencyScore: 0,
+      streak: 0,
+      weightProgression: [] as OverviewData['weightProgression'],
+      weeklyActivity: [] as OverviewData['weeklyActivity'],
+      nextMilestone: null as OverviewData['nextMilestone'],
+      recentWins: [] as OverviewData['recentWins'],
+      alerts: [] as OverviewData['alerts'],
+      avgRpe: { value: 0, trend: 'stable' as const },
+      avgPain: { value: 0, trend: 'stable' as const },
+      completionTrend: 'stable' as const
+    };
 
-    // Total exercises completed
-    const totalCompleted = exerciseCompletions.length;
-
-    // Get unique completion dates
-    const uniqueDates = new Set(exerciseCompletions.map(c => c.completionDate));
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // ============================================================
-    // SCHEDULE-AWARE STREAK CALCULATION (Lenient Mode)
-    // - Only counts scheduled days (based on program frequency)
-    // - Any activity on a scheduled day counts toward streak
-    // - Only zero completions on a scheduled day breaks streak
-    // - Rest days (non-scheduled) are skipped and don't break streak
-    // ============================================================
-
-    // Step 1: Check if we have the required program data
-    const hasValidProgram = programs.length > 0 &&
-                            programs[0].frequency &&
-                            programs[0].frequency.length > 0 &&
-                            programs[0].exerciseCount > 0;
-
-    // Step 2: Parse program start date
-    let programStartDate: Date | null = null;
-    if (hasValidProgram) {
-      const rawStartDate = programs[0].startDate;
-      if (rawStartDate && typeof rawStartDate === 'string' && rawStartDate.trim() !== '') {
-        const parsedDate = new Date(rawStartDate);
-        if (!isNaN(parsedDate.getTime())) {
-          programStartDate = parsedDate;
-          programStartDate.setHours(0, 0, 0, 0);
-        }
-      }
-    }
-
-    // Step 3: Calculate schedule-aware streak
-    const streak = hasValidProgram
-      ? calculateScheduleAwareStreak(
-          exerciseCompletions,
-          programs[0].frequency,
-          programStartDate
-        )
-      : 0;
-
-    // ============================================================
-    // COMPLETION RATE CALCULATION
-    // Formula: (Exercises Completed / Exercises Prescribed) × 100%
-    //
-    // Example: If 3 exercises are assigned on Mon/Wed/Fri (9 total per week),
-    // and patient completes 6 exercises that week, rate = (6/9) × 100 = 67%
-    // ============================================================
-    let completionRate = 0;
-
-    if (hasValidProgram) {
-      // Map day abbreviations to JavaScript day indices (0=Sunday, 6=Saturday)
-      const dayNameToIndex: { [key: string]: number } = {
-        'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
-      };
-
-      // Convert frequency array (e.g., ['Mon', 'Wed', 'Fri']) to day indices (e.g., [1, 3, 5])
-      const prescribedDayIndices = programs[0].frequency
-        .map(dayName => dayNameToIndex[dayName])
-        .filter(index => index !== undefined);
-
-      // Count how many prescribed days fall within the time range
-      // If we have a valid start date, only count days on or after that date
-      let prescribedDaysInRange = 0;
-      const referenceDate = new Date();
-      referenceDate.setHours(0, 0, 0, 0);
-
-      for (let daysAgo = 0; daysAgo < timeRange; daysAgo++) {
-        const checkDate = new Date(referenceDate);
-        checkDate.setDate(checkDate.getDate() - daysAgo);
-        const dayOfWeek = checkDate.getDay(); // 0-6
-
-        // Check if this day matches the prescribed frequency
-        if (prescribedDayIndices.includes(dayOfWeek)) {
-          // If we have a valid start date, only count days on or after it
-          // If no valid start date, count all matching days in the range
-          if (programStartDate === null || checkDate >= programStartDate) {
-            prescribedDaysInRange++;
-          }
-        }
-      }
-
-      // Step 6: Calculate total prescribed exercises
-      // Total = (number of prescribed days) × (exercises per day)
-      const exercisesPerDay = programs[0].exerciseCount;
-      const totalPrescribedExercises = prescribedDaysInRange * exercisesPerDay;
-
-      // Step 7: Calculate completion rate
-      // Rate = (completed / prescribed) × 100, capped at 100%
-      if (totalPrescribedExercises > 0) {
-        const rawRate = (totalCompleted / totalPrescribedExercises) * 100;
-        completionRate = Math.min(Math.round(rawRate), 100); // Cap at 100%
-      } else {
-        // Edge case: no prescribed days in range (program starts in future or no matching days)
-        // Show 100% if they've completed any exercises, 0% otherwise
-        completionRate = totalCompleted > 0 ? 100 : 0;
-      }
-    } else {
-      // Fallback when no program data: show percentage of days with any activity
-      // This is less accurate but provides some metric when program info is unavailable
-      completionRate = Math.round((uniqueDates.size / timeRange) * 100);
-    }
-
-    const consistencyScore = completionRate;
-
-    // Weight progression: group by exercise name and track weight over time
-    const weightByExercise = new Map<string, Array<{date: string, weight: number}>>();
-    exerciseCompletions.forEach(c => {
-      if (c.weightPerformed && c.weightPerformed > 0) {
-        if (!weightByExercise.has(c.exerciseName)) {
-          weightByExercise.set(c.exerciseName, []);
-        }
-        weightByExercise.get(c.exerciseName)!.push({
-          date: c.completionDate,
-          weight: c.weightPerformed
-        });
-      }
-    });
-
-    // Calculate weight progression for exercises with weight
-    const weightProgression = Array.from(weightByExercise.entries()).map(([name, data]) => {
-      const sorted = data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      const firstWeight = sorted[0]?.weight || 0;
-      const lastWeight = sorted[sorted.length - 1]?.weight || 0;
-      const change = lastWeight - firstWeight;
-      const changePercent = firstWeight > 0 ? Math.round((change / firstWeight) * 100) : 0;
-
-      return {
-        exerciseName: name,
-        startWeight: firstWeight,
-        currentWeight: lastWeight,
-        change,
-        changePercent,
-        dataPoints: sorted
-      };
-    }).filter(ex => ex.change !== 0 || ex.dataPoints.length > 1); // Only show exercises with progression
-
-    // Weekly activity: count completions per day
-    const days: Date[] = [];
-    // Reuse the 'today' variable already defined above
-    for (let i = timeRange - 1; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      days.push(date);
-    }
-
-    const weeklyActivity = days.map(day => {
-      const dateStr = day.toISOString().split('T')[0];
-      const count = exerciseCompletions.filter(c => c.completionDate === dateStr).length;
-      return {
-        date: dateStr,
-        dayLabel: day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        weekday: day.toLocaleDateString('en-US', { weekday: 'short' }),
-        count
-      };
-    });
-
-    // ============================================================
-    // PATIENT-SPECIFIC CALCULATIONS
-    // ============================================================
-
-    // Next Milestone: Calculate the closest achievable goal
-    let nextMilestone: { type: string; value: number; message: string } | null = null;
-
-    if (streak < 7) {
-      // Goal: Reach 7-day streak
-      const daysToGo = 7 - streak;
-      nextMilestone = {
-        type: 'streak',
-        value: daysToGo,
-        message: `${daysToGo} more day${daysToGo > 1 ? 's' : ''} to a 7-day streak!`
-      };
-    } else if (streak < 14) {
-      const daysToGo = 14 - streak;
-      nextMilestone = {
-        type: 'streak',
-        value: daysToGo,
-        message: `${daysToGo} more day${daysToGo > 1 ? 's' : ''} to a 2-week streak!`
-      };
-    } else if (streak < 30) {
-      const daysToGo = 30 - streak;
-      nextMilestone = {
-        type: 'streak',
-        value: daysToGo,
-        message: `${daysToGo} more day${daysToGo > 1 ? 's' : ''} to a 30-day streak!`
-      };
-    } else {
-      // They have a great streak - celebrate it
-      nextMilestone = {
-        type: 'celebration',
-        value: streak,
-        message: `Amazing ${streak}-day streak! Keep it going!`
-      };
-    }
-
-    // Recent Wins: Find achievements to celebrate
-    const recentWins: Array<{ type: string; message: string; date: string }> = [];
-
-    // Check for days with 100% completion
-    const daysWithFullCompletion = Array.from(uniqueDates).filter(dateStr => {
-      const dayCompletions = exerciseCompletions.filter(c => c.completionDate === dateStr);
-      // All exercises met their prescribed sets and reps
-      return dayCompletions.every(c =>
-        c.setsPerformed >= c.prescribedSets && c.repsPerformed >= c.prescribedReps
-      );
-    }).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-
-    if (daysWithFullCompletion.length > 0) {
-      const mostRecent = daysWithFullCompletion[0];
-      const dateLabel = new Date(mostRecent).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      recentWins.push({
-        type: 'completion',
-        message: `Completed all exercises on ${dateLabel}`,
-        date: mostRecent
-      });
-    }
-
-    // Check for weight increases
-    weightProgression
-      .filter(ex => ex.change > 0)
-      .slice(0, 2) // Limit to top 2 weight increases
-      .forEach(ex => {
-        recentWins.push({
-          type: 'weight',
-          message: `Increased ${ex.exerciseName} by ${ex.change}kg`,
-          date: ex.dataPoints[ex.dataPoints.length - 1]?.date || ''
-        });
-      });
-
-    // Check for streak milestones
-    if (streak >= 7 && streak < 8) {
-      recentWins.push({
-        type: 'streak',
-        message: '7-day streak achieved!',
-        date: today.toISOString().split('T')[0]
-      });
-    } else if (streak >= 14 && streak < 15) {
-      recentWins.push({
-        type: 'streak',
-        message: '2-week streak achieved!',
-        date: today.toISOString().split('T')[0]
-      });
-    } else if (streak >= 30 && streak < 31) {
-      recentWins.push({
-        type: 'streak',
-        message: '30-day streak achieved!',
-        date: today.toISOString().split('T')[0]
-      });
-    }
-
-    // ============================================================
-    // CLINICIAN-SPECIFIC CALCULATIONS
-    // ============================================================
-
-    // Alerts: Identify concerning patterns
-    const alerts: Array<{ severity: 'critical' | 'warning' | 'success'; message: string }> = [];
-
-    // Check for high pain levels
-    const recentCompletionsWithPain = exerciseCompletions.filter(c => c.painLevel !== null && c.painLevel > 0);
-    const highPainCompletions = recentCompletionsWithPain.filter(c => (c.painLevel ?? 0) >= 7);
-
-    if (highPainCompletions.length > 0) {
-      const maxPain = Math.max(...highPainCompletions.map(c => c.painLevel ?? 0));
-      const painDate = highPainCompletions.find(c => c.painLevel === maxPain)?.completionDate;
-      const dateLabel = painDate ? new Date(painDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-      alerts.push({
-        severity: 'critical',
-        message: `High pain reported (${maxPain}/10) on ${dateLabel}`
-      });
-    }
-
-    // Check for missed sessions (low completion rate)
-    if (completionRate < 50) {
-      alerts.push({
-        severity: 'warning',
-        message: `Low completion rate (${completionRate}%) - consider follow-up`
-      });
-    } else if (streak === 0 && totalCompleted > 0) {
-      alerts.push({
-        severity: 'warning',
-        message: 'Streak broken - patient may need encouragement'
-      });
-    }
-
-    // All good message
-    if (alerts.length === 0 && totalCompleted > 0) {
-      alerts.push({
-        severity: 'success',
-        message: 'Patient is progressing well'
-      });
-    }
-
-    // Average RPE calculation
-    const completionsWithRpe = exerciseCompletions.filter(c => c.rpeRating !== null && c.rpeRating > 0);
-    let avgRpe: { value: number; trend: 'up' | 'down' | 'stable' } = { value: 0, trend: 'stable' };
-
-    if (completionsWithRpe.length > 0) {
-      const totalRpe = completionsWithRpe.reduce((sum, c) => sum + (c.rpeRating ?? 0), 0);
-      avgRpe.value = Math.round((totalRpe / completionsWithRpe.length) * 10) / 10;
-
-      // Calculate trend by comparing first half vs second half
-      const sortedByDate = [...completionsWithRpe].sort((a, b) =>
-        new Date(a.completionDate).getTime() - new Date(b.completionDate).getTime()
-      );
-      const midpoint = Math.floor(sortedByDate.length / 2);
-
-      if (midpoint > 0) {
-        const firstHalf = sortedByDate.slice(0, midpoint);
-        const secondHalf = sortedByDate.slice(midpoint);
-
-        const firstAvg = firstHalf.reduce((sum, c) => sum + (c.rpeRating ?? 0), 0) / firstHalf.length;
-        const secondAvg = secondHalf.reduce((sum, c) => sum + (c.rpeRating ?? 0), 0) / secondHalf.length;
-
-        if (secondAvg > firstAvg + 0.5) avgRpe.trend = 'up';
-        else if (secondAvg < firstAvg - 0.5) avgRpe.trend = 'down';
-      }
-    }
-
-    // Average Pain calculation
-    let avgPain: { value: number; trend: 'up' | 'down' | 'stable' } = { value: 0, trend: 'stable' };
-
-    if (recentCompletionsWithPain.length > 0) {
-      const totalPain = recentCompletionsWithPain.reduce((sum, c) => sum + (c.painLevel ?? 0), 0);
-      avgPain.value = Math.round((totalPain / recentCompletionsWithPain.length) * 10) / 10;
-
-      // Calculate trend
-      const sortedByDate = [...recentCompletionsWithPain].sort((a, b) =>
-        new Date(a.completionDate).getTime() - new Date(b.completionDate).getTime()
-      );
-      const midpoint = Math.floor(sortedByDate.length / 2);
-
-      if (midpoint > 0) {
-        const firstHalf = sortedByDate.slice(0, midpoint);
-        const secondHalf = sortedByDate.slice(midpoint);
-
-        const firstAvg = firstHalf.reduce((sum, c) => sum + (c.painLevel ?? 0), 0) / firstHalf.length;
-        const secondAvg = secondHalf.reduce((sum, c) => sum + (c.painLevel ?? 0), 0) / secondHalf.length;
-
-        if (secondAvg > firstAvg + 0.5) avgPain.trend = 'up';
-        else if (secondAvg < firstAvg - 0.5) avgPain.trend = 'down';
-      }
-    }
-
-    // Completion trend
-    let completionTrend: 'up' | 'down' | 'stable' = 'stable';
-    if (weeklyActivity.length >= 7) {
-      const firstWeek = weeklyActivity.slice(0, 7);
-      const lastWeek = weeklyActivity.slice(-7);
-
-      const firstWeekTotal = firstWeek.reduce((sum, d) => sum + d.count, 0);
-      const lastWeekTotal = lastWeek.reduce((sum, d) => sum + d.count, 0);
-
-      if (lastWeekTotal > firstWeekTotal + 2) completionTrend = 'up';
-      else if (lastWeekTotal < firstWeekTotal - 2) completionTrend = 'down';
-    }
+    if (!overviewData) return empty;
 
     return {
-      totalCompleted,
-      consistencyScore,
-      streak,
-      weightProgression,
-      weeklyActivity,
-      // Patient-specific
-      nextMilestone,
-      recentWins: recentWins.slice(0, 3), // Limit to 3 wins
-      // Clinician-specific
-      alerts,
-      avgRpe,
-      avgPain,
-      completionTrend
+      totalCompleted: overviewData.totalCompleted,
+      consistencyScore: overviewData.completionRate,
+      streak: overviewData.streak,
+      weightProgression: overviewData.weightProgression || [],
+      weeklyActivity: overviewData.weeklyActivity || [],
+      nextMilestone: overviewData.nextMilestone,
+      recentWins: overviewData.recentWins || [],
+      alerts: overviewData.alerts || [],
+      avgRpe: overviewData.avgRpe || { value: 0, trend: 'stable' as const },
+      avgPain: overviewData.avgPain || { value: 0, trend: 'stable' as const },
+      completionTrend: (overviewData.completionTrend || 'stable') as 'up' | 'down' | 'stable'
     };
-  }, [exerciseCompletions, programs, timeRange]); // Only recalculate when these change
+  }, [overviewData]);
 
-  // Calculate check-in summary for clinician view
+  // Check-in summary: from backend on overview, from local data on check-ins view
   const checkInSummary = useMemo(() => {
+    if (activeView === 'overview') {
+      return overviewData?.checkInSummary || null;
+    }
     if (checkIns.length === 0) return null;
 
     const avgFeeling = Math.round(
@@ -671,7 +203,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       avgSleep,
       totalCheckIns: checkIns.length
     };
-  }, [checkIns]);
+  }, [checkIns, overviewData, activeView]);
 
   // Show error state
   if (error) {
@@ -786,7 +318,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
             <div className="text-center py-12">
               <p className="text-gray-500">Loading analytics...</p>
             </div>
-          ) : exerciseCompletions.length === 0 ? (
+          ) : (!overviewData || overviewData.totalCompleted === 0) ? (
             <div className="text-center py-12">
               <BarChart3 className="mx-auto text-gray-400 mb-4" size={48} />
               <p className="text-gray-500">No progress data yet</p>
@@ -885,20 +417,8 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
                         const maxCount = Math.max(...overviewStats.weeklyActivity.map(d => d.count), 1);
                         const heightPercent = (day.count / maxCount) * 100;
 
-                        // Use schedule-aware status
-                        const dayDate = new Date(day.date);
-                        const frequency = programs[0]?.frequency || [];
-                        const exerciseTarget = programs[0]?.exerciseCount || 3;
-
-                        // Parse program start date
-                        let progStartDate: Date | null = null;
-                        const rawStart = programs[0]?.startDate;
-                        if (rawStart && typeof rawStart === 'string' && rawStart.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                          progStartDate = new Date(rawStart);
-                          progStartDate.setHours(0, 0, 0, 0);
-                        }
-
-                        const status = getDayStatus(dayDate, exerciseCompletions, frequency, exerciseTarget, progStartDate);
+                        // Status comes from the backend
+                        const status = (day as { status?: string }).status || 'rest';
 
                         // Color mapping based on status
                         const getBarColor = () => {
