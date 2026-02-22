@@ -506,7 +506,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="h-screen bg-white flex flex-col overflow-hidden">
       {/* Program Tab - Permanently visible on right side (removed slide-out) */}
 
       {/* Modals */}
