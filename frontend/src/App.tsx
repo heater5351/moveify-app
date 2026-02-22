@@ -683,7 +683,7 @@ function App() {
 
       {/* Main Content Area - Split layout for clinician */}
       {userRole === 'patient' && loggedInPatient ? (
-        <div className="flex-1 px-4 py-8">
+        <div className="flex-1 overflow-y-auto px-4 py-8">
           <PatientPortal
             patient={loggedInPatient}
             onToggleComplete={handleToggleExerciseComplete}
