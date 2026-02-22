@@ -206,10 +206,15 @@ router.post('/favorites', async (req, res) => {
 // Remove favorite
 router.delete('/favorites', async (req, res) => {
   try {
+    // Support both body and query parameters for DELETE requests
     const { clinicianId, exerciseId, exerciseType } = req.body;
 
+    console.log('DELETE /favorites - Body:', req.body);
+    console.log('DELETE /favorites - Params:', { clinicianId, exerciseId, exerciseType });
+
     if (!clinicianId || !exerciseId || !exerciseType) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      console.error('Missing required fields:', { clinicianId, exerciseId, exerciseType });
+      return res.status(400).json({ error: 'Missing required fields', received: { clinicianId, exerciseId, exerciseType } });
     }
 
     await db.query(`
@@ -217,10 +222,12 @@ router.delete('/favorites', async (req, res) => {
       WHERE clinician_id = $1 AND exercise_id = $2 AND exercise_type = $3
     `, [clinicianId, exerciseId, exerciseType]);
 
+    console.log('Successfully removed favorite:', { clinicianId, exerciseId, exerciseType });
     res.json({ message: 'Favorite removed successfully' });
   } catch (error) {
     console.error('Remove favorite error:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ error: 'Server error', details: error.message });
   }
 });
 
