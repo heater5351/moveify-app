@@ -382,7 +382,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
   });
 
   return (
-    <>
+    <div className="h-full flex flex-col">
       {/* Selected Count */}
       {selectedExercises.length > 0 && (
         <div className="mb-6 bg-primary-50 border border-blue-200 rounded-lg p-4">
@@ -556,7 +556,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
       )}
 
       {/* Scrollable Exercise Grid Container */}
-      <div className="max-h-[calc(100vh-350px)] overflow-y-auto pr-2">
+      <div className="flex-1 overflow-y-auto pr-2">
         {/* Custom Exercises Section */}
         {filteredCustom.length > 0 && (
           <div className="mb-8">
@@ -745,6 +745,6 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
           onClose={() => setDetailModal(null)}
         />
       )}
-    </>
+    </div>
   );
 };
