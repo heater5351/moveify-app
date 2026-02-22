@@ -693,7 +693,7 @@ function App() {
         // Program Builder page - show split layout with Program Tab
         <div className="flex flex-1 overflow-hidden">
           {/* Left Side - Exercise Library */}
-          <div className="flex-1 overflow-hidden px-4 pt-8">
+          <div className="flex-1 flex flex-col overflow-hidden px-4 pt-8">
             <ExerciseLibrary onAddToProgram={handleAddToProgram} clinicianId={loggedInUser?.id} />
           </div>
 
