@@ -42,9 +42,6 @@ const ExerciseDetailModal = ({
               <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
                 {exercise.category}
               </span>
-              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                {exercise.difficulty}
-              </span>
               <span className="text-sm text-gray-500">{exercise.duration}</span>
             </div>
           </div>
@@ -104,9 +101,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
   const [customExercises, setCustomExercises] = useState<Exercise[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [detailModal, setDetailModal] = useState<Exercise | null>(null);
-  const exercisesPerPage = 20;
   const [filters, setFilters] = useState<ExerciseFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -224,6 +219,8 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
     const exerciseKey = `${exerciseType}-${exerciseId}`;
     const isFavorite = favorites.has(exerciseKey);
 
+    console.log('Toggle favorite:', { exerciseId, exerciseType, exerciseKey, isFavorite, method: isFavorite ? 'DELETE' : 'POST' });
+
     try {
       const method = isFavorite ? 'DELETE' : 'POST';
       const response = await fetch(`${API_URL}/exercises/favorites`, {
@@ -236,14 +233,19 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
         })
       });
 
+      console.log('API response:', { ok: response.ok, status: response.status });
+
       if (response.ok) {
         const newFavorites = new Set<string>(favorites);
         if (isFavorite) {
           newFavorites.delete(exerciseKey);
+          console.log('Removed from favorites:', exerciseKey);
         } else {
           newFavorites.add(exerciseKey);
+          console.log('Added to favorites:', exerciseKey);
         }
         setFavorites(newFavorites);
+        console.log('Updated favorites set size:', newFavorites.size);
       }
     } catch (error) {
       console.error('Failed to toggle favorite:', error);
@@ -378,17 +380,6 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
            matchesMovement && matchesEquipment && matchesPosition &&
            matchesFavorites;
   });
-
-  // Pagination for default exercises only
-  const totalPages = Math.ceil(filteredDefault.length / exercisesPerPage);
-  const startIndex = (currentPage - 1) * exercisesPerPage;
-  const endIndex = startIndex + exercisesPerPage;
-  const paginatedDefaultExercises = filteredDefault.slice(startIndex, endIndex);
-
-  // Reset to page 1 when search changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
 
   return (
     <>
@@ -657,7 +648,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
           <h3 className="text-lg font-semibold text-gray-700 mb-4">Default Exercise Library</h3>
         )}
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-6">
-          {paginatedDefaultExercises.map(exercise => {
+          {filteredDefault.map(exercise => {
               const isSelected = selectedExercises.includes(exercise.id);
               return (
                 <div
@@ -724,43 +715,6 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
               );
             })}
         </div>
-
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 mt-6">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-            >
-              Previous
-            </button>
-
-            <div className="flex gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-4 py-2 rounded-lg font-medium ${
-                    currentPage === page
-                      ? 'bg-moveify-teal text-white'
-                      : 'border border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-            >
-              Next
-            </button>
-          </div>
-        )}
       </div>
 
       {/* No Results */}
