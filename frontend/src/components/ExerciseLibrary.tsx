@@ -649,7 +649,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
         {customExercises.length > 0 && (
           <h3 className="text-lg font-semibold text-gray-700 mb-4">Default Exercise Library</h3>
         )}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
           {filteredDefault.map(exercise => {
               const isSelected = selectedExercises.includes(exercise.id);
               return (
