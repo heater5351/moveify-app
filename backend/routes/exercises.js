@@ -137,30 +137,6 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete an exercise
-router.delete('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { clinicianId } = req.body;
-
-    // Verify ownership
-    const existing = await db.getOne('SELECT * FROM exercises WHERE id = $1', [id]);
-    if (!existing) {
-      return res.status(404).json({ error: 'Exercise not found' });
-    }
-    if (existing.clinician_id !== parseInt(clinicianId)) {
-      return res.status(403).json({ error: 'Not authorized to delete this exercise' });
-    }
-
-    await db.query('DELETE FROM exercises WHERE id = $1', [id]);
-
-    res.json({ message: 'Exercise deleted successfully' });
-  } catch (error) {
-    console.error('Delete exercise error:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
 // Get favorites for a clinician
 router.get('/favorites/:clinicianId', async (req, res) => {
   try {
@@ -228,6 +204,30 @@ router.delete('/favorites', async (req, res) => {
     console.error('Remove favorite error:', error);
     console.error('Error stack:', error.stack);
     res.status(500).json({ error: 'Server error', details: error.message });
+  }
+});
+
+// Delete an exercise
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { clinicianId } = req.body;
+
+    // Verify ownership
+    const existing = await db.getOne('SELECT * FROM exercises WHERE id = $1', [id]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Exercise not found' });
+    }
+    if (existing.clinician_id !== parseInt(clinicianId)) {
+      return res.status(403).json({ error: 'Not authorized to delete this exercise' });
+    }
+
+    await db.query('DELETE FROM exercises WHERE id = $1', [id]);
+
+    res.json({ message: 'Exercise deleted successfully' });
+  } catch (error) {
+    console.error('Delete exercise error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
