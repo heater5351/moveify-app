@@ -189,7 +189,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
       const response = await fetch(`${API_URL}/exercises/favorites/${clinicianId}`);
       if (response.ok) {
         const data = await response.json();
-        const favSet = new Set(data.map((fav: { exercise_id: number; exercise_type: string }) =>
+        const favSet = new Set<string>(data.map((fav: { exercise_id: number; exercise_type: string }) =>
           `${fav.exercise_type}-${fav.exercise_id}`
         ));
         setFavorites(favSet);
@@ -237,7 +237,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
       });
 
       if (response.ok) {
-        const newFavorites = new Set(favorites);
+        const newFavorites = new Set<string>(favorites);
         if (isFavorite) {
           newFavorites.delete(exerciseKey);
         } else {
