@@ -8,6 +8,32 @@ export type Exercise = {
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   description: string;
   videoUrl?: string; // YouTube embed URL
+  // Filter metadata (optional, for custom exercises)
+  jointArea?: string; // Comma-separated values (e.g., "Knee, Hip")
+  muscleGroup?: string; // Comma-separated values (e.g., "Quadriceps, Glutes")
+  movementType?: string; // Comma-separated values (e.g., "Flexion, Extension")
+  equipment?: string; // e.g., "Bodyweight", "Dumbbell"
+  position?: string; // e.g., "Standing", "Seated"
+  // Computed fields (frontend only)
+  isFavorited?: boolean;
+  isCustom?: boolean;
+}
+
+export type ExerciseFavorite = {
+  exerciseId: number;
+  exerciseType: 'custom' | 'default';
+  createdAt: string;
+}
+
+export type ExerciseFilters = {
+  category?: string;
+  jointArea?: string;
+  muscleGroup?: string;
+  movementType?: string;
+  equipment?: string;
+  position?: string;
+  difficulty?: string;
+  showFavoritesOnly?: boolean;
 }
 
 export type CompletionData = {

@@ -207,6 +207,18 @@ async function initDatabase() {
       )
     `);
 
+    // Exercise favorites table (for favoriting both custom and default exercises)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS exercise_favorites (
+        id SERIAL PRIMARY KEY,
+        clinician_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        exercise_id INTEGER NOT NULL,
+        exercise_type TEXT NOT NULL CHECK(exercise_type IN ('custom', 'default')),
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(clinician_id, exercise_id, exercise_type)
+      )
+    `);
+
     // Add weight columns to existing tables (migration for deployed DB)
     console.log('🔄 Running database migrations...');
     await db.query(`
@@ -216,6 +228,17 @@ async function initDatabase() {
     await db.query(`
       ALTER TABLE exercise_completions
       ADD COLUMN IF NOT EXISTS weight_performed REAL
+    `);
+
+    // Add filter metadata columns to exercises table
+    console.log('🔄 Adding exercise filter columns...');
+    await db.query(`
+      ALTER TABLE exercises
+      ADD COLUMN IF NOT EXISTS joint_area TEXT,
+      ADD COLUMN IF NOT EXISTS muscle_group TEXT,
+      ADD COLUMN IF NOT EXISTS movement_type TEXT,
+      ADD COLUMN IF NOT EXISTS equipment TEXT,
+      ADD COLUMN IF NOT EXISTS position TEXT
     `);
 
     // Fix legacy start_date values ('today', 'tomorrow', etc.) by converting to created_at date
@@ -285,6 +308,30 @@ async function initDatabase() {
     await db.query(`
       CREATE INDEX IF NOT EXISTS idx_progression_log_exercise_id
       ON exercise_progression_log(exercise_id)
+    `);
+
+    // exercise_favorites indexes
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_favorites_clinician_id
+      ON exercise_favorites(clinician_id)
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_favorites_exercise_lookup
+      ON exercise_favorites(clinician_id, exercise_id, exercise_type)
+    `);
+
+    // exercises filter indexes
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_exercises_joint_area
+      ON exercises(joint_area)
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_exercises_muscle_group
+      ON exercises(muscle_group)
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_exercises_equipment
+      ON exercises(equipment)
     `);
 
     console.log('✅ Database indexes created');
