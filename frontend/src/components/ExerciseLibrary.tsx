@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Search, Play, Plus, Trash2, X, Check } from 'lucide-react';
-import type { ProgramExercise, Exercise } from '../types/index.ts';
+import { Search, Play, Plus, Trash2, X, Check, Star, Filter } from 'lucide-react';
+import type { ProgramExercise, Exercise, ExerciseFilters } from '../types/index.ts';
 import { exercises as defaultExercises } from '../data/exercises';
 import { AddExerciseModal } from './modals/AddExerciseModal';
 import { API_URL } from '../config';
@@ -107,11 +107,31 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
   const [currentPage, setCurrentPage] = useState(1);
   const [detailModal, setDetailModal] = useState<Exercise | null>(null);
   const exercisesPerPage = 20;
+  const [filters, setFilters] = useState<ExerciseFilters>({});
+  const [showFilters, setShowFilters] = useState(false);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [filterOptions, setFilterOptions] = useState<{
+    jointAreas: string[];
+    muscleGroups: string[];
+    movementTypes: string[];
+    equipment: string[];
+    positions: string[];
+    categories: string[];
+  }>({
+    jointAreas: [],
+    muscleGroups: [],
+    movementTypes: [],
+    equipment: [],
+    positions: [],
+    categories: ['Musculoskeletal', 'Women\'s Health', 'Neurological', 'Cardio', 'Balance', 'Flexibility']
+  });
 
   // Fetch custom exercises for this clinician
   useEffect(() => {
     if (clinicianId) {
       fetchCustomExercises();
+      fetchFavorites();
+      fetchFilterOptions();
     }
   }, [clinicianId]);
 
@@ -124,7 +144,20 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
       if (response.ok) {
         const data = await response.json();
         // Map database fields to Exercise type
-        const mapped = data.map((ex: { id: number; name: string; category: string; duration: string; difficulty: string; description: string; video_url?: string }) => ({
+        const mapped = data.map((ex: {
+          id: number;
+          name: string;
+          category: string;
+          duration: string;
+          difficulty: string;
+          description: string;
+          video_url?: string;
+          joint_area?: string;
+          muscle_group?: string;
+          movement_type?: string;
+          equipment?: string;
+          position?: string;
+        }) => ({
           id: ex.id + 10000, // Offset to avoid ID collision with default exercises
           dbId: ex.id, // Store original DB ID for deletion
           name: ex.name,
@@ -133,6 +166,11 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
           difficulty: ex.difficulty,
           description: ex.description,
           videoUrl: ex.video_url,
+          jointArea: ex.joint_area,
+          muscleGroup: ex.muscle_group,
+          movementType: ex.movement_type,
+          equipment: ex.equipment,
+          position: ex.position,
           isCustom: true
         }));
         setCustomExercises(mapped);
@@ -141,6 +179,74 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
       console.error('Failed to fetch custom exercises:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchFavorites = async () => {
+    if (!clinicianId) return;
+
+    try {
+      const response = await fetch(`${API_URL}/exercises/favorites/${clinicianId}`);
+      if (response.ok) {
+        const data = await response.json();
+        const favSet = new Set(data.map((fav: { exercise_id: number; exercise_type: string }) =>
+          `${fav.exercise_type}-${fav.exercise_id}`
+        ));
+        setFavorites(favSet);
+      }
+    } catch (error) {
+      console.error('Failed to fetch favorites:', error);
+    }
+  };
+
+  const fetchFilterOptions = async () => {
+    try {
+      const response = await fetch(`${API_URL}/exercises/filter-options`);
+      if (response.ok) {
+        const data = await response.json();
+        setFilterOptions(prev => ({
+          ...prev,
+          jointAreas: data.jointAreas || [],
+          muscleGroups: data.muscleGroups || [],
+          movementTypes: data.movementTypes || [],
+          equipment: data.equipment || [],
+          positions: data.positions || []
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch filter options:', error);
+    }
+  };
+
+  const toggleFavorite = async (exerciseId: number, exerciseType: string) => {
+    if (!clinicianId) return;
+
+    const exerciseKey = `${exerciseType}-${exerciseId}`;
+    const isFavorite = favorites.has(exerciseKey);
+
+    try {
+      const method = isFavorite ? 'DELETE' : 'POST';
+      const response = await fetch(`${API_URL}/exercises/favorites`, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clinicianId,
+          exerciseId,
+          exerciseType
+        })
+      });
+
+      if (response.ok) {
+        const newFavorites = new Set(favorites);
+        if (isFavorite) {
+          newFavorites.delete(exerciseKey);
+        } else {
+          newFavorites.add(exerciseKey);
+        }
+        setFavorites(newFavorites);
+      }
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
     }
   };
 
@@ -203,21 +309,78 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
     setSelectedExercises([]);
   };
 
-  const filteredExercises = allExercises.filter(exercise =>
-    exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    exercise.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredExercises = allExercises.filter(exercise => {
+    // Text search
+    const matchesSearch =
+      exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      exercise.category.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Filter matching (use .includes() for comma-separated)
+    const matchesCategory = !filters.category || exercise.category === filters.category;
+    const matchesJoint = !filters.jointArea || exercise.jointArea?.includes(filters.jointArea);
+    const matchesMuscle = !filters.muscleGroup || exercise.muscleGroup?.includes(filters.muscleGroup);
+    const matchesMovement = !filters.movementType || exercise.movementType?.includes(filters.movementType);
+    const matchesEquipment = !filters.equipment || exercise.equipment?.includes(filters.equipment);
+    const matchesPosition = !filters.position || exercise.position?.includes(filters.position);
+    const matchesDifficulty = !filters.difficulty || exercise.difficulty === filters.difficulty;
+
+    // Favorites filter
+    const exerciseKey = `${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`;
+    const matchesFavorites = !filters.showFavoritesOnly || favorites.has(exerciseKey);
+
+    return matchesSearch && matchesCategory && matchesJoint && matchesMuscle &&
+           matchesMovement && matchesEquipment && matchesPosition && matchesDifficulty &&
+           matchesFavorites;
+  });
 
   // Separate custom and default filtered exercises
-  const filteredCustom = customExercises.filter(exercise =>
-    exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    exercise.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCustom = customExercises.filter(exercise => {
+    // Text search
+    const matchesSearch =
+      exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      exercise.category.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const filteredDefault = defaultExercises.filter(exercise =>
-    exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    exercise.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    // Filter matching (use .includes() for comma-separated)
+    const matchesCategory = !filters.category || exercise.category === filters.category;
+    const matchesJoint = !filters.jointArea || exercise.jointArea?.includes(filters.jointArea);
+    const matchesMuscle = !filters.muscleGroup || exercise.muscleGroup?.includes(filters.muscleGroup);
+    const matchesMovement = !filters.movementType || exercise.movementType?.includes(filters.movementType);
+    const matchesEquipment = !filters.equipment || exercise.equipment?.includes(filters.equipment);
+    const matchesPosition = !filters.position || exercise.position?.includes(filters.position);
+    const matchesDifficulty = !filters.difficulty || exercise.difficulty === filters.difficulty;
+
+    // Favorites filter
+    const exerciseKey = `${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`;
+    const matchesFavorites = !filters.showFavoritesOnly || favorites.has(exerciseKey);
+
+    return matchesSearch && matchesCategory && matchesJoint && matchesMuscle &&
+           matchesMovement && matchesEquipment && matchesPosition && matchesDifficulty &&
+           matchesFavorites;
+  });
+
+  const filteredDefault = defaultExercises.filter(exercise => {
+    // Text search
+    const matchesSearch =
+      exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      exercise.category.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Filter matching (use .includes() for comma-separated)
+    const matchesCategory = !filters.category || exercise.category === filters.category;
+    const matchesJoint = !filters.jointArea || exercise.jointArea?.includes(filters.jointArea);
+    const matchesMuscle = !filters.muscleGroup || exercise.muscleGroup?.includes(filters.muscleGroup);
+    const matchesMovement = !filters.movementType || exercise.movementType?.includes(filters.movementType);
+    const matchesEquipment = !filters.equipment || exercise.equipment?.includes(filters.equipment);
+    const matchesPosition = !filters.position || exercise.position?.includes(filters.position);
+    const matchesDifficulty = !filters.difficulty || exercise.difficulty === filters.difficulty;
+
+    // Favorites filter
+    const exerciseKey = `${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`;
+    const matchesFavorites = !filters.showFavoritesOnly || favorites.has(exerciseKey);
+
+    return matchesSearch && matchesCategory && matchesJoint && matchesMuscle &&
+           matchesMovement && matchesEquipment && matchesPosition && matchesDifficulty &&
+           matchesFavorites;
+  });
 
   // Pagination for default exercises only
   const totalPages = Math.ceil(filteredDefault.length / exercisesPerPage);
@@ -254,6 +417,18 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
             />
           </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-2 px-4 py-2 border-2 border-gray-300 rounded-lg hover:border-moveify-teal transition-colors"
+          >
+            <Filter size={20} />
+            <span>Filters</span>
+            {Object.values(filters).filter(v => v).length > 0 && (
+              <span className="bg-moveify-teal text-white text-xs px-2 py-1 rounded-full">
+                {Object.values(filters).filter(v => v).length}
+              </span>
+            )}
+          </button>
           {clinicianId && (
             <button
               onClick={() => setShowAddModal(true)}
@@ -275,6 +450,129 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
             Add to Program
           </button>
         </div>
+
+        {/* Filter Panel */}
+        {showFilters && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 space-y-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                <select
+                  value={filters.category || ''}
+                  onChange={(e) => setFilters({ ...filters, category: e.target.value || undefined })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+                >
+                  <option value="">All Categories</option>
+                  {filterOptions.categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              {/* Joint/Area */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Joint/Area</label>
+                <select
+                  value={filters.jointArea || ''}
+                  onChange={(e) => setFilters({ ...filters, jointArea: e.target.value || undefined })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+                >
+                  <option value="">All Joints</option>
+                  {filterOptions.jointAreas.map(j => <option key={j} value={j}>{j}</option>)}
+                </select>
+              </div>
+
+              {/* Muscle Group */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Muscle Group</label>
+                <select
+                  value={filters.muscleGroup || ''}
+                  onChange={(e) => setFilters({ ...filters, muscleGroup: e.target.value || undefined })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+                >
+                  <option value="">All Muscles</option>
+                  {filterOptions.muscleGroups.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+
+              {/* Equipment */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Equipment</label>
+                <select
+                  value={filters.equipment || ''}
+                  onChange={(e) => setFilters({ ...filters, equipment: e.target.value || undefined })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+                >
+                  <option value="">All Equipment</option>
+                  {filterOptions.equipment.map(eq => <option key={eq} value={eq}>{eq}</option>)}
+                </select>
+              </div>
+
+              {/* Position */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Position</label>
+                <select
+                  value={filters.position || ''}
+                  onChange={(e) => setFilters({ ...filters, position: e.target.value || undefined })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+                >
+                  <option value="">All Positions</option>
+                  {filterOptions.positions.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+
+              {/* Movement Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Movement Type</label>
+                <select
+                  value={filters.movementType || ''}
+                  onChange={(e) => setFilters({ ...filters, movementType: e.target.value || undefined })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+                >
+                  <option value="">All Movements</option>
+                  {filterOptions.movementTypes.map(mt => <option key={mt} value={mt}>{mt}</option>)}
+                </select>
+              </div>
+
+              {/* Difficulty */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Difficulty</label>
+                <select
+                  value={filters.difficulty || ''}
+                  onChange={(e) => setFilters({ ...filters, difficulty: e.target.value || undefined })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+                >
+                  <option value="">All Levels</option>
+                  <option value="Beginner">Beginner</option>
+                  <option value="Intermediate">Intermediate</option>
+                  <option value="Advanced">Advanced</option>
+                </select>
+              </div>
+
+              {/* Favorites Only */}
+              <div className="flex items-end">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filters.showFavoritesOnly || false}
+                    onChange={(e) => setFilters({ ...filters, showFavoritesOnly: e.target.checked })}
+                    className="w-4 h-4 text-moveify-teal rounded focus:ring-moveify-teal"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Favorites Only</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Clear Filters */}
+            {Object.values(filters).some(v => v) && (
+              <button
+                onClick={() => setFilters({})}
+                className="text-sm text-moveify-teal hover:text-moveify-teal-dark font-medium"
+              >
+                Clear all filters
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Loading State */}
@@ -301,6 +599,22 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                   >
                     {/* Video Thumbnail */}
                     <div className="bg-gradient-to-br from-purple-500 to-purple-600 h-48 flex items-center justify-center relative">
+                      {/* Favorite Star */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const exerciseType = exercise.isCustom ? 'custom' : 'default';
+                          toggleFavorite(exercise.id, exerciseType);
+                        }}
+                        className={`absolute top-3 left-3 p-2 rounded-full transition-colors z-10 ${
+                          favorites.has(`${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`)
+                            ? 'bg-yellow-400 text-white'
+                            : 'bg-white/90 text-gray-400 hover:text-yellow-400'
+                        }`}
+                        title={favorites.has(`${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`) ? 'Remove from favorites' : 'Add to favorites'}
+                      >
+                        <Star size={18} fill={favorites.has(`${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`) ? 'currentColor' : 'none'} />
+                      </button>
                       {exercise.videoUrl ? (
                         <Play className="text-white" size={40} fill="white" />
                       ) : (
@@ -373,6 +687,22 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                 >
                   {/* Video Thumbnail */}
                   <div className="bg-gradient-to-br from-blue-500 to-blue-600 h-48 flex items-center justify-center relative">
+                    {/* Favorite Star */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const exerciseType = exercise.isCustom ? 'custom' : 'default';
+                        toggleFavorite(exercise.id, exerciseType);
+                      }}
+                      className={`absolute top-3 left-3 p-2 rounded-full transition-colors z-10 ${
+                        favorites.has(`${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`)
+                          ? 'bg-yellow-400 text-white'
+                          : 'bg-white/90 text-gray-400 hover:text-yellow-400'
+                      }`}
+                      title={favorites.has(`${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`) ? 'Remove from favorites' : 'Add to favorites'}
+                    >
+                      <Star size={18} fill={favorites.has(`${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`) ? 'currentColor' : 'none'} />
+                    </button>
                     {exercise.videoUrl ? (
                       <Play className="text-white" size={40} fill="white" />
                     ) : (

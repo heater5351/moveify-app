@@ -34,26 +34,51 @@ interface AddExerciseModalProps {
 }
 
 const CATEGORIES = [
-  'Knee',
-  'Back',
-  'Shoulder',
-  'Hip',
-  'Ankle',
-  'Core',
+  'Musculoskeletal',
+  'Women\'s Health',
+  'Neurological',
+  'Cardio',
   'Balance',
-  'Stretching'
+  'Flexibility'
 ];
 
 const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced'];
 
+const EQUIPMENT_OPTIONS = [
+  'Bodyweight',
+  'Dumbbell',
+  'Barbell',
+  'Resistance Band',
+  'Machine',
+  'Kettlebell',
+  'Medicine Ball',
+  'Foam Roller',
+  'Stability Ball'
+];
+
+const POSITION_OPTIONS = [
+  'Standing',
+  'Seated',
+  'Supine',
+  'Prone',
+  'Side-lying',
+  'Quadruped',
+  'Kneeling'
+];
+
 export const AddExerciseModal = ({ clinicianId, onClose, onSuccess }: AddExerciseModalProps) => {
   const [formData, setFormData] = useState({
     name: '',
-    category: 'Knee',
+    category: 'Musculoskeletal',
     difficulty: 'Beginner',
     duration: '',
     description: '',
-    videoUrl: ''
+    videoUrl: '',
+    jointArea: '',
+    muscleGroup: '',
+    movementType: '',
+    equipment: '',
+    position: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -78,8 +103,17 @@ export const AddExerciseModal = ({ clinicianId, onClose, onSuccess }: AddExercis
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clinicianId,
-          ...formData,
-          videoUrl: embedUrl || '' // Save the embed URL format
+          name: formData.name,
+          category: formData.category,
+          difficulty: formData.difficulty,
+          duration: formData.duration,
+          description: formData.description,
+          videoUrl: embedUrl || '',
+          jointArea: formData.jointArea || null,
+          muscleGroup: formData.muscleGroup || null,
+          movementType: formData.movementType || null,
+          equipment: formData.equipment || null,
+          position: formData.position || null
         })
       });
 
@@ -218,6 +252,93 @@ export const AddExerciseModal = ({ clinicianId, onClose, onSuccess }: AddExercis
                 <Play size={14} /> Valid YouTube URL detected
               </p>
             )}
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-200 my-4"></div>
+          <p className="text-sm font-medium text-gray-700 mb-3">
+            Additional Metadata <span className="text-gray-400">(optional - helps with filtering)</span>
+          </p>
+
+          {/* Joint/Area and Muscle Group Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Joint/Area
+              </label>
+              <input
+                type="text"
+                value={formData.jointArea}
+                onChange={(e) => setFormData({ ...formData, jointArea: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+                placeholder="e.g., Knee, Hip"
+              />
+              <p className="text-xs text-gray-500 mt-1">Comma-separated for multiple</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Muscle Group
+              </label>
+              <input
+                type="text"
+                value={formData.muscleGroup}
+                onChange={(e) => setFormData({ ...formData, muscleGroup: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+                placeholder="e.g., Quadriceps, Glutes"
+              />
+              <p className="text-xs text-gray-500 mt-1">Comma-separated for multiple</p>
+            </div>
+          </div>
+
+          {/* Movement Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Movement Type
+            </label>
+            <input
+              type="text"
+              value={formData.movementType}
+              onChange={(e) => setFormData({ ...formData, movementType: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+              placeholder="e.g., Flexion, Extension"
+            />
+            <p className="text-xs text-gray-500 mt-1">Comma-separated for multiple</p>
+          </div>
+
+          {/* Equipment and Position Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Equipment
+              </label>
+              <select
+                value={formData.equipment}
+                onChange={(e) => setFormData({ ...formData, equipment: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+              >
+                <option value="">Select equipment...</option>
+                {EQUIPMENT_OPTIONS.map(eq => (
+                  <option key={eq} value={eq}>{eq}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Position
+              </label>
+              <select
+                value={formData.position}
+                onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+              >
+                <option value="">Select position...</option>
+                {POSITION_OPTIONS.map(pos => (
+                  <option key={pos} value={pos}>{pos}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
