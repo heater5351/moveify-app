@@ -555,11 +555,13 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
         </div>
       )}
 
-      {/* Custom Exercises Section */}
-      {filteredCustom.length > 0 && (
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Your Custom Exercises</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+      {/* Scrollable Exercise Grid Container */}
+      <div className="max-h-[calc(100vh-350px)] overflow-y-auto pr-2">
+        {/* Custom Exercises Section */}
+        {filteredCustom.length > 0 && (
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">Your Custom Exercises</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
             {filteredCustom.map(exercise => {
                 const isSelected = selectedExercises.includes(exercise.id);
                 return (
@@ -723,6 +725,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
           <p className="text-gray-500">No exercises found matching "{searchTerm}"</p>
         </div>
       )}
+      </div>
 
       {/* Add Exercise Modal */}
       {showAddModal && clinicianId && (
