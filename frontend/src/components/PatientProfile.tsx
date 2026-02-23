@@ -56,209 +56,194 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
-          className="text-moveify-teal hover:text-moveify-teal-dark font-medium"
+          className="text-sm text-slate-500 hover:text-slate-800 font-medium transition-colors flex items-center gap-1"
         >
-          ← Back to Patients
+          ← Patients
         </button>
         <button
           onClick={onEdit}
-          className="bg-moveify-teal text-white px-4 py-2 rounded-lg hover:bg-moveify-teal-dark font-medium flex items-center gap-2"
+          className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-sm transition-colors shadow-sm"
         >
-          <Edit size={18} />
+          <Edit size={15} />
           Edit Profile
         </button>
       </div>
 
+      {/* Patient header card */}
+      <div className="bg-white rounded-xl ring-1 ring-slate-200 px-7 py-6 flex items-center gap-5">
+        <div className="w-14 h-14 bg-primary-50 rounded-full flex items-center justify-center border border-primary-100 flex-shrink-0">
+          <User className="text-primary-400" size={26} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-semibold font-display text-secondary-500 tracking-tight">{patient.name}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{patient.condition}</p>
+        </div>
+        <div className="hidden md:grid grid-cols-3 gap-6 text-sm">
+          <div>
+            <p className="text-xs text-slate-400 mb-0.5">DOB</p>
+            <p className="font-medium text-slate-700">{patient.dob}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 mb-0.5">Email</p>
+            <p className="font-medium text-slate-700 truncate max-w-[160px]">{patient.email}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 mb-0.5">Phone</p>
+            <p className="font-medium text-slate-700">{patient.phone}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200">
-        <div className="flex gap-4">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`pb-3 px-2 font-medium transition-colors relative ${
-              activeTab === 'overview'
-                ? 'text-moveify-teal'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <User size={18} className="inline mr-2" />
-            Overview
-            {activeTab === 'overview' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-moveify-teal"></div>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`pb-3 px-2 font-medium transition-colors relative ${
-              activeTab === 'analytics'
-                ? 'text-moveify-teal'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <TrendingUp size={18} className="inline mr-2" />
-            Progress Analytics
-            {activeTab === 'analytics' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-moveify-teal"></div>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('education')}
-            className={`pb-3 px-2 font-medium transition-colors relative ${
-              activeTab === 'education'
-                ? 'text-moveify-teal'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <BookOpen size={18} className="inline mr-2" />
-            Education
-            {activeTab === 'education' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-moveify-teal"></div>
-            )}
-          </button>
+      <div className="border-b border-slate-200">
+        <div className="flex gap-1">
+          {[
+            { id: 'overview', label: 'Overview', icon: <User size={15} /> },
+            { id: 'analytics', label: 'Progress Analytics', icon: <TrendingUp size={15} /> },
+            { id: 'education', label: 'Education', icon: <BookOpen size={15} /> },
+          ].map(({ id, label, icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id as typeof activeTab)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                activeTab === id
+                  ? 'border-primary-400 text-primary-500'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {icon}
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Tab Content */}
       {activeTab === 'overview' ? (
-        <div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-        <div className="flex items-start gap-6 mb-8">
-          <div className="w-24 h-24 bg-primary-100 rounded-full flex items-center justify-center">
-            <User className="text-moveify-teal" size={48} />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">{patient.name}</h1>
-            <p className="text-gray-600">{patient.condition}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div>
-            <p className="text-sm text-gray-500 mb-1">Date of Birth</p>
-            <p className="text-lg font-medium text-gray-900">{patient.dob}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500 mb-1">Age</p>
-            <p className="text-lg font-medium text-gray-900">{patient.age} years</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500 mb-1">Email</p>
-            <p className="text-lg font-medium text-gray-900">{patient.email}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500 mb-1">Phone</p>
-            <p className="text-lg font-medium text-gray-900">{patient.phone}</p>
-          </div>
-          <div className="md:col-span-2">
-            <p className="text-sm text-gray-500 mb-1">Address</p>
-            <p className="text-lg font-medium text-gray-900">{patient.address}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500 mb-1">Date Added</p>
-            <p className="text-lg font-medium text-gray-900">{patient.dateAdded}</p>
-          </div>
-        </div>
-
-        <div className="border-t border-gray-200 pt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Assigned Programs</h2>
-            <button
-              onClick={onAddProgram}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-medium flex items-center gap-2"
-            >
-              <PlusCircle size={18} />
-              Add Program
-            </button>
-          </div>
-          {patient.assignedPrograms && patient.assignedPrograms.length > 0 ? (
-            <div className="space-y-3">
-              {patient.assignedPrograms.map((program, index) => {
-                const completedCount = program.exercises.filter(e => e.completed).length;
-                const totalExercises = program.exercises.length;
-
-                return (
-                  <div
-                    key={program.config.id}
-                    className="bg-primary-50 p-4 rounded-lg flex items-center justify-between"
-                  >
-                    <button
-                      onClick={() => onViewProgram(index)}
-                      className="flex-1 text-left hover:opacity-80 transition-opacity"
-                    >
-                      <h3 className="font-semibold text-moveify-navy">{program.config.name}</h3>
-                      <p className="text-sm text-moveify-ocean mt-1">
-                        {totalExercises} exercises · {completedCount} completed today
-                      </p>
-                      <p className="text-xs text-moveify-teal mt-1">
-                        {program.config.frequency.join(', ')} · {program.config.duration}
-                      </p>
-                    </button>
-                    <div className="flex items-center gap-2 ml-4">
-                      <button
-                        onClick={() => program.config.id && handleProgressProgram(program.config.id)}
-                        disabled={progressingProgramId === program.config.id}
-                        className="p-2 text-green-600 hover:bg-green-100 rounded-lg transition-colors disabled:opacity-50"
-                        title="Progress program (weekly adjustment)"
-                      >
-                        {progressingProgramId === program.config.id ? (
-                          <span className="animate-spin">⚡</span>
-                        ) : (
-                          <Zap size={18} />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => onEditProgram(index)}
-                        className="p-2 text-moveify-teal hover:bg-primary-100 rounded-lg transition-colors"
-                        title="Edit program"
-                      >
-                        <Edit size={18} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (program.config.id && program.config.name) {
-                            onDeleteProgram(program.config.id, program.config.name);
-                          }
-                        }}
-                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                        title="Delete program"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+        <div className="space-y-5">
+          {/* Detail fields */}
+          <div className="bg-white rounded-xl ring-1 ring-slate-200 p-6">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Patient Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div>
+                <p className="text-xs text-slate-400 mb-1">Date of Birth</p>
+                <p className="text-sm font-medium text-slate-800">{patient.dob}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 mb-1">Age</p>
+                <p className="text-sm font-medium text-slate-800">{patient.age} years</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 mb-1">Date Added</p>
+                <p className="text-sm font-medium text-slate-800">{patient.dateAdded}</p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-xs text-slate-400 mb-1">Address</p>
+                <p className="text-sm font-medium text-slate-800">{patient.address}</p>
+              </div>
             </div>
-          ) : (
-            <div className="bg-gray-50 rounded-lg p-8 text-center">
-              <p className="text-gray-500 mb-4">No programs assigned to this patient yet</p>
+          </div>
+
+          {/* Programs */}
+          <div className="bg-white rounded-xl ring-1 ring-slate-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-slate-700">Assigned Programs</h2>
               <button
                 onClick={onAddProgram}
-                className="bg-moveify-teal text-white px-6 py-2 rounded-lg hover:bg-moveify-teal-dark font-medium inline-flex items-center gap-2"
+                className="bg-primary-400 hover:bg-primary-500 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-1.5 text-sm transition-colors shadow-sm"
               >
-                <PlusCircle size={18} />
-                Create First Program
+                <PlusCircle size={15} />
+                Add Program
               </button>
             </div>
-          )}
-        </div>
-      </div>
+            {patient.assignedPrograms && patient.assignedPrograms.length > 0 ? (
+              <div className="space-y-2.5">
+                {patient.assignedPrograms.map((program, index) => {
+                  const completedCount = program.exercises.filter(e => e.completed).length;
+                  const totalExercises = program.exercises.length;
+
+                  return (
+                    <div
+                      key={program.config.id}
+                      className="ring-1 ring-slate-200 rounded-lg p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                    >
+                      <button
+                        onClick={() => onViewProgram(index)}
+                        className="flex-1 text-left"
+                      >
+                        <h3 className="font-medium text-slate-800 text-sm">{program.config.name}</h3>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {totalExercises} exercises · {completedCount} completed today
+                        </p>
+                        <p className="text-xs text-primary-500 mt-0.5">
+                          {program.config.frequency.join(', ')} · {program.config.duration}
+                        </p>
+                      </button>
+                      <div className="flex items-center gap-1 ml-4">
+                        <button
+                          onClick={() => program.config.id && handleProgressProgram(program.config.id)}
+                          disabled={progressingProgramId === program.config.id}
+                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
+                          title="Progress program"
+                        >
+                          {progressingProgramId === program.config.id ? (
+                            <span className="animate-spin inline-block">⚡</span>
+                          ) : (
+                            <Zap size={16} />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => onEditProgram(index)}
+                          className="p-2 text-slate-500 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
+                          title="Edit program"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (program.config.id && program.config.name) {
+                              onDeleteProgram(program.config.id, program.config.name);
+                            }
+                          }}
+                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete program"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-slate-50 rounded-lg p-8 text-center ring-1 ring-slate-100">
+                <p className="text-slate-500 text-sm mb-4">No programs assigned yet</p>
+                <button
+                  onClick={onAddProgram}
+                  className="bg-primary-400 hover:bg-primary-500 text-white px-5 py-2 rounded-lg font-medium inline-flex items-center gap-2 text-sm transition-colors"
+                >
+                  <PlusCircle size={15} />
+                  Create First Program
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       ) : activeTab === 'analytics' ? (
         <ProgressAnalytics patientId={patient.id} apiUrl={API_URL} />
       ) : (
         <div>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Education Modules</h2>
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-sm font-semibold text-slate-700">Education Modules</h2>
             <button
               onClick={() => setShowAssignEducationModal(true)}
-              className="bg-moveify-teal text-white px-4 py-2 rounded-lg hover:bg-moveify-teal-dark font-medium flex items-center gap-2"
+              className="bg-primary-400 hover:bg-primary-500 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-1.5 text-sm transition-colors shadow-sm"
             >
-              <PlusCircle size={18} />
+              <PlusCircle size={15} />
               Assign Module
             </button>
           </div>

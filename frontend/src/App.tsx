@@ -506,7 +506,7 @@ function App() {
   }
 
   return (
-    <div className="h-screen bg-white flex flex-col overflow-hidden">
+    <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
       {/* Program Tab - Permanently visible on right side (removed slide-out) */}
 
       {/* Modals */}
@@ -617,69 +617,74 @@ function App() {
       )}
 
       {/* Header & Navigation */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="px-4">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-6">
-              <img
-                src="/assets/moveify-logo.png"
-                alt="Moveify Logo"
-                className="h-12 w-auto"
-              />
+      <header className="bg-secondary-500 flex-shrink-0">
+        <div className="px-6 flex items-center justify-between h-14">
+          <div className="flex items-center">
+            <img
+              src="/assets/moveify-logo.png"
+              alt="Moveify Logo"
+              className="h-7 w-auto mr-8"
+            />
 
-              {/* Navigation Tabs - Only show in Clinician mode */}
-              {userRole === 'clinician' && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setCurrentPage('exercises')}
-                    className={`px-6 py-2 rounded-lg font-medium transition-colors ${currentPage === 'exercises'
-                      ? 'bg-moveify-teal text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                  >
-                    Program Builder
-                  </button>
-                  <button
-                    onClick={() => {
-                      setCurrentPage('patients');
-                      setViewingPatient(null);
-                    }}
-                    className={`px-6 py-2 rounded-lg font-medium transition-colors ${currentPage === 'patients'
-                      ? 'bg-moveify-teal text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                  >
-                    Patients
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage('education')}
-                    className={`px-6 py-2 rounded-lg font-medium transition-colors ${currentPage === 'education'
-                      ? 'bg-moveify-teal text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                  >
-                    Education Library
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Navigation Tabs - Only show in Clinician mode */}
+            {userRole === 'clinician' && (
+              <div className="flex items-stretch h-14">
+                <button
+                  onClick={() => setCurrentPage('exercises')}
+                  className={`px-5 text-sm font-medium border-b-2 transition-colors ${
+                    currentPage === 'exercises'
+                      ? 'border-moveify-teal text-white'
+                      : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/20'
+                  }`}
+                >
+                  Program Builder
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentPage('patients');
+                    setViewingPatient(null);
+                  }}
+                  className={`px-5 text-sm font-medium border-b-2 transition-colors ${
+                    currentPage === 'patients'
+                      ? 'border-moveify-teal text-white'
+                      : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/20'
+                  }`}
+                >
+                  Patients
+                </button>
+                <button
+                  onClick={() => setCurrentPage('education')}
+                  className={`px-5 text-sm font-medium border-b-2 transition-colors ${
+                    currentPage === 'education'
+                      ? 'border-moveify-teal text-white'
+                      : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/20'
+                  }`}
+                >
+                  Education
+                </button>
+              </div>
+            )}
+          </div>
 
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">
-                {userRole === 'clinician' && '👨‍⚕️ Clinician'}
-                {userRole === 'patient' && `👤 ${loggedInPatient?.name}`}
+          <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg">
+              <div className="w-6 h-6 rounded-full bg-primary-400 flex items-center justify-center text-[11px] font-semibold text-white leading-none">
+                {userRole === 'clinician' ? 'C' : (loggedInPatient?.name?.[0]?.toUpperCase() || 'P')}
+              </div>
+              <span className="text-sm text-white/65 font-medium">
+                {userRole === 'clinician' ? 'Clinician' : loggedInPatient?.name}
               </span>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <LogOut size={20} />
-                Logout
-              </button>
             </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-all text-sm"
+            >
+              <LogOut size={15} />
+              Sign out
+            </button>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Main Content Area - Split layout for clinician */}
       {userRole === 'patient' && loggedInPatient ? (
@@ -693,12 +698,12 @@ function App() {
         // Program Builder page - show split layout with Program Tab
         <div className="flex flex-1 overflow-hidden">
           {/* Left Side - Exercise Library */}
-          <div className="flex-1 flex flex-col overflow-hidden px-4 pt-8">
+          <div className="flex-1 flex flex-col overflow-hidden px-6 pt-7">
             <ExerciseLibrary onAddToProgram={handleAddToProgram} clinicianId={loggedInUser?.id} />
           </div>
 
           {/* Right Side - Program Tab (only visible on Program Builder page) */}
-          <div className="w-96 border-l border-gray-200 bg-white overflow-y-auto">
+          <div className="w-96 border-l border-slate-200 bg-white overflow-y-auto shadow-sm">
             <ProgramBuilder
               programExercises={programExercises}
               programName={programName}
@@ -715,12 +720,12 @@ function App() {
         </div>
       ) : currentPage === 'education' ? (
         // Education Library page - full width
-        <div className="flex-1 overflow-y-auto px-4 py-8">
+        <div className="flex-1 overflow-y-auto px-6 py-7">
           <EducationLibrary clinicianId={loggedInUser?.id || 0} />
         </div>
       ) : (
         // Patients page - full width, no Program Tab
-        <div className="flex-1 overflow-y-auto px-4 py-8">
+        <div className="flex-1 overflow-y-auto px-6 py-7">
           {viewingPatient ? (
             <PatientProfile
               patient={viewingPatient}

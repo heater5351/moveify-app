@@ -74,8 +74,8 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
 
   if (!patient.assignedPrograms || patient.assignedPrograms.length === 0) {
     return (
-      <div className="text-center py-12 px-4">
-        <p className="text-gray-500">No exercises assigned yet. Please check back later.</p>
+      <div className="text-center py-16 px-4 bg-white rounded-xl ring-1 ring-slate-200">
+        <p className="text-slate-500 text-sm">No exercises assigned yet. Please check back later.</p>
       </div>
     );
   }
@@ -174,46 +174,31 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
 
       {/* Header */}
       <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">
-          Welcome back, {patient.name.split(' ')[0]}!
+        <h1 className="text-xl sm:text-2xl font-semibold font-display text-secondary-500 tracking-tight mb-0.5">
+          Welcome back, {patient.name.split(' ')[0]}
         </h1>
-        <p className="text-base sm:text-lg text-gray-600">Let's keep moving forward</p>
+        <p className="text-sm text-slate-500">Let's keep moving forward</p>
 
-        {/* View Toggle - Full width on mobile */}
-        <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-6">
-          <button
-            onClick={() => setActiveView('exercises')}
-            className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold transition-all shadow-sm text-sm sm:text-base ${
-              activeView === 'exercises'
-                ? 'bg-gradient-to-r from-moveify-teal to-moveify-ocean text-white shadow-md'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-            }`}
-          >
-            <CalendarIcon size={18} className="inline mr-1.5 sm:mr-2" />
-            Exercises
-          </button>
-          <button
-            onClick={() => setActiveView('progress')}
-            className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold transition-all shadow-sm text-sm sm:text-base ${
-              activeView === 'progress'
-                ? 'bg-gradient-to-r from-moveify-teal to-moveify-ocean text-white shadow-md'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-            }`}
-          >
-            <TrendingUp size={18} className="inline mr-1.5 sm:mr-2" />
-            Progress
-          </button>
-          <button
-            onClick={() => setActiveView('education')}
-            className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold transition-all shadow-sm text-sm sm:text-base ${
-              activeView === 'education'
-                ? 'bg-gradient-to-r from-moveify-teal to-moveify-ocean text-white shadow-md'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-            }`}
-          >
-            <BookOpen size={18} className="inline mr-1.5 sm:mr-2" />
-            Education
-          </button>
+        {/* View Toggle */}
+        <div className="flex gap-2 mt-5 border-b border-slate-200">
+          {[
+            { id: 'exercises', label: 'Exercises', icon: <CalendarIcon size={15} /> },
+            { id: 'progress', label: 'Progress', icon: <TrendingUp size={15} /> },
+            { id: 'education', label: 'Education', icon: <BookOpen size={15} /> },
+          ].map(({ id, label, icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveView(id as typeof activeView)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeView === id
+                  ? 'border-primary-400 text-primary-500'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {icon}
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 

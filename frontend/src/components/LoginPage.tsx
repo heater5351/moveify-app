@@ -120,36 +120,35 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-moveify-teal/10 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl p-10 w-full max-w-md border border-gray-100">
-        <div className="text-center mb-10">
-          <div className="inline-block mb-4">
-            <img
-              src="/assets/moveify-logo.png"
-              alt="Moveify Logo"
-              className="h-24 w-auto mx-auto"
-            />
-          </div>
-          <p className="text-moveify-navy text-lg font-medium">Sign in to your account</p>
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-9 w-full max-w-sm">
+        <div className="text-center mb-8">
+          <img
+            src="/assets/moveify-logo.png"
+            alt="Moveify Logo"
+            className="h-14 w-auto mx-auto mb-6"
+          />
+          <h1 className="text-lg font-semibold font-display text-secondary-500 tracking-tight">Sign in to Moveify</h1>
+          <p className="text-sm text-slate-500 mt-1">Enter your credentials to continue</p>
         </div>
 
-        <div className="space-y-5">
+        <div className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Email Address
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Email
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleLoginSubmit()}
-              placeholder="your@email.com"
-              className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-moveify-teal focus:border-moveify-teal shadow-sm transition-all"
+              placeholder="you@example.com"
+              className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 transition-all text-slate-900 placeholder:text-slate-400 bg-white text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
               Password
             </label>
             <input
@@ -158,12 +157,12 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
               onChange={(e) => setPassword(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleLoginSubmit()}
               placeholder="••••••••"
-              className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-moveify-teal focus:border-moveify-teal shadow-sm transition-all"
+              className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 transition-all text-slate-900 placeholder:text-slate-400 bg-white text-sm"
             />
           </div>
 
           {loginError && (
-            <div className="bg-gradient-to-r from-red-50 to-red-100 border-2 border-red-300 text-red-800 px-5 py-4 rounded-xl font-medium shadow-sm">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
               {loginError}
             </div>
           )}
@@ -171,16 +170,16 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
           <button
             onClick={handleLoginSubmit}
             disabled={isLoading}
-            className="w-full bg-gradient-to-r from-moveify-teal to-moveify-ocean text-white py-4 rounded-xl hover:from-moveify-teal-dark hover:to-moveify-ocean font-semibold transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+            className="w-full bg-primary-400 hover:bg-primary-500 text-white py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm mt-1"
           >
-            {isLoading ? 'Signing in...' : 'Sign In'}
+            {isLoading ? 'Signing in…' : 'Sign in'}
           </button>
 
-          <div className="text-center">
+          <div className="text-center pt-1">
             <button
               type="button"
               onClick={() => setShowForgotPassword(true)}
-              className="text-moveify-teal hover:text-moveify-teal-dark font-medium text-sm"
+              className="text-sm text-primary-500 hover:text-primary-600 font-medium transition-colors"
             >
               Forgot password?
             </button>

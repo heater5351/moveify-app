@@ -6,6 +6,10 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"DM Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['Sora', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
       colors: {
         // Moveify Brand Colors
         moveify: {
