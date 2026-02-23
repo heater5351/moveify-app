@@ -621,7 +621,7 @@ function App() {
         <div className="px-6 flex items-center justify-between h-14">
           <div className="flex items-center">
             <img
-              src="/assets/moveify logo gimp.png"
+              src="/assets/moveify-logo-dark.png"
               alt="Moveify Logo"
               className="h-8 w-auto mr-8"
             />
