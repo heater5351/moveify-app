@@ -623,7 +623,7 @@ function App() {
             <img
               src="/assets/moveify-logo-dark.png"
               alt="Moveify Logo"
-              className="h-8 w-auto mr-8"
+              className="h-10 w-auto mr-8"
             />
 
             {/* Navigation Tabs - Only show in Clinician mode */}
