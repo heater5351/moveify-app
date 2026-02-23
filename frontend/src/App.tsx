@@ -688,7 +688,7 @@ function App() {
 
       {/* Main Content Area - Split layout for clinician */}
       {userRole === 'patient' && loggedInPatient ? (
-        <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-8" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-8" style={{ WebkitOverflowScrolling: 'touch' }}>
           <PatientPortal
             patient={loggedInPatient}
             onToggleComplete={handleToggleExerciseComplete}
