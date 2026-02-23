@@ -28,7 +28,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [_hasCheckedInToday, setHasCheckedInToday] = useState(false);
 
-  // Check if patient has completed check-in today
+  // Check if patient has completed check-in today + trigger block evaluation
   useEffect(() => {
     const checkTodayCheckIn = async () => {
       try {
@@ -46,7 +46,22 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
       }
     };
 
+    // Lazily trigger block progression evaluation for each program
+    const triggerEvaluations = async () => {
+      if (!patient.assignedPrograms) return;
+      for (const program of patient.assignedPrograms) {
+        if (program.config.id) {
+          try {
+            await fetch(`${API_URL}/blocks/${program.config.id}/evaluate`, { method: 'PATCH' });
+          } catch {
+            // Evaluation is best-effort — don't block the UI
+          }
+        }
+      }
+    };
+
     checkTodayCheckIn();
+    triggerEvaluations();
   }, [patient.id]);
 
   const handleCheckInSubmit = async (checkInData: Omit<DailyCheckIn, 'id' | 'createdAt'>) => {

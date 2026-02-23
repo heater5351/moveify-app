@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, CheckCircle, PauseCircle } from 'lucide-react';
 import { API_URL } from '../config';
 
-type PeriodizationCycle = {
-  blockType: string;
-  blockNumber: number;
-  currentWeek: number;
-  totalWeeks: number;
-  intensityMultiplier: number;
+type BlockStatus = {
+  hasBlock: boolean;
+  id?: number;
+  currentWeek?: number;
+  blockDuration?: number;
+  status?: 'active' | 'completed' | 'paused';
+  startDate?: string;
 };
 
 type Props = {
@@ -15,49 +16,66 @@ type Props = {
 };
 
 export default function BlockProgressBanner({ programId }: Props) {
-  const [cycle, setCycle] = useState<PeriodizationCycle | null>(null);
+  const [block, setBlock] = useState<BlockStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchCycle = async () => {
+    const fetchBlock = async () => {
       try {
-        const response = await fetch(`${API_URL}/programs/${programId}/cycle`);
+        const response = await fetch(`${API_URL}/blocks/${programId}`);
         if (response.ok) {
           const data = await response.json();
-          setCycle(data);
+          setBlock(data);
         }
-      } catch (error) {
-        console.error('Failed to fetch cycle:', error);
+      } catch {
+        // Silently ignore — block is optional
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCycle();
+    fetchBlock();
   }, [programId]);
 
-  if (loading || !cycle) return null;
+  if (loading || !block || !block.hasBlock) return null;
 
-  const isIntro = cycle.blockType === 'introductory';
-  const blockName = isIntro
-    ? 'Introductory Block'
-    : `Block ${cycle.blockNumber}`;
+  const { currentWeek = 1, blockDuration = 4, status = 'active' } = block;
 
-  const weekLabel = cycle.currentWeek === 1 && !isIntro
-    ? `Week ${cycle.currentWeek} (Deload)`
-    : `Week ${cycle.currentWeek}`;
+  if (status === 'completed') {
+    return (
+      <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl p-4 mb-6 shadow-md flex items-center gap-3">
+        <CheckCircle size={22} />
+        <div>
+          <p className="font-semibold">Block Complete!</p>
+          <p className="text-sm text-white/80">All {blockDuration} weeks finished. Your clinician will review and assign a new block.</p>
+        </div>
+      </div>
+    );
+  }
 
-  const progress = (cycle.currentWeek / cycle.totalWeeks) * 100;
+  if (status === 'paused') {
+    return (
+      <div className="bg-gradient-to-r from-amber-400 to-orange-400 text-white rounded-xl p-4 mb-6 shadow-md flex items-center gap-3">
+        <PauseCircle size={22} />
+        <div>
+          <p className="font-semibold">Program Paused</p>
+          <p className="text-sm text-white/80">Your clinician has paused progression. Continue with your current prescription.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const progress = (currentWeek / blockDuration) * 100;
 
   return (
     <div className="bg-gradient-to-r from-moveify-teal to-moveify-ocean text-white rounded-xl p-4 mb-6 shadow-md">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <TrendingUp size={20} />
-          <h3 className="font-semibold text-lg">{blockName}</h3>
+          <h3 className="font-semibold text-lg">Periodization Block</h3>
         </div>
         <div className="text-sm font-medium bg-white bg-opacity-20 px-3 py-1 rounded-full">
-          {weekLabel} / {cycle.totalWeeks}
+          Week {currentWeek} / {blockDuration}
         </div>
       </div>
 
@@ -69,12 +87,10 @@ export default function BlockProgressBanner({ programId }: Props) {
         />
       </div>
 
-      <p className="text-sm text-white text-opacity-90">
-        {isIntro
-          ? 'Building foundation and technique'
-          : cycle.currentWeek === 1
-          ? 'Deload week - recovering and preparing for progression'
-          : `Progressive overload - increasing volume`}
+      <p className="text-sm text-white/90">
+        {currentWeek === blockDuration
+          ? 'Final week — great work!'
+          : `${blockDuration - currentWeek} week${blockDuration - currentWeek !== 1 ? 's' : ''} remaining in this block`}
       </p>
     </div>
   );

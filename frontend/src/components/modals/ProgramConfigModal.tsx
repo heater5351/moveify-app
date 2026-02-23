@@ -27,40 +27,6 @@ export const ProgramConfigModal = ({ config, onUpdate, onConfirm, onBack }: Prog
       <div className="bg-white rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
         <h3 className="text-2xl font-bold text-gray-900 mb-6">Configure Program</h3>
 
-        {/* Block Type Selection */}
-        <div className="mb-6">
-          <h4 className="text-lg font-semibold text-gray-900 mb-2">Program Type</h4>
-          <p className="text-sm text-gray-600 mb-3">Choose the appropriate starting point for this patient</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button
-              onClick={() => onUpdate({ ...config, blockType: 'standard' as any })}
-              className={`p-4 rounded-lg border-2 text-left transition-all ${
-                (config as any).blockType === 'standard' || !(config as any).blockType
-                  ? 'border-moveify-teal bg-moveify-teal bg-opacity-10'
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-            >
-              <div className="font-semibold text-gray-900 mb-1">Standard Block</div>
-              <div className="text-sm text-gray-600">
-                For patients with training experience. Starts at 2x8 (deload week).
-              </div>
-            </button>
-            <button
-              onClick={() => onUpdate({ ...config, blockType: 'introductory' as any })}
-              className={`p-4 rounded-lg border-2 text-left transition-all ${
-                (config as any).blockType === 'introductory'
-                  ? 'border-moveify-teal bg-moveify-teal bg-opacity-10'
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-            >
-              <div className="font-semibold text-gray-900 mb-1">Introductory Block</div>
-              <div className="text-sm text-gray-600">
-                For beginners or deconditioned patients. Starts at 1x8 to minimize soreness.
-              </div>
-            </button>
-          </div>
-        </div>
-
         {/* Start Date */}
         <div className="mb-6">
           <h4 className="text-lg font-semibold text-gray-900 mb-3">When do you want this program to start?</h4>

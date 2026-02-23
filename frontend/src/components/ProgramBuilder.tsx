@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trash2, X, GripVertical } from 'lucide-react';
+import { Trash2, X, GripVertical, BarChart2 } from 'lucide-react';
 import type { ProgramExercise, Patient } from '../types/index.ts';
 import {
   DndContext,
@@ -26,17 +26,19 @@ interface ProgramBuilderProps {
   isEditing: boolean;
   onProgramNameChange: (name: string) => void;
   onRemoveExercise: (index: number) => void;
-  onUpdateExercise: (index: number, field: 'sets' | 'reps' | 'weight' | 'enablePeriodization', value: number | boolean) => void;
+  onUpdateExercise: (index: number, field: 'sets' | 'reps' | 'weight', value: number) => void;
   onReorderExercises: (newOrder: ProgramExercise[]) => void;
   onAssignToPatient: () => void;
   onCancelPatientAssignment: () => void;
+  onConfigureBlock?: () => void;
+  hasBlock?: boolean;
 }
 
 interface SortableExerciseProps {
   exercise: ProgramExercise;
   index: number;
   onRemove: (index: number) => void;
-  onUpdate: (index: number, field: 'sets' | 'reps' | 'weight' | 'enablePeriodization', value: number | boolean) => void;
+  onUpdate: (index: number, field: 'sets' | 'reps' | 'weight', value: number) => void;
 }
 
 const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerciseProps) => {
@@ -133,20 +135,7 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
         </div>
       </div>
 
-      <div className="flex items-center gap-2 pt-2.5 border-t border-slate-100">
-        <input
-          type="checkbox"
-          id={`periodization-${index}`}
-          checked={exercise.enablePeriodization !== false}
-          onChange={(e) => onUpdate(index, 'enablePeriodization', e.target.checked)}
-          className="w-3.5 h-3.5 text-primary-400 border-slate-300 rounded focus:ring-primary-400"
-        />
-        <label htmlFor={`periodization-${index}`} className="text-xs text-slate-500 cursor-pointer">
-          Auto-progression (weekly increase)
-        </label>
-      </div>
-
-      <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded inline-block mt-2.5">
+      <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded inline-block mt-1.5">
         {exercise.category}
       </span>
     </div>
@@ -163,7 +152,9 @@ export const ProgramBuilder = ({
   onUpdateExercise,
   onReorderExercises,
   onAssignToPatient,
-  onCancelPatientAssignment
+  onCancelPatientAssignment,
+  onConfigureBlock,
+  hasBlock = false
 }: ProgramBuilderProps) => {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -259,7 +250,16 @@ export const ProgramBuilder = ({
       </div>
 
       {programExercises.length > 0 && (
-        <div className="p-5 border-t border-slate-100">
+        <div className="p-5 border-t border-slate-100 space-y-2.5">
+          {onConfigureBlock && (
+            <button
+              onClick={onConfigureBlock}
+              className="w-full flex items-center justify-center gap-2 border border-primary-300 text-primary-500 hover:bg-primary-50 px-5 py-2.5 rounded-lg font-medium text-sm transition-colors"
+            >
+              <BarChart2 size={15} />
+              {hasBlock ? 'Edit Periodization Block' : 'Configure Block (optional)'}
+            </button>
+          )}
           <button
             onClick={onAssignToPatient}
             disabled={!programName.trim()}

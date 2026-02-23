@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, useSearchParams, useNavigate } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
-import type { Patient, ProgramExercise, ProgramConfig, UserRole, NewPatient, CompletionData, User } from './types/index.ts';
+import type { Patient, ProgramExercise, ProgramConfig, UserRole, NewPatient, CompletionData, User, ExerciseWeekPrescription } from './types/index.ts';
 import { LoginPage } from './components/LoginPage';
 import { SetupPasswordPage } from './components/SetupPasswordPage';
 import { ExerciseLibrary } from './components/ExerciseLibrary';
@@ -18,6 +18,7 @@ import { ProgramDetailsModal } from './components/modals/ProgramDetailsModal';
 import { NotificationModal } from './components/modals/NotificationModal';
 import { ConfirmModal } from './components/modals/ConfirmModal';
 import { ResetPasswordModal } from './components/modals/ResetPasswordModal';
+import { BlockBuilderModal } from './components/modals/BlockBuilderModal';
 import { API_URL } from './config';
 
 function App() {
@@ -49,6 +50,8 @@ function App() {
   const [editingProgramIndex, setEditingProgramIndex] = useState<number | null>(null);
   const [editingProgramId, setEditingProgramId] = useState<number | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [showBlockBuilderModal, setShowBlockBuilderModal] = useState(false);
+  const [pendingBlockData, setPendingBlockData] = useState<{ duration: number; weeks: ExerciseWeekPrescription[] } | null>(null);
   const [showDeletePatientConfirm, setShowDeletePatientConfirm] = useState(false);
   const [showDeleteProgramConfirm, setShowDeleteProgramConfirm] = useState(false);
   const [programToDelete, setProgramToDelete] = useState<{ id: number; name: string } | null>(null);
@@ -131,14 +134,12 @@ function App() {
     setProgramExercises(programExercises.filter((_, i) => i !== index));
   };
 
-  const handleUpdateExercise = (index: number, field: 'sets' | 'reps' | 'weight' | 'enablePeriodization', value: number | boolean) => {
+  const handleUpdateExercise = (index: number, field: 'sets' | 'reps' | 'weight', value: number) => {
     const updated = [...programExercises];
     if (field === 'weight') {
-      updated[index].prescribedWeight = value as number;
-    } else if (field === 'enablePeriodization') {
-      updated[index].enablePeriodization = value as boolean;
+      updated[index].prescribedWeight = value;
     } else {
-      updated[index][field] = value as number;
+      updated[index][field] = value;
     }
     setProgramExercises(updated);
   };
@@ -188,13 +189,57 @@ function App() {
           body: JSON.stringify({
             name: programName,
             exercises: programExercises,
-            config: programConfig,
-            blockType: (programConfig as any).blockType || 'standard'
+            config: programConfig
           })
         });
       }
 
       if (response.ok) {
+        const responseData = await response.json();
+
+        // If a block was configured, create it now with the new program's exercise IDs
+        if (!isEditing && pendingBlockData && responseData.programId) {
+          try {
+            // Fetch the newly created program to get exercise IDs
+            const progRes = await fetch(`${API_URL}/programs/patient/${selectedPatient.id}`);
+            if (progRes.ok) {
+              const progData = await progRes.json();
+              if (progData.program && progData.program.exercises) {
+                const exerciseIds = progData.program.exercises.map((e: { id: number }) => e.id);
+                // Remap programExerciseId from index-based to actual IDs
+                const remappedWeeks = pendingBlockData.weeks.map(w => {
+                  // Find the exercise index in the original programExercises array
+                  const exIdx = programExercises.findIndex((_, i) => {
+                    // exerciseWeeks come from BlockBuilderModal using exercise.id
+                    return programExercises[i].id === w.programExerciseId ||
+                      exerciseIds[programExercises.findIndex(ex => ex.id === w.programExerciseId)] === w.programExerciseId;
+                  });
+                  const actualId = exIdx >= 0 ? exerciseIds[exIdx] : exerciseIds[0];
+                  return { ...w, programExerciseId: actualId || w.programExerciseId };
+                });
+                // Use actual DB exercise IDs based on order
+                const reorderedWeeks = pendingBlockData.weeks.map((w, i) => {
+                  const exIndex = programExercises.findIndex((pe) => pe.id === w.programExerciseId);
+                  const actualId = exIndex >= 0 && exIndex < exerciseIds.length ? exerciseIds[exIndex] : exerciseIds[i % exerciseIds.length];
+                  return { ...w, programExerciseId: actualId };
+                });
+                void remappedWeeks; // unused after rewrite
+                await fetch(`${API_URL}/blocks/${responseData.programId}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    blockDuration: pendingBlockData.duration,
+                    startDate: new Date().toISOString().split('T')[0],
+                    exerciseWeeks: reorderedWeeks
+                  })
+                });
+              }
+            }
+          } catch (blockError) {
+            console.error('Failed to create block (program still saved):', blockError);
+          }
+        }
+
         // Refresh patient list to get updated program data
         await fetchPatients();
 
@@ -220,6 +265,7 @@ function App() {
         setProgramName('');
         setEditingProgramIndex(null);
         setEditingProgramId(null);
+        setPendingBlockData(null);
         setProgramConfig({
           startDate: 'today',
           customStartDate: '',
@@ -333,6 +379,7 @@ function App() {
     setProgramName('');
     setEditingProgramIndex(null);
     setEditingProgramId(null);
+    setPendingBlockData(null);
     setProgramConfig({
       startDate: 'today',
       customStartDate: '',
@@ -578,6 +625,49 @@ function App() {
         />
       )}
 
+      {/* Block Builder Modal */}
+      {showBlockBuilderModal && programExercises.length > 0 && (
+        <BlockBuilderModal
+          programExercises={programExercises}
+          clinicianId={loggedInUser?.id || 0}
+          initialDuration={(pendingBlockData?.duration as 4 | 6 | 8) || 4}
+          initialWeeks={pendingBlockData?.weeks || []}
+          onClose={() => setShowBlockBuilderModal(false)}
+          onSave={async (blockDuration, exerciseWeeks, saveAsTemplate) => {
+            setPendingBlockData({ duration: blockDuration, weeks: exerciseWeeks });
+            setShowBlockBuilderModal(false);
+            // If saving as template, do that now
+            if (saveAsTemplate && loggedInUser?.id) {
+              try {
+                const slotMap = new Map<number, number>();
+                programExercises.forEach((ex, i) => { if (ex.id) slotMap.set(ex.id, i); });
+                const templateWeeks = exerciseWeeks.map(w => ({
+                  exerciseSlot: slotMap.get(w.programExerciseId) ?? 0,
+                  weekNumber: w.weekNumber,
+                  sets: w.sets,
+                  reps: w.reps,
+                  rpeTarget: w.rpeTarget
+                }));
+                await fetch(`${API_URL}/blocks/templates`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    name: saveAsTemplate.name,
+                    description: saveAsTemplate.description,
+                    blockDuration,
+                    weeks: templateWeeks,
+                    clinicianId: loggedInUser.id
+                  })
+                });
+                setNotification({ message: `Template "${saveAsTemplate.name}" saved!`, type: 'success' });
+              } catch {
+                setNotification({ message: 'Block saved but template save failed', type: 'error' });
+              }
+            }
+          }}
+        />
+      )}
+
       {/* Notification Modal */}
       {notification && (
         <NotificationModal
@@ -715,6 +805,8 @@ function App() {
               onReorderExercises={handleReorderExercises}
               onAssignToPatient={handleAssignToPatient}
               onCancelPatientAssignment={handleCancelProgramAssignment}
+              onConfigureBlock={programExercises.length > 0 ? () => setShowBlockBuilderModal(true) : undefined}
+              hasBlock={pendingBlockData !== null}
             />
           </div>
         </div>
@@ -741,6 +833,7 @@ function App() {
               onEditProgram={handleEditProgram}
               onDeleteProgram={handleDeleteProgram}
               onAddProgram={handleAddProgram}
+              clinicianId={loggedInUser?.id}
             />
           ) : (
             <PatientsPage

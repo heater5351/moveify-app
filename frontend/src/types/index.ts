@@ -55,7 +55,6 @@ export type ProgramExercise = Exercise & {
   instructions?: string;
   completionData?: CompletionData | null;
   allCompletions?: { [date: string]: CompletionData }; // All completions by date (YYYY-MM-DD)
-  enablePeriodization?: boolean;
 }
 
 export type ProgramConfig = {
@@ -69,7 +68,6 @@ export type ProgramConfig = {
   trackActualPerformance?: boolean;
   trackRpe?: boolean;
   trackPainLevel?: boolean;
-  blockType?: 'introductory' | 'standard';
 }
 
 export type AssignedProgram = {
@@ -109,36 +107,63 @@ export type User = {
   role: UserRole;
 }
 
-// Periodization types
-export type BlockType = 'introductory' | 'standard';
-
-export type PeriodizationCycle = {
+// Block-based periodization types
+export type BlockSchedule = {
   id: number;
   programId: number;
-  blockType: BlockType;
-  blockNumber: number;
-  blockStartDate: string;
+  blockDuration: 4 | 6 | 8;
+  startDate: string;
   currentWeek: number;
-  totalWeeks: number;
-  intensityMultiplier: number;
+  status: 'active' | 'completed' | 'paused';
+  lastEvaluatedAt: string | null;
+}
+
+export type ExerciseWeekPrescription = {
+  programExerciseId: number;
+  weekNumber: number;
+  sets: number;
+  reps: number;
+  rpeTarget?: number | null;
+  weight?: number | null;
+  notes?: string | null;
+}
+
+export type PeriodizationTemplate = {
+  id: number;
+  name: string;
+  description: string | null;
+  blockDuration: 4 | 6 | 8;
+  createdBy: number;
+  isGlobal: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-export type ProgressionLogEntry = {
+export type TemplateWeek = {
   id: number;
-  exerciseId: number;
+  templateId: number;
+  exerciseSlot: number;
+  weekNumber: number;
+  sets: number;
+  reps: number;
+  rpeTarget?: number | null;
+  notes?: string | null;
+}
+
+export type ClinicianFlag = {
+  id: number;
   programId: number;
-  previousSets?: number;
-  previousReps?: number;
-  newSets: number;
-  newReps: number;
-  adjustmentReason: string;
-  avgRpe?: number;
-  avgPain?: number;
-  completionRate?: number;
-  weekInCycle?: number;
-  adjustedAt: string;
+  patientId: number;
+  flagType: 'pain_flare' | 'performance_hold' | 'block_complete';
+  flagReason: string;
+  flagDate: string;
+  resolved: boolean;
+  resolvedAt: string | null;
+  resolvedBy: number | null;
+  createdAt: string;
+  // Joined fields
+  patientName?: string;
+  programName?: string;
 }
 
 // Daily check-in types

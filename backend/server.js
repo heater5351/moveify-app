@@ -11,6 +11,7 @@ const programRoutes = require('./routes/programs');
 const checkInRoutes = require('./routes/check-ins');
 const exerciseRoutes = require('./routes/exercises');
 const educationRoutes = require('./routes/education');
+const blockRoutes = require('./routes/blocks');
 
 // Import database init
 const { initDatabase } = require('./database/init');
@@ -38,6 +39,7 @@ app.use('/api/programs', programRoutes);
 app.use('/api/check-ins', checkInRoutes);
 app.use('/api/exercises', exerciseRoutes);
 app.use('/api/education', educationRoutes);
+app.use('/api/blocks', blockRoutes);
 
 // Test route
 app.get('/', (req, res) => {

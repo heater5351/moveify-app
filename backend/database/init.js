@@ -207,6 +207,100 @@ async function initDatabase() {
       )
     `);
 
+    // ===== BLOCK-BASED PERIODIZATION TABLES =====
+
+    // One block per program (active)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS block_schedules (
+        id                SERIAL PRIMARY KEY,
+        program_id        INTEGER NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+        block_duration    INTEGER NOT NULL CHECK(block_duration IN (4, 6, 8)),
+        start_date        DATE NOT NULL,
+        current_week      INTEGER NOT NULL DEFAULT 1,
+        status            TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','completed','paused')),
+        last_evaluated_at TIMESTAMP,
+        created_at        TIMESTAMP DEFAULT NOW(),
+        updated_at        TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_block_schedules_active
+      ON block_schedules(program_id) WHERE status = 'active'
+    `);
+
+    // Per-exercise, per-week prescription cells
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS exercise_block_weeks (
+        id                  SERIAL PRIMARY KEY,
+        block_schedule_id   INTEGER NOT NULL REFERENCES block_schedules(id) ON DELETE CASCADE,
+        program_exercise_id INTEGER NOT NULL REFERENCES program_exercises(id) ON DELETE CASCADE,
+        week_number         INTEGER NOT NULL CHECK(week_number BETWEEN 1 AND 8),
+        sets                INTEGER NOT NULL,
+        reps                INTEGER NOT NULL,
+        rpe_target          INTEGER CHECK(rpe_target BETWEEN 1 AND 10),
+        weight              REAL,
+        notes               TEXT,
+        overridden_by       INTEGER REFERENCES users(id),
+        overridden_at       TIMESTAMP,
+        created_at          TIMESTAMP DEFAULT NOW(),
+        UNIQUE(block_schedule_id, program_exercise_id, week_number)
+      )
+    `);
+
+    // Saved periodization templates
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS periodization_templates (
+        id             SERIAL PRIMARY KEY,
+        name           TEXT NOT NULL,
+        description    TEXT,
+        block_duration INTEGER NOT NULL CHECK(block_duration IN (4, 6, 8)),
+        created_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        is_global      BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at     TIMESTAMP DEFAULT NOW(),
+        updated_at     TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    // Week structure per template
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS template_weeks (
+        id            SERIAL PRIMARY KEY,
+        template_id   INTEGER NOT NULL REFERENCES periodization_templates(id) ON DELETE CASCADE,
+        exercise_slot INTEGER NOT NULL,
+        week_number   INTEGER NOT NULL CHECK(week_number BETWEEN 1 AND 8),
+        sets          INTEGER NOT NULL,
+        reps          INTEGER NOT NULL,
+        rpe_target    INTEGER CHECK(rpe_target BETWEEN 1 AND 10),
+        notes         TEXT,
+        UNIQUE(template_id, exercise_slot, week_number)
+      )
+    `);
+
+    // Clinician alert flags
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS clinician_flags (
+        id          SERIAL PRIMARY KEY,
+        program_id  INTEGER NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+        patient_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        flag_type   TEXT NOT NULL CHECK(flag_type IN ('pain_flare','performance_hold','block_complete')),
+        flag_reason TEXT NOT NULL,
+        flag_date   DATE NOT NULL DEFAULT CURRENT_DATE,
+        resolved    BOOLEAN NOT NULL DEFAULT FALSE,
+        resolved_at TIMESTAMP,
+        resolved_by INTEGER REFERENCES users(id),
+        created_at  TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_clinician_flags_unresolved
+      ON clinician_flags(resolved) WHERE resolved = FALSE
+    `);
+
+    // Add clinician_id to programs for flag querying
+    await db.query(`
+      ALTER TABLE programs ADD COLUMN IF NOT EXISTS clinician_id INTEGER REFERENCES users(id)
+    `);
+
     // Exercise favorites table (for favoriting both custom and default exercises)
     await db.query(`
       CREATE TABLE IF NOT EXISTS exercise_favorites (

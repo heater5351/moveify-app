@@ -1,7 +1,6 @@
 // Program routes
 const express = require('express');
 const db = require('../database/db');
-const periodizationService = require('../services/periodization-service');
 const checkInService = require('../services/check-in-service');
 
 const router = express.Router();
@@ -101,7 +100,7 @@ router.post('/patient/:patientId', async (req, res) => {
 
   try {
     const { patientId } = req.params;
-    const { exercises, config, name, blockType } = req.body;
+    const { exercises, config, name } = req.body;
 
     if (!name || name.trim() === '') {
       client.release();
@@ -136,59 +135,35 @@ router.post('/patient/:patientId', async (req, res) => {
 
     const programId = programResult.rows[0].id;
 
-    // Insert exercises with baseline values
+    // Insert exercises
     for (let index = 0; index < exercises.length; index++) {
       const exercise = exercises[index];
-      const baselineSets = exercise.sets;
-      const baselineReps = exercise.reps;
-
-      // Calculate initial sets/reps based on block type
-      const cycleBlockType = blockType || 'standard';
-      const calculated = periodizationService.calculateSetsReps(
-        cycleBlockType,
-        1, // Week 1
-        baselineSets,
-        baselineReps
-      );
 
       await client.query(`
         INSERT INTO program_exercises (
           program_id, exercise_name, exercise_category, sets, reps, prescribed_weight,
-          hold_time, instructions, image_url, exercise_order,
-          baseline_sets, baseline_reps, auto_adjust_enabled
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          hold_time, instructions, image_url, exercise_order
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `, [
         programId,
         exercise.name,
         exercise.category || '',
-        calculated.sets,
-        calculated.reps,
+        exercise.sets,
+        exercise.reps,
         exercise.prescribedWeight || 0,
         exercise.holdTime || '',
         exercise.instructions || '',
         exercise.image || '',
-        index,
-        baselineSets,
-        baselineReps,
-        exercise.enablePeriodization !== undefined ? exercise.enablePeriodization : false
+        index
       ]);
     }
 
     await client.query('COMMIT');
     client.release();
 
-    // Initialize periodization cycle
-    try {
-      const cycleBlockType = blockType || 'standard';
-      await periodizationService.initializeCycle(programId, cycleBlockType);
-    } catch (error) {
-      console.error('Failed to initialize cycle:', error);
-    }
-
     res.json({
       message: 'Program assigned successfully',
-      programId: programId,
-      blockType: blockType || 'standard'
+      programId: programId
     });
   } catch (error) {
     await client.query('ROLLBACK');
@@ -865,102 +840,17 @@ router.delete('/:programId', async (req, res) => {
   }
 });
 
-// ===== PERIODIZATION ENDPOINTS =====
+// ===== RETIRED PERIODIZATION ENDPOINTS (410 Gone) =====
 
-// Trigger weekly progression for a program
-router.post('/:programId/progress', async (req, res) => {
-  try {
-    const { programId } = req.params;
+const goneResponse = (req, res) => {
+  res.status(410).json({ error: 'This endpoint has been retired. Use /api/blocks instead.' });
+};
 
-    const result = await periodizationService.progressProgram(parseInt(programId));
-
-    res.json(result);
-  } catch (error) {
-    console.error('Progress program error:', error);
-    res.status(500).json({ error: error.message || 'Failed to progress program' });
-  }
-});
-
-// Adjust weights based on RPE (called after progressProgram)
-router.post('/:programId/adjust-weight', async (req, res) => {
-  try {
-    const { programId } = req.params;
-    const result = await periodizationService.adjustWeightBasedOnRPE(parseInt(programId));
-    res.json(result);
-  } catch (error) {
-    console.error('Adjust weight error:', error);
-    res.status(500).json({ error: error.message || 'Failed to adjust weight' });
-  }
-});
-
-// Get current periodization cycle for a program
-router.get('/:programId/cycle', async (req, res) => {
-  try {
-    const { programId } = req.params;
-
-    const cycle = await periodizationService.getCurrentCycle(parseInt(programId));
-
-    if (!cycle) {
-      return res.status(404).json({ error: 'No active cycle found' });
-    }
-
-    res.json({
-      id: cycle.id,
-      programId: cycle.program_id,
-      blockType: cycle.block_type,
-      blockNumber: cycle.block_number,
-      blockStartDate: cycle.block_start_date,
-      currentWeek: cycle.current_week,
-      totalWeeks: cycle.total_weeks,
-      intensityMultiplier: cycle.intensity_multiplier,
-      createdAt: cycle.created_at,
-      updatedAt: cycle.updated_at
-    });
-  } catch (error) {
-    console.error('Get cycle error:', error);
-    res.status(500).json({ error: 'Failed to get cycle' });
-  }
-});
-
-// Get progression history for a program
-router.get('/:programId/progression-history', async (req, res) => {
-  try {
-    const { programId } = req.params;
-    const { limit } = req.query;
-
-    const history = await periodizationService.getProgressionHistory(
-      parseInt(programId),
-      limit ? parseInt(limit) : 50
-    );
-
-    res.json(history);
-  } catch (error) {
-    console.error('Get progression history error:', error);
-    res.status(500).json({ error: 'Failed to get progression history' });
-  }
-});
-
-// Get weekly metrics for an exercise
-router.get('/exercise/:exerciseId/metrics', async (req, res) => {
-  try {
-    const { exerciseId } = req.params;
-    const { patientId } = req.query;
-
-    if (!patientId) {
-      return res.status(400).json({ error: 'Patient ID required' });
-    }
-
-    const metrics = await periodizationService.getWeeklyMetrics(
-      parseInt(exerciseId),
-      parseInt(patientId)
-    );
-
-    res.json(metrics);
-  } catch (error) {
-    console.error('Get metrics error:', error);
-    res.status(500).json({ error: 'Failed to get metrics' });
-  }
-});
+router.post('/:programId/progress', goneResponse);
+router.post('/:programId/adjust-weight', goneResponse);
+router.get('/:programId/cycle', goneResponse);
+router.get('/:programId/progression-history', goneResponse);
+router.get('/exercise/:exerciseId/metrics', goneResponse);
 
 // Get exercise completions for a patient (clinician dashboard)
 router.get('/exercise-completions/patient/:patientId', async (req, res) => {
@@ -1037,49 +927,8 @@ router.get('/progression-logs/patient/:patientId', async (req, res) => {
   }
 });
 
-// Override auto-adjustment for an exercise
-router.patch('/exercise/:exerciseId/override', async (req, res) => {
-  try {
-    const { exerciseId } = req.params;
-    const { sets, reps, autoAdjustEnabled } = req.body;
-
-    const updates = [];
-    const values = [];
-    let paramIndex = 1;
-
-    if (sets !== undefined) {
-      updates.push(`sets = $${paramIndex++}`);
-      values.push(sets);
-    }
-
-    if (reps !== undefined) {
-      updates.push(`reps = $${paramIndex++}`);
-      values.push(reps);
-    }
-
-    if (autoAdjustEnabled !== undefined) {
-      updates.push(`auto_adjust_enabled = $${paramIndex++}`);
-      values.push(autoAdjustEnabled);
-    }
-
-    if (updates.length === 0) {
-      return res.status(400).json({ error: 'No fields to update' });
-    }
-
-    values.push(parseInt(exerciseId));
-
-    await db.query(`
-      UPDATE program_exercises
-      SET ${updates.join(', ')}
-      WHERE id = $${paramIndex}
-    `, values);
-
-    res.json({ message: 'Exercise updated successfully' });
-  } catch (error) {
-    console.error('Override exercise error:', error);
-    res.status(500).json({ error: 'Failed to update exercise' });
-  }
-});
+// Retired endpoint
+router.patch('/exercise/:exerciseId/override', goneResponse);
 
 // ADMIN: Clear all check-in and completion data (for fresh start)
 // SECURITY: Requires admin secret header to prevent unauthorized data deletion

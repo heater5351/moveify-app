@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Edit, User, Trash2, PlusCircle, TrendingUp, Zap, BookOpen } from 'lucide-react';
-import type { Patient } from '../types/index.ts';
+import { useState, useEffect } from 'react';
+import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown } from 'lucide-react';
+import type { Patient, ClinicianFlag } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
 import { AssignEducationModal } from './modals/AssignEducationModal';
@@ -14,44 +14,45 @@ interface PatientProfileProps {
   onEditProgram: (programIndex: number) => void;
   onDeleteProgram: (programId: number, programName: string) => void;
   onAddProgram: () => void;
+  clinicianId?: number;
 }
 
-export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram }: PatientProfileProps) => {
+export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram, clinicianId }: PatientProfileProps) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'education'>('overview');
-  const [progressingProgramId, setProgressingProgramId] = useState<number | null>(null);
   const [showAssignEducationModal, setShowAssignEducationModal] = useState(false);
   const [educationModulesRefreshKey, setEducationModulesRefreshKey] = useState(0);
+  const [flags, setFlags] = useState<ClinicianFlag[]>([]);
+  const [showFlags, setShowFlags] = useState(false);
 
-  const handleProgressProgram = async (programId: number) => {
-    if (!confirm('This will analyze the last week of data and adjust the program based on progression gates. Continue?')) {
-      return;
-    }
-
-    setProgressingProgramId(programId);
-    try {
-      const response = await fetch(`${API_URL}/programs/${programId}/progress`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to progress program');
+  // Fetch unresolved flags for this patient's programs
+  useEffect(() => {
+    if (!clinicianId) return;
+    const fetchFlags = async () => {
+      try {
+        const res = await fetch(`${API_URL}/blocks/flags/${clinicianId}`);
+        if (res.ok) {
+          const data = await res.json();
+          // Filter to this patient only
+          const patientFlags = (data.flags || []).filter((f: ClinicianFlag) => f.patientId === patient.id);
+          setFlags(patientFlags);
+        }
+      } catch {
+        // Flags are optional
       }
+    };
+    fetchFlags();
+  }, [clinicianId, patient.id]);
 
-      const result = await response.json();
-
-      alert(
-        `Program progressed successfully!\n\n` +
-        `${result.adjustments.length} exercise(s) adjusted.\n` +
-        `Now on Week ${result.nextWeek} of Block ${result.blockNumber}`
-      );
-
-      // Refresh the page to show updated values
-      window.location.reload();
-    } catch (error) {
-      console.error('Failed to progress program:', error);
-      alert('Failed to progress program. Please try again.');
-    } finally {
-      setProgressingProgramId(null);
+  const handleResolveFlag = async (flagId: number) => {
+    try {
+      await fetch(`${API_URL}/blocks/flags/${flagId}/resolve`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolvedBy: clinicianId })
+      });
+      setFlags(prev => prev.filter(f => f.id !== flagId));
+    } catch {
+      // Silently ignore
     }
   };
 
@@ -125,6 +126,58 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
       {/* Tab Content */}
       {activeTab === 'overview' ? (
         <div className="space-y-5">
+          {/* Flags banner */}
+          {flags.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <button
+                onClick={() => setShowFlags(!showFlags)}
+                className="flex items-center justify-between w-full"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={16} className="text-amber-500" />
+                  <span className="text-sm font-semibold text-amber-800">
+                    {flags.length} Unresolved Alert{flags.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`text-amber-500 transition-transform ${showFlags ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {showFlags && (
+                <div className="mt-3 space-y-2">
+                  {flags.map(flag => (
+                    <div key={flag.id} className="bg-white rounded-lg p-3 border border-amber-100 flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            flag.flagType === 'pain_flare'
+                              ? 'bg-red-100 text-red-700'
+                              : flag.flagType === 'block_complete'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {flag.flagType === 'pain_flare' ? 'Pain Flare' : flag.flagType === 'block_complete' ? 'Block Complete' : 'Performance Hold'}
+                          </span>
+                          <span className="text-xs text-slate-400">{flag.flagDate}</span>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed">{flag.flagReason}</p>
+                      </div>
+                      <button
+                        onClick={() => handleResolveFlag(flag.id)}
+                        className="flex-shrink-0 flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-medium transition-colors"
+                        title="Mark as resolved"
+                      >
+                        <CheckCircle size={15} />
+                        Resolve
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Detail fields */}
           <div className="bg-white rounded-xl ring-1 ring-slate-200 p-6">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Patient Details</h3>
@@ -184,18 +237,6 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
                         </p>
                       </button>
                       <div className="flex items-center gap-1 ml-4">
-                        <button
-                          onClick={() => program.config.id && handleProgressProgram(program.config.id)}
-                          disabled={progressingProgramId === program.config.id}
-                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
-                          title="Progress program"
-                        >
-                          {progressingProgramId === program.config.id ? (
-                            <span className="animate-spin inline-block">⚡</span>
-                          ) : (
-                            <Zap size={16} />
-                          )}
-                        </button>
                         <button
                           onClick={() => onEditProgram(index)}
                           className="p-2 text-slate-500 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
