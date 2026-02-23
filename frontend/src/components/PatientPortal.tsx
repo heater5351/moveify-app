@@ -230,7 +230,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                   >
                     <div className="font-semibold text-sm sm:text-base">{program.config.name}</div>
                     <div className="text-xs mt-1.5 sm:mt-2 opacity-90">
-                      {program.exercises.filter(e => e.completed).length}/{program.exercises.length} completed
+                      {program.exercises.filter(e => !!e.allCompletions?.[todayDate.toISOString().split('T')[0]]).length}/{program.exercises.length} completed today
                     </div>
                   </button>
                 ))}
