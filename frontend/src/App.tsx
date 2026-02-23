@@ -621,9 +621,9 @@ function App() {
         <div className="px-6 flex items-center justify-between h-14">
           <div className="flex items-center">
             <img
-              src="/assets/moveify-logo.png"
+              src="/assets/moveify logo gimp.png"
               alt="Moveify Logo"
-              className="h-7 w-auto mr-8"
+              className="h-8 w-auto mr-8"
             />
 
             {/* Navigation Tabs - Only show in Clinician mode */}
