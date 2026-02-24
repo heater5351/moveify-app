@@ -206,31 +206,18 @@ function App() {
               const progData = await progRes.json();
               if (progData.program && progData.program.exercises) {
                 const exerciseIds = progData.program.exercises.map((e: { id: number }) => e.id);
-                // Remap programExerciseId from index-based to actual IDs
-                const remappedWeeks = pendingBlockData.weeks.map(w => {
-                  // Find the exercise index in the original programExercises array
-                  const exIdx = programExercises.findIndex((_, i) => {
-                    // exerciseWeeks come from BlockBuilderModal using exercise.id
-                    return programExercises[i].id === w.programExerciseId ||
-                      exerciseIds[programExercises.findIndex(ex => ex.id === w.programExerciseId)] === w.programExerciseId;
-                  });
-                  const actualId = exIdx >= 0 ? exerciseIds[exIdx] : exerciseIds[0];
-                  return { ...w, programExerciseId: actualId || w.programExerciseId };
-                });
-                // Use actual DB exercise IDs based on order
-                const reorderedWeeks = pendingBlockData.weeks.map((w, i) => {
-                  const exIndex = programExercises.findIndex((pe) => pe.id === w.programExerciseId);
-                  const actualId = exIndex >= 0 && exIndex < exerciseIds.length ? exerciseIds[exIndex] : exerciseIds[i % exerciseIds.length];
-                  return { ...w, programExerciseId: actualId };
-                });
-                void remappedWeeks; // unused after rewrite
+                // w.programExerciseId is the array index (set by BlockBuilderModal), remap to actual DB IDs
+                const remappedWeeks = pendingBlockData.weeks.map(w => ({
+                  ...w,
+                  programExerciseId: exerciseIds[w.programExerciseId] ?? exerciseIds[0]
+                }));
                 await fetch(`${API_URL}/blocks/${responseData.programId}`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     blockDuration: pendingBlockData.duration,
                     startDate: new Date().toISOString().split('T')[0],
-                    exerciseWeeks: reorderedWeeks
+                    exerciseWeeks: remappedWeeks
                   })
                 });
               }
@@ -639,10 +626,9 @@ function App() {
             // If saving as template, do that now
             if (saveAsTemplate && loggedInUser?.id) {
               try {
-                const slotMap = new Map<number, number>();
-                programExercises.forEach((ex, i) => { if (ex.id) slotMap.set(ex.id, i); });
+                // w.programExerciseId is the array index (set by BlockBuilderModal)
                 const templateWeeks = exerciseWeeks.map(w => ({
-                  exerciseSlot: slotMap.get(w.programExerciseId) ?? 0,
+                  exerciseSlot: w.programExerciseId,
                   weekNumber: w.weekNumber,
                   sets: w.sets,
                   reps: w.reps,

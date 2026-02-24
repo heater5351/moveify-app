@@ -135,7 +135,7 @@ export const BlockBuilderModal = ({
       });
 
       const slots = Object.keys(slotMap).map(Number).sort((a, b) => a - b);
-      const newCells: Record<CellKey, CellData> = { ...cells };
+      const newCells: Record<CellKey, CellData> = {};
 
       slots.forEach((slot, idx) => {
         if (idx >= programExercises.length) return;
@@ -158,14 +158,13 @@ export const BlockBuilderModal = ({
   const buildExerciseWeeks = (): ExerciseWeekPrescription[] => {
     const weeks: ExerciseWeekPrescription[] = [];
     programExercises.forEach((ex, idx) => {
-      if (!ex.id) return;
       for (let week = 1; week <= blockDuration; week++) {
         const cell = getCell(idx, week);
         const sets = parseInt(cell.sets) || ex.sets || 3;
         const reps = parseInt(cell.reps) || ex.reps || 10;
         const rpe = parseInt(cell.rpe) || undefined;
         weeks.push({
-          programExerciseId: ex.id,
+          programExerciseId: idx,
           weekNumber: week,
           sets,
           reps,

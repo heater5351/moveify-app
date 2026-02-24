@@ -5,6 +5,130 @@ const templateService = require('../services/template-service');
 
 const router = express.Router();
 
+// ===== TEMPLATE ROUTES =====
+// Must be declared before /:programId wildcard routes to avoid being swallowed
+
+// Get templates (own + global)
+// GET /api/blocks/templates?clinicianId=X
+router.get('/templates', async (req, res) => {
+  try {
+    const { clinicianId } = req.query;
+    if (!clinicianId) {
+      return res.status(400).json({ error: 'clinicianId is required' });
+    }
+    const templates = await templateService.getTemplates(parseInt(clinicianId));
+    res.json({ templates });
+  } catch (error) {
+    console.error('Get templates error:', error);
+    res.status(500).json({ error: 'Failed to get templates' });
+  }
+});
+
+// Create a template
+// POST /api/blocks/templates
+router.post('/templates', async (req, res) => {
+  try {
+    const { name, description, blockDuration, weeks, clinicianId, isGlobal } = req.body;
+
+    if (!name || !blockDuration || !clinicianId) {
+      return res.status(400).json({ error: 'name, blockDuration, and clinicianId are required' });
+    }
+
+    const result = await templateService.createTemplate(
+      name, description, blockDuration, weeks || [], clinicianId, isGlobal || false
+    );
+    res.json({ message: 'Template created successfully', ...result });
+  } catch (error) {
+    console.error('Create template error:', error);
+    res.status(500).json({ error: 'Failed to create template' });
+  }
+});
+
+// Get a specific template with weeks
+// GET /api/blocks/templates/:id
+router.get('/templates/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const template = await templateService.getTemplate(parseInt(id));
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+    res.json(template);
+  } catch (error) {
+    console.error('Get template error:', error);
+    res.status(500).json({ error: 'Failed to get template' });
+  }
+});
+
+// Delete a template
+// DELETE /api/blocks/templates/:id
+router.delete('/templates/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { clinicianId } = req.body;
+
+    if (!clinicianId) {
+      return res.status(400).json({ error: 'clinicianId is required' });
+    }
+
+    await templateService.deleteTemplate(parseInt(id), parseInt(clinicianId));
+    res.json({ message: 'Template deleted successfully' });
+  } catch (error) {
+    console.error('Delete template error:', error);
+    res.status(500).json({ error: error.message || 'Failed to delete template' });
+  }
+});
+
+// Apply a template to a program's exercises
+// POST /api/blocks/templates/:id/apply
+router.post('/templates/:id/apply', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { programExerciseIds } = req.body;
+
+    if (!programExerciseIds || !Array.isArray(programExerciseIds)) {
+      return res.status(400).json({ error: 'programExerciseIds array is required' });
+    }
+
+    const result = await templateService.applyTemplate(parseInt(id), programExerciseIds);
+    res.json(result);
+  } catch (error) {
+    console.error('Apply template error:', error);
+    res.status(500).json({ error: error.message || 'Failed to apply template' });
+  }
+});
+
+// ===== FLAG ROUTES =====
+// Must be declared before /:programId wildcard routes
+
+// Get unresolved flags for a clinician
+// GET /api/blocks/flags/:clinicianId
+router.get('/flags/:clinicianId', async (req, res) => {
+  try {
+    const { clinicianId } = req.params;
+    const flags = await blockService.getUnresolvedFlags(parseInt(clinicianId));
+    res.json({ flags });
+  } catch (error) {
+    console.error('Get flags error:', error);
+    res.status(500).json({ error: 'Failed to get flags' });
+  }
+});
+
+// Resolve a flag
+// PATCH /api/blocks/flags/:flagId/resolve
+router.patch('/flags/:flagId/resolve', async (req, res) => {
+  try {
+    const { flagId } = req.params;
+    const { resolvedBy } = req.body;
+
+    await blockService.resolveFlag(parseInt(flagId), resolvedBy);
+    res.json({ message: 'Flag resolved successfully' });
+  } catch (error) {
+    console.error('Resolve flag error:', error);
+    res.status(500).json({ error: 'Failed to resolve flag' });
+  }
+});
+
 // ===== BLOCK ROUTES =====
 
 // Create a block for a program
@@ -121,128 +245,6 @@ router.patch('/:blockScheduleId/cell', async (req, res) => {
   } catch (error) {
     console.error('Override cell error:', error);
     res.status(500).json({ error: 'Failed to update cell' });
-  }
-});
-
-// ===== TEMPLATE ROUTES =====
-
-// Get templates (own + global)
-// GET /api/blocks/templates?clinicianId=X
-router.get('/templates', async (req, res) => {
-  try {
-    const { clinicianId } = req.query;
-    if (!clinicianId) {
-      return res.status(400).json({ error: 'clinicianId is required' });
-    }
-    const templates = await templateService.getTemplates(parseInt(clinicianId));
-    res.json({ templates });
-  } catch (error) {
-    console.error('Get templates error:', error);
-    res.status(500).json({ error: 'Failed to get templates' });
-  }
-});
-
-// Create a template
-// POST /api/blocks/templates
-router.post('/templates', async (req, res) => {
-  try {
-    const { name, description, blockDuration, weeks, clinicianId, isGlobal } = req.body;
-
-    if (!name || !blockDuration || !clinicianId) {
-      return res.status(400).json({ error: 'name, blockDuration, and clinicianId are required' });
-    }
-
-    const result = await templateService.createTemplate(
-      name, description, blockDuration, weeks || [], clinicianId, isGlobal || false
-    );
-    res.json({ message: 'Template created successfully', ...result });
-  } catch (error) {
-    console.error('Create template error:', error);
-    res.status(500).json({ error: 'Failed to create template' });
-  }
-});
-
-// Get a specific template with weeks
-// GET /api/blocks/templates/:id
-router.get('/templates/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const template = await templateService.getTemplate(parseInt(id));
-    if (!template) {
-      return res.status(404).json({ error: 'Template not found' });
-    }
-    res.json(template);
-  } catch (error) {
-    console.error('Get template error:', error);
-    res.status(500).json({ error: 'Failed to get template' });
-  }
-});
-
-// Delete a template
-// DELETE /api/blocks/templates/:id
-router.delete('/templates/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { clinicianId } = req.body;
-
-    if (!clinicianId) {
-      return res.status(400).json({ error: 'clinicianId is required' });
-    }
-
-    await templateService.deleteTemplate(parseInt(id), parseInt(clinicianId));
-    res.json({ message: 'Template deleted successfully' });
-  } catch (error) {
-    console.error('Delete template error:', error);
-    res.status(500).json({ error: error.message || 'Failed to delete template' });
-  }
-});
-
-// Apply a template to a program's exercises
-// POST /api/blocks/templates/:id/apply
-router.post('/templates/:id/apply', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { programExerciseIds } = req.body;
-
-    if (!programExerciseIds || !Array.isArray(programExerciseIds)) {
-      return res.status(400).json({ error: 'programExerciseIds array is required' });
-    }
-
-    const result = await templateService.applyTemplate(parseInt(id), programExerciseIds);
-    res.json(result);
-  } catch (error) {
-    console.error('Apply template error:', error);
-    res.status(500).json({ error: error.message || 'Failed to apply template' });
-  }
-});
-
-// ===== FLAG ROUTES =====
-
-// Get unresolved flags for a clinician
-// GET /api/blocks/flags/:clinicianId
-router.get('/flags/:clinicianId', async (req, res) => {
-  try {
-    const { clinicianId } = req.params;
-    const flags = await blockService.getUnresolvedFlags(parseInt(clinicianId));
-    res.json({ flags });
-  } catch (error) {
-    console.error('Get flags error:', error);
-    res.status(500).json({ error: 'Failed to get flags' });
-  }
-});
-
-// Resolve a flag
-// PATCH /api/blocks/flags/:flagId/resolve
-router.patch('/flags/:flagId/resolve', async (req, res) => {
-  try {
-    const { flagId } = req.params;
-    const { resolvedBy } = req.body;
-
-    await blockService.resolveFlag(parseInt(flagId), resolvedBy);
-    res.json({ message: 'Flag resolved successfully' });
-  } catch (error) {
-    console.error('Resolve flag error:', error);
-    res.status(500).json({ error: 'Failed to resolve flag' });
   }
 });
 
