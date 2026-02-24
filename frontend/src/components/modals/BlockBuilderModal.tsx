@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, ChevronDown, Save } from 'lucide-react';
+import { X, ChevronDown, Save, Settings } from 'lucide-react';
 import type { ProgramExercise, PeriodizationTemplate, ExerciseWeekPrescription } from '../../types/index.ts';
+import { TemplateManagerModal } from './TemplateManagerModal';
 import { API_URL } from '../../config';
 
 interface BlockBuilderModalProps {
@@ -33,6 +34,7 @@ export const BlockBuilderModal = ({
   const [cells, setCells] = useState<Record<CellKey, CellData>>({});
   const [templates, setTemplates] = useState<PeriodizationTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | ''>('');
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
@@ -185,6 +187,20 @@ export const BlockBuilderModal = ({
   const weeks = Array.from({ length: blockDuration }, (_, i) => i + 1);
 
   return (
+    <>
+    {showTemplateManager && (
+      <TemplateManagerModal
+        clinicianId={clinicianId}
+        onClose={() => {
+          setShowTemplateManager(false);
+          // Refresh templates after managing
+          fetch(`${API_URL}/blocks/templates?clinicianId=${clinicianId}`)
+            .then(r => r.ok ? r.json() : { templates: [] })
+            .then(d => setTemplates(d.templates || []))
+            .catch(() => {});
+        }}
+      />
+    )}
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl">
         {/* Header */}
@@ -221,8 +237,8 @@ export const BlockBuilderModal = ({
           </div>
 
           {/* Template picker */}
-          {templates.length > 0 && (
-            <div className="flex gap-2 items-end">
+          <div className="flex gap-2 items-end">
+            {templates.length > 0 && (
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Apply Template</label>
                 <div className="relative">
@@ -241,6 +257,8 @@ export const BlockBuilderModal = ({
                   <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
               </div>
+            )}
+            {templates.length > 0 && (
               <button
                 onClick={applyTemplate}
                 disabled={!selectedTemplateId}
@@ -248,8 +266,16 @@ export const BlockBuilderModal = ({
               >
                 Apply
               </button>
-            </div>
-          )}
+            )}
+            <button
+              onClick={() => setShowTemplateManager(true)}
+              className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg text-sm font-medium transition-colors"
+              title="Manage saved templates"
+            >
+              <Settings size={14} />
+              {templates.length === 0 ? 'Templates' : 'Manage'}
+            </button>
+          </div>
         </div>
 
         {/* Spreadsheet Grid */}
@@ -376,5 +402,6 @@ export const BlockBuilderModal = ({
         </div>
       </div>
     </div>
+    </>
   );
 };
