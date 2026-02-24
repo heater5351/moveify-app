@@ -334,6 +334,16 @@ async function initDatabase() {
       ADD COLUMN IF NOT EXISTS weight_performed REAL
     `);
 
+    // Add weight progression columns to templates
+    await db.query(`
+      ALTER TABLE periodization_templates
+      ADD COLUMN IF NOT EXISTS weight_unit TEXT DEFAULT NULL CHECK(weight_unit IN ('kg', 'percent'))
+    `);
+    await db.query(`
+      ALTER TABLE template_weeks
+      ADD COLUMN IF NOT EXISTS weight_offset REAL
+    `);
+
     // Add filter metadata columns to exercises table
     console.log('🔄 Adding exercise filter columns...');
     await db.query(`

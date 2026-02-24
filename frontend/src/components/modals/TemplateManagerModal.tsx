@@ -12,25 +12,28 @@ interface WeekData {
   sets: string;
   reps: string;
   rpe: string;
+  weightOffset: string;
 }
 
 interface TemplateFormData {
   name: string;
   description: string;
   blockDuration: 4 | 6 | 8;
+  weightUnit: 'kg' | 'percent';
   weeks: WeekData[];
 }
 
 interface TemplateWithWeeksData extends PeriodizationTemplate {
-  weeks?: { week_number: number; sets: number; reps: number; rpe_target?: number | null }[];
+  weeks?: { week_number: number; sets: number; reps: number; rpe_target?: number | null; weight_offset?: number | null }[];
 }
 
-const emptyWeek = (): WeekData => ({ sets: '3', reps: '10', rpe: '' });
+const emptyWeek = (): WeekData => ({ sets: '3', reps: '10', rpe: '', weightOffset: '' });
 
 const makeEmptyForm = (duration: 4 | 6 | 8 = 4): TemplateFormData => ({
   name: '',
   description: '',
   blockDuration: duration,
+  weightUnit: 'kg',
   weeks: Array.from({ length: duration }, emptyWeek)
 });
 
@@ -51,6 +54,7 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
     name: t.name as string,
     description: (t.description as string) || null,
     blockDuration: (t.block_duration || t.blockDuration) as 4 | 6 | 8,
+    weightUnit: (t.weight_unit || t.weightUnit || null) as 'kg' | 'percent' | null,
     createdBy: (t.created_by || t.createdBy) as number,
     isGlobal: (t.is_global ?? t.isGlobal ?? false) as boolean,
     createdAt: (t.created_at || t.createdAt || '') as string,
@@ -136,9 +140,10 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
       name: template.name,
       description: template.description || '',
       blockDuration: template.blockDuration,
+      weightUnit: template.weightUnit || 'kg',
       weeks: Array.from({ length: template.blockDuration }, (_, i) => {
         const w = weeks!.find((wk: { week_number: number }) => wk.week_number === i + 1);
-        return w ? { sets: String(w.sets), reps: String(w.reps), rpe: w.rpe_target ? String(w.rpe_target) : '' } : emptyWeek();
+        return w ? { sets: String(w.sets), reps: String(w.reps), rpe: w.rpe_target ? String(w.rpe_target) : '', weightOffset: w.weight_offset != null ? String(w.weight_offset) : '' } : emptyWeek();
       })
     });
   };
@@ -166,7 +171,8 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
         weekNumber: i + 1,
         sets: parseInt(w.sets) || 3,
         reps: parseInt(w.reps) || 10,
-        rpeTarget: parseInt(w.rpe) || null
+        rpeTarget: parseInt(w.rpe) || null,
+        weightOffset: w.weightOffset !== '' ? parseFloat(w.weightOffset) : null
       }));
       const res = await fetch(`${API_URL}/blocks/templates/${editingId}`, {
         method: 'PUT',
@@ -175,6 +181,7 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
           name: editForm.name.trim(),
           description: editForm.description.trim() || null,
           blockDuration: editForm.blockDuration,
+          weightUnit: editForm.weightUnit,
           weeks,
           clinicianId
         })
@@ -202,7 +209,8 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
         weekNumber: i + 1,
         sets: parseInt(w.sets) || 3,
         reps: parseInt(w.reps) || 10,
-        rpeTarget: parseInt(w.rpe) || null
+        rpeTarget: parseInt(w.rpe) || null,
+        weightOffset: w.weightOffset !== '' ? parseFloat(w.weightOffset) : null
       }));
       const res = await fetch(`${API_URL}/blocks/templates`, {
         method: 'POST',
@@ -211,6 +219,7 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
           name: createForm.name.trim(),
           description: createForm.description.trim() || null,
           blockDuration: createForm.blockDuration,
+          weightUnit: createForm.weightUnit,
           weeks,
           clinicianId
         })
@@ -264,12 +273,19 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
                 placeholder="RPE" title="RPE Target"
                 className="w-14 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 text-amber-700"
               />
+              <input
+                type="number" step="0.5" value={w.weightOffset}
+                onChange={e => updateWeekField(form, setForm, i, 'weightOffset', e.target.value)}
+                placeholder={form.weightUnit === 'kg' ? '+wt' : '+%'}
+                title={`Weight offset (${form.weightUnit === 'kg' ? 'kg' : '%'})`}
+                className="w-14 px-1.5 py-1 border border-emerald-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 text-emerald-700 bg-emerald-50/50"
+              />
             </div>
           </div>
         ))}
       </div>
       <div className="flex gap-4 mt-1 text-[10px] text-slate-400">
-        <span>Sets</span><span>Reps</span><span>RPE</span>
+        <span>Sets</span><span>Reps</span><span>RPE</span><span className="text-emerald-500">Wt offset</span>
       </div>
     </div>
   );
@@ -292,12 +308,31 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
     </div>
   );
 
-  const formatWeekSummary = (weeks: { week_number: number; sets: number; reps: number; rpe_target?: number | null }[]) => {
+  const renderWeightUnitPicker = (
+    current: 'kg' | 'percent',
+    onChange: (u: 'kg' | 'percent') => void
+  ) => (
+    <div className="flex gap-1.5">
+      {([['kg', 'kg (+/-)'], ['percent', '% (+/-)']] as const).map(([val, label]) => (
+        <button
+          key={val} onClick={() => onChange(val)}
+          className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+            current === val ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const formatWeekSummary = (weeks: { week_number: number; sets: number; reps: number; rpe_target?: number | null; weight_offset?: number | null }[], weightUnit?: 'kg' | 'percent' | null) => {
     return weeks
       .sort((a, b) => a.week_number - b.week_number)
       .map(w => {
-        const rpe = w.rpe_target ? ` @${w.rpe_target}` : '';
-        return `W${w.week_number}: ${w.sets}x${w.reps}${rpe}`;
+        const rpe = w.rpe_target ? ` @RPE${w.rpe_target}` : '';
+        const wt = w.weight_offset != null ? ` ${w.weight_offset >= 0 ? '+' : ''}${w.weight_offset}${weightUnit === 'percent' ? '%' : 'kg'}` : '';
+        return `W${w.week_number}: ${w.sets}x${w.reps}${rpe}${wt}`;
       })
       .join('  |  ');
   };
@@ -370,9 +405,11 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
                     className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400"
                   />
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <span className="text-xs font-medium text-slate-500">Duration:</span>
                   {renderDurationPicker(editForm.blockDuration, handleEditDurationChange)}
+                  <span className="text-xs font-medium text-slate-500 ml-2">Weight mode:</span>
+                  {renderWeightUnitPicker(editForm.weightUnit, (u) => setEditForm({ ...editForm, weightUnit: u }))}
                 </div>
                 {renderWeekInputs(editForm, (f) => setEditForm(f))}
                 <div className="flex gap-2 pt-1">
@@ -397,7 +434,7 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
               <div className="pt-3">
                 {t.weeks ? (
                   <p className="text-xs text-slate-600 font-mono leading-relaxed">
-                    {formatWeekSummary(t.weeks)}
+                    {formatWeekSummary(t.weeks, t.weightUnit)}
                   </p>
                 ) : (
                   <p className="text-xs text-slate-400 italic">Loading...</p>
@@ -449,9 +486,11 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
                   className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 bg-white"
                 />
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-xs font-medium text-slate-500">Duration:</span>
                 {renderDurationPicker(createForm.blockDuration, handleCreateDurationChange)}
+                <span className="text-xs font-medium text-slate-500 ml-2">Weight mode:</span>
+                {renderWeightUnitPicker(createForm.weightUnit, (u) => setCreateForm({ ...createForm, weightUnit: u }))}
               </div>
               {renderWeekInputs(createForm, setCreateForm)}
               <div className="flex gap-2 pt-1">

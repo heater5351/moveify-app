@@ -6,7 +6,7 @@ const db = require('../database/db');
  */
 async function getTemplates(clinicianId) {
   return db.getAll(`
-    SELECT id, name, description, block_duration, created_by, is_global, created_at, updated_at
+    SELECT id, name, description, block_duration, weight_unit, created_by, is_global, created_at, updated_at
     FROM periodization_templates
     WHERE created_by = $1 OR is_global = TRUE
     ORDER BY is_global DESC, created_at DESC
@@ -17,27 +17,27 @@ async function getTemplates(clinicianId) {
  * Create a new template with week data.
  * weeks: [{ weekNumber, sets, reps, rpeTarget, notes }]
  */
-async function createTemplate(name, description, blockDuration, weeks, clinicianId, isGlobal = false) {
+async function createTemplate(name, description, blockDuration, weeks, clinicianId, isGlobal = false, weightUnit = null) {
   const client = await db.getClient();
   try {
     await client.query('BEGIN');
 
     const result = await client.query(`
-      INSERT INTO periodization_templates (name, description, block_duration, created_by, is_global)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO periodization_templates (name, description, block_duration, created_by, is_global, weight_unit)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id
-    `, [name, description || null, blockDuration, clinicianId, isGlobal]);
+    `, [name, description || null, blockDuration, clinicianId, isGlobal, weightUnit || null]);
 
     const templateId = result.rows[0].id;
 
     for (const w of weeks) {
       await client.query(`
-        INSERT INTO template_weeks (template_id, week_number, sets, reps, rpe_target, notes)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO template_weeks (template_id, week_number, sets, reps, rpe_target, notes, weight_offset)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (template_id, week_number)
         DO UPDATE SET sets = EXCLUDED.sets, reps = EXCLUDED.reps,
-          rpe_target = EXCLUDED.rpe_target, notes = EXCLUDED.notes
-      `, [templateId, w.weekNumber, w.sets, w.reps, w.rpeTarget || null, w.notes || null]);
+          rpe_target = EXCLUDED.rpe_target, notes = EXCLUDED.notes, weight_offset = EXCLUDED.weight_offset
+      `, [templateId, w.weekNumber, w.sets, w.reps, w.rpeTarget || null, w.notes || null, w.weightOffset != null ? w.weightOffset : null]);
     }
 
     await client.query('COMMIT');
@@ -71,7 +71,7 @@ async function getTemplate(templateId) {
 /**
  * Update an existing template (name, description, duration, weeks).
  */
-async function updateTemplate(templateId, name, description, blockDuration, weeks, clinicianId) {
+async function updateTemplate(templateId, name, description, blockDuration, weeks, clinicianId, weightUnit = null) {
   const template = await db.getOne(
     `SELECT created_by FROM periodization_templates WHERE id = $1`,
     [templateId]
@@ -85,18 +85,18 @@ async function updateTemplate(templateId, name, description, blockDuration, week
 
     await client.query(`
       UPDATE periodization_templates
-      SET name = $1, description = $2, block_duration = $3, updated_at = NOW()
-      WHERE id = $4
-    `, [name, description || null, blockDuration, templateId]);
+      SET name = $1, description = $2, block_duration = $3, weight_unit = $4, updated_at = NOW()
+      WHERE id = $5
+    `, [name, description || null, blockDuration, weightUnit || null, templateId]);
 
     // Delete old weeks and insert new ones
     await client.query(`DELETE FROM template_weeks WHERE template_id = $1`, [templateId]);
 
     for (const w of weeks) {
       await client.query(`
-        INSERT INTO template_weeks (template_id, week_number, sets, reps, rpe_target, notes)
-        VALUES ($1, $2, $3, $4, $5, $6)
-      `, [templateId, w.weekNumber, w.sets, w.reps, w.rpeTarget || null, w.notes || null]);
+        INSERT INTO template_weeks (template_id, week_number, sets, reps, rpe_target, notes, weight_offset)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [templateId, w.weekNumber, w.sets, w.reps, w.rpeTarget || null, w.notes || null, w.weightOffset != null ? w.weightOffset : null]);
     }
 
     await client.query('COMMIT');
@@ -118,11 +118,13 @@ async function applyTemplate(templateId) {
 
   return {
     blockDuration: template.block_duration,
+    weightUnit: template.weight_unit || null,
     weeks: template.weeks.map(w => ({
       weekNumber: w.week_number,
       sets: w.sets,
       reps: w.reps,
-      rpeTarget: w.rpe_target
+      rpeTarget: w.rpe_target,
+      weightOffset: w.weight_offset != null ? w.weight_offset : null
     }))
   };
 }

@@ -52,9 +52,9 @@ async function createBlock(programId, blockDuration, startDate, exerciseWeeks) {
       for (const cell of week1Cells) {
         await client.query(`
           UPDATE program_exercises
-          SET sets = $1, reps = $2
-          WHERE id = $3
-        `, [cell.sets, cell.reps, cell.programExerciseId]);
+          SET sets = $1, reps = $2, prescribed_weight = COALESCE($3, prescribed_weight)
+          WHERE id = $4
+        `, [cell.sets, cell.reps, cell.weight || null, cell.programExerciseId]);
       }
     }
 
@@ -279,15 +279,15 @@ async function evaluateProgression(programId) {
 
       // Apply final week's prescription
       const finalCells = await db.getAll(`
-        SELECT program_exercise_id, sets, reps
+        SELECT program_exercise_id, sets, reps, weight
         FROM exercise_block_weeks
         WHERE block_schedule_id = $1 AND week_number = $2
       `, [block.id, block.block_duration]);
 
       for (const cell of finalCells) {
         await client.query(
-          `UPDATE program_exercises SET sets = $1, reps = $2 WHERE id = $3`,
-          [cell.sets, cell.reps, cell.program_exercise_id]
+          `UPDATE program_exercises SET sets = $1, reps = $2, prescribed_weight = COALESCE($3, prescribed_weight) WHERE id = $4`,
+          [cell.sets, cell.reps, cell.weight, cell.program_exercise_id]
         );
       }
 
@@ -304,15 +304,15 @@ async function evaluateProgression(programId) {
 
       // Apply new week's prescription to program_exercises
       const newCells = await db.getAll(`
-        SELECT program_exercise_id, sets, reps
+        SELECT program_exercise_id, sets, reps, weight
         FROM exercise_block_weeks
         WHERE block_schedule_id = $1 AND week_number = $2
       `, [block.id, advancedToWeek]);
 
       for (const cell of newCells) {
         await client.query(
-          `UPDATE program_exercises SET sets = $1, reps = $2 WHERE id = $3`,
-          [cell.sets, cell.reps, cell.program_exercise_id]
+          `UPDATE program_exercises SET sets = $1, reps = $2, prescribed_weight = COALESCE($3, prescribed_weight) WHERE id = $4`,
+          [cell.sets, cell.reps, cell.weight, cell.program_exercise_id]
         );
       }
     }
@@ -363,15 +363,15 @@ async function manualOverride(programId, action) {
     // Apply new week's prescription
     if (newWeek !== block.current_week) {
       const cells = await db.getAll(`
-        SELECT program_exercise_id, sets, reps
+        SELECT program_exercise_id, sets, reps, weight
         FROM exercise_block_weeks
         WHERE block_schedule_id = $1 AND week_number = $2
       `, [block.id, newWeek]);
 
       for (const cell of cells) {
         await client.query(
-          `UPDATE program_exercises SET sets = $1, reps = $2 WHERE id = $3`,
-          [cell.sets, cell.reps, cell.program_exercise_id]
+          `UPDATE program_exercises SET sets = $1, reps = $2, prescribed_weight = COALESCE($3, prescribed_weight) WHERE id = $4`,
+          [cell.sets, cell.reps, cell.weight, cell.program_exercise_id]
         );
       }
     }

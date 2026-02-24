@@ -133,6 +133,7 @@ export type PeriodizationTemplate = {
   name: string;
   description: string | null;
   blockDuration: 4 | 6 | 8;
+  weightUnit?: 'kg' | 'percent' | null;
   createdBy: number;
   isGlobal: boolean;
   createdAt: string;
@@ -146,6 +147,7 @@ export type TemplateWeek = {
   sets: number;
   reps: number;
   rpeTarget?: number | null;
+  weightOffset?: number | null;
   notes?: string | null;
 }
 

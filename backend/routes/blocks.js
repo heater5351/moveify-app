@@ -28,14 +28,14 @@ router.get('/templates', async (req, res) => {
 // POST /api/blocks/templates
 router.post('/templates', async (req, res) => {
   try {
-    const { name, description, blockDuration, weeks, clinicianId, isGlobal } = req.body;
+    const { name, description, blockDuration, weeks, clinicianId, isGlobal, weightUnit } = req.body;
 
     if (!name || !blockDuration || !clinicianId) {
       return res.status(400).json({ error: 'name, blockDuration, and clinicianId are required' });
     }
 
     const result = await templateService.createTemplate(
-      name, description, blockDuration, weeks || [], clinicianId, isGlobal || false
+      name, description, blockDuration, weeks || [], clinicianId, isGlobal || false, weightUnit || null
     );
     res.json({ message: 'Template created successfully', ...result });
   } catch (error) {
@@ -65,14 +65,14 @@ router.get('/templates/:id', async (req, res) => {
 router.put('/templates/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, blockDuration, weeks, clinicianId } = req.body;
+    const { name, description, blockDuration, weeks, clinicianId, weightUnit } = req.body;
 
     if (!name || !blockDuration || !clinicianId) {
       return res.status(400).json({ error: 'name, blockDuration, and clinicianId are required' });
     }
 
     const result = await templateService.updateTemplate(
-      parseInt(id), name, description, blockDuration, weeks || [], parseInt(clinicianId)
+      parseInt(id), name, description, blockDuration, weeks || [], parseInt(clinicianId), weightUnit || null
     );
     res.json({ message: 'Template updated successfully', ...result });
   } catch (error) {
