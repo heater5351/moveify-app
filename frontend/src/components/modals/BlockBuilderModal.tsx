@@ -67,13 +67,25 @@ export const BlockBuilderModal = ({
     setCells(initial);
   }, []);
 
+  // Map snake_case API response to camelCase frontend types
+  const mapTemplate = (t: Record<string, unknown>): PeriodizationTemplate => ({
+    id: t.id as number,
+    name: t.name as string,
+    description: (t.description as string) || null,
+    blockDuration: (t.block_duration || t.blockDuration) as 4 | 6 | 8,
+    createdBy: (t.created_by || t.createdBy) as number,
+    isGlobal: (t.is_global ?? t.isGlobal ?? false) as boolean,
+    createdAt: (t.created_at || t.createdAt || '') as string,
+    updatedAt: (t.updated_at || t.updatedAt || '') as string,
+  });
+
   // Fetch templates
   const fetchTemplates = async () => {
     try {
       const res = await fetch(`${API_URL}/blocks/templates?clinicianId=${clinicianId}`);
       if (res.ok) {
         const data = await res.json();
-        setTemplates(data.templates || []);
+        setTemplates((data.templates || []).map(mapTemplate));
       }
     } catch {
       // Templates are optional

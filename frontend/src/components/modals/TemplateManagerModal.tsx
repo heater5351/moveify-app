@@ -45,13 +45,25 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
   const [createForm, setCreateForm] = useState<TemplateFormData>(makeEmptyForm());
   const [saving, setSaving] = useState(false);
 
+  // Map snake_case API response to camelCase frontend types
+  const mapTemplate = (t: Record<string, unknown>): TemplateWithWeeksData => ({
+    id: t.id as number,
+    name: t.name as string,
+    description: (t.description as string) || null,
+    blockDuration: (t.block_duration || t.blockDuration) as 4 | 6 | 8,
+    createdBy: (t.created_by || t.createdBy) as number,
+    isGlobal: (t.is_global ?? t.isGlobal ?? false) as boolean,
+    createdAt: (t.created_at || t.createdAt || '') as string,
+    updatedAt: (t.updated_at || t.updatedAt || '') as string,
+  });
+
   const fetchTemplates = async () => {
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/blocks/templates?clinicianId=${clinicianId}`);
       if (res.ok) {
         const data = await res.json();
-        setTemplates(data.templates || []);
+        setTemplates((data.templates || []).map(mapTemplate));
       }
     } catch {
       // Ignore
