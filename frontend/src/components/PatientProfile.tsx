@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown } from 'lucide-react';
-import type { Patient, ClinicianFlag } from '../types/index.ts';
+import type { Patient, ClinicianFlag, BlockStatusResponse } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
 import { AssignEducationModal } from './modals/AssignEducationModal';
@@ -23,6 +23,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
   const [educationModulesRefreshKey, setEducationModulesRefreshKey] = useState(0);
   const [flags, setFlags] = useState<ClinicianFlag[]>([]);
   const [showFlags, setShowFlags] = useState(false);
+  const [blockMap, setBlockMap] = useState<Record<number, BlockStatusResponse>>({});
 
   // Fetch unresolved flags for this patient's programs
   useEffect(() => {
@@ -42,6 +43,40 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
     };
     fetchFlags();
   }, [clinicianId, patient.id]);
+
+  // Fetch block status for each program
+  useEffect(() => {
+    const programs = patient.assignedPrograms || [];
+    if (programs.length === 0) return;
+    const fetchBlocks = async () => {
+      const results: Record<number, BlockStatusResponse> = {};
+      await Promise.all(
+        programs.map(async (p) => {
+          const pid = p.config.id;
+          if (!pid) return;
+          try {
+            const res = await fetch(`${API_URL}/blocks/${pid}`);
+            if (res.ok) {
+              const data = await res.json();
+              results[pid] = {
+                hasBlock: data.has_block ?? data.hasBlock ?? false,
+                id: data.id,
+                programId: data.program_id ?? data.programId,
+                blockDuration: data.block_duration ?? data.blockDuration,
+                startDate: data.start_date ?? data.startDate,
+                currentWeek: data.current_week ?? data.currentWeek,
+                status: data.status,
+              };
+            }
+          } catch {
+            // Silent — block features just won't render
+          }
+        })
+      );
+      setBlockMap(results);
+    };
+    fetchBlocks();
+  }, [patient.assignedPrograms]);
 
   const handleResolveFlag = async (flagId: number) => {
     try {
@@ -235,6 +270,17 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
                         <p className="text-xs text-primary-500 mt-0.5">
                           {program.config.frequency.join(', ')} · {program.config.duration}
                         </p>
+                        {program.config.id && blockMap[program.config.id]?.hasBlock && (
+                          <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${
+                            blockMap[program.config.id].status === 'active'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : blockMap[program.config.id].status === 'paused'
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            Wk {blockMap[program.config.id].currentWeek}/{blockMap[program.config.id].blockDuration} · {blockMap[program.config.id].status && blockMap[program.config.id].status!.charAt(0).toUpperCase() + blockMap[program.config.id].status!.slice(1)}
+                          </span>
+                        )}
                       </button>
                       <div className="flex items-center gap-1 ml-4">
                         <button

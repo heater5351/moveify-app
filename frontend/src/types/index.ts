@@ -211,3 +211,25 @@ export type PatientEducationModule = EducationModule & {
   viewed: boolean;
   viewedAt: string | null;
 }
+
+export type BlockStatusResponse = {
+  hasBlock: boolean;
+  id?: number;
+  programId?: number;
+  blockDuration?: number;
+  startDate?: string;
+  currentWeek?: number;
+  status?: 'active' | 'completed' | 'paused';
+  weeks?: BlockWeekRow[];
+}
+
+export type BlockWeekRow = {
+  programExerciseId: number;
+  exerciseName: string;
+  weekNumber: number;
+  sets: number;
+  reps: number;
+  rpeTarget?: number | null;
+  weight?: number | null;
+  notes?: string | null;
+}
