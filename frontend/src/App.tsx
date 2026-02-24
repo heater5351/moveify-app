@@ -197,30 +197,43 @@ function App() {
       if (response.ok) {
         const responseData = await response.json();
 
-        // If a block was configured, create it now with the new program's exercise IDs
-        if (!isEditing && pendingBlockData && responseData.programId) {
+        // If a block was configured, create/update it with the program's exercise IDs
+        if (pendingBlockData && responseData.programId) {
           try {
-            // Fetch the newly created program to get exercise IDs
-            const progRes = await fetch(`${API_URL}/programs/patient/${selectedPatient.id}`);
-            if (progRes.ok) {
-              const progData = await progRes.json();
-              if (progData.program && progData.program.exercises) {
-                const exerciseIds = progData.program.exercises.map((e: { id: number }) => e.id);
-                // w.programExerciseId is the array index (set by BlockBuilderModal), remap to actual DB IDs
-                const remappedWeeks = pendingBlockData.weeks.map(w => ({
-                  ...w,
-                  programExerciseId: exerciseIds[w.programExerciseId] ?? exerciseIds[0]
-                }));
-                await fetch(`${API_URL}/blocks/${responseData.programId}`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    blockDuration: pendingBlockData.duration,
-                    startDate: new Date().toISOString().split('T')[0],
-                    exerciseWeeks: remappedWeeks
-                  })
-                });
+            const targetProgramId = responseData.programId;
+
+            // For editing, exercises already have DB IDs; for new, fetch to get them
+            let exerciseIds: number[] = [];
+            if (isEditing) {
+              exerciseIds = programExercises.map(e => e.id).filter((id): id is number => id !== undefined);
+            }
+
+            if (!isEditing || exerciseIds.length === 0) {
+              // Fetch the newly created program to get exercise IDs
+              const progRes = await fetch(`${API_URL}/programs/patient/${selectedPatient.id}`);
+              if (progRes.ok) {
+                const progData = await progRes.json();
+                if (progData.program && progData.program.exercises) {
+                  exerciseIds = progData.program.exercises.map((e: { id: number }) => e.id);
+                }
               }
+            }
+
+            if (exerciseIds.length > 0) {
+              // w.programExerciseId is the array index (set by BlockBuilderModal), remap to actual DB IDs
+              const remappedWeeks = pendingBlockData.weeks.map(w => ({
+                ...w,
+                programExerciseId: exerciseIds[w.programExerciseId] ?? exerciseIds[0]
+              }));
+              await fetch(`${API_URL}/blocks/${targetProgramId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  blockDuration: pendingBlockData.duration,
+                  startDate: new Date().toISOString().split('T')[0],
+                  exerciseWeeks: remappedWeeks
+                })
+              });
             }
           } catch (blockError) {
             console.error('Failed to create block (program still saved):', blockError);
@@ -295,6 +308,28 @@ function App() {
       duration: program.config.duration,
       customEndDate: program.config.customEndDate || ''
     });
+    // Fetch existing block data for this program
+    setPendingBlockData(null);
+    if (program.config.id) {
+      fetch(`${API_URL}/blocks/${program.config.id}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data && (data.has_block || data.hasBlock)) {
+            const duration = data.block_duration ?? data.blockDuration;
+            const weeks = (data.weeks || []).map((w: Record<string, unknown>) => ({
+              programExerciseId: w.program_exercise_id ?? w.programExerciseId,
+              weekNumber: w.week_number ?? w.weekNumber,
+              sets: w.sets,
+              reps: w.reps,
+              rpeTarget: w.rpe_target ?? w.rpeTarget ?? null,
+              weight: w.weight ?? null,
+              notes: w.notes ?? null,
+            }));
+            setPendingBlockData({ duration, weeks });
+          }
+        })
+        .catch(() => {});
+    }
     // Navigate to Program Builder tab (exercise library)
     setCurrentPage('exercises');
     setViewingPatient(null);
