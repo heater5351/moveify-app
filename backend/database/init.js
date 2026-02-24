@@ -261,19 +261,29 @@ async function initDatabase() {
       )
     `);
 
-    // Week structure per template
+    // Week structure per template (single-exercise progression pattern)
     await db.query(`
       CREATE TABLE IF NOT EXISTS template_weeks (
         id            SERIAL PRIMARY KEY,
         template_id   INTEGER NOT NULL REFERENCES periodization_templates(id) ON DELETE CASCADE,
-        exercise_slot INTEGER NOT NULL,
         week_number   INTEGER NOT NULL CHECK(week_number BETWEEN 1 AND 8),
         sets          INTEGER NOT NULL,
         reps          INTEGER NOT NULL,
         rpe_target    INTEGER CHECK(rpe_target BETWEEN 1 AND 10),
         notes         TEXT,
-        UNIQUE(template_id, exercise_slot, week_number)
+        UNIQUE(template_id, week_number)
       )
+    `);
+
+    // Migration: drop exercise_slot if it exists (templates are now single-exercise progressions)
+    await db.query(`ALTER TABLE template_weeks DROP COLUMN IF EXISTS exercise_slot`);
+    await db.query(`ALTER TABLE template_weeks DROP CONSTRAINT IF EXISTS template_weeks_template_id_exercise_slot_week_number_key`);
+    await db.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'template_weeks_template_id_week_number_key') THEN
+          ALTER TABLE template_weeks ADD CONSTRAINT template_weeks_template_id_week_number_key UNIQUE(template_id, week_number);
+        END IF;
+      END $$
     `);
 
     // Clinician alert flags

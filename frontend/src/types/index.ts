@@ -142,12 +142,16 @@ export type PeriodizationTemplate = {
 export type TemplateWeek = {
   id: number;
   templateId: number;
-  exerciseSlot: number;
   weekNumber: number;
   sets: number;
   reps: number;
   rpeTarget?: number | null;
   notes?: string | null;
+}
+
+// Convenience type for template with weeks loaded
+export type TemplateWithWeeks = PeriodizationTemplate & {
+  weeks: TemplateWeek[];
 }
 
 export type ClinicianFlag = {

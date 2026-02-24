@@ -60,6 +60,27 @@ router.get('/templates/:id', async (req, res) => {
   }
 });
 
+// Update a template
+// PUT /api/blocks/templates/:id
+router.put('/templates/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, blockDuration, weeks, clinicianId } = req.body;
+
+    if (!name || !blockDuration || !clinicianId) {
+      return res.status(400).json({ error: 'name, blockDuration, and clinicianId are required' });
+    }
+
+    const result = await templateService.updateTemplate(
+      parseInt(id), name, description, blockDuration, weeks || [], parseInt(clinicianId)
+    );
+    res.json({ message: 'Template updated successfully', ...result });
+  } catch (error) {
+    console.error('Update template error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update template' });
+  }
+});
+
 // Delete a template
 // DELETE /api/blocks/templates/:id
 router.delete('/templates/:id', async (req, res) => {
@@ -79,18 +100,12 @@ router.delete('/templates/:id', async (req, res) => {
   }
 });
 
-// Apply a template to a program's exercises
+// Apply a template — returns exercise-agnostic progression data
 // POST /api/blocks/templates/:id/apply
 router.post('/templates/:id/apply', async (req, res) => {
   try {
     const { id } = req.params;
-    const { programExerciseIds } = req.body;
-
-    if (!programExerciseIds || !Array.isArray(programExerciseIds)) {
-      return res.status(400).json({ error: 'programExerciseIds array is required' });
-    }
-
-    const result = await templateService.applyTemplate(parseInt(id), programExerciseIds);
+    const result = await templateService.applyTemplate(parseInt(id));
     res.json(result);
   } catch (error) {
     console.error('Apply template error:', error);

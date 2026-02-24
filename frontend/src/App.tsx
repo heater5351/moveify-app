@@ -620,36 +620,9 @@ function App() {
           initialDuration={(pendingBlockData?.duration as 4 | 6 | 8) || 4}
           initialWeeks={pendingBlockData?.weeks || []}
           onClose={() => setShowBlockBuilderModal(false)}
-          onSave={async (blockDuration, exerciseWeeks, saveAsTemplate) => {
+          onSave={(blockDuration, exerciseWeeks) => {
             setPendingBlockData({ duration: blockDuration, weeks: exerciseWeeks });
             setShowBlockBuilderModal(false);
-            // If saving as template, do that now
-            if (saveAsTemplate && loggedInUser?.id) {
-              try {
-                // w.programExerciseId is the array index (set by BlockBuilderModal)
-                const templateWeeks = exerciseWeeks.map(w => ({
-                  exerciseSlot: w.programExerciseId,
-                  weekNumber: w.weekNumber,
-                  sets: w.sets,
-                  reps: w.reps,
-                  rpeTarget: w.rpeTarget
-                }));
-                await fetch(`${API_URL}/blocks/templates`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    name: saveAsTemplate.name,
-                    description: saveAsTemplate.description,
-                    blockDuration,
-                    weeks: templateWeeks,
-                    clinicianId: loggedInUser.id
-                  })
-                });
-                setNotification({ message: `Template "${saveAsTemplate.name}" saved!`, type: 'success' });
-              } catch {
-                setNotification({ message: 'Block saved but template save failed', type: 'error' });
-              }
-            }
           }}
         />
       )}

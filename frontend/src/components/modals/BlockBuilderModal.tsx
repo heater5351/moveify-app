@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ChevronDown, Save, Settings } from 'lucide-react';
+import { X, ChevronDown, Settings } from 'lucide-react';
 import type { ProgramExercise, PeriodizationTemplate, ExerciseWeekPrescription } from '../../types/index.ts';
 import { TemplateManagerModal } from './TemplateManagerModal';
 import { API_URL } from '../../config';
@@ -8,7 +8,7 @@ interface BlockBuilderModalProps {
   programExercises: ProgramExercise[];
   clinicianId: number;
   onClose: () => void;
-  onSave: (blockDuration: number, exerciseWeeks: ExerciseWeekPrescription[], saveAsTemplate?: { name: string; description: string }) => void;
+  onSave: (blockDuration: number, exerciseWeeks: ExerciseWeekPrescription[]) => void;
   // Pre-existing block data for editing
   initialDuration?: 4 | 6 | 8;
   initialWeeks?: ExerciseWeekPrescription[];
@@ -34,10 +34,8 @@ export const BlockBuilderModal = ({
   const [cells, setCells] = useState<Record<CellKey, CellData>>({});
   const [templates, setTemplates] = useState<PeriodizationTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | ''>('');
+  const [rowTemplateIds, setRowTemplateIds] = useState<Record<number, number | ''>>({});
   const [showTemplateManager, setShowTemplateManager] = useState(false);
-  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
-  const [templateName, setTemplateName] = useState('');
-  const [templateDescription, setTemplateDescription] = useState('');
 
   // Initialize cells from initialWeeks or defaults
   useEffect(() => {
@@ -70,18 +68,19 @@ export const BlockBuilderModal = ({
   }, []);
 
   // Fetch templates
-  useEffect(() => {
-    const fetchTemplates = async () => {
-      try {
-        const res = await fetch(`${API_URL}/blocks/templates?clinicianId=${clinicianId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setTemplates(data.templates || []);
-        }
-      } catch {
-        // Templates are optional
+  const fetchTemplates = async () => {
+    try {
+      const res = await fetch(`${API_URL}/blocks/templates?clinicianId=${clinicianId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTemplates(data.templates || []);
       }
-    };
+    } catch {
+      // Templates are optional
+    }
+  };
+
+  useEffect(() => {
     fetchTemplates();
   }, [clinicianId]);
 
@@ -115,44 +114,53 @@ export const BlockBuilderModal = ({
     }
   };
 
-  const applyTemplate = async () => {
-    if (!selectedTemplateId) return;
+  // Apply a template's progression to specific exercise rows
+  const applyTemplateToRows = async (templateId: number, exerciseIndices: number[]) => {
     try {
-      const res = await fetch(`${API_URL}/blocks/templates/${selectedTemplateId}`);
-      if (!res.ok) return;
-      const template = await res.json();
-
-      if (!template.weeks || template.weeks.length === 0) return;
-
-      // Set duration to match template
-      setBlockDuration(template.block_duration as 4 | 6 | 8);
-
-      // Group weeks by exercise_slot
-      const slotMap: Record<number, typeof template.weeks> = {};
-      template.weeks.forEach((w: { exercise_slot: number; week_number: number; sets: number; reps: number; rpe_target?: number }) => {
-        if (!slotMap[w.exercise_slot]) slotMap[w.exercise_slot] = [];
-        slotMap[w.exercise_slot].push(w);
+      const res = await fetch(`${API_URL}/blocks/templates/${templateId}/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
       });
+      if (!res.ok) return;
+      const data = await res.json();
 
-      const slots = Object.keys(slotMap).map(Number).sort((a, b) => a - b);
+      if (!data.weeks || data.weeks.length === 0) return;
+
+      // Optionally match block duration
+      if (data.blockDuration && [4, 6, 8].includes(data.blockDuration)) {
+        setBlockDuration(data.blockDuration as 4 | 6 | 8);
+      }
+
       const newCells: Record<CellKey, CellData> = {};
-
-      slots.forEach((slot, idx) => {
-        if (idx >= programExercises.length) return;
-        slotMap[slot].forEach((w: { week_number: number; sets: number; reps: number; rpe_target?: number }) => {
-          const key: CellKey = `${idx}-${w.week_number}`;
+      exerciseIndices.forEach(idx => {
+        data.weeks.forEach((w: { weekNumber: number; sets: number; reps: number; rpeTarget?: number | null }) => {
+          const key: CellKey = `${idx}-${w.weekNumber}`;
           newCells[key] = {
             sets: String(w.sets),
             reps: String(w.reps),
-            rpe: w.rpe_target ? String(w.rpe_target) : ''
+            rpe: w.rpeTarget ? String(w.rpeTarget) : ''
           };
         });
       });
 
-      setCells(newCells);
+      setCells(prev => ({ ...prev, ...newCells }));
     } catch {
       // Silently ignore template load errors
     }
+  };
+
+  // Apply template to ALL exercises
+  const handleApplyToAll = async () => {
+    if (!selectedTemplateId) return;
+    const allIndices = programExercises.map((_, i) => i);
+    await applyTemplateToRows(Number(selectedTemplateId), allIndices);
+  };
+
+  // Apply template to a single exercise row
+  const handleApplyToRow = async (exIdx: number, templateId: number) => {
+    setRowTemplateIds(prev => ({ ...prev, [exIdx]: templateId }));
+    await applyTemplateToRows(templateId, [exIdx]);
   };
 
   const buildExerciseWeeks = (): ExerciseWeekPrescription[] => {
@@ -177,10 +185,7 @@ export const BlockBuilderModal = ({
 
   const handleSave = () => {
     const exerciseWeeks = buildExerciseWeeks();
-    const saveTemplate = showSaveTemplate && templateName.trim()
-      ? { name: templateName.trim(), description: templateDescription.trim() }
-      : undefined;
-    onSave(blockDuration, exerciseWeeks, saveTemplate);
+    onSave(blockDuration, exerciseWeeks);
   };
 
   const weeks = Array.from({ length: blockDuration }, (_, i) => i + 1);
@@ -193,10 +198,7 @@ export const BlockBuilderModal = ({
         onClose={() => {
           setShowTemplateManager(false);
           // Refresh templates after managing
-          fetch(`${API_URL}/blocks/templates?clinicianId=${clinicianId}`)
-            .then(r => r.ok ? r.json() : { templates: [] })
-            .then(d => setTemplates(d.templates || []))
-            .catch(() => {});
+          fetchTemplates();
         }}
       />
     )}
@@ -235,11 +237,11 @@ export const BlockBuilderModal = ({
             </div>
           </div>
 
-          {/* Template picker */}
+          {/* Apply to All template picker */}
           <div className="flex gap-2 items-end">
             {templates.length > 0 && (
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5">Apply Template</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Apply to All</label>
                 <div className="relative">
                   <select
                     value={selectedTemplateId}
@@ -249,7 +251,7 @@ export const BlockBuilderModal = ({
                     <option value="">-- Select template --</option>
                     {templates.map(t => (
                       <option key={t.id} value={t.id}>
-                        {t.name} ({t.blockDuration}w){t.isGlobal ? ' ✓' : ''}
+                        {t.name} ({t.blockDuration}w){t.isGlobal ? ' *' : ''}
                       </option>
                     ))}
                   </select>
@@ -259,7 +261,7 @@ export const BlockBuilderModal = ({
             )}
             {templates.length > 0 && (
               <button
-                onClick={applyTemplate}
+                onClick={handleApplyToAll}
                 disabled={!selectedTemplateId}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -269,7 +271,7 @@ export const BlockBuilderModal = ({
             <button
               onClick={() => setShowTemplateManager(true)}
               className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg text-sm font-medium transition-colors"
-              title="Manage saved templates"
+              title="Manage progression templates"
             >
               <Settings size={14} />
               {templates.length === 0 ? 'Templates' : 'Manage'}
@@ -286,10 +288,15 @@ export const BlockBuilderModal = ({
                   <th className="text-left py-2 pr-4 font-medium text-slate-500 text-xs w-40 sticky left-0 bg-white">
                     Exercise
                   </th>
+                  {templates.length > 0 && (
+                    <th className="text-center pb-2 px-1 font-medium text-slate-500 text-xs w-28 sticky left-40 bg-white">
+                      Template
+                    </th>
+                  )}
                   {weeks.map(w => (
                     <th key={w} className="text-center pb-2 px-1 font-semibold text-slate-600 text-xs min-w-[100px]">
                       Week {w}
-                      <div className="text-[10px] font-normal text-slate-400 mt-0.5">Sets × Reps (RPE)</div>
+                      <div className="text-[10px] font-normal text-slate-400 mt-0.5">Sets x Reps (RPE)</div>
                     </th>
                   ))}
                 </tr>
@@ -303,6 +310,30 @@ export const BlockBuilderModal = ({
                       </div>
                       <div className="text-[10px] text-slate-400">{exercise.category}</div>
                     </td>
+                    {templates.length > 0 && (
+                      <td className="py-1.5 px-1 sticky left-40 bg-inherit">
+                        <div className="relative">
+                          <select
+                            value={rowTemplateIds[exIdx] || ''}
+                            onChange={e => {
+                              const val = e.target.value ? Number(e.target.value) : '';
+                              if (val) handleApplyToRow(exIdx, val);
+                              else setRowTemplateIds(prev => ({ ...prev, [exIdx]: '' }));
+                            }}
+                            className="appearance-none w-full pl-2 pr-6 py-1 border border-slate-200 rounded text-[11px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400 bg-white truncate"
+                            title="Apply a progression template to this exercise"
+                          >
+                            <option value="">None</option>
+                            {templates.map(t => (
+                              <option key={t.id} value={t.id}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        </div>
+                      </td>
+                    )}
                     {weeks.map(week => {
                       const cell = getCell(exIdx, week);
                       return (
@@ -318,7 +349,7 @@ export const BlockBuilderModal = ({
                               className="w-10 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400"
                               title="Sets"
                             />
-                            <span className="text-slate-300 text-xs">×</span>
+                            <span className="text-slate-300 text-xs">x</span>
                             <input
                               type="number"
                               min="1"
@@ -350,39 +381,10 @@ export const BlockBuilderModal = ({
           </div>
         </div>
 
-        {/* Save as Template */}
-        <div className="px-6 py-3 border-t border-slate-100">
-          <button
-            onClick={() => setShowSaveTemplate(!showSaveTemplate)}
-            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 font-medium transition-colors"
-          >
-            <Save size={13} />
-            {showSaveTemplate ? 'Cancel save as template' : 'Save as template for future use'}
-          </button>
-          {showSaveTemplate && (
-            <div className="mt-3 flex gap-3">
-              <input
-                type="text"
-                value={templateName}
-                onChange={e => setTemplateName(e.target.value)}
-                placeholder="Template name (required)"
-                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400"
-              />
-              <input
-                type="text"
-                value={templateDescription}
-                onChange={e => setTemplateDescription(e.target.value)}
-                placeholder="Description (optional)"
-                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400"
-              />
-            </div>
-          )}
-        </div>
-
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-200 flex justify-between items-center">
           <p className="text-xs text-slate-400">
-            {programExercises.length} exercise{programExercises.length !== 1 ? 's' : ''} × {blockDuration} weeks = {programExercises.length * blockDuration} cells
+            {programExercises.length} exercise{programExercises.length !== 1 ? 's' : ''} x {blockDuration} weeks = {programExercises.length * blockDuration} cells
           </p>
           <div className="flex gap-3">
             <button
