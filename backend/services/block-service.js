@@ -155,133 +155,119 @@ async function getCurrentPrescription(programId) {
 
 /**
  * Evaluate weekly progression for a program.
- * Idempotent: skips if evaluated within last 24h or < 7 days since start.
+ * Calendar-based: calculates expected week from elapsed time and catches up,
+ * checking pain/performance for each intermediate week. Naturally idempotent.
  */
 async function evaluateProgression(programId) {
   const block = await getActiveBlock(programId);
   if (!block) return { action: 'no_block' };
-
-  // Idempotency: skip if evaluated in last 24h
-  if (block.last_evaluated_at) {
-    const hoursAgo = (Date.now() - new Date(block.last_evaluated_at).getTime()) / (1000 * 60 * 60);
-    if (hoursAgo < 24) return { action: 'too_soon', hoursAgo: Math.round(hoursAgo) };
-  }
 
   // Too early: less than 7 days since start
   const startDate = new Date(block.start_date);
   const daysSinceStart = (Date.now() - startDate.getTime()) / (1000 * 60 * 60 * 24);
   if (daysSinceStart < 7) return { action: 'too_early', daysSinceStart: Math.round(daysSinceStart) };
 
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+  // Calculate expected week from calendar time
+  const expectedWeek = Math.min(Math.floor(daysSinceStart / 7) + 1, block.block_duration);
+  const currentWeek = block.current_week;
+
+  if (expectedWeek <= currentWeek) return { action: 'up_to_date', currentWeek };
 
   // Get patient_id from program
   const program = await db.getOne('SELECT patient_id FROM programs WHERE id = $1', [programId]);
   if (!program) return { action: 'no_program' };
   const patientId = program.patient_id;
 
-  // Fetch daily check-ins for last 7 days
-  const checkIns = await db.getAll(`
-    SELECT general_pain_level, overall_feeling
-    FROM daily_check_ins
-    WHERE patient_id = $1 AND check_in_date >= $2
-  `, [patientId, sevenDaysAgoStr]);
+  // Walk through each week from currentWeek to expectedWeek, checking metrics
+  let advancedToWeek = currentWeek;
+  let holdAction = null;
 
-  let avgGeneralPain = 0;
-  if (checkIns.length > 0) {
-    avgGeneralPain = checkIns.reduce((s, c) => s + (c.general_pain_level || 0), 0) / checkIns.length;
+  for (let week = currentWeek; week < expectedWeek; week++) {
+    // Compute this week's calendar date range
+    const weekStartMs = startDate.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000;
+    const weekEndMs = startDate.getTime() + week * 7 * 24 * 60 * 60 * 1000;
+    const weekStartStr = new Date(weekStartMs).toISOString().split('T')[0];
+    const weekEndStr = new Date(weekEndMs).toISOString().split('T')[0];
+
+    // Fetch daily check-ins for this week's date range
+    const checkIns = await db.getAll(`
+      SELECT general_pain_level, overall_feeling
+      FROM daily_check_ins
+      WHERE patient_id = $1 AND check_in_date >= $2 AND check_in_date < $3
+    `, [patientId, weekStartStr, weekEndStr]);
+
+    let avgGeneralPain = 0;
+    if (checkIns.length > 0) {
+      avgGeneralPain = checkIns.reduce((s, c) => s + (c.general_pain_level || 0), 0) / checkIns.length;
+    }
+
+    // Fetch exercise completions for this week's date range
+    const completions = await db.getAll(`
+      SELECT ec.sets_performed, ec.reps_performed, ec.pain_level,
+             pe.sets as prescribed_sets, pe.reps as prescribed_reps
+      FROM exercise_completions ec
+      JOIN program_exercises pe ON ec.exercise_id = pe.id
+      WHERE pe.program_id = $1 AND ec.patient_id = $2
+        AND ec.completion_date >= $3 AND ec.completion_date < $4
+    `, [programId, patientId, weekStartStr, weekEndStr]);
+
+    let avgExercisePain = 0;
+    let completionRate = 0;
+
+    if (completions.length > 0) {
+      const painCompletions = completions.filter(c => c.pain_level != null);
+      avgExercisePain = painCompletions.length > 0
+        ? painCompletions.reduce((s, c) => s + c.pain_level, 0) / painCompletions.length
+        : 0;
+
+      const rates = completions.map(c => {
+        const setsRate = c.prescribed_sets > 0 ? (c.sets_performed || 0) / c.prescribed_sets : 1;
+        const repsRate = c.prescribed_reps > 0 ? (c.reps_performed || 0) / c.prescribed_reps : 1;
+        return Math.min(setsRate, 1) * Math.min(repsRate, 1);
+      });
+      completionRate = rates.reduce((s, r) => s + r, 0) / rates.length;
+    }
+
+    // PAIN CHECK (highest priority) — hold at this week
+    if (avgGeneralPain >= 6 || avgExercisePain >= 5) {
+      await db.query(`
+        INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date)
+        VALUES ($1, $2, 'pain_flare', $3, CURRENT_DATE)
+      `, [
+        programId, patientId,
+        `Pain flare detected in week ${week}: avg general pain ${avgGeneralPain.toFixed(1)}/10, avg exercise pain ${avgExercisePain.toFixed(1)}/10. Week held.`
+      ]);
+      holdAction = { action: 'hold_pain', heldAtWeek: week, avgGeneralPain, avgExercisePain };
+      break;
+    }
+
+    // PERFORMANCE CHECK — hold at this week
+    if (completionRate < 0.70) {
+      await db.query(`
+        INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date, resolved)
+        VALUES ($1, $2, 'performance_hold', $3, CURRENT_DATE, TRUE)
+      `, [
+        programId, patientId,
+        `Performance hold in week ${week}: completion rate ${Math.round(completionRate * 100)}% (threshold 70%). Week held.`
+      ]);
+      holdAction = { action: 'hold_performance', heldAtWeek: week, completionRate };
+      break;
+    }
+
+    // Week passed checks — advance
+    advancedToWeek = week + 1;
   }
 
-  // Fetch exercise completions for last 7 days
-  const completions = await db.getAll(`
-    SELECT ec.sets_performed, ec.reps_performed, ec.pain_level,
-           pe.sets as prescribed_sets, pe.reps as prescribed_reps
-    FROM exercise_completions ec
-    JOIN program_exercises pe ON ec.exercise_id = pe.id
-    WHERE pe.program_id = $1 AND ec.patient_id = $2 AND ec.completion_date >= $3
-  `, [programId, patientId, sevenDaysAgoStr]);
-
-  let avgExercisePain = 0;
-  let completionRate = 0;
-
-  if (completions.length > 0) {
-    const painCompletions = completions.filter(c => c.pain_level != null);
-    avgExercisePain = painCompletions.length > 0
-      ? painCompletions.reduce((s, c) => s + c.pain_level, 0) / painCompletions.length
-      : 0;
-
-    const rates = completions.map(c => {
-      const setsRate = c.prescribed_sets > 0 ? (c.sets_performed || 0) / c.prescribed_sets : 1;
-      const repsRate = c.prescribed_reps > 0 ? (c.reps_performed || 0) / c.prescribed_reps : 1;
-      return Math.min(setsRate, 1) * Math.min(repsRate, 1);
-    });
-    completionRate = rates.reduce((s, r) => s + r, 0) / rates.length;
-  }
-
-  // Stamp evaluation time first (prevents duplicate triggers)
-  await db.query(
-    `UPDATE block_schedules SET last_evaluated_at = NOW(), updated_at = NOW() WHERE id = $1`,
-    [block.id]
-  );
-
-  // PAIN CHECK (highest priority)
-  if (avgGeneralPain >= 6 || avgExercisePain >= 5) {
-    await db.query(`
-      INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date)
-      VALUES ($1, $2, 'pain_flare', $3, CURRENT_DATE)
-    `, [
-      programId, patientId,
-      `Pain flare detected: avg general pain ${avgGeneralPain.toFixed(1)}/10, avg exercise pain ${avgExercisePain.toFixed(1)}/10. Week held.`
-    ]);
-    return { action: 'hold_pain', avgGeneralPain, avgExercisePain };
-  }
-
-  // PERFORMANCE CHECK
-  if (completionRate < 0.70) {
-    await db.query(`
-      INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date, resolved)
-      VALUES ($1, $2, 'performance_hold', $3, CURRENT_DATE, TRUE)
-    `, [
-      programId, patientId,
-      `Performance hold: completion rate ${Math.round(completionRate * 100)}% (threshold 70%). Week held.`
-    ]);
-    return { action: 'hold_performance', completionRate };
-  }
-
-  // ADVANCE
+  // Apply final state in a transaction
   const client = await db.getClient();
   try {
     await client.query('BEGIN');
 
-    if (block.current_week < block.block_duration) {
-      const nextWeek = block.current_week + 1;
-      await client.query(
-        `UPDATE block_schedules SET current_week = $1, updated_at = NOW() WHERE id = $2`,
-        [nextWeek, block.id]
-      );
-
-      // Apply next week's prescription to program_exercises as live values
-      const nextCells = await db.getAll(`
-        SELECT program_exercise_id, sets, reps
-        FROM exercise_block_weeks
-        WHERE block_schedule_id = $1 AND week_number = $2
-      `, [block.id, nextWeek]);
-
-      for (const cell of nextCells) {
-        await client.query(
-          `UPDATE program_exercises SET sets = $1, reps = $2 WHERE id = $3`,
-          [cell.sets, cell.reps, cell.program_exercise_id]
-        );
-      }
-
-      await client.query('COMMIT');
-      return { action: 'advanced', newWeek: nextWeek };
-    } else {
+    if (advancedToWeek >= block.block_duration && !holdAction) {
       // Block complete
       await client.query(
-        `UPDATE block_schedules SET status = 'completed', updated_at = NOW() WHERE id = $1`,
-        [block.id]
+        `UPDATE block_schedules SET current_week = $1, status = 'completed', updated_at = NOW() WHERE id = $2`,
+        [block.block_duration, block.id]
       );
       await client.query(`
         INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date)
@@ -291,9 +277,57 @@ async function evaluateProgression(programId) {
         `Block complete: patient has finished all ${block.block_duration} weeks. Please review and assign new block.`
       ]);
 
+      // Apply final week's prescription
+      const finalCells = await db.getAll(`
+        SELECT program_exercise_id, sets, reps
+        FROM exercise_block_weeks
+        WHERE block_schedule_id = $1 AND week_number = $2
+      `, [block.id, block.block_duration]);
+
+      for (const cell of finalCells) {
+        await client.query(
+          `UPDATE program_exercises SET sets = $1, reps = $2 WHERE id = $3`,
+          [cell.sets, cell.reps, cell.program_exercise_id]
+        );
+      }
+
       await client.query('COMMIT');
-      return { action: 'block_complete', finalWeek: block.current_week };
+      return { action: 'block_complete', finalWeek: block.block_duration };
     }
+
+    if (advancedToWeek > currentWeek) {
+      // Advance to the new week
+      await client.query(
+        `UPDATE block_schedules SET current_week = $1, updated_at = NOW() WHERE id = $2`,
+        [advancedToWeek, block.id]
+      );
+
+      // Apply new week's prescription to program_exercises
+      const newCells = await db.getAll(`
+        SELECT program_exercise_id, sets, reps
+        FROM exercise_block_weeks
+        WHERE block_schedule_id = $1 AND week_number = $2
+      `, [block.id, advancedToWeek]);
+
+      for (const cell of newCells) {
+        await client.query(
+          `UPDATE program_exercises SET sets = $1, reps = $2 WHERE id = $3`,
+          [cell.sets, cell.reps, cell.program_exercise_id]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
+    if (holdAction) {
+      return holdAction;
+    }
+
+    if (advancedToWeek > currentWeek) {
+      return { action: 'advanced', previousWeek: currentWeek, newWeek: advancedToWeek };
+    }
+
+    return { action: 'up_to_date', currentWeek };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

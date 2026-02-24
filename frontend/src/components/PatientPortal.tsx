@@ -27,6 +27,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   } | null>(null);
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [_hasCheckedInToday, setHasCheckedInToday] = useState(false);
+  const [blockRefreshKey, setBlockRefreshKey] = useState(0);
 
   // Check if patient has completed check-in today + trigger block evaluation
   useEffect(() => {
@@ -58,6 +59,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
           }
         }
       }
+      setBlockRefreshKey(k => k + 1);
     };
 
     checkTodayCheckIn();
@@ -225,7 +227,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
         <>
           {/* Block Progress Banner */}
           {selectedProgram?.id && (
-            <BlockProgressBanner programId={selectedProgram.id} />
+            <BlockProgressBanner programId={selectedProgram.id} refreshKey={blockRefreshKey} />
           )}
 
           {/* Program Selector */}

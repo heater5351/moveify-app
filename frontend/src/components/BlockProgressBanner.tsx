@@ -13,9 +13,10 @@ type BlockStatus = {
 
 type Props = {
   programId: number;
+  refreshKey?: number;
 };
 
-export default function BlockProgressBanner({ programId }: Props) {
+export default function BlockProgressBanner({ programId, refreshKey }: Props) {
   const [block, setBlock] = useState<BlockStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -35,7 +36,7 @@ export default function BlockProgressBanner({ programId }: Props) {
     };
 
     fetchBlock();
-  }, [programId]);
+  }, [programId, refreshKey]);
 
   if (loading || !block || !block.hasBlock) return null;
 
