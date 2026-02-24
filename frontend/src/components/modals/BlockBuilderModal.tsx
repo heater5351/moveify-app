@@ -96,6 +96,9 @@ export const BlockBuilderModal = ({
     fetchTemplates();
   }, [clinicianId]);
 
+  // Only show templates that match the current block duration
+  const matchingTemplates = templates.filter(t => t.blockDuration === blockDuration);
+
   const getCell = (exIdx: number, week: number): CellData => {
     const key: CellKey = `${exIdx}-${week}`;
     return cells[key] || { sets: '', reps: '', rpe: '' };
@@ -111,6 +114,8 @@ export const BlockBuilderModal = ({
 
   const handleDurationChange = (d: 4 | 6 | 8) => {
     setBlockDuration(d);
+    setSelectedTemplateId('');
+    setRowTemplateIds({});
     // Fill new weeks with defaults for existing exercises
     if (d > blockDuration) {
       const additions: Record<CellKey, CellData> = {};
@@ -138,11 +143,6 @@ export const BlockBuilderModal = ({
       const data = await res.json();
 
       if (!data.weeks || data.weeks.length === 0) return;
-
-      // Optionally match block duration
-      if (data.blockDuration && [4, 6, 8].includes(data.blockDuration)) {
-        setBlockDuration(data.blockDuration as 4 | 6 | 8);
-      }
 
       const newCells: Record<CellKey, CellData> = {};
       exerciseIndices.forEach(idx => {
@@ -251,7 +251,7 @@ export const BlockBuilderModal = ({
 
           {/* Apply to All template picker */}
           <div className="flex gap-2 items-end">
-            {templates.length > 0 && (
+            {matchingTemplates.length > 0 && (
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Apply to All</label>
                 <div className="relative">
@@ -261,7 +261,7 @@ export const BlockBuilderModal = ({
                     className="appearance-none pl-3 pr-8 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 bg-white"
                   >
                     <option value="">-- Select template --</option>
-                    {templates.map(t => (
+                    {matchingTemplates.map(t => (
                       <option key={t.id} value={t.id}>
                         {t.name} ({t.blockDuration}w){t.isGlobal ? ' *' : ''}
                       </option>
@@ -271,7 +271,7 @@ export const BlockBuilderModal = ({
                 </div>
               </div>
             )}
-            {templates.length > 0 && (
+            {matchingTemplates.length > 0 && (
               <button
                 onClick={handleApplyToAll}
                 disabled={!selectedTemplateId}
@@ -300,7 +300,7 @@ export const BlockBuilderModal = ({
                   <th className="text-left py-2 pr-4 font-medium text-slate-500 text-xs w-40 sticky left-0 bg-white">
                     Exercise
                   </th>
-                  {templates.length > 0 && (
+                  {matchingTemplates.length > 0 && (
                     <th className="text-center pb-2 px-1 font-medium text-slate-500 text-xs w-28 sticky left-40 bg-white">
                       Template
                     </th>
@@ -322,7 +322,7 @@ export const BlockBuilderModal = ({
                       </div>
                       <div className="text-[10px] text-slate-400">{exercise.category}</div>
                     </td>
-                    {templates.length > 0 && (
+                    {matchingTemplates.length > 0 && (
                       <td className="py-1.5 px-1 sticky left-40 bg-inherit">
                         <div className="relative">
                           <select
@@ -336,7 +336,7 @@ export const BlockBuilderModal = ({
                             title="Apply a progression template to this exercise"
                           >
                             <option value="">None</option>
-                            {templates.map(t => (
+                            {matchingTemplates.map(t => (
                               <option key={t.id} value={t.id}>
                                 {t.name}
                               </option>
