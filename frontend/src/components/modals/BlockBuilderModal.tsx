@@ -389,7 +389,6 @@ export const BlockBuilderModal = ({
                       <div className="text-xs font-medium text-slate-700 truncate max-w-[144px]" title={exercise.name}>
                         {exercise.name}
                       </div>
-                      <div className="text-[10px] text-slate-400">{exercise.category}</div>
                       <input
                         type="number"
                         min="0"

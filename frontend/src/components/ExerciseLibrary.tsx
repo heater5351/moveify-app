@@ -39,9 +39,6 @@ const ExerciseDetailModal = ({
           <div>
             <h3 className="font-semibold text-xl text-gray-900">{exercise.name}</h3>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                {exercise.category}
-              </span>
               <span className="text-sm text-gray-500">{exercise.duration}</span>
             </div>
           </div>
@@ -626,11 +623,8 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
 
                     {/* Exercise Info */}
                     <div className="p-5">
-                      <div className="flex items-start justify-between mb-2">
+                      <div className="mb-2">
                         <h3 className="font-semibold text-gray-900 text-lg">{exercise.name}</h3>
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                          {exercise.category}
-                        </span>
                       </div>
 
                       <p className="text-sm text-gray-600 line-clamp-3">
@@ -702,11 +696,8 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
 
                   {/* Exercise Info */}
                   <div className="p-5">
-                    <div className="flex items-start justify-between mb-2">
+                    <div className="mb-2">
                       <h3 className="font-semibold text-gray-900 text-lg">{exercise.name}</h3>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                        {exercise.category}
-                      </span>
                     </div>
 
                     <p className="text-sm text-gray-600 line-clamp-3">

@@ -273,9 +273,6 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
                       <p className="text-sm text-gray-600 italic">{exercise.instructions}</p>
                     )}
                   </div>
-                  <span className="text-xs bg-gray-200 text-gray-600 px-3 py-1 rounded ml-4">
-                    {exercise.category}
-                  </span>
                 </div>
               </div>
             ))}

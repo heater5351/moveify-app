@@ -404,9 +404,6 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                               </span>
                             )}
                           </div>
-                          <span className="inline-block text-xs sm:text-sm bg-white text-moveify-ocean px-3 py-1 rounded-full font-medium border border-gray-200">
-                            {exercise.category}
-                          </span>
                         </div>
                       </div>
 

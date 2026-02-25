@@ -135,9 +135,6 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
         </div>
       </div>
 
-      <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded inline-block mt-1.5">
-        {exercise.category}
-      </span>
     </div>
   );
 };
