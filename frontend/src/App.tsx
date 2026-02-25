@@ -423,7 +423,11 @@ function App() {
 
     const dobDate = new Date(editingPatient.dob);
     const today = new Date();
-    const age = today.getFullYear() - dobDate.getFullYear();
+    let age = today.getFullYear() - dobDate.getFullYear();
+    const monthDiff = today.getMonth() - dobDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dobDate.getDate())) {
+      age--;
+    }
 
     const updatedPatients = patients.map(p =>
       p.id === editingPatient.id
