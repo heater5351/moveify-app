@@ -519,10 +519,10 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                       e.dataTransfer.setData('application/exercise', JSON.stringify({ ...exercise, sets: 3, reps: 10, completed: false }));
                       e.dataTransfer.effectAllowed = 'copy';
                     }}
-                    className="bg-white rounded-xl shadow-sm border-2 border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer"
+                    className="bg-white rounded-xl shadow-sm border-2 border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer aspect-square flex flex-col"
                   >
                     {/* Video Thumbnail */}
-                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 aspect-square flex items-center justify-center relative">
+                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 basis-2/3 flex items-center justify-center relative">
                       {/* Favorite Star */}
                       <button
                         onClick={(e) => {
@@ -570,7 +570,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                     </div>
 
                     {/* Exercise Info */}
-                    <div className="p-2">
+                    <div className="basis-1/3 flex items-center p-2">
                       <h3 className="font-medium text-gray-900 text-xs line-clamp-2">{exercise.name}</h3>
                     </div>
                   </div>
@@ -596,10 +596,10 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                     e.dataTransfer.setData('application/exercise', JSON.stringify({ ...exercise, sets: 3, reps: 10, completed: false }));
                     e.dataTransfer.effectAllowed = 'copy';
                   }}
-                  className="bg-white rounded-xl shadow-sm border-2 border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer"
+                  className="bg-white rounded-xl shadow-sm border-2 border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer aspect-square flex flex-col"
                 >
                   {/* Video Thumbnail */}
-                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 aspect-square flex items-center justify-center relative">
+                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 basis-2/3 flex items-center justify-center relative">
                     {/* Favorite Star */}
                     <button
                       onClick={(e) => {
@@ -635,7 +635,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                   </div>
 
                   {/* Exercise Info */}
-                  <div className="p-2">
+                  <div className="basis-1/3 flex items-center p-2">
                     <h3 className="font-medium text-gray-900 text-xs line-clamp-2">{exercise.name}</h3>
                   </div>
                 </div>
