@@ -38,6 +38,11 @@ export const BlockBuilderModal = ({
   const [rowTemplateIds, setRowTemplateIds] = useState<Record<number, number | ''>>({});
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [startingWeights, setStartingWeights] = useState<Record<number, string>>({});
+  // Store applied template weight data per exercise index for reactive recalculation
+  const [appliedWeightData, setAppliedWeightData] = useState<Record<number, {
+    weightUnit: 'kg' | 'percent';
+    offsets: { weekNumber: number; weightOffset: number }[];
+  }>>({});
 
   // Initialize cells from initialWeeks or defaults
   useEffect(() => {
@@ -144,6 +149,13 @@ export const BlockBuilderModal = ({
     }
   };
 
+  // Calculate weight from starting weight and offset
+  const calcWeight = (startWeight: number, offset: number, unit: 'kg' | 'percent'): string => {
+    if (startWeight <= 0) return '';
+    if (unit === 'kg') return String(startWeight + offset);
+    return String(Math.round((startWeight * (1 + offset / 100)) * 100) / 100);
+  };
+
   // Apply a template's progression to specific exercise rows
   const applyTemplateToRows = async (templateId: number, exerciseIndices: number[]) => {
     try {
@@ -157,18 +169,26 @@ export const BlockBuilderModal = ({
 
       if (!data.weeks || data.weeks.length === 0) return;
 
+      // Store template weight data for reactive recalculation
+      if (data.weightUnit) {
+        const offsets = data.weeks
+          .filter((w: { weightOffset?: number | null }) => w.weightOffset != null)
+          .map((w: { weekNumber: number; weightOffset: number }) => ({ weekNumber: w.weekNumber, weightOffset: w.weightOffset }));
+        if (offsets.length > 0) {
+          const newWeightData: Record<number, { weightUnit: 'kg' | 'percent'; offsets: { weekNumber: number; weightOffset: number }[] }> = {};
+          exerciseIndices.forEach(idx => { newWeightData[idx] = { weightUnit: data.weightUnit, offsets }; });
+          setAppliedWeightData(prev => ({ ...prev, ...newWeightData }));
+        }
+      }
+
       const newCells: Record<CellKey, CellData> = {};
       exerciseIndices.forEach(idx => {
         const startWeight = parseFloat(startingWeights[idx]) || 0;
         data.weeks.forEach((w: { weekNumber: number; sets: number; reps: number; rpeTarget?: number | null; weightOffset?: number | null }) => {
           const key: CellKey = `${idx}-${w.weekNumber}`;
           let weightStr = '';
-          if (data.weightUnit && w.weightOffset != null && startWeight > 0) {
-            if (data.weightUnit === 'kg') {
-              weightStr = String(startWeight + w.weightOffset);
-            } else if (data.weightUnit === 'percent') {
-              weightStr = String(Math.round((startWeight * (1 + w.weightOffset / 100)) * 100) / 100);
-            }
+          if (data.weightUnit && w.weightOffset != null) {
+            weightStr = calcWeight(startWeight, w.weightOffset, data.weightUnit);
           }
           newCells[key] = {
             sets: String(w.sets),
@@ -184,6 +204,30 @@ export const BlockBuilderModal = ({
       // Silently ignore template load errors
     }
   };
+
+  // Recalculate weight cells when starting weights change (for exercises with applied templates)
+  useEffect(() => {
+    const updates: Record<CellKey, CellData> = {};
+    let hasUpdates = false;
+    for (const [idxStr, weightData] of Object.entries(appliedWeightData)) {
+      const idx = Number(idxStr);
+      const startWeight = parseFloat(startingWeights[idx]) || 0;
+      for (const { weekNumber, weightOffset } of weightData.offsets) {
+        const key: CellKey = `${idx}-${weekNumber}`;
+        const existing = cells[key];
+        if (existing) {
+          const newWeight = calcWeight(startWeight, weightOffset, weightData.weightUnit);
+          if (existing.weight !== newWeight) {
+            updates[key] = { ...existing, weight: newWeight };
+            hasUpdates = true;
+          }
+        }
+      }
+    }
+    if (hasUpdates) {
+      setCells(prev => ({ ...prev, ...updates }));
+    }
+  }, [startingWeights, appliedWeightData]);
 
   // Apply template to ALL exercises
   const handleApplyToAll = async () => {
