@@ -522,7 +522,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                     className="bg-white rounded-xl shadow-sm border-2 border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer"
                   >
                     {/* Video Thumbnail */}
-                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 h-48 flex items-center justify-center relative">
+                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 aspect-square flex items-center justify-center relative">
                       {/* Favorite Star */}
                       <button
                         onClick={(e) => {
@@ -570,8 +570,8 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                     </div>
 
                     {/* Exercise Info */}
-                    <div className="p-5">
-                      <h3 className="font-semibold text-gray-900 text-lg">{exercise.name}</h3>
+                    <div className="p-2">
+                      <h3 className="font-medium text-gray-900 text-xs line-clamp-2">{exercise.name}</h3>
                     </div>
                   </div>
                 );
@@ -599,7 +599,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                   className="bg-white rounded-xl shadow-sm border-2 border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer"
                 >
                   {/* Video Thumbnail */}
-                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 h-48 flex items-center justify-center relative">
+                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 aspect-square flex items-center justify-center relative">
                     {/* Favorite Star */}
                     <button
                       onClick={(e) => {
@@ -635,8 +635,8 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                   </div>
 
                   {/* Exercise Info */}
-                  <div className="p-5">
-                    <h3 className="font-semibold text-gray-900 text-lg">{exercise.name}</h3>
+                  <div className="p-2">
+                    <h3 className="font-medium text-gray-900 text-xs line-clamp-2">{exercise.name}</h3>
                   </div>
                 </div>
               );
