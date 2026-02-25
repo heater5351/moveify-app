@@ -72,48 +72,48 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl ring-1 ring-slate-200 max-w-3xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h3 className="text-2xl font-bold text-gray-900">{program.config.name}</h3>
-            <p className="text-sm text-gray-600 mt-1">
+            <h3 className="text-lg font-semibold font-display text-slate-800">{program.config.name}</h3>
+            <p className="text-sm text-slate-500 mt-1">
               {patientName} · {completedCount} of {totalExercises} exercises completed ({completionPercentage}%)
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1"
           >
-            <X size={24} />
+            <X size={20} />
           </button>
         </div>
 
         {/* Progress Bar */}
         <div className="px-6 pt-4">
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-slate-200 rounded-full h-2">
             <div
-              className="bg-green-600 h-2 rounded-full transition-all"
+              className="bg-primary-400 h-2 rounded-full transition-all"
               style={{ width: `${completionPercentage}%` }}
             />
           </div>
         </div>
 
         {/* Program Details */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
-              <p className="text-gray-600">Start Date</p>
-              <p className="font-medium text-gray-900">{program.config.startDate}</p>
+              <p className="text-slate-400">Start Date</p>
+              <p className="font-medium text-slate-800">{program.config.startDate}</p>
             </div>
             <div>
-              <p className="text-gray-600">Duration</p>
-              <p className="font-medium text-gray-900">{program.config.duration}</p>
+              <p className="text-slate-400">Duration</p>
+              <p className="font-medium text-slate-800">{program.config.duration}</p>
             </div>
             <div>
-              <p className="text-gray-600">Frequency</p>
-              <p className="font-medium text-gray-900">
+              <p className="text-slate-400">Frequency</p>
+              <p className="font-medium text-slate-800">
                 {program.config.frequency.length > 0
                   ? program.config.frequency.join(', ')
                   : 'As needed'}
@@ -124,10 +124,10 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
 
         {/* Block Periodization Section */}
         {blockData?.hasBlock && (
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-6 py-4 border-b border-slate-100">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <h4 className="font-semibold text-gray-900 text-sm">Block Periodization</h4>
+                <h4 className="font-semibold text-slate-800 text-sm">Block Periodization</h4>
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                   blockData.status === 'active'
                     ? 'bg-emerald-100 text-emerald-700'
@@ -144,7 +144,7 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
             </div>
 
             {/* Progress bar */}
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+            <div className="w-full bg-slate-200 rounded-full h-2 mb-4">
               <div
                 className="bg-primary-400 h-2 rounded-full transition-all"
                 style={{ width: `${((blockData.currentWeek || 1) / (blockData.blockDuration || 1)) * 100}%` }}
@@ -243,34 +243,34 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
 
         {/* Exercise List */}
         <div className="flex-1 overflow-y-auto p-6">
-          <h4 className="font-semibold text-gray-900 mb-4">Exercises</h4>
+          <h4 className="font-semibold text-slate-800 mb-4">Exercises</h4>
           <div className="space-y-3">
             {program.exercises.map((exercise, index) => (
               <div
                 key={index}
-                className={`p-4 rounded-lg border-2 ${
+                className={`p-4 rounded-lg ${
                   exercise.completed
-                    ? 'bg-green-50 border-green-200'
-                    : 'bg-gray-50 border-gray-200'
+                    ? 'bg-emerald-50 ring-1 ring-emerald-200'
+                    : 'bg-slate-50 ring-1 ring-slate-200'
                 }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <h5 className="font-semibold text-gray-900">{exercise.name}</h5>
+                      <h5 className="font-semibold text-slate-800">{exercise.name}</h5>
                       {exercise.completed && (
-                        <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded flex items-center gap-1">
+                        <span className="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2 py-1 rounded flex items-center gap-1">
                           <Check size={14} />
                           Completed
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-700 mb-2">
+                    <p className="text-sm text-slate-600 mb-2">
                       <strong>{exercise.sets} sets × {exercise.reps} reps</strong>
                       {exercise.holdTime && ` · Hold ${exercise.holdTime}`}
                     </p>
                     {exercise.instructions && (
-                      <p className="text-sm text-gray-600 italic">{exercise.instructions}</p>
+                      <p className="text-sm text-slate-500 italic">{exercise.instructions}</p>
                     )}
                   </div>
                 </div>
@@ -280,10 +280,10 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-200">
+        <div className="px-6 py-4 border-t border-slate-100">
           <button
             onClick={onClose}
-            className="w-full bg-moveify-teal text-white py-3 rounded-lg hover:bg-moveify-teal-dark font-medium"
+            className="w-full bg-primary-400 text-white py-3 rounded-lg hover:bg-primary-500 font-medium"
           >
             Close
           </button>
