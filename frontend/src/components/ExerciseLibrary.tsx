@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Play, Plus, Trash2, X, Check, Star, Filter } from 'lucide-react';
+import { Search, Play, Plus, Trash2, X, Star, Filter } from 'lucide-react';
 import type { ProgramExercise, Exercise, ExerciseFilters } from '../types/index.ts';
 import { exercises as defaultExercises } from '../data/exercises';
 import { AddExerciseModal } from './modals/AddExerciseModal';
@@ -8,13 +8,11 @@ import { API_URL } from '../config';
 // Exercise Detail Modal Component
 const ExerciseDetailModal = ({
   exercise,
-  isSelected,
-  onToggleSelect,
+  onAddToProgram,
   onClose
 }: {
   exercise: Exercise;
-  isSelected: boolean;
-  onToggleSelect: () => void;
+  onAddToProgram: (exercises: ProgramExercise[]) => void;
   onClose: () => void;
 }) => {
   useEffect(() => {
@@ -68,17 +66,16 @@ const ExerciseDetailModal = ({
           <p className="text-gray-700 whitespace-pre-wrap">{exercise.description}</p>
         </div>
 
-        {/* Footer with Select Button */}
+        {/* Footer with Add Button */}
         <div className="p-4 border-t bg-gray-50">
           <button
-            onClick={onToggleSelect}
-            className={`w-full py-3 rounded-lg font-medium transition-colors ${
-              isSelected
-                ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                : 'bg-moveify-teal text-white hover:bg-moveify-teal-dark'
-            }`}
+            onClick={() => {
+              onAddToProgram([{ ...exercise, sets: 3, reps: 10, completed: false }]);
+              onClose();
+            }}
+            className="w-full py-3 rounded-lg font-medium transition-colors bg-moveify-teal text-white hover:bg-moveify-teal-dark"
           >
-            {isSelected ? 'Remove from Selection' : 'Add to Selection'}
+            Add to Program
           </button>
         </div>
       </div>
@@ -93,7 +90,6 @@ interface ExerciseLibraryProps {
 
 export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibraryProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedExercises, setSelectedExercises] = useState<number[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [customExercises, setCustomExercises] = useState<Exercise[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -267,8 +263,6 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
       if (response.ok) {
         // Remove from custom exercises list
         setCustomExercises(customExercises.filter(ex => ex.id !== exerciseId));
-        // Remove from selected if it was selected
-        setSelectedExercises(selectedExercises.filter(id => id !== exerciseId));
       } else {
         const data = await response.json();
         alert(data.error || 'Failed to delete exercise');
@@ -283,30 +277,6 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
 
   // Combine default and custom exercises
   const allExercises = [...defaultExercises, ...customExercises];
-
-  const toggleExercise = (exerciseId: number) => {
-    if (selectedExercises.includes(exerciseId)) {
-      setSelectedExercises(selectedExercises.filter(id => id !== exerciseId));
-    } else {
-      setSelectedExercises([...selectedExercises, exerciseId]);
-    }
-  };
-
-  const handleAddToProgram = () => {
-    if (selectedExercises.length === 0) return;
-
-    const newExercises = allExercises
-      .filter(ex => selectedExercises.includes(ex.id))
-      .map(ex => ({
-        ...ex,
-        sets: 3,
-        reps: 10,
-        completed: false
-      }));
-
-    onAddToProgram(newExercises);
-    setSelectedExercises([]);
-  };
 
   const filteredExercises = allExercises.filter(exercise => {
     // Text search
@@ -380,15 +350,6 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      {/* Selected Count */}
-      {selectedExercises.length > 0 && (
-        <div className="mb-6 bg-primary-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-blue-900 font-medium">
-            {selectedExercises.length} exercise{selectedExercises.length !== 1 ? 's' : ''} selected
-          </p>
-        </div>
-      )}
-
       {/* Search Bar and Actions */}
       <div className="mb-8">
         <div className="flex gap-3 items-center flex-wrap">
@@ -423,17 +384,6 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
               Add Exercise
             </button>
           )}
-          <button
-            onClick={handleAddToProgram}
-            disabled={selectedExercises.length === 0}
-            className={`px-6 py-3 rounded-lg font-medium whitespace-nowrap ${
-              selectedExercises.length === 0
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-moveify-teal text-white hover:bg-moveify-teal-dark'
-            }`}
-          >
-            Add to Program
-          </button>
         </div>
 
         {/* Filter Panel */}
@@ -560,14 +510,16 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
             <h3 className="text-lg font-semibold text-gray-700 mb-4">Your Custom Exercises</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
             {filteredCustom.map(exercise => {
-                const isSelected = selectedExercises.includes(exercise.id);
                 return (
                   <div
                     key={exercise.id}
                     onClick={() => setDetailModal(exercise)}
-                    className={`bg-white rounded-xl shadow-sm border-2 overflow-hidden hover:shadow-md transition-all cursor-pointer ${
-                      isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-100'
-                    }`}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/exercise', JSON.stringify({ ...exercise, sets: 3, reps: 10, completed: false }));
+                      e.dataTransfer.effectAllowed = 'copy';
+                    }}
+                    className="bg-white rounded-xl shadow-sm border-2 border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer"
                   >
                     {/* Video Thumbnail */}
                     <div className="bg-gradient-to-br from-purple-500 to-purple-600 h-48 flex items-center justify-center relative">
@@ -592,20 +544,16 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                       ) : (
                         <Play className="text-white/50" size={56} />
                       )}
-                      {/* Selection Checkbox */}
+                      {/* Add to Program Button */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          toggleExercise(exercise.id);
+                          onAddToProgram([{ ...exercise, sets: 3, reps: 10, completed: false }]);
                         }}
-                        className={`absolute top-3 right-3 w-7 h-7 rounded-md border-2 flex items-center justify-center transition-colors ${
-                          isSelected
-                            ? 'bg-moveify-teal border-moveify-teal text-white'
-                            : 'bg-white/90 border-gray-300 hover:border-moveify-teal'
-                        }`}
-                        title={isSelected ? 'Deselect exercise' : 'Select exercise'}
+                        className="absolute top-3 right-3 p-2 rounded-full transition-colors bg-white/90 text-gray-400 hover:text-moveify-teal"
+                        title="Add to program"
                       >
-                        {isSelected && <Check size={16} />}
+                        <Plus size={16} />
                       </button>
                       {/* Delete Button */}
                       <button
@@ -623,13 +571,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
 
                     {/* Exercise Info */}
                     <div className="p-5">
-                      <div className="mb-2">
-                        <h3 className="font-semibold text-gray-900 text-lg">{exercise.name}</h3>
-                      </div>
-
-                      <p className="text-sm text-gray-600 line-clamp-3">
-                        {exercise.description}
-                      </p>
+                      <h3 className="font-semibold text-gray-900 text-lg">{exercise.name}</h3>
                     </div>
                   </div>
                 );
@@ -645,14 +587,16 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
         )}
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
           {filteredDefault.map(exercise => {
-              const isSelected = selectedExercises.includes(exercise.id);
               return (
                 <div
                   key={exercise.id}
                   onClick={() => setDetailModal(exercise)}
-                  className={`bg-white rounded-xl shadow-sm border-2 overflow-hidden hover:shadow-md transition-all cursor-pointer ${
-                    isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-100'
-                  }`}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('application/exercise', JSON.stringify({ ...exercise, sets: 3, reps: 10, completed: false }));
+                    e.dataTransfer.effectAllowed = 'copy';
+                  }}
+                  className="bg-white rounded-xl shadow-sm border-2 border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer"
                 >
                   {/* Video Thumbnail */}
                   <div className="bg-gradient-to-br from-blue-500 to-blue-600 h-48 flex items-center justify-center relative">
@@ -677,32 +621,22 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
                     ) : (
                       <Play className="text-white/50" size={56} />
                     )}
-                    {/* Selection Checkbox */}
+                    {/* Add to Program Button */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        toggleExercise(exercise.id);
+                        onAddToProgram([{ ...exercise, sets: 3, reps: 10, completed: false }]);
                       }}
-                      className={`absolute top-3 right-3 w-7 h-7 rounded-md border-2 flex items-center justify-center transition-colors ${
-                        isSelected
-                          ? 'bg-moveify-teal border-moveify-teal text-white'
-                          : 'bg-white/90 border-gray-300 hover:border-moveify-teal'
-                      }`}
-                      title={isSelected ? 'Deselect exercise' : 'Select exercise'}
+                      className="absolute top-3 right-3 p-2 rounded-full transition-colors bg-white/90 text-gray-400 hover:text-moveify-teal"
+                      title="Add to program"
                     >
-                      {isSelected && <Check size={16} />}
+                      <Plus size={16} />
                     </button>
                   </div>
 
                   {/* Exercise Info */}
                   <div className="p-5">
-                    <div className="mb-2">
-                      <h3 className="font-semibold text-gray-900 text-lg">{exercise.name}</h3>
-                    </div>
-
-                    <p className="text-sm text-gray-600 line-clamp-3">
-                      {exercise.description}
-                    </p>
+                    <h3 className="font-semibold text-gray-900 text-lg">{exercise.name}</h3>
                   </div>
                 </div>
               );
@@ -731,8 +665,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
       {detailModal && (
         <ExerciseDetailModal
           exercise={detailModal}
-          isSelected={selectedExercises.includes(detailModal.id)}
-          onToggleSelect={() => toggleExercise(detailModal.id)}
+          onAddToProgram={onAddToProgram}
           onClose={() => setDetailModal(null)}
         />
       )}

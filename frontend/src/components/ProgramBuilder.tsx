@@ -32,6 +32,7 @@ interface ProgramBuilderProps {
   onCancelPatientAssignment: () => void;
   onConfigureBlock?: () => void;
   hasBlock?: boolean;
+  onAddExercise?: (exercise: ProgramExercise) => void;
 }
 
 interface SortableExerciseProps {
@@ -151,8 +152,11 @@ export const ProgramBuilder = ({
   onAssignToPatient,
   onCancelPatientAssignment,
   onConfigureBlock,
-  hasBlock = false
+  hasBlock = false,
+  onAddExercise
 }: ProgramBuilderProps) => {
+  const [isDragOver, setIsDragOver] = useState(false);
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -214,11 +218,34 @@ export const ProgramBuilder = ({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5">
+      <div
+        className={`flex-1 overflow-y-auto p-5 transition-colors ${isDragOver ? 'bg-primary-50 ring-2 ring-inset ring-dashed ring-primary-300' : ''}`}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes('application/exercise')) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            setIsDragOver(true);
+          }
+        }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragOver(false);
+          const data = e.dataTransfer.getData('application/exercise');
+          if (data && onAddExercise) {
+            try {
+              const exercise = JSON.parse(data) as ProgramExercise;
+              onAddExercise(exercise);
+            } catch {
+              // ignore invalid data
+            }
+          }
+        }}
+      >
         {programExercises.length === 0 ? (
           <div className="text-center mt-12">
             <p className="text-slate-400 text-sm">No exercises added yet</p>
-            <p className="text-slate-300 text-xs mt-1">Select exercises from the library</p>
+            <p className="text-slate-300 text-xs mt-1">Drag exercises here or click + to add</p>
           </div>
         ) : (
           <DndContext

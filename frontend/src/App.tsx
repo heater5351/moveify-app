@@ -130,6 +130,10 @@ function App() {
     setProgramExercises([...programExercises, ...exercises]);
   };
 
+  const handleAddSingleExercise = (exercise: ProgramExercise) => {
+    setProgramExercises(prev => [...prev, exercise]);
+  };
+
   const handleRemoveFromProgram = (index: number) => {
     setProgramExercises(programExercises.filter((_, i) => i !== index));
   };
@@ -801,6 +805,7 @@ function App() {
               onCancelPatientAssignment={handleCancelProgramAssignment}
               onConfigureBlock={programExercises.length > 0 ? () => setShowBlockBuilderModal(true) : undefined}
               hasBlock={pendingBlockData !== null}
+              onAddExercise={handleAddSingleExercise}
             />
           </div>
         </div>
