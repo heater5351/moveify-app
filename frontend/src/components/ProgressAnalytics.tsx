@@ -11,12 +11,6 @@ const getPainColor = (pain: number) => {
   return 'text-red-600';
 };
 
-const getPainBadge = (pain: number) => {
-  if (pain <= PAIN_THRESHOLDS.low) return 'bg-green-100 text-green-800';
-  if (pain <= PAIN_THRESHOLDS.moderate) return 'bg-yellow-100 text-yellow-800';
-  return 'bg-red-100 text-red-800';
-};
-
 const getPainLabel = (pain: number) => {
   if (pain <= PAIN_THRESHOLDS.low) return 'Low';
   if (pain <= PAIN_THRESHOLDS.moderate) return 'Moderate';
@@ -35,12 +29,6 @@ const getRpeColor = (rpe: number) => {
   return 'text-red-600';
 };
 
-const getRpeBadge = (rpe: number) => {
-  if (rpe <= RPE_THRESHOLDS.easy) return 'bg-green-100 text-green-800';
-  if (rpe <= RPE_THRESHOLDS.target) return 'bg-yellow-100 text-yellow-800';
-  return 'bg-red-100 text-red-800';
-};
-
 const getRpeLabel = (rpe: number) => {
   if (rpe <= RPE_THRESHOLDS.easy) return 'Easy';
   if (rpe <= RPE_THRESHOLDS.target) return 'In target zone (6-8)';
@@ -48,32 +36,6 @@ const getRpeLabel = (rpe: number) => {
 };
 
 // ── Interfaces ──────────────────────────────────────────────────────────
-
-interface ExerciseCompletion {
-  id: number;
-  exerciseName: string;
-  completionDate: string;
-  setsPerformed: number;
-  repsPerformed: number;
-  weightPerformed: number | null;
-  prescribedSets: number;
-  prescribedReps: number;
-  prescribedWeight: number | null;
-  rpeRating: number | null;
-  painLevel: number | null;
-  notes: string | null;
-}
-
-interface DailyCheckIn {
-  id: number;
-  checkInDate: string;
-  overallFeeling: number;
-  generalPainLevel: number;
-  energyLevel: number;
-  sleepQuality: number;
-  notes: string | null;
-  createdAt: string;
-}
 
 interface ProgressionLog {
   id: number;
@@ -122,14 +84,8 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<7 | 14 | 30>(30);
 
-  // All data loaded in parallel
   const [overviewData, setOverviewData] = useState<OverviewData | null>(null);
-  const [exerciseCompletions, setExerciseCompletions] = useState<ExerciseCompletion[]>([]);
-  const [, setCheckIns] = useState<DailyCheckIn[]>([]);
   const [progressionLogs, setProgressionLogs] = useState<ProgressionLog[]>([]);
-
-  // UI toggles
-  const [showAllCompletions, setShowAllCompletions] = useState(false);
 
   // ── Data Fetching — Parallel on Mount ─────────────────────────────
   useEffect(() => {
@@ -138,26 +94,14 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       setError(null);
 
       try {
-        const [overviewRes, completionsRes, checkInsRes, logsRes] = await Promise.all([
+        const [overviewRes, logsRes] = await Promise.all([
           fetch(`${apiUrl}/programs/analytics/patient/${patientId}?days=${timeRange}`),
-          fetch(`${apiUrl}/programs/exercise-completions/patient/${patientId}?days=${timeRange}`),
-          fetch(`${apiUrl}/check-ins/patient/${patientId}?days=${timeRange}`),
           fetch(`${apiUrl}/programs/progression-logs/patient/${patientId}?limit=50`),
         ]);
 
         if (!overviewRes.ok) throw new Error(`Failed to fetch analytics: ${overviewRes.status}`);
         const overviewJson = await overviewRes.json();
         setOverviewData(overviewJson.overview);
-
-        if (completionsRes.ok) {
-          const completionsJson = await completionsRes.json();
-          setExerciseCompletions(completionsJson.completions || []);
-        }
-
-        if (checkInsRes.ok) {
-          const checkInsJson = await checkInsRes.json();
-          setCheckIns(checkInsJson.checkIns || []);
-        }
 
         if (logsRes.ok) {
           const logsJson = await logsRes.json();
@@ -181,9 +125,6 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       totalCompleted: overviewData.totalCompleted,
       completionRate: overviewData.completionRate,
       streak: overviewData.streak,
-      weightProgression: overviewData.weightProgression || [],
-      weeklyActivity: overviewData.weeklyActivity || [],
-      nextMilestone: overviewData.nextMilestone,
       recentWins: overviewData.recentWins || [],
       alerts: overviewData.alerts || [],
       avgRpe: overviewData.avgRpe || { value: 0, trend: 'stable' as const },
@@ -192,13 +133,6 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       checkInSummary: overviewData.checkInSummary,
     };
   }, [overviewData]);
-
-  const visibleCompletions = useMemo(() => {
-    if (isPatientView) {
-      return showAllCompletions ? exerciseCompletions : exerciseCompletions.slice(0, 5);
-    }
-    return showAllCompletions ? exerciseCompletions : exerciseCompletions.slice(0, 10);
-  }, [exerciseCompletions, showAllCompletions, isPatientView]);
 
   // ── Error State ───────────────────────────────────────────────────
   if (error) {
@@ -239,144 +173,6 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
     );
   }
 
-  // ── Shared: Activity Chart ────────────────────────────────────────
-  const renderActivityChart = () => {
-    if (stats.weeklyActivity.length === 0) return null;
-
-    return (
-      <div className="bg-white rounded-xl ring-1 ring-slate-200 p-4 sm:p-6">
-        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Activity</h4>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-500">Last {timeRange} days</span>
-            <span className="text-sm font-medium text-slate-800">
-              {stats.weeklyActivity.filter(d => d.count > 0).length} active days
-            </span>
-          </div>
-
-          <div className="relative h-24 sm:h-32">
-            <div className="absolute inset-0 flex items-end justify-between gap-0.5 sm:gap-1">
-              {stats.weeklyActivity.map((day, index) => {
-                const maxCount = Math.max(...stats.weeklyActivity.map(d => d.count), 1);
-                const heightPercent = (day.count / maxCount) * 100;
-                const status = day.status || 'rest';
-
-                const getBarColor = () => {
-                  switch (status) {
-                    case 'full': return 'bg-green-500 hover:bg-green-600';
-                    case 'partial': return 'bg-yellow-500 hover:bg-yellow-600';
-                    case 'missed': return 'bg-red-400 hover:bg-red-500';
-                    case 'rest': return 'bg-slate-200';
-                    case 'future': return 'bg-slate-100 border border-dashed border-slate-300';
-                    default: return 'bg-slate-200';
-                  }
-                };
-
-                return (
-                  <div
-                    key={index}
-                    className="flex-1 flex flex-col items-center group relative"
-                    style={{ minWidth: '8px' }}
-                  >
-                    {(status !== 'rest' && status !== 'future') && (
-                      <div className="absolute bottom-full mb-2 hidden group-hover:block bg-slate-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10 pointer-events-none">
-                        {day.dayLabel}: {day.count} {day.count === 1 ? 'exercise' : 'exercises'}
-                        {status === 'full' && ' ✓'}
-                        {status === 'missed' && ' (missed)'}
-                      </div>
-                    )}
-
-                    <div
-                      className={`w-full rounded-t transition-all ${getBarColor()}`}
-                      style={{
-                        height: day.count > 0 ? `${heightPercent}%` : (status === 'missed' ? '8px' : '4px'),
-                        minHeight: day.count > 0 ? '8px' : '4px'
-                      }}
-                    />
-
-                    {(timeRange === 7 || index % Math.ceil(timeRange / 7) === 0) && (
-                      <span className="text-xs text-slate-400 mt-1 hidden sm:block">
-                        {day.dayLabel.split(' ')[1]}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center gap-4 text-xs text-slate-500 pt-2 border-t border-slate-100">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-green-500" />
-              <span>All done</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-yellow-500" />
-              <span>Partial</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-red-400" />
-              <span>Missed</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-slate-200" />
-              <span>Rest</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ── Shared: Weight Progression ────────────────────────────────────
-  const renderWeightProgression = () => {
-    if (stats.weightProgression.length === 0) return null;
-
-    return (
-      <div className="bg-white rounded-xl ring-1 ring-slate-200 p-4 sm:p-6">
-        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4 flex items-center gap-2">
-          <TrendingUp size={14} className="text-green-600" />
-          Weight Progression
-        </h4>
-        <div className="space-y-3">
-          {stats.weightProgression.slice(0, 5).map((exercise, index) => (
-            <div key={index} className="border-b border-slate-100 last:border-0 pb-3 last:pb-0">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-slate-800 truncate pr-2">
-                  {exercise.exerciseName}
-                </p>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={`text-sm font-bold ${
-                    exercise.change > 0 ? 'text-green-600' : exercise.change < 0 ? 'text-red-600' : 'text-slate-600'
-                  }`}>
-                    {exercise.change > 0 ? '+' : ''}{exercise.change} kg
-                  </span>
-                  {exercise.changePercent !== 0 && (
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${
-                      exercise.change > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {exercise.changePercent > 0 ? '+' : ''}{exercise.changePercent}%
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <span>{exercise.startWeight} kg</span>
-                <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${exercise.change > 0 ? 'bg-primary-400' : 'bg-slate-400'}`}
-                    style={{ width: '100%' }}
-                  />
-                </div>
-                <span className="font-medium text-slate-800">{exercise.currentWeight} kg</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
   // ── Shared: Trend Icon ────────────────────────────────────────────
   const TrendIcon = ({ trend, upColor = 'text-green-500', downColor = 'text-red-500' }: { trend: string; upColor?: string; downColor?: string }) => {
     if (trend === 'up') return <TrendingUp size={16} className={upColor} />;
@@ -384,30 +180,34 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
     return <Minus size={16} className="text-slate-400" />;
   };
 
+  // ── Time Range Selector (shared) ──────────────────────────────────
+  const timeRangeSelector = (
+    <div className="flex items-center justify-end">
+      <div className="flex gap-1.5">
+        {([7, 14, 30] as const).map((days) => (
+          <button
+            key={days}
+            onClick={() => setTimeRange(days)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              timeRange === days
+                ? 'bg-primary-400 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {days}d
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   // ══════════════════════════════════════════════════════════════════
   // PATIENT VIEW
   // ══════════════════════════════════════════════════════════════════
   if (isPatientView) {
     return (
       <div className="space-y-5">
-        {/* Time Range Selector */}
-        <div className="flex items-center justify-end">
-          <div className="flex gap-1.5">
-            {([7, 14, 30] as const).map((days) => (
-              <button
-                key={days}
-                onClick={() => setTimeRange(days)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  timeRange === days
-                    ? 'bg-primary-400 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {days}d
-              </button>
-            ))}
-          </div>
-        </div>
+        {timeRangeSelector}
 
         {/* Hero Metrics — 2 gradient cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -457,9 +257,6 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
           </div>
         </div>
 
-        {/* Activity Chart */}
-        {renderActivityChart()}
-
         {/* Recent Wins */}
         {stats.recentWins.length > 0 && (
           <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl ring-1 ring-amber-200 p-4 sm:p-5">
@@ -477,96 +274,6 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
             </div>
           </div>
         )}
-
-        {/* Weight Progress */}
-        {renderWeightProgression()}
-
-        {/* Recent Completions — Card Format */}
-        {exerciseCompletions.length > 0 && (
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Recent Completions</h4>
-            {visibleCompletions.map((completion) => (
-              <div key={completion.id} className="bg-white rounded-xl ring-1 ring-slate-200 p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h5 className="text-sm font-medium text-slate-800">{completion.exerciseName}</h5>
-                    <p className="text-xs text-slate-400">
-                      {new Date(completion.completionDate).toLocaleDateString('en-US', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric'
-                      })}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1">Volume</p>
-                    <p className="text-sm">
-                      <span className={completion.setsPerformed >= completion.prescribedSets && completion.repsPerformed >= completion.prescribedReps ? 'text-green-700 font-medium' : 'text-slate-700'}>
-                        {completion.setsPerformed}×{completion.repsPerformed}
-                      </span>
-                      <span className="text-slate-300"> / </span>
-                      <span className="text-slate-400">{completion.prescribedSets}×{completion.prescribedReps}</span>
-                    </p>
-                  </div>
-
-                  {(completion.weightPerformed !== null && completion.weightPerformed > 0) && (
-                    <div>
-                      <p className="text-xs text-slate-400 mb-1">Weight</p>
-                      <p className="text-sm">
-                        <span className={completion.weightPerformed >= (completion.prescribedWeight ?? 0) ? 'text-green-700 font-medium' : 'text-slate-700'}>
-                          {completion.weightPerformed} kg
-                        </span>
-                        {completion.prescribedWeight !== null && completion.prescribedWeight > 0 && (
-                          <>
-                            <span className="text-slate-300"> / </span>
-                            <span className="text-slate-400">{completion.prescribedWeight} kg</span>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  )}
-
-                  {completion.rpeRating !== null && (
-                    <div>
-                      <p className="text-xs text-slate-400 mb-1">RPE</p>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getRpeBadge(completion.rpeRating)}`}>
-                        {completion.rpeRating}/10
-                      </span>
-                    </div>
-                  )}
-
-                  {completion.painLevel !== null && (
-                    <div>
-                      <p className="text-xs text-slate-400 mb-1">Pain</p>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getPainBadge(completion.painLevel)}`}>
-                        {completion.painLevel}/10
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {completion.notes && (
-                  <div className="pt-3 mt-3 border-t border-slate-100">
-                    <p className="text-xs text-slate-400 mb-1">Notes</p>
-                    <p className="text-sm text-slate-600">{completion.notes}</p>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {exerciseCompletions.length > 5 && (
-              <button
-                onClick={() => setShowAllCompletions(!showAllCompletions)}
-                className="w-full py-2 text-sm font-medium text-primary-400 hover:text-primary-500 transition-colors"
-              >
-                {showAllCompletions ? 'Show Less' : `Show All (${exerciseCompletions.length})`}
-              </button>
-            )}
-          </div>
-        )}
       </div>
     );
   }
@@ -576,24 +283,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
   // ══════════════════════════════════════════════════════════════════
   return (
     <div className="space-y-5">
-      {/* Time Range Selector */}
-      <div className="flex items-center justify-end">
-        <div className="flex gap-1.5">
-          {([7, 14, 30] as const).map((days) => (
-            <button
-              key={days}
-              onClick={() => setTimeRange(days)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                timeRange === days
-                  ? 'bg-primary-400 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {days}d
-            </button>
-          ))}
-        </div>
-      </div>
+      {timeRangeSelector}
 
       {/* Alert Banner */}
       {stats.alerts.length > 0 && (
@@ -679,9 +369,6 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
         </div>
       </div>
 
-      {/* Activity Chart */}
-      {renderActivityChart()}
-
       {/* Check-In Summary */}
       {stats.checkInSummary && (
         <div className="bg-white rounded-xl ring-1 ring-slate-200 p-4 sm:p-6">
@@ -747,106 +434,6 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Weight Progression */}
-      {renderWeightProgression()}
-
-      {/* Recent Exercise Completions — Table */}
-      {exerciseCompletions.length > 0 && (
-        <div className="bg-white rounded-xl ring-1 ring-slate-200 overflow-hidden">
-          <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3">
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Recent Completions</h4>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-y border-slate-100">
-                <tr>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Date</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Exercise</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Volume</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Weight</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">RPE</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Pain</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Notes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {visibleCompletions.map((completion) => (
-                  <tr key={completion.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 text-sm text-slate-600 whitespace-nowrap">
-                      {new Date(completion.completionDate).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric'
-                      })}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-medium text-slate-800">
-                      {completion.exerciseName}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <span className={completion.setsPerformed >= completion.prescribedSets && completion.repsPerformed >= completion.prescribedReps ? 'text-green-700 font-medium' : 'text-slate-700'}>
-                        {completion.setsPerformed}×{completion.repsPerformed}
-                      </span>
-                      <span className="text-slate-300"> / </span>
-                      <span className="text-slate-400">
-                        {completion.prescribedSets}×{completion.prescribedReps}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {completion.weightPerformed !== null && completion.weightPerformed > 0 ? (
-                        <>
-                          <span className={completion.weightPerformed >= (completion.prescribedWeight ?? 0) ? 'text-green-700 font-medium' : 'text-slate-700'}>
-                            {completion.weightPerformed} kg
-                          </span>
-                          {completion.prescribedWeight !== null && completion.prescribedWeight > 0 && (
-                            <>
-                              <span className="text-slate-300"> / </span>
-                              <span className="text-slate-400">{completion.prescribedWeight} kg</span>
-                            </>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {completion.rpeRating !== null ? (
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getRpeBadge(completion.rpeRating)}`}>
-                          {completion.rpeRating}/10
-                        </span>
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {completion.painLevel !== null ? (
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getPainBadge(completion.painLevel)}`}>
-                          {completion.painLevel}/10
-                        </span>
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-500 max-w-xs truncate">
-                      {completion.notes || '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {exerciseCompletions.length > 10 && (
-            <div className="px-4 sm:px-6 py-3 border-t border-slate-100">
-              <button
-                onClick={() => setShowAllCompletions(!showAllCompletions)}
-                className="text-sm font-medium text-primary-400 hover:text-primary-500 transition-colors"
-              >
-                {showAllCompletions ? 'Show Less' : `Show All (${exerciseCompletions.length})`}
-              </button>
-            </div>
-          )}
         </div>
       )}
 
