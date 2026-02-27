@@ -16,7 +16,7 @@ Moveify is a clinical exercise prescription and patient management platform (sim
 - **React 19** with TypeScript 5.9
 - **Vite 7** for dev server and builds
 - **Tailwind CSS 3** for styling (utility-first, no CSS modules or styled-components)
-- **React Router DOM 7** for client-side routing
+- **React Router DOM 7** for public routes only (login, setup-password, reset-password)
 - **@dnd-kit** for drag-and-drop (program builder exercise reordering)
 - **Lucide React** for icons
 
@@ -69,6 +69,7 @@ frontend/src/
 ### Styling
 
 - **Tailwind utility classes only** — never write custom CSS unless absolutely necessary
+- **Fonts:** `font-display` = Sora (headings), `font-sans` = DM Sans (body text)
 - Use the Moveify brand color palette defined in `tailwind.config.js`:
   - Primary: `primary-400` (teal `#46c1c0`) — buttons, links, accents
   - Secondary: `secondary-500` (navy `#132232`) — headers, dark backgrounds
@@ -83,6 +84,7 @@ frontend/src/
 - Use `ConfirmModal` for destructive action confirmations
 - Use `NotificationModal` for toast-like feedback
 - Drag-and-drop uses `@dnd-kit` — follow existing `ProgramBuilder.tsx` patterns
+- **Modals are fully controlled by App.tsx** — parent manages `show*Modal` boolean state and passes `onClose`/`onUpdate` callbacks. Modals never manage their own open/close state.
 
 ### API Integration
 
@@ -120,13 +122,118 @@ cd backend && npm run dev       # Nodemon dev server on :3000
 cd backend && npm start         # Production server
 ```
 
+## Frontend Navigation
+
+**Authenticated pages do NOT use React Router.** Navigation is state-driven via `currentPage` in App.tsx:
+
+- `'exercises'` → ExerciseLibrary + ProgramBuilder (side by side)
+- `'patients'` → PatientsPage
+- `'programs'` → PatientProfile (viewing a specific patient's programs)
+- `'education'` → EducationLibrary
+- `'analytics'` → ProgressAnalytics
+
+React Router is only used for public/unauthenticated routes: `/` (login), `/setup-password`, `/reset-password`.
+
+**Do not add new `<Route>` components for authenticated views.** Add new tabs by extending the `currentPage` state pattern.
+
+## App.tsx State
+
+App.tsx is the **centralized state monolith** (~60+ state variables). All child components receive state via props. Key state categories:
+
+- **Auth:** `isLoggedIn`, `userRole`, `loggedInPatient`, `loggedInUser`
+- **Navigation:** `currentPage`, `viewingPatient`, `viewingProgramIndex`
+- **Program builder:** `programExercises`, `programName`, `selectedPatient`, `programConfig`, `pendingBlockData`
+- **Patients:** `patients` (all), `newPatient` (form), `editingPatient`
+- **Modals:** 13 separate `show*Modal` booleans
+- **Notifications:** `notification` (success/error toast)
+
+When adding new state, add it to App.tsx and pass via props. Do not introduce Context API or external state management.
+
+## Auth & Security
+
+### Current auth flow
+
+1. **Login:** `POST /api/auth/login` → returns user object → stored in App.tsx state (no JWT, no session cookie)
+2. **Invitation:** clinician generates invite → creates user row with `password_hash = NULL` → patient receives email link → sets password via `/setup-password`
+3. **Password reset:** `POST /api/auth/forgot-password` → token (1hr expiry) → email link → `POST /api/auth/reset-password`
+
+### Critical: No backend auth middleware
+
+**Backend routes have NO authentication or authorization middleware.** Routes trust the client to send correct `userId`/`patientId`. There is no `req.user`, no JWT verification, no session validation on the server.
+
+This is a **known security gap**. When adding new routes, follow the existing pattern but be aware this needs to be addressed. Do not assume any middleware exists that protects routes.
+
+## Backend API Routes
+
+All routes are prefixed with `/api`. Key endpoints:
+
+| Route file | Prefix | Key endpoints |
+|-----------|--------|---------------|
+| `auth.js` | `/api/auth` | `POST /signup`, `POST /login`, `POST /forgot-password`, `POST /reset-password` |
+| `invitations.js` | `/api/invitations` | `POST /generate`, `GET /validate/:token`, `POST /set-password` |
+| `patients.js` | `/api/patients` | `GET /`, `GET /:id`, `DELETE /:id` |
+| `programs.js` | `/api/programs` | `GET /patient/:patientId`, `POST /patient/:patientId`, `PUT /:programId`, `DELETE /:programId`, `PATCH /exercise/:exerciseId/complete`, `GET /analytics/:patientId` |
+| `exercises.js` | `/api/exercises` | `GET /clinician/:clinicianId`, `POST /`, `PUT /:exerciseId`, `DELETE /:exerciseId`, favorites CRUD |
+| `check-ins.js` | `/api/check-ins` | `POST /`, `GET /today/:patientId`, `GET /history/:patientId`, `GET /averages/:patientId` |
+| `education.js` | `/api/education` | modules CRUD, `POST /patient/:patientId/modules/:moduleId` (assign), `POST .../viewed` |
+| `blocks.js` | `/api/blocks` | templates CRUD, `POST /:programId` (create block), `GET /:programId` |
+
+## Database Schema
+
+Defined in `backend/database/init.js`. Key tables:
+
+| Table | Key columns | Notes |
+|-------|-------------|-------|
+| `users` | id, email, password_hash, role (`'clinician'`/`'patient'`), name, dob, phone, condition | Single table for both roles |
+| `programs` | patient_id, clinician_id, name, frequency, start_date, duration | `frequency` is a **JSON string** (e.g., `'["Mon","Wed","Fri"]'`) — must `JSON.parse()` on read |
+| `program_exercises` | program_id, exercise_name, sets, reps, prescribed_weight, exercise_order | `prescribed_weight` is **nullable** — not all programs track weight |
+| `exercise_completions` | exercise_id, patient_id, completion_date, sets/reps/weight_performed, rpe_rating, pain_level | `completion_date` is **DATE not DATETIME** — only tracks day, not time |
+| `daily_check_ins` | patient_id, check_in_date, overall_feeling (1-5), general_pain_level (0-10), energy_level (1-5), sleep_quality (1-5) | One per patient per day |
+| `exercises` | clinician_id, name, category, joint_area, muscle_group, equipment, video_url | Custom exercises. Metadata fields are **comma-separated strings** (e.g., `"Knee, Hip"`) |
+| `block_schedules` | program_id, block_duration (4/6/8 weeks), current_week, status | Periodization blocks |
+| `education_modules` | title, content, category, estimated_duration_minutes, created_by | Text/video education |
+
+### Database patterns
+
+- **Transactions:** use `const client = await db.getClient()` then `client.query('BEGIN')` / `COMMIT` / `ROLLBACK` / `client.release()`. Used in program creation.
+- **No joins in patient loading** — `patients.js` fetches patient → programs → exercises → completions in sequential queries (N+1 pattern)
+- **Date handling:** use `toLocalDateString()` helper to avoid UTC timezone shifts
+
+## Environment Variables
+
+### Backend (`backend/.env`)
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `PORT` | No | `3000` | Server port |
+| `NODE_ENV` | No | `development` | Environment mode |
+| `DATABASE_URL` | Yes (local) | — | PostgreSQL connection string (local dev) |
+| `INSTANCE_CONNECTION_NAME` | Yes (GCP) | — | Cloud SQL socket path (production) |
+| `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Yes (GCP) | — | Cloud SQL credentials (production) |
+| `CORS_ORIGIN` | No | `*` | Allowed CORS origin |
+| `FRONTEND_URL` | No | `http://localhost:5173` | Used in invitation/reset email links |
+| `RESEND_API_KEY` | No | — | Resend email API key (emails fail silently without it) |
+| `RESEND_FROM_EMAIL` | No | `onboarding@resend.dev` | Sender address |
+
+### Frontend (`frontend/.env`)
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `VITE_API_URL` | No | `http://{hostname}:3000/api` | Backend API URL (dynamic hostname fallback in `config.ts`) |
+
+## Known Technical Debt
+
+- **No backend auth middleware** — routes are unprotected (see Auth section above)
+- **N+1 queries** in `patients.js` patient loading — no SQL joins used
+- **Inconsistent API wrapper usage** — some frontend calls use `fetchWithRetry` from `utils/api.ts`, others use raw `fetch()` directly in App.tsx
+- **No error boundaries** for API failures — only React render errors caught by `ErrorBoundary.tsx`
+- **No test framework** — when adding tests, prefer Vitest (matches Vite ecosystem)
+
 ## Important Notes
 
 - The app is a **SPA with client-side routing** — all routes rewrite to index.html (configured in vercel.json)
-- No test framework is set up yet — when adding tests, prefer Vitest (matches Vite ecosystem)
 - The exercise library has 25+ built-in exercises in `data/exercises.ts` — clinicians can also create custom exercises
 - Page layouts should use `h-screen` with flex containers for proper scrolling (see recent git history for scroll fixes)
-- Auth is session-based with role checking — always handle both clinician and patient views when modifying shared components
 
 ## Privacy & Compliance (Australian Privacy Act 1988)
 
