@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+.env
+.env.*
+logs/
+*.db
+test-*.js
+test-*.html
+backend_test.log
+.git
+railway.toml
+ecosystem.config.js
+nodemon.json

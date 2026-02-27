@@ -1,20 +1,36 @@
 // PostgreSQL Database Connection Pool
 const { Pool } = require('pg');
 
-// Use DATABASE_URL for Railway, or construct from individual env vars for local
-const connectionString = process.env.DATABASE_URL;
+// Build pool config: Cloud SQL Unix socket (GCP) or DATABASE_URL (local/other)
+function getPoolConfig() {
+  const base = {
+    max: 5,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+    query_timeout: 15000,
+    statement_timeout: 15000,
+  };
 
-const pool = new Pool({
-  connectionString: connectionString,
-  // SSL required for Railway PostgreSQL
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  // Connection pool settings
-  max: 20, // Maximum number of connections (increased for production)
-  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-  connectionTimeoutMillis: 10000, // Wait up to 10 seconds for connection (increased from 2s)
-  query_timeout: 15000, // Query timeout of 15 seconds
-  statement_timeout: 15000, // Statement timeout of 15 seconds
-});
+  if (process.env.INSTANCE_CONNECTION_NAME) {
+    // Cloud Run + Cloud SQL: connect via Unix socket
+    return {
+      ...base,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      host: `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
+    };
+  }
+
+  // Local dev or other hosts: use DATABASE_URL
+  return {
+    ...base,
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  };
+}
+
+const pool = new Pool(getPoolConfig());
 
 // Test connection on startup
 pool.on('connect', () => {
