@@ -31,8 +31,10 @@ Moveify is a clinical exercise prescription and patient management platform (sim
 ### Deployment
 
 - Frontend: **Vercel** (vite build → `dist/`)
-- Backend: **Railway** (nixpacks)
+- Backend: **GCP Cloud Run** (Docker container) + **Cloud SQL PostgreSQL** (`australia-southeast1`)
 - Environment variable `VITE_API_URL` points frontend to backend (falls back to `localhost:3000`)
+- Cloud Run connects to Cloud SQL via Unix socket (`/cloudsql/{INSTANCE_CONNECTION_NAME}`)
+- `backend/Dockerfile` builds the container; `backend/database/db.js` switches between Cloud SQL socket and `DATABASE_URL` based on env vars
 
 ## Project Structure
 
@@ -125,6 +127,62 @@ cd backend && npm start         # Production server
 - The exercise library has 25+ built-in exercises in `data/exercises.ts` — clinicians can also create custom exercises
 - Page layouts should use `h-screen` with flex containers for proper scrolling (see recent git history for scroll fixes)
 - Auth is session-based with role checking — always handle both clinician and patient views when modifying shared components
+
+## Privacy & Compliance (Australian Privacy Act 1988)
+
+Moveify stores **sensitive health information** (patient demographics, conditions, pain scores, exercise completions, daily wellness check-ins). This carries legal obligations under Australian law. When writing code that touches patient data, always consider these requirements.
+
+### Why the Privacy Act applies
+
+- Health data is classified as **"sensitive information"** under the Privacy Act — the highest protection tier
+- **Health service providers are NOT exempt** from the Privacy Act regardless of revenue (the normal $3M small business exemption does not apply to health service providers — Privacy Act s6D(4))
+- Australia has **no controller/processor distinction** (unlike GDPR). Any entity that *holds* personal information is an APP entity with full obligations. This means both the clinics using Moveify AND Moveify as the platform are almost certainly covered, since Moveify holds the data
+- **Conservative position:** treat Moveify as fully covered by the Privacy Act and all 13 APPs. Consult a privacy lawyer to confirm the exact classification
+
+### Key obligations (Australian Privacy Principles)
+
+| APP | Requirement | What it means for Moveify |
+|-----|-------------|---------------------------|
+| **APP 3** | Collection — only collect sensitive info with consent and if reasonably necessary | Must have explicit consent flow; don't collect health data beyond what's needed |
+| **APP 5** | Notification — tell individuals what you collect, why, and who gets it | Requires a privacy policy displayed in-app |
+| **APP 6** | Use & disclosure — only for the primary purpose it was collected for | Don't repurpose patient health data (e.g., analytics, marketing) without consent |
+| **APP 8** | Cross-border disclosure — accountable if overseas recipient mishandles data | Data is in `australia-southeast1` (Sydney) so this is currently a non-issue. **Do not move Cloud SQL to a non-Australian region without legal review** |
+| **APP 11** | Security — take "reasonable steps" to protect from misuse, loss, unauthorized access | Encryption at rest/transit (Cloud SQL + Cloud Run defaults), access controls, bcrypt hashing, patching |
+| **APP 12** | Access — individuals can request access to their data | Need a data export/access mechanism |
+| **APP 13** | Correction — individuals can request correction of their data | Need ability for patients to request corrections |
+
+### Notifiable Data Breaches (NDB) scheme
+
+If a breach is **likely to cause serious harm**:
+1. **Assess** within **30 calendar days** of becoming aware (s26WH)
+2. **Notify the OAIC and all affected individuals** "as soon as practicable" after forming a reasonable belief the breach is eligible (s26WK, s26WL) — there is no fixed day count, but the OAIC enforces this strictly
+3. Health sector is the #1 reported breach category (~20% of all NDB notifications)
+
+### Current technical safeguards (in place)
+
+- Encryption at rest (Cloud SQL default) and in transit (HTTPS/TLS on Cloud Run)
+- Automated daily backups with 7-day retention
+- Data stored in `australia-southeast1` — no cross-border transfer
+- Non-root Docker container, no hardcoded credentials
+- Passwords hashed with bcrypt
+
+### Known compliance gaps (TODO)
+
+- **No privacy policy** displayed in-app (APP 1, APP 5)
+- **No explicit consent flow** for health data collection at signup (APP 3)
+- **No audit logging** of who accessed/modified patient records (APP 11)
+- **No data export or deletion** feature for patients (APP 12, APP 13, APP 11)
+- **No documented breach response plan** (NDB scheme)
+- **No data retention policy** — APP 11 requires destroying data no longer needed
+- **IAM permissions not yet reviewed** for least-privilege
+
+### Development guidelines
+
+- **Never log patient health data** (pain scores, conditions, check-in responses) to console or files — use anonymized IDs only
+- **Never expose health data in URLs** (query params, path segments)
+- **Always validate authorization** before returning patient data — a patient must only see their own data, a clinician only their own patients
+- **Treat all patient-facing endpoints as security-critical** — validate input, sanitize output, check roles
+- **Do not add analytics, tracking, or third-party scripts** that could access patient health data without explicit legal review
 
 ## Workflow
 
