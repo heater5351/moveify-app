@@ -90,22 +90,30 @@ process.on('SIGTERM', () => {
 
 // Initialize database and start server
 async function startServer() {
-  try {
-    // Initialize database tables
-    await initDatabase();
-    console.log('Database initialized');
+  // Start server first so Cloud Run health checks pass
+  server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    if (process.env.CORS_ORIGIN) {
+      console.log(`CORS origin: ${process.env.CORS_ORIGIN}`);
+    }
+  });
 
-    // Start server
-    server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      if (process.env.CORS_ORIGIN) {
-        console.log(`CORS origin: ${process.env.CORS_ORIGIN}`);
+  // Initialize database tables (retry for Cloud SQL proxy startup)
+  const maxRetries = 5;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await initDatabase();
+      console.log('Database initialized');
+      break;
+    } catch (error) {
+      console.error(`Database init attempt ${attempt}/${maxRetries} failed:`, error.message);
+      if (attempt === maxRetries) {
+        console.error('All database init attempts failed. Server is running but DB is not ready.');
+      } else {
+        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
       }
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
+    }
   }
 }
 
