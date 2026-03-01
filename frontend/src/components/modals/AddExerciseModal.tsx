@@ -63,7 +63,56 @@ const POSITION_OPTIONS = [
   'Prone',
   'Side-lying',
   'Quadruped',
-  'Kneeling'
+  'Kneeling',
+  'Hanging'
+];
+
+const JOINT_AREA_OPTIONS = [
+  'Hip',
+  'Knee',
+  'Shoulder',
+  'Elbow',
+  'Ankle',
+  'Spine',
+  'Wrist'
+];
+
+const MUSCLE_GROUP_OPTIONS = [
+  'Quadriceps',
+  'Glutes',
+  'Hamstrings',
+  'Chest',
+  'Triceps',
+  'Biceps',
+  'Lats',
+  'Deltoids',
+  'Abs',
+  'Obliques',
+  'Core',
+  'Lower Back',
+  'Calves',
+  'Forearms',
+  'Traps',
+  'Rhomboids',
+  'Rear Deltoids',
+  'Adductors',
+  'Hip Flexors',
+  'Rotator Cuff',
+  'Brachialis',
+  'Serratus'
+];
+
+const MOVEMENT_TYPE_OPTIONS = [
+  'Flexion',
+  'Extension',
+  'Abduction',
+  'Adduction',
+  'Rotation',
+  'External Rotation',
+  'Isometric',
+  'Elevation',
+  'Lateral Flexion',
+  'Plantar Flexion'
 ];
 
 export const AddExerciseModal = ({ clinicianId, onClose, onSuccess }: AddExerciseModalProps) => {
@@ -82,6 +131,15 @@ export const AddExerciseModal = ({ clinicianId, onClose, onSuccess }: AddExercis
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Toggle a value in a comma-separated string field
+  const toggleCheckboxValue = (field: 'jointArea' | 'muscleGroup' | 'movementType', value: string) => {
+    const current = formData[field] ? formData[field].split(',').map(v => v.trim()).filter(Boolean) : [];
+    const updated = current.includes(value)
+      ? current.filter(v => v !== value)
+      : [...current, value];
+    setFormData({ ...formData, [field]: updated.join(', ') });
+  };
 
   const handleSubmit = async () => {
     setError('');
@@ -260,34 +318,55 @@ export const AddExerciseModal = ({ clinicianId, onClose, onSuccess }: AddExercis
             Additional Metadata <span className="text-gray-400">(optional - helps with filtering)</span>
           </p>
 
-          {/* Joint/Area and Muscle Group Row */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Joint/Area
-              </label>
-              <input
-                type="text"
-                value={formData.jointArea}
-                onChange={(e) => setFormData({ ...formData, jointArea: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
-                placeholder="e.g., Knee, Hip"
-              />
-              <p className="text-xs text-gray-500 mt-1">Comma-separated for multiple</p>
+          {/* Joint/Area */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Joint/Area
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {JOINT_AREA_OPTIONS.map(option => {
+                const selected = formData.jointArea.split(',').map(v => v.trim()).includes(option);
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => toggleCheckboxValue('jointArea', option)}
+                    className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                      selected
+                        ? 'bg-moveify-teal text-white border-moveify-teal'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-moveify-teal'
+                    }`}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Muscle Group
-              </label>
-              <input
-                type="text"
-                value={formData.muscleGroup}
-                onChange={(e) => setFormData({ ...formData, muscleGroup: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
-                placeholder="e.g., Quadriceps, Glutes"
-              />
-              <p className="text-xs text-gray-500 mt-1">Comma-separated for multiple</p>
+          {/* Muscle Group */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Muscle Group
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {MUSCLE_GROUP_OPTIONS.map(option => {
+                const selected = formData.muscleGroup.split(',').map(v => v.trim()).includes(option);
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => toggleCheckboxValue('muscleGroup', option)}
+                    className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                      selected
+                        ? 'bg-moveify-teal text-white border-moveify-teal'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-moveify-teal'
+                    }`}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -296,14 +375,25 @@ export const AddExerciseModal = ({ clinicianId, onClose, onSuccess }: AddExercis
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Movement Type
             </label>
-            <input
-              type="text"
-              value={formData.movementType}
-              onChange={(e) => setFormData({ ...formData, movementType: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
-              placeholder="e.g., Flexion, Extension"
-            />
-            <p className="text-xs text-gray-500 mt-1">Comma-separated for multiple</p>
+            <div className="flex flex-wrap gap-2">
+              {MOVEMENT_TYPE_OPTIONS.map(option => {
+                const selected = formData.movementType.split(',').map(v => v.trim()).includes(option);
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => toggleCheckboxValue('movementType', option)}
+                    className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                      selected
+                        ? 'bg-moveify-teal text-white border-moveify-teal'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-moveify-teal'
+                    }`}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Equipment and Position Row */}

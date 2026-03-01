@@ -1,9 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, Play, Plus, Trash2, X, Star, Filter } from 'lucide-react';
 import type { ProgramExercise, Exercise, ExerciseFilters } from '../types/index.ts';
 import { exercises as defaultExercises } from '../data/exercises';
 import { AddExerciseModal } from './modals/AddExerciseModal';
 import { API_URL } from '../config';
+
+// Extract unique, sorted values from a comma-separated field across all exercises
+const extractUniqueValues = (exercises: Exercise[], field: keyof Exercise): string[] => {
+  const values = new Set<string>();
+  for (const ex of exercises) {
+    const val = ex[field];
+    if (typeof val === 'string' && val) {
+      for (const part of val.split(',')) {
+        const trimmed = part.trim();
+        if (trimmed) values.add(trimmed);
+      }
+    }
+  }
+  return Array.from(values).sort();
+};
+
+// Check if a comma-separated field contains an exact value (not substring)
+const fieldContainsValue = (fieldValue: string | undefined, filterValue: string): boolean => {
+  if (!fieldValue) return false;
+  return fieldValue.split(',').some(v => v.trim() === filterValue);
+};
+
+// Merge two string arrays, deduplicate and sort
+const mergeAndSort = (a: string[], b: string[]): string[] => {
+  return Array.from(new Set([...a, ...b])).sort();
+};
 
 // Exercise Detail Modal Component
 const ExerciseDetailModal = ({
@@ -98,7 +124,17 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
   const [filters, setFilters] = useState<ExerciseFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [filterOptions, setFilterOptions] = useState<{
+  // Extract filter options from hardcoded defaults (always available)
+  const defaultFilterOptions = useMemo(() => ({
+    jointAreas: extractUniqueValues(defaultExercises, 'jointArea'),
+    muscleGroups: extractUniqueValues(defaultExercises, 'muscleGroup'),
+    movementTypes: extractUniqueValues(defaultExercises, 'movementType'),
+    equipment: extractUniqueValues(defaultExercises, 'equipment'),
+    positions: extractUniqueValues(defaultExercises, 'position'),
+    categories: extractUniqueValues(defaultExercises, 'category'),
+  }), []);
+
+  const [apiFilterOptions, setApiFilterOptions] = useState<{
     jointAreas: string[];
     muscleGroups: string[];
     movementTypes: string[];
@@ -111,8 +147,18 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
     movementTypes: [],
     equipment: [],
     positions: [],
-    categories: ['Musculoskeletal', 'Women\'s Health', 'Neurological', 'Cardio', 'Balance', 'Flexibility']
+    categories: []
   });
+
+  // Merge default + API filter options
+  const filterOptions = useMemo(() => ({
+    jointAreas: mergeAndSort(defaultFilterOptions.jointAreas, apiFilterOptions.jointAreas),
+    muscleGroups: mergeAndSort(defaultFilterOptions.muscleGroups, apiFilterOptions.muscleGroups),
+    movementTypes: mergeAndSort(defaultFilterOptions.movementTypes, apiFilterOptions.movementTypes),
+    equipment: mergeAndSort(defaultFilterOptions.equipment, apiFilterOptions.equipment),
+    positions: mergeAndSort(defaultFilterOptions.positions, apiFilterOptions.positions),
+    categories: mergeAndSort(defaultFilterOptions.categories, apiFilterOptions.categories),
+  }), [defaultFilterOptions, apiFilterOptions]);
 
   // Fetch custom exercises for this clinician
   useEffect(() => {
@@ -192,14 +238,14 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
       const response = await fetch(`${API_URL}/exercises/filter-options`);
       if (response.ok) {
         const data = await response.json();
-        setFilterOptions(prev => ({
-          ...prev,
+        setApiFilterOptions({
           jointAreas: data.jointAreas || [],
           muscleGroups: data.muscleGroups || [],
           movementTypes: data.movementTypes || [],
           equipment: data.equipment || [],
-          positions: data.positions || []
-        }));
+          positions: data.positions || [],
+          categories: data.categories || []
+        });
       }
     } catch (error) {
       console.error('Failed to fetch filter options:', error);
@@ -275,78 +321,35 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
     }
   };
 
+  // Shared filter function — applies search, filters, and favorites
+  const applyFilters = (exerciseList: Exercise[]): Exercise[] => {
+    const search = searchTerm.toLowerCase();
+    return exerciseList.filter(exercise => {
+      const matchesSearch =
+        exercise.name.toLowerCase().includes(search) ||
+        exercise.category.toLowerCase().includes(search);
+
+      const matchesCategory = !filters.category || exercise.category === filters.category;
+      const matchesJoint = !filters.jointArea || fieldContainsValue(exercise.jointArea, filters.jointArea);
+      const matchesMuscle = !filters.muscleGroup || fieldContainsValue(exercise.muscleGroup, filters.muscleGroup);
+      const matchesMovement = !filters.movementType || fieldContainsValue(exercise.movementType, filters.movementType);
+      const matchesEquipment = !filters.equipment || fieldContainsValue(exercise.equipment, filters.equipment);
+      const matchesPosition = !filters.position || fieldContainsValue(exercise.position, filters.position);
+
+      const exerciseKey = `${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`;
+      const matchesFavorites = !filters.showFavoritesOnly || favorites.has(exerciseKey);
+
+      return matchesSearch && matchesCategory && matchesJoint && matchesMuscle &&
+             matchesMovement && matchesEquipment && matchesPosition &&
+             matchesFavorites;
+    });
+  };
+
   // Combine default and custom exercises
   const allExercises = [...defaultExercises, ...customExercises];
-
-  const filteredExercises = allExercises.filter(exercise => {
-    // Text search
-    const matchesSearch =
-      exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      exercise.category.toLowerCase().includes(searchTerm.toLowerCase());
-
-    // Filter matching (use .includes() for comma-separated)
-    const matchesCategory = !filters.category || exercise.category === filters.category;
-    const matchesJoint = !filters.jointArea || exercise.jointArea?.includes(filters.jointArea);
-    const matchesMuscle = !filters.muscleGroup || exercise.muscleGroup?.includes(filters.muscleGroup);
-    const matchesMovement = !filters.movementType || exercise.movementType?.includes(filters.movementType);
-    const matchesEquipment = !filters.equipment || exercise.equipment?.includes(filters.equipment);
-    const matchesPosition = !filters.position || exercise.position?.includes(filters.position);
-
-    // Favorites filter
-    const exerciseKey = `${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`;
-    const matchesFavorites = !filters.showFavoritesOnly || favorites.has(exerciseKey);
-
-    return matchesSearch && matchesCategory && matchesJoint && matchesMuscle &&
-           matchesMovement && matchesEquipment && matchesPosition &&
-           matchesFavorites;
-  });
-
-  // Separate custom and default filtered exercises
-  const filteredCustom = customExercises.filter(exercise => {
-    // Text search
-    const matchesSearch =
-      exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      exercise.category.toLowerCase().includes(searchTerm.toLowerCase());
-
-    // Filter matching (use .includes() for comma-separated)
-    const matchesCategory = !filters.category || exercise.category === filters.category;
-    const matchesJoint = !filters.jointArea || exercise.jointArea?.includes(filters.jointArea);
-    const matchesMuscle = !filters.muscleGroup || exercise.muscleGroup?.includes(filters.muscleGroup);
-    const matchesMovement = !filters.movementType || exercise.movementType?.includes(filters.movementType);
-    const matchesEquipment = !filters.equipment || exercise.equipment?.includes(filters.equipment);
-    const matchesPosition = !filters.position || exercise.position?.includes(filters.position);
-
-    // Favorites filter
-    const exerciseKey = `${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`;
-    const matchesFavorites = !filters.showFavoritesOnly || favorites.has(exerciseKey);
-
-    return matchesSearch && matchesCategory && matchesJoint && matchesMuscle &&
-           matchesMovement && matchesEquipment && matchesPosition &&
-           matchesFavorites;
-  });
-
-  const filteredDefault = defaultExercises.filter(exercise => {
-    // Text search
-    const matchesSearch =
-      exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      exercise.category.toLowerCase().includes(searchTerm.toLowerCase());
-
-    // Filter matching (use .includes() for comma-separated)
-    const matchesCategory = !filters.category || exercise.category === filters.category;
-    const matchesJoint = !filters.jointArea || exercise.jointArea?.includes(filters.jointArea);
-    const matchesMuscle = !filters.muscleGroup || exercise.muscleGroup?.includes(filters.muscleGroup);
-    const matchesMovement = !filters.movementType || exercise.movementType?.includes(filters.movementType);
-    const matchesEquipment = !filters.equipment || exercise.equipment?.includes(filters.equipment);
-    const matchesPosition = !filters.position || exercise.position?.includes(filters.position);
-
-    // Favorites filter
-    const exerciseKey = `${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`;
-    const matchesFavorites = !filters.showFavoritesOnly || favorites.has(exerciseKey);
-
-    return matchesSearch && matchesCategory && matchesJoint && matchesMuscle &&
-           matchesMovement && matchesEquipment && matchesPosition &&
-           matchesFavorites;
-  });
+  const filteredExercises = applyFilters(allExercises);
+  const filteredCustom = applyFilters(customExercises);
+  const filteredDefault = applyFilters(defaultExercises);
 
   return (
     <div className="h-full flex flex-col min-h-0">
