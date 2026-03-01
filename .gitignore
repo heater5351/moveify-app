@@ -18,5 +18,8 @@ Thumbs.db
 # Claude/ngrok temp files
 ngrok.yml
 
+# Service account keys
+*-service-account.json
+
 # Old files
 *.tsx.bak

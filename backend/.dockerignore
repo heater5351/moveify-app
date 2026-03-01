@@ -11,3 +11,4 @@ backend_test.log
 railway.toml
 ecosystem.config.js
 nodemon.json
+*-service-account.json

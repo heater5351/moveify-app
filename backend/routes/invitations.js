@@ -3,6 +3,7 @@ const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const db = require('../database/db');
+const { sendInvitationEmail } = require('../services/email');
 
 const router = express.Router();
 
@@ -44,6 +45,14 @@ router.post('/generate', async (req, res) => {
     // Generate invitation URL - use env var in production
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const invitationUrl = `${baseUrl}/setup-password?token=${token}`;
+
+    // Send invitation email
+    try {
+      await sendInvitationEmail(email, name, invitationUrl);
+    } catch (emailError) {
+      console.error('Failed to send invitation email:', emailError);
+      // Still return success — invitation was created, email just failed
+    }
 
     res.json({
       message: 'Invitation created successfully',
