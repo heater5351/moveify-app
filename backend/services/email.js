@@ -73,44 +73,89 @@ async function sendEmail(to, subject, htmlBody, textBody) {
   return result.data;
 }
 
+// Shared email wrapper — clean, professional layout matching Moveify brand
+function wrapEmail(content) {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; padding: 40px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 480px; background-color: #ffffff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+        <!-- Header -->
+        <tr>
+          <td style="padding: 32px 32px 0 32px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 700; color: #46c1c0; letter-spacing: -0.5px;">moveify</div>
+          </td>
+        </tr>
+        <!-- Content -->
+        <tr>
+          <td style="padding: 24px 32px 32px 32px;">
+            ${content}
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="padding: 0 32px 24px 32px; text-align: center; border-top: 1px solid #f1f5f9;">
+            <p style="margin: 16px 0 0 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
+              Moveify Health Pty Ltd<br>
+              This is an automated message — please do not reply directly.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 async function sendPasswordResetEmail(toEmail, resetToken) {
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
 
-  const htmlBody = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px;">
-      <h2 style="color: #46c1c0; margin-bottom: 16px;">Reset Your Password</h2>
-      <p>You requested to reset your password for your Moveify account.</p>
-      <p>Click the button below to set a new password:</p>
-      <a href="${resetUrl}" style="display: inline-block; background-color: #46c1c0; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 16px 0; font-weight: 600;">Reset Password</a>
-      <p style="color: #666; font-size: 14px;">This link will expire in 1 hour.</p>
-      <p style="color: #666; font-size: 14px;">If you didn't request this, you can safely ignore this email.</p>
-      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
-      <p style="color: #999; font-size: 12px;">Moveify — Clinical Exercise Platform</p>
-    </div>
-  `;
+  const htmlBody = wrapEmail(`
+    <h2 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600; color: #132232;">Reset your password</h2>
+    <p style="margin: 0 0 20px 0; font-size: 14px; color: #64748b; line-height: 1.6;">
+      We received a request to reset the password for your Moveify account. Click the button below to choose a new one.
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr><td align="center" style="padding: 4px 0 20px 0;">
+        <a href="${resetUrl}" style="display: inline-block; background-color: #46c1c0; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 600;">Reset password</a>
+      </td></tr>
+    </table>
+    <p style="margin: 0 0 4px 0; font-size: 13px; color: #94a3b8;">This link expires in 1 hour.</p>
+    <p style="margin: 0; font-size: 13px; color: #94a3b8;">If you didn't request this, you can safely ignore this email.</p>
+  `);
 
-  const textBody = `Reset your Moveify password\n\nClick this link to reset your password: ${resetUrl}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, ignore this email.`;
+  const textBody = `Reset your Moveify password\n\nWe received a request to reset your password. Visit this link to choose a new one:\n\n${resetUrl}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, ignore this email.`;
 
   return sendEmail(toEmail, 'Reset your Moveify password', htmlBody, textBody);
 }
 
 async function sendInvitationEmail(toEmail, patientName, invitationUrl) {
-  const htmlBody = `
-    <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px;">
-      <h2 style="color: #46c1c0; margin-bottom: 16px;">Welcome to Moveify</h2>
-      <p>Hi ${patientName},</p>
-      <p>Your clinician has set up a Moveify account for you to manage your exercise program.</p>
-      <p>Click the button below to set your password and get started:</p>
-      <a href="${invitationUrl}" style="display: inline-block; background-color: #46c1c0; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 16px 0; font-weight: 600;">Set Up Your Account</a>
-      <p style="color: #666; font-size: 14px;">This link will expire in 7 days.</p>
-      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
-      <p style="color: #999; font-size: 12px;">Moveify — Clinical Exercise Platform</p>
+  const firstName = patientName.split(' ')[0];
+
+  const htmlBody = wrapEmail(`
+    <h2 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600; color: #132232;">Welcome to Moveify</h2>
+    <p style="margin: 0 0 20px 0; font-size: 14px; color: #64748b; line-height: 1.6;">
+      Hi ${firstName}, your clinician has created an account for you on Moveify to manage your exercise program. Set your password below to get started.
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr><td align="center" style="padding: 4px 0 20px 0;">
+        <a href="${invitationUrl}" style="display: inline-block; background-color: #46c1c0; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 600;">Set up your account</a>
+      </td></tr>
+    </table>
+    <div style="background-color: #f8fafc; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+      <p style="margin: 0 0 4px 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Your email</p>
+      <p style="margin: 0; font-size: 14px; color: #334155; font-weight: 500;">${toEmail}</p>
     </div>
-  `;
+    <p style="margin: 0; font-size: 13px; color: #94a3b8;">This link expires in 7 days. If you weren't expecting this, please disregard.</p>
+  `);
 
-  const textBody = `Welcome to Moveify\n\nHi ${patientName},\n\nYour clinician has set up a Moveify account for you.\n\nSet your password here: ${invitationUrl}\n\nThis link expires in 7 days.`;
+  const textBody = `Welcome to Moveify\n\nHi ${firstName},\n\nYour clinician has created a Moveify account for you to manage your exercise program.\n\nSet your password here: ${invitationUrl}\n\nYour email: ${toEmail}\n\nThis link expires in 7 days.`;
 
-  return sendEmail(toEmail, 'Set up your Moveify account', htmlBody, textBody);
+  return sendEmail(toEmail, `${firstName}, set up your Moveify account`, htmlBody, textBody);
 }
 
 module.exports = {
