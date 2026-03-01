@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Copy, Check } from 'lucide-react';
+import { X, Mail } from 'lucide-react';
 import type { NewPatient } from '../../types/index.ts';
 import { API_URL } from '../../config';
 
@@ -12,10 +12,9 @@ interface AddPatientModalProps {
 
 export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: AddPatientModalProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [invitationUrl, setInvitationUrl] = useState('');
+  const [invitationSent, setInvitationSent] = useState(false);
   const [expiresAt, setExpiresAt] = useState('');
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
 
   const handleGenerateInvitation = async () => {
     setError('');
@@ -46,7 +45,7 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
       const data = await response.json();
 
       if (response.ok) {
-        setInvitationUrl(data.invitationUrl);
+        setInvitationSent(true);
         setExpiresAt(data.expiresAt);
         // Call onSuccess to refresh patient list
         if (onSuccess) {
@@ -62,64 +61,36 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
     }
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(invitationUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   // If invitation was generated, show success screen
-  if (invitationUrl) {
+  if (invitationSent) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl max-w-2xl w-full p-6">
+        <div className="bg-white rounded-xl max-w-md w-full p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-2xl font-bold text-gray-900">Invitation Created!</h3>
+            <h3 className="text-2xl font-bold font-display text-secondary-500">Invitation Sent</h3>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
               <X size={24} />
             </button>
           </div>
 
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <p className="text-green-800 font-medium mb-2">✓ Invitation sent successfully</p>
-            <p className="text-sm text-green-700">
-              Patient: <strong>{newPatient.name}</strong> ({newPatient.email})
-            </p>
-            <p className="text-sm text-green-700">
-              Expires: <strong>{new Date(expiresAt).toLocaleDateString()}</strong>
-            </p>
-          </div>
-
-          <div className="bg-primary-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Invitation Link (share this with the patient)
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={invitationUrl}
-                readOnly
-                className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm"
-              />
-              <button
-                onClick={handleCopyLink}
-                className="px-4 py-2 bg-moveify-teal text-white rounded-lg hover:bg-moveify-teal-dark flex items-center gap-2"
-              >
-                {copied ? <><Check size={16} /> Copied</> : <><Copy size={16} /> Copy</>}
-              </button>
+          <div className="flex flex-col items-center text-center mb-6">
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <Mail size={24} className="text-green-600" />
             </div>
+            <p className="text-gray-900 font-medium mb-1">
+              A setup email has been sent to
+            </p>
+            <p className="text-primary-400 font-semibold">{newPatient.email}</p>
           </div>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-600">
-              📧 <strong>Next steps:</strong> Send this link to the patient via email or SMS.
-              They will use it to set their password and create their account.
-            </p>
+          <div className="bg-gray-50 rounded-lg p-4 mb-6 text-sm text-gray-600 space-y-1">
+            <p><strong>{newPatient.name}</strong> will receive a link to set their password and access their account.</p>
+            <p>The link expires on <strong>{new Date(expiresAt).toLocaleDateString()}</strong>.</p>
           </div>
 
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-medium"
+            className="w-full px-4 py-2 bg-primary-400 text-white rounded-lg hover:bg-primary-500 font-medium"
           >
             Done
           </button>
@@ -236,7 +207,7 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
             disabled={isGenerating || !newPatient.name || !newPatient.email}
             className="flex-1 px-4 py-2 bg-moveify-teal text-white rounded-lg hover:bg-moveify-teal-dark font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            {isGenerating ? 'Generating...' : 'Generate Invitation'}
+            {isGenerating ? 'Sending...' : 'Send Invitation'}
           </button>
         </div>
       </div>
