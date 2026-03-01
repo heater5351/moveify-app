@@ -25,7 +25,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Hip, Knee',
     muscleGroup: 'Quadriceps, Glutes',
     movementType: 'Flexion, Extension',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Standing'
   },
   {
@@ -144,7 +144,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Hip, Knee',
     muscleGroup: 'Hamstrings, Glutes',
     movementType: 'Extension',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Standing'
   },
 
@@ -211,7 +211,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Shoulder, Elbow',
     muscleGroup: 'Deltoids, Triceps',
     movementType: 'Extension',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Seated'
   },
   {
@@ -278,7 +278,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Shoulder, Elbow',
     muscleGroup: 'Lats, Biceps, Rhomboids',
     movementType: 'Flexion',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Standing'
   },
   {
@@ -332,7 +332,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Elbow',
     muscleGroup: 'Biceps',
     movementType: 'Flexion',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Standing'
   },
   {
@@ -345,7 +345,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Elbow',
     muscleGroup: 'Biceps, Brachialis, Forearms',
     movementType: 'Flexion',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Standing'
   },
   {
@@ -371,7 +371,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Elbow',
     muscleGroup: 'Triceps',
     movementType: 'Extension',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Standing'
   },
   {
@@ -518,7 +518,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Spine',
     muscleGroup: 'Core, Obliques',
     movementType: 'Rotation',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Seated'
   },
   {
@@ -559,7 +559,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Shoulder',
     muscleGroup: 'Deltoids',
     movementType: 'Abduction',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Standing'
   },
   {
@@ -572,7 +572,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Shoulder',
     muscleGroup: 'Deltoids',
     movementType: 'Flexion',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Standing'
   },
   {
@@ -585,7 +585,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Shoulder',
     muscleGroup: 'Traps',
     movementType: 'Elevation',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Standing'
   },
   {
@@ -598,7 +598,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Shoulder, Elbow',
     muscleGroup: 'Deltoids, Triceps',
     movementType: 'Extension, Rotation',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Seated'
   },
   {
@@ -624,7 +624,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Shoulder',
     muscleGroup: 'Rear Deltoids, Rhomboids',
     movementType: 'Abduction',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Standing'
   },
   {
@@ -650,7 +650,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Elbow',
     muscleGroup: 'Biceps',
     movementType: 'Flexion',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Seated'
   },
   {
@@ -676,7 +676,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Elbow, Wrist',
     muscleGroup: 'Biceps, Forearms',
     movementType: 'Flexion, Rotation',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Standing'
   },
   {
@@ -888,7 +888,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Spine',
     muscleGroup: 'Core, Obliques',
     movementType: 'Lateral Flexion',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Standing'
   },
   {
@@ -901,7 +901,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Spine, Hip, Shoulder',
     muscleGroup: 'Core, Abs, Deltoids',
     movementType: 'Rotation, Extension',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Supine'
   },
   {
@@ -955,7 +955,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Shoulder',
     muscleGroup: 'Lats, Chest',
     movementType: 'Extension',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Supine'
   },
   {
@@ -994,7 +994,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Elbow',
     muscleGroup: 'Biceps',
     movementType: 'Flexion',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Seated'
   },
   {
@@ -1007,7 +1007,7 @@ export const exercises: Exercise[] = [
     jointArea: 'Elbow',
     muscleGroup: 'Triceps',
     movementType: 'Extension',
-    equipment: 'Dumbbell',
+    equipment: 'Dumbbells',
     position: 'Standing'
   }
 ];

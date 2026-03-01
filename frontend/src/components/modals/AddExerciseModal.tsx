@@ -46,14 +46,15 @@ const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced'];
 
 const EQUIPMENT_OPTIONS = [
   'Bodyweight',
-  'Dumbbell',
+  'Dumbbells',
   'Barbell',
   'Resistance Band',
   'Machine',
   'Kettlebell',
   'Medicine Ball',
   'Foam Roller',
-  'Stability Ball'
+  'Stability Ball',
+  'Support'
 ];
 
 const POSITION_OPTIONS = [
