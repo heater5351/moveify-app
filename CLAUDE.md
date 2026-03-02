@@ -25,6 +25,9 @@ Moveify is a clinical exercise prescription and patient management platform (sim
 - **Express 4** (CommonJS, not ESM)
 - **PostgreSQL** via `pg` driver (no ORM)
 - **bcrypt** for password hashing
+- **jsonwebtoken** for JWT authentication
+- **express-rate-limit** for brute force protection
+- **helmet** for security headers
 - **Resend** for transactional emails
 - **PM2** for process management in production
 
@@ -49,10 +52,23 @@ frontend/src/
 │   ├── ExerciseLibrary.tsx
 │   └── ...
 ├── types/index.ts       # All TypeScript interfaces
-├── utils/api.ts         # Fetch wrapper with retry logic
+├── utils/api.ts         # Fetch wrapper with retry logic, JWT token management, auth headers
 ├── data/exercises.ts    # Default exercise database
 ├── config.ts            # API URL configuration
 └── main.tsx             # Entry point
+
+backend/
+├── middleware/
+│   ├── auth.js          # JWT verify, role check, token generation
+│   └── ownership.js     # Patient/program ownership checks
+├── services/
+│   └── audit.js         # Fire-and-forget audit logging
+├── routes/              # All API route files
+├── database/
+│   ├── db.js            # PostgreSQL pool
+│   └── init.js          # Schema + migrations
+├── server.js            # Express app, middleware, rate limiting
+└── Dockerfile
 ```
 
 ## Conventions
@@ -88,9 +104,11 @@ frontend/src/
 
 ### API Integration
 
-- All API calls go through `utils/api.ts` which provides retry logic with exponential backoff
+- All API calls use `getAuthHeaders()` from `utils/api.ts` which attaches the JWT Bearer token
+- `utils/api.ts` also provides retry logic with exponential backoff, token management (`getToken`, `setToken`, `clearAuth`), and automatic 401 handling (clears auth + redirects to login)
 - API base URL comes from `config.ts` — never hardcode URLs
 - Backend endpoints follow REST: `GET/POST/PUT/PATCH/DELETE /api/{resource}`
+- **Never pass `clinicianId` or `patientId` in request bodies for identity** — the backend derives these from the JWT token via `req.user.id`
 
 ## Exercise Naming Convention
 
@@ -170,32 +188,79 @@ When adding new state, add it to App.tsx and pass via props. Do not introduce Co
 
 ## Auth & Security
 
-### Current auth flow
+### Authentication (JWT)
 
-1. **Login:** `POST /api/auth/login` → returns user object → stored in App.tsx state (no JWT, no session cookie)
-2. **Invitation:** clinician generates invite → creates user row with `password_hash = NULL` → patient receives email link → sets password via `/setup-password`
-3. **Password reset:** `POST /api/auth/forgot-password` → token (1hr expiry) → email link → `POST /api/auth/reset-password`
+1. **Login:** `POST /api/auth/login` → returns `{ user, token }` → token stored in `localStorage` (`moveify_token`), user stored in `moveify_user`
+2. **Session restoration:** On page load, App.tsx reads token from localStorage and calls `GET /api/auth/me` to validate. If valid, session is restored without re-login.
+3. **Token format:** JWT signed with `JWT_SECRET`, payload `{ id, role, email }`, default expiry `7d`
+4. **All authenticated requests** include `Authorization: Bearer <token>` header via `getAuthHeaders()` from `utils/api.ts`
+5. **401 handling:** If any API call returns 401, `utils/api.ts` automatically clears localStorage and redirects to login
+6. **Invitation:** clinician generates invite (requires auth) → creates user row with `password_hash = NULL` → patient receives email link → sets password via `/setup-password`
+7. **Password reset:** `POST /api/auth/forgot-password` → token (1hr expiry) → email link → `POST /api/auth/reset-password`
 
-### Critical: No backend auth middleware
+### Authorization (middleware)
 
-**Backend routes have NO authentication or authorization middleware.** Routes trust the client to send correct `userId`/`patientId`. There is no `req.user`, no JWT verification, no session validation on the server.
+All backend routes (except public auth routes) are protected by middleware in `backend/middleware/`:
 
-This is a **known security gap**. When adding new routes, follow the existing pattern but be aware this needs to be addressed. Do not assume any middleware exists that protects routes.
+- **`authenticate`** — verifies JWT token, sets `req.user = { id, role, email }`
+- **`requireRole(...roles)`** — checks `req.user.role` is in allowed list
+- **`requirePatientOwnership`** — verifies clinician owns the patient via `clinician_patients` junction table
+- **`requireProgramOwnership`** — verifies clinician owns the program via `programs.clinician_id`
+- **`requireSelf(paramName)`** — verifies `req.params[paramName]` === `req.user.id` (patient accessing own data)
+- **`requirePatientAccess`** — allows both clinician (via ownership) and patient (via self-access)
+
+**When adding new routes:** always apply `authenticate` middleware. Use `requireRole` for role-specific routes. Use ownership middleware for patient data access. Never trust client-supplied IDs for identity — use `req.user.id`.
+
+### Clinician-Patient Ownership
+
+- **`clinician_patients` junction table** links clinicians to their patients (many-to-many)
+- Populated automatically when a clinician invites a patient
+- `GET /api/patients` only returns patients linked to the authenticated clinician
+- A clinician cannot access another clinician's patients
+
+### Security Hardening
+
+- **Rate limiting:** Auth endpoints (`/api/auth/login`, `/api/auth/forgot-password`): 10 requests per 15 min per IP. General API: 100 requests per minute per IP.
+- **Security headers:** `helmet()` middleware (CSP, X-Frame-Options, etc.)
+- **CORS:** Production requires `CORS_ORIGIN` env var (no wildcard). Development defaults to `http://localhost:5173`.
+- **Input validation:** Email format validation on login/invitation, password min 8 chars on set-password
+- **No public signup:** Users can only be created via clinician invitation
+- **No admin endpoints:** The admin clear-data endpoint has been removed
+
+### Audit Logging
+
+- `audit_logs` table records key operations (login, patient access, program CRUD, exercise completions, check-ins)
+- Logged via `backend/services/audit.js` — fire-and-forget (never fails the request)
+- Each log includes: `user_id`, `action`, `resource_type`, `resource_id`, `details` (JSONB), `ip_address`, `created_at`
 
 ## Backend API Routes
 
-All routes are prefixed with `/api`. Key endpoints:
+All routes are prefixed with `/api`. Routes marked with a lock require authentication.
 
-| Route file | Prefix | Key endpoints |
-|-----------|--------|---------------|
-| `auth.js` | `/api/auth` | `POST /signup`, `POST /login`, `POST /forgot-password`, `POST /reset-password` |
-| `invitations.js` | `/api/invitations` | `POST /generate`, `GET /validate/:token`, `POST /set-password` |
-| `patients.js` | `/api/patients` | `GET /`, `GET /:id`, `DELETE /:id` |
-| `programs.js` | `/api/programs` | `GET /patient/:patientId`, `POST /patient/:patientId`, `PUT /:programId`, `DELETE /:programId`, `PATCH /exercise/:exerciseId/complete`, `GET /analytics/:patientId` |
-| `exercises.js` | `/api/exercises` | `GET /clinician/:clinicianId`, `POST /`, `PUT /:exerciseId`, `DELETE /:exerciseId`, favorites CRUD |
-| `check-ins.js` | `/api/check-ins` | `POST /`, `GET /today/:patientId`, `GET /history/:patientId`, `GET /averages/:patientId` |
-| `education.js` | `/api/education` | modules CRUD, `POST /patient/:patientId/modules/:moduleId` (assign), `POST .../viewed` |
-| `blocks.js` | `/api/blocks` | templates CRUD, `POST /:programId` (create block), `GET /:programId` |
+### Public routes (no auth required)
+| Route file | Endpoints |
+|-----------|--------|
+| `auth.js` | `POST /login`, `POST /forgot-password`, `GET /verify-reset-token/:token`, `POST /reset-password` |
+| `invitations.js` | `GET /validate/:token`, `POST /set-password` |
+
+### Protected routes (require JWT)
+| Route file | Prefix | Key endpoints | Auth |
+|-----------|--------|---------------|------|
+| `auth.js` | `/api/auth` | `GET /me` | Any authenticated user |
+| `invitations.js` | `/api/invitations` | `POST /generate` | Clinician only |
+| `patients.js` | `/api/patients` | `GET /` (filtered by ownership), `GET /:id`, `DELETE /:id` | Clinician + ownership |
+| `programs.js` | `/api/programs` | `POST /patient/:patientId`, `PUT /:programId`, `DELETE /:programId` | Clinician + ownership |
+| `programs.js` | `/api/programs` | `PATCH /exercise/:exerciseId/complete` | Patient only (uses `req.user.id`) |
+| `programs.js` | `/api/programs` | `GET /patient/:patientId`, `GET /analytics/patient/:patientId` | Both roles + access check |
+| `exercises.js` | `/api/exercises` | `GET /`, `POST /`, `PUT /:id`, `DELETE /:id`, favorites | Clinician only |
+| `check-ins.js` | `/api/check-ins` | `POST /` | Patient only (uses `req.user.id`) |
+| `check-ins.js` | `/api/check-ins` | `GET /today/:patientId`, `GET /history/:patientId` | Patient self-access |
+| `check-ins.js` | `/api/check-ins` | `GET /patient/:patientId`, `GET /averages/:patientId` | Both roles + access check |
+| `education.js` | `/api/education` | Module CRUD, categories | Clinician only |
+| `education.js` | `/api/education` | Assign/unassign modules | Clinician + ownership |
+| `education.js` | `/api/education` | `POST .../viewed`, `GET /patient/:patientId/modules` | Both roles + access check |
+| `blocks.js` | `/api/blocks` | Templates CRUD, `GET /flags` | Clinician only |
+| `blocks.js` | `/api/blocks` | Block read/prescription | Both roles + access check |
 
 ## Database Schema
 
@@ -211,6 +276,9 @@ Defined in `backend/database/init.js`. Key tables:
 | `exercises` | clinician_id, name, category, joint_area, muscle_group, equipment, video_url | Custom exercises. Metadata fields are **comma-separated strings** (e.g., `"Knee, Hip"`) |
 | `block_schedules` | program_id, block_duration (4/6/8 weeks), current_week, status | Periodization blocks |
 | `education_modules` | title, content, category, estimated_duration_minutes, created_by | Text/video education |
+| `clinician_patients` | clinician_id, patient_id | Junction table linking clinicians to their patients. UNIQUE constraint on (clinician_id, patient_id) |
+| `audit_logs` | user_id, action, resource_type, resource_id, details (JSONB), ip_address | Audit trail for key operations |
+| `invitation_tokens` | ..., clinician_id | Links invitations to the clinician who created them |
 
 ### Database patterns
 
@@ -229,7 +297,9 @@ Defined in `backend/database/init.js`. Key tables:
 | `DATABASE_URL` | Yes (local) | — | PostgreSQL connection string (local dev) |
 | `INSTANCE_CONNECTION_NAME` | Yes (GCP) | — | Cloud SQL socket path (production) |
 | `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Yes (GCP) | — | Cloud SQL credentials (production) |
-| `CORS_ORIGIN` | No | `*` | Allowed CORS origin |
+| `JWT_SECRET` | **Yes** | — | JWT signing key (min 32 random chars). Server will not start without it. |
+| `JWT_EXPIRY` | No | `7d` | JWT token expiration |
+| `CORS_ORIGIN` | Yes (prod) | `http://localhost:5173` (dev) | Allowed frontend origin. **No wildcard in production.** |
 | `FRONTEND_URL` | No | `http://localhost:5173` | Used in invitation/reset email links |
 | `RESEND_API_KEY` | No | — | Resend email API key (emails fail silently without it) |
 | `RESEND_FROM_EMAIL` | No | `onboarding@resend.dev` | Sender address |
@@ -242,9 +312,7 @@ Defined in `backend/database/init.js`. Key tables:
 
 ## Known Technical Debt
 
-- **No backend auth middleware** — routes are unprotected (see Auth section above)
 - **N+1 queries** in `patients.js` patient loading — no SQL joins used
-- **Inconsistent API wrapper usage** — some frontend calls use `fetchWithRetry` from `utils/api.ts`, others use raw `fetch()` directly in App.tsx
 - **No error boundaries** for API failures — only React render errors caught by `ErrorBoundary.tsx`
 - **No test framework** — when adding tests, prefer Vitest (matches Vite ecosystem)
 
@@ -291,12 +359,20 @@ If a breach is **likely to cause serious harm**:
 - Data stored in `australia-southeast1` — no cross-border transfer
 - Non-root Docker container, no hardcoded credentials
 - Passwords hashed with bcrypt
+- **JWT authentication** on all API routes with role-based authorization
+- **Clinician-patient ownership** — clinicians can only access their own patients' data
+- **Patients can only access their own data** via self-access checks
+- **Rate limiting** on auth endpoints (10 req/15min) and general API (100 req/min)
+- **Security headers** via helmet (CSP, X-Frame-Options, etc.)
+- **CORS hardened** — no wildcard in production
+- **Audit logging** of key operations (login, patient access, program CRUD, completions, check-ins)
+- **No public signup** — users created via clinician invitation only
+- **Input validation** — email format, password minimum length
 
 ### Known compliance gaps (TODO)
 
 - **No privacy policy** displayed in-app (APP 1, APP 5)
 - **No explicit consent flow** for health data collection at signup (APP 3)
-- **No audit logging** of who accessed/modified patient records (APP 11)
 - **No data export or deletion** feature for patients (APP 12, APP 13, APP 11)
 - **No documented breach response plan** (NDB scheme)
 - **No data retention policy** — APP 11 requires destroying data no longer needed
