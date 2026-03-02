@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { X, Trash2, Globe, User, Plus, Pencil, ChevronDown, ChevronRight, Check } from 'lucide-react';
 import type { PeriodizationTemplate } from '../../types/index.ts';
 import { API_URL } from '../../config';
+import { getAuthHeaders } from '../../utils/api';
 
 interface TemplateManagerModalProps {
-  clinicianId: number;
   onClose: () => void;
 }
 
@@ -37,7 +37,7 @@ const makeEmptyForm = (duration: 4 | 6 | 8 = 4): TemplateFormData => ({
   weeks: Array.from({ length: duration }, emptyWeek)
 });
 
-export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerModalProps) => {
+export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => {
   const [templates, setTemplates] = useState<TemplateWithWeeksData[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -64,7 +64,9 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
   const fetchTemplates = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/blocks/templates?clinicianId=${clinicianId}`);
+      const res = await fetch(`${API_URL}/blocks/templates`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setTemplates((data.templates || []).map(mapTemplate));
@@ -78,11 +80,13 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
 
   useEffect(() => {
     fetchTemplates();
-  }, [clinicianId]);
+  }, []);
 
   const fetchTemplateWeeks = async (templateId: number) => {
     try {
-      const res = await fetch(`${API_URL}/blocks/templates/${templateId}`);
+      const res = await fetch(`${API_URL}/blocks/templates/${templateId}`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setTemplates(prev => prev.map(t =>
@@ -114,8 +118,7 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
     try {
       const res = await fetch(`${API_URL}/blocks/templates/${templateId}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clinicianId })
+        headers: getAuthHeaders()
       });
       if (res.ok) {
         setTemplates(prev => prev.filter(t => t.id !== templateId));
@@ -176,14 +179,13 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
       }));
       const res = await fetch(`${API_URL}/blocks/templates/${editingId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           name: editForm.name.trim(),
           description: editForm.description.trim() || null,
           blockDuration: editForm.blockDuration,
           weightUnit: editForm.weightUnit,
-          weeks,
-          clinicianId
+          weeks
         })
       });
       if (res.ok) {
@@ -214,14 +216,13 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
       }));
       const res = await fetch(`${API_URL}/blocks/templates`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           name: createForm.name.trim(),
           description: createForm.description.trim() || null,
           blockDuration: createForm.blockDuration,
           weightUnit: createForm.weightUnit,
-          weeks,
-          clinicianId
+          weeks
         })
       });
       if (res.ok) {
@@ -337,7 +338,7 @@ export const TemplateManagerModal = ({ clinicianId, onClose }: TemplateManagerMo
       .join('  |  ');
   };
 
-  const myTemplates = templates.filter(t => t.createdBy === clinicianId && !t.isGlobal);
+  const myTemplates = templates.filter(t => !t.isGlobal);
   const globalTemplates = templates.filter(t => t.isGlobal);
 
   const renderTemplateCard = (t: TemplateWithWeeksData, canEdit: boolean) => {

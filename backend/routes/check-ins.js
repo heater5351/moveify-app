@@ -2,14 +2,21 @@
 const express = require('express');
 const router = express.Router();
 const checkInService = require('../services/check-in-service');
+const { authenticate, requireRole } = require('../middleware/auth');
+const { requireSelf, requirePatientAccess } = require('../middleware/ownership');
+const audit = require('../services/audit');
 
-// Submit daily check-in
-router.post('/', async (req, res) => {
+// All check-in routes require authentication
+router.use(authenticate);
+
+// Submit daily check-in (patient only — uses JWT identity)
+router.post('/', requireRole('patient'), async (req, res) => {
   try {
-    const { patientId, checkInDate, overallFeeling, generalPainLevel, energyLevel, sleepQuality, notes } = req.body;
+    const patientId = req.user.id;
+    const { checkInDate, overallFeeling, generalPainLevel, energyLevel, sleepQuality, notes } = req.body;
 
     // Validation
-    if (!patientId || !checkInDate || !overallFeeling) {
+    if (!checkInDate || !overallFeeling) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -39,6 +46,8 @@ router.post('/', async (req, res) => {
       notes
     });
 
+    audit.log(req, 'checkin_submit', 'check_in', null, { date: checkInDate });
+
     res.json(result);
   } catch (error) {
     console.error('Error submitting check-in:', error);
@@ -46,8 +55,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Get today's check-in
-router.get('/today/:patientId', async (req, res) => {
+// Get today's check-in (patient accessing own data)
+router.get('/today/:patientId', requireSelf('patientId'), async (req, res) => {
   try {
     const { patientId } = req.params;
     const checkIn = await checkInService.getTodayCheckIn(parseInt(patientId));
@@ -63,8 +72,8 @@ router.get('/today/:patientId', async (req, res) => {
   }
 });
 
-// Get check-in history
-router.get('/history/:patientId', async (req, res) => {
+// Get check-in history (patient accessing own data)
+router.get('/history/:patientId', requireSelf('patientId'), async (req, res) => {
   try {
     const { patientId } = req.params;
     const { days } = req.query;
@@ -81,8 +90,8 @@ router.get('/history/:patientId', async (req, res) => {
   }
 });
 
-// Get check-ins for patient (for clinician dashboard)
-router.get('/patient/:patientId', async (req, res) => {
+// Get check-ins for patient (clinician or patient self)
+router.get('/patient/:patientId', requirePatientAccess, async (req, res) => {
   try {
     const { patientId } = req.params;
     const { days } = req.query;
@@ -99,8 +108,8 @@ router.get('/patient/:patientId', async (req, res) => {
   }
 });
 
-// Get average metrics for a date range
-router.get('/averages/:patientId', async (req, res) => {
+// Get average metrics for a date range (clinician or patient self)
+router.get('/averages/:patientId', requirePatientAccess, async (req, res) => {
   try {
     const { patientId } = req.params;
     const { startDate, endDate } = req.query;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Minus, Flame, BarChart3, Heart, Zap, Trophy, AlertTriangle, CheckCircle } from 'lucide-react';
+import { getAuthHeaders } from '../utils/api';
 
 // ── Centralized Threshold Constants (Bug Fix) ──────────────────────────
 const PAIN_THRESHOLDS = { low: 3, moderate: 6 }; // <=3 green, 4-6 yellow, >6 red
@@ -95,8 +96,8 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
 
       try {
         const [overviewRes, logsRes] = await Promise.all([
-          fetch(`${apiUrl}/programs/analytics/patient/${patientId}?days=${timeRange}`),
-          fetch(`${apiUrl}/programs/progression-logs/patient/${patientId}?limit=50`),
+          fetch(`${apiUrl}/programs/analytics/patient/${patientId}?days=${timeRange}`, { headers: getAuthHeaders() }),
+          fetch(`${apiUrl}/programs/progression-logs/patient/${patientId}?limit=50`, { headers: getAuthHeaders() }),
         ]);
 
         if (!overviewRes.ok) throw new Error(`Failed to fetch analytics: ${overviewRes.status}`);

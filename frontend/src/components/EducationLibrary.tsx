@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { BookOpen, Plus, Edit, Trash2, Search, Filter } from 'lucide-react';
 import type { EducationModule } from '../types/index.ts';
 import { API_URL } from '../config';
+import { getAuthHeaders } from '../utils/api';
 
 interface EducationLibraryProps {
-  clinicianId: number;
   onAssignToPatient?: (module: EducationModule) => void;
 }
 
-export const EducationLibrary = ({ clinicianId, onAssignToPatient }: EducationLibraryProps) => {
+export const EducationLibrary = ({ onAssignToPatient }: EducationLibraryProps) => {
   const [modules, setModules] = useState<EducationModule[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,7 +25,9 @@ export const EducationLibrary = ({ clinicianId, onAssignToPatient }: EducationLi
   const fetchModules = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/education/modules`);
+      const response = await fetch(`${API_URL}/education/modules`, {
+        headers: getAuthHeaders()
+      });
       if (response.ok) {
         const data = await response.json();
         setModules(data.modules || []);
@@ -39,7 +41,9 @@ export const EducationLibrary = ({ clinicianId, onAssignToPatient }: EducationLi
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch(`${API_URL}/education/categories`);
+      const response = await fetch(`${API_URL}/education/categories`, {
+        headers: getAuthHeaders()
+      });
       if (response.ok) {
         const data = await response.json();
         setCategories(data.categories || []);
@@ -53,8 +57,8 @@ export const EducationLibrary = ({ clinicianId, onAssignToPatient }: EducationLi
     try {
       const response = await fetch(`${API_URL}/education/modules`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...moduleData, createdBy: clinicianId })
+        headers: getAuthHeaders(),
+        body: JSON.stringify(moduleData)
       });
 
       if (response.ok) {
@@ -72,7 +76,7 @@ export const EducationLibrary = ({ clinicianId, onAssignToPatient }: EducationLi
     try {
       const response = await fetch(`${API_URL}/education/modules/${moduleId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates)
       });
 
@@ -94,7 +98,8 @@ export const EducationLibrary = ({ clinicianId, onAssignToPatient }: EducationLi
 
     try {
       const response = await fetch(`${API_URL}/education/modules/${moduleId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders()
       });
 
       if (response.ok) {

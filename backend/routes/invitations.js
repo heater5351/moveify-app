@@ -4,17 +4,25 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const db = require('../database/db');
 const { sendInvitationEmail } = require('../services/email');
+const { authenticate, requireRole } = require('../middleware/auth');
+const audit = require('../services/audit');
 
 const router = express.Router();
 
-// Generate invitation for new user (called by clinician)
-router.post('/generate', async (req, res) => {
+// Generate invitation for new patient (called by clinician)
+router.post('/generate', authenticate, requireRole('clinician'), async (req, res) => {
   try {
-    const { email, role, name, dob, phone, address, condition } = req.body;
+    const { email, name, dob, phone, address, condition } = req.body;
 
     // Validate required fields
-    if (!email || !role || !name) {
-      return res.status(400).json({ error: 'Email, role, and name are required' });
+    if (!email || !name) {
+      return res.status(400).json({ error: 'Email and name are required' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
     }
 
     // Check if user already exists
@@ -23,24 +31,35 @@ router.post('/generate', async (req, res) => {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
+    const clinicianId = req.user.id;
+
     // Generate unique token
     const token = crypto.randomBytes(32).toString('hex');
 
     // Set expiration (7 days from now)
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Save invitation
+    // Save invitation (always patient role)
     await db.query(`
-      INSERT INTO invitation_tokens (token, email, role, name, dob, phone, address, condition, expires_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `, [token, email, role, name, dob, phone, address, condition, expiresAt]);
+      INSERT INTO invitation_tokens (token, email, role, name, dob, phone, address, condition, expires_at, clinician_id)
+      VALUES ($1, $2, 'patient', $3, $4, $5, $6, $7, $8, $9)
+    `, [token, email, name, dob, phone, address, condition, expiresAt, clinicianId]);
 
     // Create user immediately with null password (they'll set it when accepting invitation)
     const userResult = await db.query(`
       INSERT INTO users (email, password_hash, role, name, dob, phone, address, condition)
-      VALUES ($1, NULL, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, NULL, 'patient', $2, $3, $4, $5, $6)
       RETURNING id
-    `, [email, role, name, dob, phone, address, condition]);
+    `, [email, name, dob, phone, address, condition]);
+
+    const patientId = userResult.rows[0].id;
+
+    // Create clinician-patient relationship
+    await db.query(`
+      INSERT INTO clinician_patients (clinician_id, patient_id)
+      VALUES ($1, $2)
+      ON CONFLICT (clinician_id, patient_id) DO NOTHING
+    `, [clinicianId, patientId]);
 
     // Generate invitation URL - use env var in production
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -54,12 +73,14 @@ router.post('/generate', async (req, res) => {
       // Still return success — invitation was created, email just failed
     }
 
+    audit.log(req, 'patient_invite', 'patient', patientId, { email });
+
     res.json({
       message: 'Invitation created successfully',
       token,
       invitationUrl,
       expiresAt,
-      userId: userResult.rows[0].id
+      userId: patientId
     });
   } catch (error) {
     console.error('Generate invitation error:', error);
@@ -67,7 +88,7 @@ router.post('/generate', async (req, res) => {
   }
 });
 
-// Validate invitation token
+// Validate invitation token (public — used by setup-password page)
 router.get('/validate/:token', async (req, res) => {
   try {
     const { token } = req.params;
@@ -93,13 +114,17 @@ router.get('/validate/:token', async (req, res) => {
   }
 });
 
-// Set password using invitation token
+// Set password using invitation token (public — used by setup-password page)
 router.post('/set-password', async (req, res) => {
   try {
     const { token, password } = req.body;
 
     if (!token || !password) {
       return res.status(400).json({ error: 'Token and password are required' });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
     // Validate invitation

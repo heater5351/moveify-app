@@ -1,6 +1,8 @@
 // Moveify Backend Server
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 // Import routes
@@ -19,17 +21,49 @@ const { initDatabase } = require('./database/init');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS Configuration - whitelist frontend in production
+// Security headers
+app.use(helmet());
+
+// CORS Configuration
+const isProduction = process.env.NODE_ENV === 'production';
+const corsOrigin = process.env.CORS_ORIGIN || (isProduction ? undefined : 'http://localhost:5173');
+
+if (isProduction && !corsOrigin) {
+  console.warn('WARNING: CORS_ORIGIN not set in production. CORS will reject all cross-origin requests.');
+}
+
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: corsOrigin || false,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 };
 
-// Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
+
+// Rate limiting — auth endpoints (brute force protection)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 requests per window per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please try again later.' }
+});
+
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+
+// Rate limiting — general API
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100, // 100 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down.' }
+});
+
+app.use('/api', apiLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);

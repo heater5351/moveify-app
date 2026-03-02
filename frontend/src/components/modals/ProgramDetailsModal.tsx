@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Check, ChevronLeft, ChevronRight, Pause } from 'lucide-react';
 import type { AssignedProgram, BlockStatusResponse, BlockWeekRow } from '../../types/index.ts';
 import { API_URL } from '../../config';
+import { getAuthHeaders } from '../../utils/api';
 
 interface ProgramDetailsModalProps {
   program: AssignedProgram;
@@ -21,7 +22,9 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
     const pid = program.config.id;
     if (!pid) return;
     try {
-      const res = await fetch(`${API_URL}/blocks/${pid}`);
+      const res = await fetch(`${API_URL}/blocks/${pid}`, {
+        headers: getAuthHeaders()
+      });
       if (!res.ok) return;
       const data = await res.json();
       const weeks: BlockWeekRow[] = (data.weeks || []).map((w: Record<string, unknown>) => ({
@@ -60,7 +63,7 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
     try {
       await fetch(`${API_URL}/blocks/${pid}/override`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ action }),
       });
       await fetchBlockData();

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BookOpen, Check, Clock, ExternalLink } from 'lucide-react';
 import type { PatientEducationModule } from '../types/index.ts';
 import { API_URL } from '../config';
+import { getAuthHeaders } from '../utils/api';
 
 interface PatientEducationModulesProps {
   patientId: number;
@@ -20,7 +21,9 @@ export const PatientEducationModules = ({ patientId, isPatientView = false }: Pa
   const fetchModules = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/education/patient/${patientId}/modules`);
+      const response = await fetch(`${API_URL}/education/patient/${patientId}/modules`, {
+        headers: getAuthHeaders()
+      });
       if (response.ok) {
         const data = await response.json();
         setModules(data.modules || []);
@@ -39,7 +42,8 @@ export const PatientEducationModules = ({ patientId, isPatientView = false }: Pa
     if (isPatientView && !module.viewed) {
       try {
         await fetch(`${API_URL}/education/patient/${patientId}/modules/${module.id}/viewed`, {
-          method: 'POST'
+          method: 'POST',
+          headers: getAuthHeaders()
         });
         // Update local state
         setModules(modules.map(m =>
@@ -58,7 +62,8 @@ export const PatientEducationModules = ({ patientId, isPatientView = false }: Pa
 
     try {
       await fetch(`${API_URL}/education/patient/${patientId}/modules/${moduleId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders()
       });
       await fetchModules();
     } catch (error) {

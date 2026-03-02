@@ -2,21 +2,23 @@
 const express = require('express');
 const blockService = require('../services/block-service');
 const templateService = require('../services/template-service');
+const { authenticate, requireRole } = require('../middleware/auth');
+const { requireProgramOwnership } = require('../middleware/ownership');
+const db = require('../database/db');
 
 const router = express.Router();
+
+// All block routes require authentication
+router.use(authenticate);
 
 // ===== TEMPLATE ROUTES =====
 // Must be declared before /:programId wildcard routes to avoid being swallowed
 
-// Get templates (own + global)
-// GET /api/blocks/templates?clinicianId=X
-router.get('/templates', async (req, res) => {
+// Get templates (own + global) — clinicianId from JWT
+router.get('/templates', requireRole('clinician'), async (req, res) => {
   try {
-    const { clinicianId } = req.query;
-    if (!clinicianId) {
-      return res.status(400).json({ error: 'clinicianId is required' });
-    }
-    const templates = await templateService.getTemplates(parseInt(clinicianId));
+    const clinicianId = req.user.id;
+    const templates = await templateService.getTemplates(clinicianId);
     res.json({ templates });
   } catch (error) {
     console.error('Get templates error:', error);
@@ -24,14 +26,14 @@ router.get('/templates', async (req, res) => {
   }
 });
 
-// Create a template
-// POST /api/blocks/templates
-router.post('/templates', async (req, res) => {
+// Create a template (clinicianId from JWT)
+router.post('/templates', requireRole('clinician'), async (req, res) => {
   try {
-    const { name, description, blockDuration, weeks, clinicianId, isGlobal, weightUnit } = req.body;
+    const clinicianId = req.user.id;
+    const { name, description, blockDuration, weeks, isGlobal, weightUnit } = req.body;
 
-    if (!name || !blockDuration || !clinicianId) {
-      return res.status(400).json({ error: 'name, blockDuration, and clinicianId are required' });
+    if (!name || !blockDuration) {
+      return res.status(400).json({ error: 'name and blockDuration are required' });
     }
 
     const result = await templateService.createTemplate(
@@ -45,7 +47,6 @@ router.post('/templates', async (req, res) => {
 });
 
 // Get a specific template with weeks
-// GET /api/blocks/templates/:id
 router.get('/templates/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -60,19 +61,19 @@ router.get('/templates/:id', async (req, res) => {
   }
 });
 
-// Update a template
-// PUT /api/blocks/templates/:id
-router.put('/templates/:id', async (req, res) => {
+// Update a template (clinicianId from JWT)
+router.put('/templates/:id', requireRole('clinician'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, blockDuration, weeks, clinicianId, weightUnit } = req.body;
+    const clinicianId = req.user.id;
+    const { name, description, blockDuration, weeks, weightUnit } = req.body;
 
-    if (!name || !blockDuration || !clinicianId) {
-      return res.status(400).json({ error: 'name, blockDuration, and clinicianId are required' });
+    if (!name || !blockDuration) {
+      return res.status(400).json({ error: 'name and blockDuration are required' });
     }
 
     const result = await templateService.updateTemplate(
-      parseInt(id), name, description, blockDuration, weeks || [], parseInt(clinicianId), weightUnit || null
+      parseInt(id), name, description, blockDuration, weeks || [], clinicianId, weightUnit || null
     );
     res.json({ message: 'Template updated successfully', ...result });
   } catch (error) {
@@ -81,18 +82,13 @@ router.put('/templates/:id', async (req, res) => {
   }
 });
 
-// Delete a template
-// DELETE /api/blocks/templates/:id
-router.delete('/templates/:id', async (req, res) => {
+// Delete a template (clinicianId from JWT)
+router.delete('/templates/:id', requireRole('clinician'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { clinicianId } = req.body;
+    const clinicianId = req.user.id;
 
-    if (!clinicianId) {
-      return res.status(400).json({ error: 'clinicianId is required' });
-    }
-
-    await templateService.deleteTemplate(parseInt(id), parseInt(clinicianId));
+    await templateService.deleteTemplate(parseInt(id), clinicianId);
     res.json({ message: 'Template deleted successfully' });
   } catch (error) {
     console.error('Delete template error:', error);
@@ -100,8 +96,7 @@ router.delete('/templates/:id', async (req, res) => {
   }
 });
 
-// Apply a template — returns exercise-agnostic progression data
-// POST /api/blocks/templates/:id/apply
+// Apply a template
 router.post('/templates/:id/apply', async (req, res) => {
   try {
     const { id } = req.params;
@@ -114,14 +109,12 @@ router.post('/templates/:id/apply', async (req, res) => {
 });
 
 // ===== FLAG ROUTES =====
-// Must be declared before /:programId wildcard routes
 
-// Get unresolved flags for a clinician
-// GET /api/blocks/flags/:clinicianId
-router.get('/flags/:clinicianId', async (req, res) => {
+// Get unresolved flags for the authenticated clinician
+router.get('/flags', requireRole('clinician'), async (req, res) => {
   try {
-    const { clinicianId } = req.params;
-    const flags = await blockService.getUnresolvedFlags(parseInt(clinicianId));
+    const clinicianId = req.user.id;
+    const flags = await blockService.getUnresolvedFlags(clinicianId);
     res.json({ flags });
   } catch (error) {
     console.error('Get flags error:', error);
@@ -129,12 +122,11 @@ router.get('/flags/:clinicianId', async (req, res) => {
   }
 });
 
-// Resolve a flag
-// PATCH /api/blocks/flags/:flagId/resolve
-router.patch('/flags/:flagId/resolve', async (req, res) => {
+// Resolve a flag (clinician only, resolvedBy from JWT)
+router.patch('/flags/:flagId/resolve', requireRole('clinician'), async (req, res) => {
   try {
     const { flagId } = req.params;
-    const { resolvedBy } = req.body;
+    const resolvedBy = req.user.id;
 
     await blockService.resolveFlag(parseInt(flagId), resolvedBy);
     res.json({ message: 'Flag resolved successfully' });
@@ -146,9 +138,56 @@ router.patch('/flags/:flagId/resolve', async (req, res) => {
 
 // ===== BLOCK ROUTES =====
 
-// Create a block for a program
-// POST /api/blocks/:programId
-router.post('/:programId', async (req, res) => {
+// Helper: verify program access (clinician ownership or patient self-access)
+async function verifyProgramAccess(req, res, next) {
+  const programId = parseInt(req.params.programId || req.params.blockScheduleId);
+  const userId = req.user.id;
+  const role = req.user.role;
+
+  try {
+    if (role === 'clinician') {
+      const program = await db.getOne(
+        'SELECT 1 FROM programs WHERE id = $1 AND clinician_id = $2',
+        [programId, userId]
+      );
+      if (!program) {
+        // For block schedule IDs, check via block_schedules -> programs
+        const blockProgram = await db.getOne(
+          `SELECT 1 FROM block_schedules bs
+           JOIN programs p ON bs.program_id = p.id
+           WHERE bs.id = $1 AND p.clinician_id = $2`,
+          [programId, userId]
+        );
+        if (!blockProgram) {
+          return res.status(403).json({ error: 'You do not have access to this program' });
+        }
+      }
+    } else if (role === 'patient') {
+      const program = await db.getOne(
+        'SELECT 1 FROM programs WHERE id = $1 AND patient_id = $2',
+        [programId, userId]
+      );
+      if (!program) {
+        const blockProgram = await db.getOne(
+          `SELECT 1 FROM block_schedules bs
+           JOIN programs p ON bs.program_id = p.id
+           WHERE bs.id = $1 AND p.patient_id = $2`,
+          [programId, userId]
+        );
+        if (!blockProgram) {
+          return res.status(403).json({ error: 'You do not have access to this program' });
+        }
+      }
+    }
+    next();
+  } catch (error) {
+    console.error('Program access check error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// Create a block for a program (clinician only, with ownership)
+router.post('/:programId', requireRole('clinician'), requireProgramOwnership, async (req, res) => {
   try {
     const { programId } = req.params;
     const { blockDuration, startDate, exerciseWeeks } = req.body;
@@ -174,9 +213,8 @@ router.post('/:programId', async (req, res) => {
   }
 });
 
-// Get block status for a program
-// GET /api/blocks/:programId
-router.get('/:programId', async (req, res) => {
+// Get block status for a program (clinician or patient)
+router.get('/:programId', verifyProgramAccess, async (req, res) => {
   try {
     const { programId } = req.params;
     const status = await blockService.getBlockStatus(parseInt(programId));
@@ -193,8 +231,7 @@ router.get('/:programId', async (req, res) => {
 });
 
 // Get current prescription for all exercises
-// GET /api/blocks/:programId/prescription
-router.get('/:programId/prescription', async (req, res) => {
+router.get('/:programId/prescription', verifyProgramAccess, async (req, res) => {
   try {
     const { programId } = req.params;
     const prescription = await blockService.getCurrentPrescription(parseInt(programId));
@@ -205,9 +242,8 @@ router.get('/:programId/prescription', async (req, res) => {
   }
 });
 
-// Trigger evaluation (lazy trigger from frontend on login/load)
-// PATCH /api/blocks/:programId/evaluate
-router.patch('/:programId/evaluate', async (req, res) => {
+// Trigger evaluation (patient triggers on login/load)
+router.patch('/:programId/evaluate', verifyProgramAccess, async (req, res) => {
   try {
     const { programId } = req.params;
     const result = await blockService.evaluateProgression(parseInt(programId));
@@ -218,9 +254,8 @@ router.patch('/:programId/evaluate', async (req, res) => {
   }
 });
 
-// Manual override: advance, hold, or regress
-// PATCH /api/blocks/:programId/override
-router.patch('/:programId/override', async (req, res) => {
+// Manual override: advance, hold, or regress (clinician only)
+router.patch('/:programId/override', requireRole('clinician'), requireProgramOwnership, async (req, res) => {
   try {
     const { programId } = req.params;
     const { action } = req.body;
@@ -237,12 +272,11 @@ router.patch('/:programId/override', async (req, res) => {
   }
 });
 
-// Override a single cell
-// PATCH /api/blocks/:blockScheduleId/cell
-router.patch('/:blockScheduleId/cell', async (req, res) => {
+// Override a single cell (clinician only, overriddenBy from JWT)
+router.patch('/:blockScheduleId/cell', requireRole('clinician'), verifyProgramAccess, async (req, res) => {
   try {
     const { blockScheduleId } = req.params;
-    const { programExerciseId, weekNumber, sets, reps, rpeTarget, weight, notes, overriddenBy } = req.body;
+    const { programExerciseId, weekNumber, sets, reps, rpeTarget, weight, notes } = req.body;
 
     if (!programExerciseId || !weekNumber) {
       return res.status(400).json({ error: 'programExerciseId and weekNumber are required' });
@@ -253,7 +287,7 @@ router.patch('/:blockScheduleId/cell', async (req, res) => {
       parseInt(programExerciseId),
       parseInt(weekNumber),
       { sets, reps, rpeTarget, weight, notes },
-      overriddenBy
+      req.user.id
     );
 
     res.json({ message: 'Cell updated successfully' });

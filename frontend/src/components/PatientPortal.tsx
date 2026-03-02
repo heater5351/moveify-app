@@ -7,6 +7,7 @@ import { ExerciseCompletionModal } from './modals/ExerciseCompletionModal';
 import DailyCheckInModal from './modals/DailyCheckInModal';
 import BlockProgressBanner from './BlockProgressBanner';
 import { API_URL } from '../config';
+import { getAuthHeaders } from '../utils/api';
 
 interface PatientPortalProps {
   patient: Patient;
@@ -33,7 +34,9 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   useEffect(() => {
     const checkTodayCheckIn = async () => {
       try {
-        const response = await fetch(`${API_URL}/check-ins/today/${patient.id}`);
+        const response = await fetch(`${API_URL}/check-ins/today/${patient.id}`, {
+          headers: getAuthHeaders()
+        });
         if (response.ok) {
           setHasCheckedInToday(true);
         } else {
@@ -53,7 +56,10 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
       for (const program of patient.assignedPrograms) {
         if (program.config.id) {
           try {
-            await fetch(`${API_URL}/blocks/${program.config.id}/evaluate`, { method: 'PATCH' });
+            await fetch(`${API_URL}/blocks/${program.config.id}/evaluate`, {
+              method: 'PATCH',
+              headers: getAuthHeaders()
+            });
           } catch {
             // Evaluation is best-effort — don't block the UI
           }
@@ -70,9 +76,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
     try {
       const response = await fetch(`${API_URL}/check-ins`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(checkInData),
       });
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TrendingUp, CheckCircle, PauseCircle } from 'lucide-react';
 import { API_URL } from '../config';
+import { getAuthHeaders } from '../utils/api';
 
 type BlockStatus = {
   hasBlock: boolean;
@@ -23,7 +24,9 @@ export default function BlockProgressBanner({ programId, refreshKey }: Props) {
   useEffect(() => {
     const fetchBlock = async () => {
       try {
-        const response = await fetch(`${API_URL}/blocks/${programId}`);
+        const response = await fetch(`${API_URL}/blocks/${programId}`, {
+          headers: getAuthHeaders()
+        });
         if (response.ok) {
           const data = await response.json();
           setBlock(data);

@@ -5,6 +5,7 @@ import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
 import { AssignEducationModal } from './modals/AssignEducationModal';
 import { API_URL } from '../config';
+import { getAuthHeaders } from '../utils/api';
 
 interface PatientProfileProps {
   patient: Patient;
@@ -14,10 +15,9 @@ interface PatientProfileProps {
   onEditProgram: (programIndex: number) => void;
   onDeleteProgram: (programId: number, programName: string) => void;
   onAddProgram: () => void;
-  clinicianId?: number;
 }
 
-export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram, clinicianId }: PatientProfileProps) => {
+export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram }: PatientProfileProps) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'education'>('overview');
   const [showAssignEducationModal, setShowAssignEducationModal] = useState(false);
   const [educationModulesRefreshKey, setEducationModulesRefreshKey] = useState(0);
@@ -27,10 +27,11 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
 
   // Fetch unresolved flags for this patient's programs
   useEffect(() => {
-    if (!clinicianId) return;
     const fetchFlags = async () => {
       try {
-        const res = await fetch(`${API_URL}/blocks/flags/${clinicianId}`);
+        const res = await fetch(`${API_URL}/blocks/flags`, {
+          headers: getAuthHeaders()
+        });
         if (res.ok) {
           const data = await res.json();
           // Filter to this patient only
@@ -42,7 +43,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
       }
     };
     fetchFlags();
-  }, [clinicianId, patient.id]);
+  }, [patient.id]);
 
   // Fetch block status for each program
   useEffect(() => {
@@ -55,7 +56,9 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
           const pid = p.config.id;
           if (!pid) return;
           try {
-            const res = await fetch(`${API_URL}/blocks/${pid}`);
+            const res = await fetch(`${API_URL}/blocks/${pid}`, {
+              headers: getAuthHeaders()
+            });
             if (res.ok) {
               const data = await res.json();
               results[pid] = {
@@ -82,8 +85,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
     try {
       await fetch(`${API_URL}/blocks/flags/${flagId}/resolve`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resolvedBy: clinicianId })
+        headers: getAuthHeaders()
       });
       setFlags(prev => prev.filter(f => f.id !== flagId));
     } catch {

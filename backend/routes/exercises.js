@@ -1,20 +1,23 @@
 // Custom exercises routes (per-clinician library)
 const express = require('express');
 const db = require('../database/db');
+const { authenticate, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Get all exercises for a clinician with optional filters
-router.get('/clinician/:clinicianId', async (req, res) => {
+// All exercise routes require authentication and clinician role
+router.use(authenticate, requireRole('clinician'));
+
+// Get all exercises for the authenticated clinician with optional filters
+router.get('/', async (req, res) => {
   try {
-    const { clinicianId } = req.params;
+    const clinicianId = req.user.id;
     const { joint_area, muscle_group, movement_type, equipment, position, category, difficulty } = req.query;
 
     let query = 'SELECT * FROM exercises WHERE clinician_id = $1';
     let params = [clinicianId];
     let paramIndex = 2;
 
-    // Add filter conditions dynamically (using LIKE for comma-separated values)
     if (joint_area) {
       query += ` AND joint_area LIKE $${paramIndex}`;
       params.push(`%${joint_area}%`);
@@ -62,20 +65,19 @@ router.get('/clinician/:clinicianId', async (req, res) => {
   }
 });
 
-// Create a new exercise
+// Create a new exercise (clinicianId from JWT)
 router.post('/', async (req, res) => {
   try {
+    const clinicianId = req.user.id;
     const {
-      clinicianId, name, category, difficulty, duration, description, videoUrl,
+      name, category, difficulty, duration, description, videoUrl,
       jointArea, muscleGroup, movementType, equipment, position
     } = req.body;
 
-    // Validate required fields
-    if (!clinicianId || !name || !category || !difficulty || !duration || !description) {
+    if (!name || !category || !difficulty || !duration || !description) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Validate difficulty
     const validDifficulties = ['Beginner', 'Intermediate', 'Advanced'];
     if (!validDifficulties.includes(difficulty)) {
       return res.status(400).json({ error: 'Invalid difficulty level' });
@@ -100,12 +102,13 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update an exercise
+// Update an exercise (verify ownership via JWT)
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const clinicianId = req.user.id;
     const {
-      name, category, difficulty, duration, description, videoUrl, clinicianId,
+      name, category, difficulty, duration, description, videoUrl,
       jointArea, muscleGroup, movementType, equipment, position
     } = req.body;
 
@@ -114,7 +117,7 @@ router.put('/:id', async (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: 'Exercise not found' });
     }
-    if (existing.clinician_id !== parseInt(clinicianId)) {
+    if (existing.clinician_id !== clinicianId) {
       return res.status(403).json({ error: 'Not authorized to edit this exercise' });
     }
 
@@ -137,10 +140,10 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Get favorites for a clinician
-router.get('/favorites/:clinicianId', async (req, res) => {
+// Get favorites for the authenticated clinician
+router.get('/favorites', async (req, res) => {
   try {
-    const { clinicianId } = req.params;
+    const clinicianId = req.user.id;
 
     const favorites = await db.getAll(`
       SELECT exercise_id, exercise_type, created_at
@@ -156,12 +159,13 @@ router.get('/favorites/:clinicianId', async (req, res) => {
   }
 });
 
-// Add favorite
+// Add favorite (clinicianId from JWT)
 router.post('/favorites', async (req, res) => {
   try {
-    const { clinicianId, exerciseId, exerciseType } = req.body;
+    const clinicianId = req.user.id;
+    const { exerciseId, exerciseType } = req.body;
 
-    if (!clinicianId || !exerciseId || !exerciseType) {
+    if (!exerciseId || !exerciseType) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -179,18 +183,14 @@ router.post('/favorites', async (req, res) => {
   }
 });
 
-// Remove favorite
+// Remove favorite (clinicianId from JWT)
 router.delete('/favorites', async (req, res) => {
   try {
-    // Support both body and query parameters for DELETE requests
-    const { clinicianId, exerciseId, exerciseType } = req.body;
+    const clinicianId = req.user.id;
+    const { exerciseId, exerciseType } = req.body;
 
-    console.log('DELETE /favorites - Body:', req.body);
-    console.log('DELETE /favorites - Params:', { clinicianId, exerciseId, exerciseType });
-
-    if (!clinicianId || !exerciseId || !exerciseType) {
-      console.error('Missing required fields:', { clinicianId, exerciseId, exerciseType });
-      return res.status(400).json({ error: 'Missing required fields', received: { clinicianId, exerciseId, exerciseType } });
+    if (!exerciseId || !exerciseType) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
     await db.query(`
@@ -198,27 +198,25 @@ router.delete('/favorites', async (req, res) => {
       WHERE clinician_id = $1 AND exercise_id = $2 AND exercise_type = $3
     `, [clinicianId, exerciseId, exerciseType]);
 
-    console.log('Successfully removed favorite:', { clinicianId, exerciseId, exerciseType });
     res.json({ message: 'Favorite removed successfully' });
   } catch (error) {
     console.error('Remove favorite error:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({ error: 'Server error', details: error.message });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Delete an exercise
+// Delete an exercise (verify ownership via JWT)
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { clinicianId } = req.body;
+    const clinicianId = req.user.id;
 
     // Verify ownership
     const existing = await db.getOne('SELECT * FROM exercises WHERE id = $1', [id]);
     if (!existing) {
       return res.status(404).json({ error: 'Exercise not found' });
     }
-    if (existing.clinician_id !== parseInt(clinicianId)) {
+    if (existing.clinician_id !== clinicianId) {
       return res.status(403).json({ error: 'Not authorized to delete this exercise' });
     }
 

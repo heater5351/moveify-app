@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BookOpen, Search, Check, X } from 'lucide-react';
 import type { EducationModule, PatientEducationModule } from '../../types/index.ts';
 import { API_URL } from '../../config';
+import { getAuthHeaders } from '../../utils/api';
 
 interface AssignEducationModalProps {
   patientId: number;
@@ -32,9 +33,9 @@ export const AssignEducationModal = ({
     try {
       setLoading(true);
       const [modulesRes, assignedRes, categoriesRes] = await Promise.all([
-        fetch(`${API_URL}/education/modules`),
-        fetch(`${API_URL}/education/patient/${patientId}/modules`),
-        fetch(`${API_URL}/education/categories`)
+        fetch(`${API_URL}/education/modules`, { headers: getAuthHeaders() }),
+        fetch(`${API_URL}/education/patient/${patientId}/modules`, { headers: getAuthHeaders() }),
+        fetch(`${API_URL}/education/categories`, { headers: getAuthHeaders() })
       ]);
 
       if (modulesRes.ok) {
@@ -63,7 +64,7 @@ export const AssignEducationModal = ({
       setAssigning(true);
       const response = await fetch(
         `${API_URL}/education/patient/${patientId}/modules/${moduleId}`,
-        { method: 'POST' }
+        { method: 'POST', headers: getAuthHeaders() }
       );
 
       if (response.ok) {
@@ -82,7 +83,7 @@ export const AssignEducationModal = ({
       setAssigning(true);
       const response = await fetch(
         `${API_URL}/education/patient/${patientId}/modules/${moduleId}`,
-        { method: 'DELETE' }
+        { method: 'DELETE', headers: getAuthHeaders() }
       );
 
       if (response.ok) {

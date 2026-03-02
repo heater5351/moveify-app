@@ -4,6 +4,7 @@ import type { ProgramExercise, Exercise, ExerciseFilters } from '../types/index.
 import { exercises as defaultExercises } from '../data/exercises';
 import { AddExerciseModal } from './modals/AddExerciseModal';
 import { API_URL } from '../config';
+import { getAuthHeaders } from '../utils/api';
 
 // Extract unique, sorted values from a comma-separated field across all exercises
 const extractUniqueValues = (exercises: Exercise[], field: keyof Exercise): string[] => {
@@ -111,10 +112,9 @@ const ExerciseDetailModal = ({
 
 interface ExerciseLibraryProps {
   onAddToProgram: (exercises: ProgramExercise[]) => void;
-  clinicianId?: number;
 }
 
-export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibraryProps) => {
+export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [customExercises, setCustomExercises] = useState<Exercise[]>([]);
@@ -160,21 +160,19 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
     categories: mergeAndSort(defaultFilterOptions.categories, apiFilterOptions.categories),
   }), [defaultFilterOptions, apiFilterOptions]);
 
-  // Fetch custom exercises for this clinician
+  // Fetch custom exercises on mount
   useEffect(() => {
-    if (clinicianId) {
-      fetchCustomExercises();
-      fetchFavorites();
-      fetchFilterOptions();
-    }
-  }, [clinicianId]);
+    fetchCustomExercises();
+    fetchFavorites();
+    fetchFilterOptions();
+  }, []);
 
   const fetchCustomExercises = async () => {
-    if (!clinicianId) return;
-
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/exercises/clinician/${clinicianId}`);
+      const response = await fetch(`${API_URL}/exercises`, {
+        headers: getAuthHeaders()
+      });
       if (response.ok) {
         const data = await response.json();
         // Map database fields to Exercise type
@@ -217,10 +215,10 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
   };
 
   const fetchFavorites = async () => {
-    if (!clinicianId) return;
-
     try {
-      const response = await fetch(`${API_URL}/exercises/favorites/${clinicianId}`);
+      const response = await fetch(`${API_URL}/exercises/favorites`, {
+        headers: getAuthHeaders()
+      });
       if (response.ok) {
         const data = await response.json();
         const favSet = new Set<string>(data.map((fav: { exercise_id: number; exercise_type: string }) =>
@@ -235,7 +233,9 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
 
   const fetchFilterOptions = async () => {
     try {
-      const response = await fetch(`${API_URL}/exercises/filter-options`);
+      const response = await fetch(`${API_URL}/exercises/filter-options`, {
+        headers: getAuthHeaders()
+      });
       if (response.ok) {
         const data = await response.json();
         setApiFilterOptions({
@@ -253,38 +253,28 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
   };
 
   const toggleFavorite = async (exerciseId: number, exerciseType: string) => {
-    if (!clinicianId) return;
-
     const exerciseKey = `${exerciseType}-${exerciseId}`;
     const isFavorite = favorites.has(exerciseKey);
-
-    console.log('Toggle favorite:', { exerciseId, exerciseType, exerciseKey, isFavorite, method: isFavorite ? 'DELETE' : 'POST' });
 
     try {
       const method = isFavorite ? 'DELETE' : 'POST';
       const response = await fetch(`${API_URL}/exercises/favorites`, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
-          clinicianId,
           exerciseId,
           exerciseType
         })
       });
 
-      console.log('API response:', { ok: response.ok, status: response.status });
-
       if (response.ok) {
         const newFavorites = new Set<string>(favorites);
         if (isFavorite) {
           newFavorites.delete(exerciseKey);
-          console.log('Removed from favorites:', exerciseKey);
         } else {
           newFavorites.add(exerciseKey);
-          console.log('Added to favorites:', exerciseKey);
         }
         setFavorites(newFavorites);
-        console.log('Updated favorites set size:', newFavorites.size);
       }
     } catch (error) {
       console.error('Failed to toggle favorite:', error);
@@ -302,8 +292,7 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
     try {
       const response = await fetch(`${API_URL}/exercises/${dbId}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clinicianId })
+        headers: getAuthHeaders()
       });
 
       if (response.ok) {
@@ -378,15 +367,13 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
               </span>
             )}
           </button>
-          {clinicianId && (
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="px-4 py-3 rounded-lg font-medium whitespace-nowrap bg-white border-2 border-moveify-teal text-moveify-teal hover:bg-moveify-teal hover:text-white transition-colors flex items-center gap-2"
-            >
-              <Plus size={20} />
-              Add Exercise
-            </button>
-          )}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-4 py-3 rounded-lg font-medium whitespace-nowrap bg-white border-2 border-moveify-teal text-moveify-teal hover:bg-moveify-teal hover:text-white transition-colors flex items-center gap-2"
+          >
+            <Plus size={20} />
+            Add Exercise
+          </button>
         </div>
 
         {/* Filter Panel */}
@@ -656,9 +643,8 @@ export const ExerciseLibrary = ({ onAddToProgram, clinicianId }: ExerciseLibrary
       </div>
 
       {/* Add Exercise Modal */}
-      {showAddModal && clinicianId && (
+      {showAddModal && (
         <AddExerciseModal
-          clinicianId={clinicianId}
           onClose={() => setShowAddModal(false)}
           onSuccess={fetchCustomExercises}
         />

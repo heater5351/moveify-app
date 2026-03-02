@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Mail } from 'lucide-react';
 import type { NewPatient } from '../../types/index.ts';
 import { API_URL } from '../../config';
+import { getAuthHeaders } from '../../utils/api';
 
 interface AddPatientModalProps {
   newPatient: NewPatient;
@@ -30,11 +31,10 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
     try {
       const response = await fetch(`${API_URL}/invitations/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           name: newPatient.name,
           email: newPatient.email,
-          role: 'patient',
           dob: newPatient.dob,
           phone: newPatient.phone,
           address: newPatient.address,

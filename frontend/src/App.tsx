@@ -20,13 +20,15 @@ import { ConfirmModal } from './components/modals/ConfirmModal';
 import { ResetPasswordModal } from './components/modals/ResetPasswordModal';
 import { BlockBuilderModal } from './components/modals/BlockBuilderModal';
 import { API_URL } from './config';
+import { getAuthHeaders, setToken, clearAuth, setStoredUser, getToken } from './utils/api';
 
 function App() {
   // Authentication state
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>('');
   const [loggedInPatient, setLoggedInPatient] = useState<Patient | null>(null);
-  const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
+  const [_loggedInUser, setLoggedInUser] = useState<User | null>(null);
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
 
   // Navigation state
   const [currentPage, setCurrentPage] = useState('exercises');
@@ -77,10 +79,59 @@ function App() {
     trackRpe: true
   });
 
+  // Session restoration on mount
+  useEffect(() => {
+    const restoreSession = async () => {
+      const token = getToken();
+      if (!token) {
+        setIsRestoringSession(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/auth/me`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const user = data.user;
+
+          if (user.role === 'patient') {
+            // Fetch patient data
+            const patientResponse = await fetch(`${API_URL}/patients/${user.id}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (patientResponse.ok) {
+              const patientData = await patientResponse.json();
+              setLoggedInPatient(patientData);
+            }
+            setUserRole('patient');
+          } else {
+            setLoggedInUser({ id: user.id, email: user.email, name: user.name, role: 'clinician' });
+            setUserRole('clinician');
+          }
+          setIsLoggedIn(true);
+        } else {
+          // Token invalid/expired
+          clearAuth();
+        }
+      } catch {
+        clearAuth();
+      }
+
+      setIsRestoringSession(false);
+    };
+
+    restoreSession();
+  }, []);
+
   // Fetch patients from database
   const fetchPatients = async () => {
     try {
-      const response = await fetch(`${API_URL}/patients`);
+      const response = await fetch(`${API_URL}/patients`, {
+        headers: getAuthHeaders()
+      });
       const data = await response.json();
       if (response.ok) {
         setPatients(data.patients);
@@ -108,7 +159,10 @@ function App() {
   }, [patients]);
 
   // Handlers
-  const handleLogin = (role: UserRole, patient?: Patient, user?: User) => {
+  const handleLogin = (role: UserRole, patient?: Patient, user?: User, token?: string) => {
+    if (token) {
+      setToken(token);
+    }
     setIsLoggedIn(true);
     setUserRole(role);
     if (patient) {
@@ -116,10 +170,12 @@ function App() {
     }
     if (user) {
       setLoggedInUser(user);
+      setStoredUser(user);
     }
   };
 
   const handleLogout = () => {
+    clearAuth();
     setIsLoggedIn(false);
     setUserRole('');
     setLoggedInPatient(null);
@@ -178,7 +234,7 @@ function App() {
         // Update existing program
         response = await fetch(`${API_URL}/programs/${editingProgramId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             name: programName,
             exercises: programExercises,
@@ -189,7 +245,7 @@ function App() {
         // Create new program
         response = await fetch(`${API_URL}/programs/patient/${selectedPatient.id}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             name: programName,
             exercises: programExercises,
@@ -214,7 +270,9 @@ function App() {
 
             if (!isEditing || exerciseIds.length === 0) {
               // Fetch the newly created program to get exercise IDs
-              const progRes = await fetch(`${API_URL}/programs/patient/${selectedPatient.id}`);
+              const progRes = await fetch(`${API_URL}/programs/patient/${selectedPatient.id}`, {
+                headers: getAuthHeaders()
+              });
               if (progRes.ok) {
                 const progData = await progRes.json();
                 if (progData.program && progData.program.exercises) {
@@ -224,14 +282,13 @@ function App() {
             }
 
             if (exerciseIds.length > 0) {
-              // w.programExerciseId is the array index (set by BlockBuilderModal), remap to actual DB IDs
               const remappedWeeks = pendingBlockData.weeks.map(w => ({
                 ...w,
                 programExerciseId: exerciseIds[w.programExerciseId] ?? exerciseIds[0]
               }));
               await fetch(`${API_URL}/blocks/${targetProgramId}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({
                   blockDuration: pendingBlockData.duration,
                   startDate: new Date().toISOString().split('T')[0],
@@ -315,7 +372,9 @@ function App() {
     // Fetch existing block data for this program
     setPendingBlockData(null);
     if (program.config.id) {
-      fetch(`${API_URL}/blocks/${program.config.id}`)
+      fetch(`${API_URL}/blocks/${program.config.id}`, {
+        headers: getAuthHeaders()
+      })
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data && (data.has_block || data.hasBlock)) {
@@ -351,7 +410,8 @@ function App() {
 
     try {
       const response = await fetch(`${API_URL}/programs/${programToDelete.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders()
       });
 
       if (response.ok) {
@@ -359,7 +419,9 @@ function App() {
 
         // Update viewing patient by fetching fresh data from API
         if (viewingPatient) {
-          const patientResponse = await fetch(`${API_URL}/patients/${viewingPatient.id}`);
+          const patientResponse = await fetch(`${API_URL}/patients/${viewingPatient.id}`, {
+            headers: getAuthHeaders()
+          });
           if (patientResponse.ok) {
             const updatedPatient = await patientResponse.json();
             setViewingPatient(updatedPatient);
@@ -392,14 +454,11 @@ function App() {
       duration: '4weeks',
       customEndDate: ''
     });
-    // No need to set isProgramOpen since it's always visible
-    // Navigate to Program Builder tab (exercise library)
     setCurrentPage('exercises');
     setViewingPatient(null);
   };
 
   const handleCancelProgramAssignment = () => {
-    // Clear all program-related state (program tab stays visible)
     setSelectedPatient(null);
     setProgramExercises([]);
     setProgramName('');
@@ -458,11 +517,11 @@ function App() {
 
     try {
       const response = await fetch(`${API_URL}/patients/${editingPatient.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders()
       });
 
       if (response.ok) {
-        // Refresh patient list from database
         await fetchPatients();
         setShowEditPatientModal(false);
         setEditingPatient(null);
@@ -485,8 +544,6 @@ function App() {
     if (userRole === 'patient' && loggedInPatient && loggedInPatient.assignedPrograms.length > programIndex) {
       const exercise = loggedInPatient.assignedPrograms[programIndex].exercises[exerciseIndex];
 
-      // When completionData is provided, always mark as completed (not toggle)
-      // This handles both new completions and editing existing completions
       const newCompletedStatus = completionData ? true : !exercise.completed;
 
       // Optimistic update
@@ -496,7 +553,6 @@ function App() {
         exercises: [...updatedPrograms[programIndex].exercises]
       };
 
-      // Update allCompletions with the new completion data
       const updatedAllCompletions = { ...exercise.allCompletions };
       if (completionData?.completionDate) {
         updatedAllCompletions[completionData.completionDate] = completionData;
@@ -516,10 +572,9 @@ function App() {
         try {
           const response = await fetch(`${API_URL}/programs/exercise/${exercise.id}/complete`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({
               completed: newCompletedStatus,
-              patientId: loggedInPatient.id,
               setsPerformed: completionData?.setsPerformed,
               repsPerformed: completionData?.repsPerformed,
               weightPerformed: completionData?.weightPerformed,
@@ -553,13 +608,21 @@ function App() {
   const isResetPasswordPage = window.location.pathname === '/reset-password';
 
   const handleResetPasswordClose = () => {
-    // Clear the token from URL and navigate to login
     navigate('/', { replace: true });
   };
 
   const handleResetPasswordSuccess = () => {
     setNotification({ message: 'Password reset successfully! You can now log in.', type: 'success' });
   };
+
+  // Show loading while restoring session
+  if (isRestoringSession) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-slate-400 text-sm">Loading...</div>
+      </div>
+    );
+  }
 
   // Router for public pages (login, setup password, reset password)
   if (!isLoggedIn) {
@@ -584,8 +647,6 @@ function App() {
 
   return (
     <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
-      {/* Program Tab - Permanently visible on right side (removed slide-out) */}
-
       {/* Modals */}
       {showPatientModal && (
         <PatientSelectionModal
@@ -659,7 +720,6 @@ function App() {
       {showBlockBuilderModal && programExercises.length > 0 && (
         <BlockBuilderModal
           programExercises={programExercises}
-          clinicianId={loggedInUser?.id || 0}
           initialDuration={(pendingBlockData?.duration as 4 | 6 | 8) || 4}
           initialWeeks={pendingBlockData?.weeks || []}
           onClose={() => setShowBlockBuilderModal(false)}
@@ -787,14 +847,10 @@ function App() {
           />
         </div>
       ) : currentPage === 'exercises' ? (
-        // Program Builder page - show split layout with Program Tab
         <div className="flex flex-1 overflow-hidden">
-          {/* Left Side - Exercise Library */}
           <div className="flex-1 flex flex-col overflow-hidden px-6 pt-7">
-            <ExerciseLibrary onAddToProgram={handleAddToProgram} clinicianId={loggedInUser?.id} />
+            <ExerciseLibrary onAddToProgram={handleAddToProgram} />
           </div>
-
-          {/* Right Side - Program Tab (only visible on Program Builder page) */}
           <div className="w-96 border-l border-slate-200 bg-white overflow-y-auto shadow-sm">
             <ProgramBuilder
               programExercises={programExercises}
@@ -814,12 +870,10 @@ function App() {
           </div>
         </div>
       ) : currentPage === 'education' ? (
-        // Education Library page - full width
         <div className="flex-1 overflow-y-auto px-6 py-7">
-          <EducationLibrary clinicianId={loggedInUser?.id || 0} />
+          <EducationLibrary />
         </div>
       ) : (
-        // Patients page - full width, no Program Tab
         <div className="flex-1 overflow-y-auto px-6 py-7">
           {viewingPatient ? (
             <PatientProfile
@@ -836,7 +890,6 @@ function App() {
               onEditProgram={handleEditProgram}
               onDeleteProgram={handleDeleteProgram}
               onAddProgram={handleAddProgram}
-              clinicianId={loggedInUser?.id}
             />
           ) : (
             <PatientsPage

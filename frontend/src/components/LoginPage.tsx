@@ -4,7 +4,7 @@ import { API_URL } from '../config';
 import { ForgotPasswordModal } from './modals/ForgotPasswordModal';
 
 interface LoginPageProps {
-  onLogin: (role: UserRole, patient?: Patient, user?: User) => void;
+  onLogin: (role: UserRole, patient?: Patient, user?: User, token?: string) => void;
 }
 
 export const LoginPage = ({ onLogin }: LoginPageProps) => {
@@ -20,10 +20,10 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
       try {
         const response = await fetch(url, options);
         return response;
-      } catch (error: any) {
-        // If it's a timeout or network error, and we have retries left, try again
-        if (i < maxRetries && (error.name === 'AbortError' || error.message.includes('fetch'))) {
-          const delay = Math.min(1000 * Math.pow(2, i), 3000); // 1s, 2s, max 3s
+      } catch (error: unknown) {
+        const err = error as Error;
+        if (i < maxRetries && (err.name === 'AbortError' || err.message.includes('fetch'))) {
+          const delay = Math.min(1000 * Math.pow(2, i), 3000);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
@@ -54,29 +54,29 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
       const data = await response.json();
 
       if (response.ok) {
-        // Login successful
         const user = data.user;
+        const token = data.token;
 
         if (user.role === 'patient') {
-          // Fetch THIS patient's full data including assigned program (more efficient)
+          // Fetch THIS patient's full data including assigned program
           try {
             const patientController = new AbortController();
             const patientTimeoutId = setTimeout(() => patientController.abort(), 15000);
 
             const patientResponse = await fetchWithRetry(`${API_URL}/patients/${user.id}`, {
-              signal: patientController.signal
+              signal: patientController.signal,
+              headers: { 'Authorization': `Bearer ${token}` }
             });
 
             clearTimeout(patientTimeoutId);
 
             if (patientResponse.ok) {
               const patientWithProgram = await patientResponse.json();
-              onLogin('patient', patientWithProgram);
+              onLogin('patient', patientWithProgram, undefined, token);
             } else {
               throw new Error('Failed to fetch patient data');
             }
-          } catch (patientError) {
-            console.warn('Failed to fetch patient program, logging in with basic data:', patientError);
+          } catch {
             // Fallback: create patient object without program
             const patient: Patient = {
               id: user.id,
@@ -90,26 +90,26 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
               dateAdded: user.created_at,
               assignedPrograms: []
             };
-            onLogin('patient', patient);
+            onLogin('patient', patient, undefined, token);
           }
         } else {
-          // Clinician login - pass user data
+          // Clinician login
           const clinicianUser: User = {
             id: user.id,
             email: user.email,
             name: user.name,
             role: 'clinician'
           };
-          onLogin('clinician', undefined, clinicianUser);
+          onLogin('clinician', undefined, clinicianUser, token);
         }
       } else {
         setLoginError(data.error || 'Invalid email or password');
       }
-    } catch (error: any) {
-      console.error('Login error:', error);
-      if (error.name === 'AbortError') {
+    } catch (error: unknown) {
+      const err = error as Error;
+      if (err.name === 'AbortError') {
         setLoginError('Login timed out. The server may be slow or unavailable. Please try again.');
-      } else if (error.message === 'Max retries exceeded') {
+      } else if (err.message === 'Max retries exceeded') {
         setLoginError('Connection failed after multiple attempts. Please check your internet connection.');
       } else {
         setLoginError('Connection error. Please make sure the server is running and try again.');

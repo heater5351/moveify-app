@@ -3,10 +3,10 @@ import { X, ChevronDown, Settings } from 'lucide-react';
 import type { ProgramExercise, PeriodizationTemplate, ExerciseWeekPrescription } from '../../types/index.ts';
 import { TemplateManagerModal } from './TemplateManagerModal';
 import { API_URL } from '../../config';
+import { getAuthHeaders } from '../../utils/api';
 
 interface BlockBuilderModalProps {
   programExercises: ProgramExercise[];
-  clinicianId: number;
   onClose: () => void;
   onSave: (blockDuration: number, exerciseWeeks: ExerciseWeekPrescription[]) => void;
   // Pre-existing block data for editing
@@ -25,7 +25,6 @@ interface CellData {
 
 export const BlockBuilderModal = ({
   programExercises,
-  clinicianId,
   onClose,
   onSave,
   initialDuration = 4,
@@ -100,7 +99,9 @@ export const BlockBuilderModal = ({
   // Fetch templates
   const fetchTemplates = async () => {
     try {
-      const res = await fetch(`${API_URL}/blocks/templates?clinicianId=${clinicianId}`);
+      const res = await fetch(`${API_URL}/blocks/templates`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setTemplates((data.templates || []).map(mapTemplate));
@@ -112,7 +113,7 @@ export const BlockBuilderModal = ({
 
   useEffect(() => {
     fetchTemplates();
-  }, [clinicianId]);
+  }, []);
 
   // Only show templates that match the current block duration
   const matchingTemplates = templates.filter(t => t.blockDuration === blockDuration);
@@ -161,7 +162,7 @@ export const BlockBuilderModal = ({
     try {
       const res = await fetch(`${API_URL}/blocks/templates/${templateId}/apply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({})
       });
       if (!res.ok) return;
@@ -275,7 +276,6 @@ export const BlockBuilderModal = ({
     <>
     {showTemplateManager && (
       <TemplateManagerModal
-        clinicianId={clinicianId}
         onClose={() => {
           setShowTemplateManager(false);
           // Refresh templates after managing

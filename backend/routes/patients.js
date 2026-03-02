@@ -1,8 +1,14 @@
 // Patient routes
 const express = require('express');
 const db = require('../database/db');
+const { authenticate, requireRole } = require('../middleware/auth');
+const { requirePatientOwnership } = require('../middleware/ownership');
+const audit = require('../services/audit');
 
 const router = express.Router();
+
+// All patient routes require authentication and clinician role
+router.use(authenticate, requireRole('clinician'));
 
 // Helper to format a patient with their programs (OPTIMIZED - reduces N+1 queries)
 async function formatPatientWithPrograms(patient) {
@@ -40,7 +46,6 @@ async function formatPatientWithPrograms(patient) {
   );
 
   // Get ALL completions for the patient (no date window limit)
-  // This allows the frontend to show completion status for any historical date
   const exerciseIds = allExercises.map(ex => ex.id);
   let completions = [];
   if (exerciseIds.length > 0) {
@@ -60,14 +65,9 @@ async function formatPatientWithPrograms(patient) {
        ORDER BY completion_date DESC`,
       [exerciseIds, patient.id]
     );
-    console.log(`[DEBUG] Loaded ${completions.length} completions for patient ${patient.id}`);
-    if (completions.length > 0) {
-      console.log('[DEBUG] Sample completion:', completions[0]);
-    }
   }
 
   // Create a Map for O(1) lookup with completion data
-  // Key format: "exerciseId-date" to support multiple completions per exercise
   const completionDataMap = new Map();
   completions.forEach(c => {
     const key = `${c.exercise_id}-${c.completion_date}`;
@@ -111,7 +111,6 @@ async function formatPatientWithPrograms(patient) {
     completions
       .filter(c => c.exercise_id === ex.id)
       .forEach(c => {
-        // Convert completion_date to YYYY-MM-DD string format
         const dateKey = typeof c.completion_date === 'string'
           ? c.completion_date.split('T')[0]
           : new Date(c.completion_date).toISOString().split('T')[0];
@@ -126,10 +125,6 @@ async function formatPatientWithPrograms(patient) {
         };
       });
 
-    if (Object.keys(allExerciseCompletions).length > 0) {
-      console.log(`[DEBUG] Exercise ${ex.id} (${ex.exercise_name}) has completions:`, Object.keys(allExerciseCompletions));
-    }
-
     exercisesByProgram[ex.program_id].push({
       id: ex.id,
       name: ex.exercise_name,
@@ -142,7 +137,7 @@ async function formatPatientWithPrograms(patient) {
       image: ex.image_url,
       completed: todayCompletionMap.has(ex.id),
       completionData: todayCompletion || null,
-      allCompletions: allExerciseCompletions, // All completions by date
+      allCompletions: allExerciseCompletions,
       enablePeriodization: ex.auto_adjust_enabled !== false
     });
   });
@@ -177,20 +172,25 @@ async function formatPatientWithPrograms(patient) {
   };
 }
 
-// Get all patients
+// Get all patients (filtered by clinician ownership)
 router.get('/', async (req, res) => {
   try {
+    const clinicianId = req.user.id;
+
     const patients = await db.getAll(`
-      SELECT id, email, role, name, dob, phone, address, condition, created_at
-      FROM users
-      WHERE role = 'patient'
-      ORDER BY created_at DESC
-    `);
+      SELECT u.id, u.email, u.role, u.name, u.dob, u.phone, u.address, u.condition, u.created_at
+      FROM users u
+      INNER JOIN clinician_patients cp ON u.id = cp.patient_id
+      WHERE u.role = 'patient' AND cp.clinician_id = $1
+      ORDER BY u.created_at DESC
+    `, [clinicianId]);
 
     // Transform to match frontend Patient type and fetch their programs
     const formattedPatients = await Promise.all(
       patients.map(patient => formatPatientWithPrograms(patient))
     );
+
+    audit.log(req, 'patients_list', 'patient', null, { count: formattedPatients.length });
 
     res.json({ patients: formattedPatients });
   } catch (error) {
@@ -199,22 +199,25 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get single patient by ID
-router.get('/:id', async (req, res) => {
+// Get single patient by ID (requires ownership)
+router.get('/:patientId', requirePatientOwnership, async (req, res) => {
   try {
-    const { id } = req.params;
+    const { patientId } = req.params;
 
     const patient = await db.getOne(`
       SELECT id, email, role, name, dob, phone, address, condition, created_at
       FROM users
       WHERE id = $1 AND role = 'patient'
-    `, [id]);
+    `, [patientId]);
 
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
     const formattedPatient = await formatPatientWithPrograms(patient);
+
+    audit.log(req, 'patient_view', 'patient', parseInt(patientId));
+
     res.json(formattedPatient);
   } catch (error) {
     console.error('Get patient error:', error);
@@ -222,23 +225,25 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Delete patient by ID
-router.delete('/:id', async (req, res) => {
+// Delete patient by ID (requires ownership)
+router.delete('/:patientId', requirePatientOwnership, async (req, res) => {
   try {
-    const { id } = req.params;
+    const { patientId } = req.params;
 
     // Check if patient exists
     const patient = await db.getOne(
       `SELECT id, email, role FROM users WHERE id = $1 AND role = 'patient'`,
-      [id]
+      [patientId]
     );
 
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    // Delete the user from database
-    await db.query(`DELETE FROM users WHERE id = $1 AND role = 'patient'`, [id]);
+    // Delete the user from database (cascades to clinician_patients, programs, etc.)
+    await db.query(`DELETE FROM users WHERE id = $1 AND role = 'patient'`, [patientId]);
+
+    audit.log(req, 'patient_delete', 'patient', parseInt(patientId), { email: patient.email });
 
     res.json({
       message: 'Patient deleted successfully',
@@ -253,4 +258,6 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// Export formatPatientWithPrograms for use in other routes (patient self-access)
 module.exports = router;
+module.exports.formatPatientWithPrograms = formatPatientWithPrograms;

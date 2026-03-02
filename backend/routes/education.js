@@ -2,14 +2,19 @@
 const express = require('express');
 const router = express.Router();
 const educationService = require('../services/education-service');
+const { authenticate, requireRole } = require('../middleware/auth');
+const { requirePatientOwnership, requirePatientAccess, requireSelf } = require('../middleware/ownership');
 
-// Get all education modules (library)
-router.get('/modules', async (req, res) => {
+// All education routes require authentication
+router.use(authenticate);
+
+// Get all education modules (clinician only — library view)
+router.get('/modules', requireRole('clinician'), async (req, res) => {
   try {
-    const { category, createdBy } = req.query;
+    const { category } = req.query;
     const modules = await educationService.getAllModules({
       category,
-      createdBy: createdBy ? parseInt(createdBy) : undefined
+      createdBy: req.user.id
     });
     res.json({ modules });
   } catch (error) {
@@ -35,8 +40,8 @@ router.get('/modules/:moduleId', async (req, res) => {
   }
 });
 
-// Create a new module
-router.post('/modules', async (req, res) => {
+// Create a new module (clinician only, createdBy from JWT)
+router.post('/modules', requireRole('clinician'), async (req, res) => {
   try {
     const {
       title,
@@ -45,12 +50,11 @@ router.post('/modules', async (req, res) => {
       category,
       estimatedDurationMinutes,
       imageUrl,
-      videoUrl,
-      createdBy
+      videoUrl
     } = req.body;
 
-    if (!title || !content || !createdBy) {
-      return res.status(400).json({ error: 'Title, content, and createdBy are required' });
+    if (!title || !content) {
+      return res.status(400).json({ error: 'Title and content are required' });
     }
 
     const module = await educationService.createModule({
@@ -61,7 +65,7 @@ router.post('/modules', async (req, res) => {
       estimatedDurationMinutes,
       imageUrl,
       videoUrl,
-      createdBy
+      createdBy: req.user.id
     });
 
     res.status(201).json(module);
@@ -71,8 +75,8 @@ router.post('/modules', async (req, res) => {
   }
 });
 
-// Update a module
-router.put('/modules/:moduleId', async (req, res) => {
+// Update a module (clinician only)
+router.put('/modules/:moduleId', requireRole('clinician'), async (req, res) => {
   try {
     const { moduleId } = req.params;
     const updates = req.body;
@@ -85,8 +89,8 @@ router.put('/modules/:moduleId', async (req, res) => {
   }
 });
 
-// Delete a module
-router.delete('/modules/:moduleId', async (req, res) => {
+// Delete a module (clinician only)
+router.delete('/modules/:moduleId', requireRole('clinician'), async (req, res) => {
   try {
     const { moduleId } = req.params;
     await educationService.deleteModule(parseInt(moduleId));
@@ -108,8 +112,8 @@ router.get('/categories', async (req, res) => {
   }
 });
 
-// Get modules assigned to a patient
-router.get('/patient/:patientId/modules', async (req, res) => {
+// Get modules assigned to a patient (clinician with ownership, or patient self)
+router.get('/patient/:patientId/modules', requirePatientAccess, async (req, res) => {
   try {
     const { patientId } = req.params;
     const modules = await educationService.getPatientModules(parseInt(patientId));
@@ -120,8 +124,8 @@ router.get('/patient/:patientId/modules', async (req, res) => {
   }
 });
 
-// Assign a module to a patient
-router.post('/patient/:patientId/modules/:moduleId', async (req, res) => {
+// Assign a module to a patient (clinician only, with ownership)
+router.post('/patient/:patientId/modules/:moduleId', requireRole('clinician'), requirePatientOwnership, async (req, res) => {
   try {
     const { patientId, moduleId } = req.params;
     await educationService.assignModuleToPatient(
@@ -135,8 +139,8 @@ router.post('/patient/:patientId/modules/:moduleId', async (req, res) => {
   }
 });
 
-// Mark a module as viewed
-router.post('/patient/:patientId/modules/:moduleId/viewed', async (req, res) => {
+// Mark a module as viewed (patient accessing own data)
+router.post('/patient/:patientId/modules/:moduleId/viewed', requireSelf('patientId'), async (req, res) => {
   try {
     const { patientId, moduleId } = req.params;
     await educationService.markModuleAsViewed(
@@ -150,8 +154,8 @@ router.post('/patient/:patientId/modules/:moduleId/viewed', async (req, res) => 
   }
 });
 
-// Unassign a module from a patient
-router.delete('/patient/:patientId/modules/:moduleId', async (req, res) => {
+// Unassign a module from a patient (clinician only, with ownership)
+router.delete('/patient/:patientId/modules/:moduleId', requireRole('clinician'), requirePatientOwnership, async (req, res) => {
   try {
     const { patientId, moduleId } = req.params;
     await educationService.unassignModuleFromPatient(

@@ -1,5 +1,49 @@
-// API utility with retry logic and error handling
+// API utility with retry logic, error handling, and JWT auth
 import { API_URL } from '../config';
+
+const TOKEN_KEY = 'moveify_token';
+const USER_KEY = 'moveify_user';
+
+// Token management
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearAuth(): void {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
+export function getStoredUser(): { id: number; email: string; role: string; name: string } | null {
+  try {
+    const stored = localStorage.getItem(USER_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredUser(user: { id: number; email: string; role: string; name: string }): void {
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+/**
+ * Get auth headers for API calls
+ */
+export function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+  const token = getToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 interface FetchOptions extends RequestInit {
   retries?: number;
@@ -35,6 +79,13 @@ export async function fetchWithRetry(
       });
 
       clearTimeout(timeoutId);
+
+      // Handle 401 — clear auth and redirect to login
+      if (response.status === 401) {
+        clearAuth();
+        window.location.href = '/';
+        return response;
+      }
 
       // Don't retry on client errors (4xx), only server errors (5xx) and network errors
       if (response.ok || (response.status >= 400 && response.status < 500)) {
@@ -73,7 +124,7 @@ export async function fetchWithRetry(
 /**
  * Wrapper for API calls with automatic retry and JSON parsing
  */
-export async function apiCall<T = any>(
+export async function apiCall<T = unknown>(
   endpoint: string,
   options: FetchOptions = {}
 ): Promise<T> {
@@ -82,7 +133,7 @@ export async function apiCall<T = any>(
   const response = await fetchWithRetry(url, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
       ...options.headers,
     },
   });
@@ -105,8 +156,7 @@ export async function checkServerHealth(): Promise<boolean> {
       signal: AbortSignal.timeout(5000), // 5 second timeout
     });
     return response.ok;
-  } catch (error) {
-    console.error('Server health check failed:', error);
+  } catch {
     return false;
   }
 }
@@ -121,15 +171,12 @@ export async function waitForServer(maxWaitTime: number = 30000): Promise<boolea
   while (Date.now() - startTime < maxWaitTime) {
     const isHealthy = await checkServerHealth();
     if (isHealthy) {
-      console.log('✅ Server is ready');
       return true;
     }
 
-    console.log('⏳ Waiting for server to be ready...');
     await new Promise(resolve => setTimeout(resolve, checkInterval));
   }
 
-  console.error('❌ Server did not become ready within the expected time');
   return false;
 }
 

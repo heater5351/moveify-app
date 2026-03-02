@@ -311,6 +311,47 @@ async function initDatabase() {
       ALTER TABLE programs ADD COLUMN IF NOT EXISTS clinician_id INTEGER REFERENCES users(id)
     `);
 
+    // Clinician-patient ownership junction table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS clinician_patients (
+        id SERIAL PRIMARY KEY,
+        clinician_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        patient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(clinician_id, patient_id)
+      )
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_clinician_patients_clinician
+      ON clinician_patients(clinician_id)
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_clinician_patients_patient
+      ON clinician_patients(patient_id)
+    `);
+
+    // Audit logs table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        action TEXT NOT NULL,
+        resource_type TEXT NOT NULL,
+        resource_id INTEGER,
+        details JSONB,
+        ip_address INET,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id
+      ON audit_logs(user_id)
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at
+      ON audit_logs(created_at)
+    `);
+
     // Exercise favorites table (for favoriting both custom and default exercises)
     await db.query(`
       CREATE TABLE IF NOT EXISTS exercise_favorites (
@@ -321,6 +362,12 @@ async function initDatabase() {
         created_at TIMESTAMP DEFAULT NOW(),
         UNIQUE(clinician_id, exercise_id, exercise_type)
       )
+    `);
+
+    // Add clinician_id to invitation_tokens for tracking who invited
+    await db.query(`
+      ALTER TABLE invitation_tokens
+      ADD COLUMN IF NOT EXISTS clinician_id INTEGER REFERENCES users(id)
     `);
 
     // Add weight columns to existing tables (migration for deployed DB)
@@ -450,6 +497,47 @@ async function initDatabase() {
 
     console.log('✅ Database indexes created');
     console.log('✅ Database migrations complete');
+
+    // Backfill clinician_patients from existing programs data
+    console.log('🔄 Backfilling clinician_patients...');
+    const cpCount = await db.getOne('SELECT COUNT(*) as count FROM clinician_patients');
+    if (cpCount && parseInt(cpCount.count) === 0) {
+      // Try to populate from programs.clinician_id
+      const programLinks = await db.getAll(`
+        SELECT DISTINCT clinician_id, patient_id FROM programs
+        WHERE clinician_id IS NOT NULL
+      `);
+      if (programLinks && programLinks.length > 0) {
+        for (const link of programLinks) {
+          await db.query(
+            `INSERT INTO clinician_patients (clinician_id, patient_id)
+             VALUES ($1, $2)
+             ON CONFLICT (clinician_id, patient_id) DO NOTHING`,
+            [link.clinician_id, link.patient_id]
+          );
+        }
+        console.log(`✅ Backfilled ${programLinks.length} clinician-patient relationships from programs`);
+      } else {
+        // Fallback: assign all patients to the first clinician
+        const firstClinician = await db.getOne(
+          "SELECT id FROM users WHERE role = 'clinician' ORDER BY id ASC LIMIT 1"
+        );
+        if (firstClinician) {
+          const patients = await db.getAll(
+            "SELECT id FROM users WHERE role = 'patient'"
+          );
+          for (const patient of patients) {
+            await db.query(
+              `INSERT INTO clinician_patients (clinician_id, patient_id)
+               VALUES ($1, $2)
+               ON CONFLICT (clinician_id, patient_id) DO NOTHING`,
+              [firstClinician.id, patient.id]
+            );
+          }
+          console.log(`✅ Backfilled ${patients.length} patients to clinician ${firstClinician.id}`);
+        }
+      }
+    }
 
     console.log('✅ Database tables initialized');
   } catch (error) {

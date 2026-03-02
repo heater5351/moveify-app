@@ -2,8 +2,14 @@
 const express = require('express');
 const db = require('../database/db');
 const checkInService = require('../services/check-in-service');
+const { authenticate, requireRole } = require('../middleware/auth');
+const { requirePatientOwnership, requireProgramOwnership, requirePatientAccess } = require('../middleware/ownership');
+const audit = require('../services/audit');
 
 const router = express.Router();
+
+// All program routes require authentication
+router.use(authenticate);
 
 // Timezone-safe date string (avoids UTC shift from toISOString)
 function toLocalDateString(date) {
@@ -31,15 +37,13 @@ function getActualStartDate(startDateValue, customStartDate) {
   } else if (startDateValue === 'custom' && customStartDate) {
     return customStartDate;
   } else if (startDateValue && startDateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
-    // Already a date string
     return startDateValue;
   }
-  // Default to today
   return toLocalDateString(today);
 }
 
-// Get program for a patient
-router.get('/patient/:patientId', async (req, res) => {
+// Get program for a patient (both clinician and patient can access)
+router.get('/patient/:patientId', requirePatientAccess, async (req, res) => {
   try {
     const { patientId } = req.params;
 
@@ -94,8 +98,8 @@ router.get('/patient/:patientId', async (req, res) => {
   }
 });
 
-// Create new program for a patient
-router.post('/patient/:patientId', async (req, res) => {
+// Create new program for a patient (clinician only, with ownership check)
+router.post('/patient/:patientId', requireRole('clinician'), requirePatientOwnership, async (req, res) => {
   const client = await db.getClient();
 
   try {
@@ -116,13 +120,14 @@ router.post('/patient/:patientId', async (req, res) => {
 
     const actualStartDate = getActualStartDate(config?.startDate, config?.customStartDate);
 
-    // Create new program
+    // Create new program with clinician_id from JWT
     const programResult = await client.query(`
-      INSERT INTO programs (patient_id, name, start_date, frequency, duration, custom_end_date, track_actual_performance, track_rpe, track_pain)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO programs (patient_id, clinician_id, name, start_date, frequency, duration, custom_end_date, track_actual_performance, track_rpe, track_pain)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING id
     `, [
       patientId,
+      req.user.id,
       name,
       actualStartDate,
       JSON.stringify(config?.frequency || []),
@@ -161,6 +166,8 @@ router.post('/patient/:patientId', async (req, res) => {
     await client.query('COMMIT');
     client.release();
 
+    audit.log(req, 'program_create', 'program', programId, { patientId: parseInt(patientId), exerciseCount: exercises.length });
+
     res.json({
       message: 'Program assigned successfully',
       programId: programId
@@ -173,8 +180,8 @@ router.post('/patient/:patientId', async (req, res) => {
   }
 });
 
-// Update existing program
-router.put('/:programId', async (req, res) => {
+// Update existing program (clinician only, with program ownership)
+router.put('/:programId', requireRole('clinician'), requireProgramOwnership, async (req, res) => {
   const client = await db.getClient();
 
   try {
@@ -231,7 +238,6 @@ router.put('/:programId', async (req, res) => {
       const existingId = existingExerciseMap.get(exercise.name);
 
       if (existingId) {
-        // Exercise exists - UPDATE it (preserves ID and completion history)
         await client.query(`
           UPDATE program_exercises
           SET exercise_category = $1, sets = $2, reps = $3, prescribed_weight = $4,
@@ -252,7 +258,6 @@ router.put('/:programId', async (req, res) => {
         ]);
         updatedExerciseIds.add(existingId);
       } else {
-        // New exercise - INSERT it
         await client.query(`
           INSERT INTO program_exercises (
             program_id, exercise_name, exercise_category, sets, reps, prescribed_weight,
@@ -283,12 +288,13 @@ router.put('/:programId', async (req, res) => {
         [programId, ...idsToKeep]
       );
     } else {
-      // All exercises removed - delete all
       await client.query('DELETE FROM program_exercises WHERE program_id = $1', [programId]);
     }
 
     await client.query('COMMIT');
     client.release();
+
+    audit.log(req, 'program_update', 'program', parseInt(programId));
 
     res.json({
       message: 'Program updated successfully',
@@ -302,13 +308,13 @@ router.put('/:programId', async (req, res) => {
   }
 });
 
-// Update exercise completion status (daily tracking)
-router.patch('/exercise/:exerciseId/complete', async (req, res) => {
+// Update exercise completion status (patient only — uses JWT identity)
+router.patch('/exercise/:exerciseId/complete', requireRole('patient'), async (req, res) => {
   try {
     const { exerciseId } = req.params;
+    const patientId = req.user.id;
     const {
       completed,
-      patientId,
       setsPerformed,
       repsPerformed,
       weightPerformed,
@@ -318,8 +324,15 @@ router.patch('/exercise/:exerciseId/complete', async (req, res) => {
       completionDate
     } = req.body;
 
-    if (!patientId) {
-      return res.status(400).json({ error: 'Patient ID is required' });
+    // Verify this exercise belongs to a program assigned to this patient
+    const exerciseCheck = await db.getOne(`
+      SELECT pe.id FROM program_exercises pe
+      JOIN programs p ON pe.program_id = p.id
+      WHERE pe.id = $1 AND p.patient_id = $2
+    `, [exerciseId, patientId]);
+
+    if (!exerciseCheck) {
+      return res.status(403).json({ error: 'This exercise is not assigned to you' });
     }
 
     // Validation
@@ -334,7 +347,6 @@ router.patch('/exercise/:exerciseId/complete', async (req, res) => {
     const dateToUse = completionDate || toLocalDateString(new Date());
 
     if (completed) {
-      // PostgreSQL upsert using ON CONFLICT
       await db.query(`
         INSERT INTO exercise_completions (
           exercise_id, patient_id, completion_date,
@@ -359,8 +371,9 @@ router.patch('/exercise/:exerciseId/complete', async (req, res) => {
         painLevel || null,
         notes || null
       ]);
+
+      audit.log(req, 'exercise_complete', 'exercise_completion', parseInt(exerciseId), { date: dateToUse });
     } else {
-      // Remove completion for the specified date
       await db.query(
         'DELETE FROM exercise_completions WHERE exercise_id = $1 AND patient_id = $2 AND completion_date = $3',
         [exerciseId, patientId, dateToUse]
@@ -375,7 +388,7 @@ router.patch('/exercise/:exerciseId/complete', async (req, res) => {
 });
 
 // Get today's completion details for an exercise
-router.get('/exercise/:exerciseId/completion/:patientId/today', async (req, res) => {
+router.get('/exercise/:exerciseId/completion/:patientId/today', requirePatientAccess, async (req, res) => {
   try {
     const { exerciseId, patientId } = req.params;
     const today = toLocalDateString(new Date());
@@ -400,7 +413,6 @@ function isScheduledDay(date, frequency) {
 }
 
 // Helper: Calculate schedule-aware streak (LENIENT MODE)
-// Any activity on a scheduled day counts - only zero completions breaks streak
 function calculateScheduleAwareStreak(completionsByDate, frequency, programStartDate) {
   if (!frequency || frequency.length === 0) return 0;
 
@@ -408,7 +420,6 @@ function calculateScheduleAwareStreak(completionsByDate, frequency, programStart
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Grace period: if today is scheduled but has no activity yet, start from yesterday
   const todayStr = toLocalDateString(today);
   const todayCompletions = completionsByDate[todayStr] || 0;
   const startFromYesterday = isScheduledDay(today, frequency) && todayCompletions === 0;
@@ -418,11 +429,9 @@ function calculateScheduleAwareStreak(completionsByDate, frequency, programStart
     checkDate.setDate(checkDate.getDate() - 1);
   }
 
-  // Walk backwards through days
   for (let i = 0; i < 365; i++) {
     const dateStr = toLocalDateString(checkDate);
 
-    // Don't count days before program started
     if (programStartDate && checkDate < programStartDate) {
       break;
     }
@@ -431,14 +440,11 @@ function calculateScheduleAwareStreak(completionsByDate, frequency, programStart
       const completionCount = completionsByDate[dateStr] || 0;
 
       if (completionCount > 0) {
-        // Any activity counts (lenient mode)
         streak++;
       } else {
-        // Zero completions on a scheduled day - streak breaks
         break;
       }
     }
-    // Non-scheduled days are skipped (don't break streak)
 
     checkDate.setDate(checkDate.getDate() - 1);
   }
@@ -446,12 +452,14 @@ function calculateScheduleAwareStreak(completionsByDate, frequency, programStart
   return streak;
 }
 
-// Get completion analytics for a patient
-router.get('/analytics/patient/:patientId', async (req, res) => {
+// Get completion analytics for a patient (clinician or patient self)
+router.get('/analytics/patient/:patientId', requirePatientAccess, async (req, res) => {
   try {
     const { patientId } = req.params;
     const { days = 30 } = req.query;
     const daysInt = parseInt(days) || 30;
+
+    audit.log(req, 'analytics_view', 'patient', parseInt(patientId));
 
     // Get all programs for this patient with frequency data
     const programs = await db.getAll(
@@ -471,11 +479,9 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
       });
     }
 
-    // ============================================================
     // PER-PROGRAM ANALYTICS
-    // ============================================================
     const perProgramData = [];
-    const allCompletionsByDate = {}; // merged across all programs
+    const allCompletionsByDate = {};
     const allFrequencies = new Set();
     const allStartDates = [];
     let totalPrescribedAll = 0;
@@ -499,7 +505,6 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
         continue;
       }
 
-      // Parse program start date
       let programStartDate = null;
       if (program.start_date && program.start_date.trim() !== '') {
         const parsedDate = new Date(program.start_date);
@@ -510,7 +515,6 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
         }
       }
 
-      // Query window
       const daysAgoDate = new Date();
       daysAgoDate.setDate(daysAgoDate.getDate() - daysInt);
       const programCreatedDate = new Date(program.created_at);
@@ -528,7 +532,6 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
         ORDER BY completion_date ASC
       `, [...exerciseIds, patientId, queryStartDateStr]);
 
-      // All completions for streak
       const allCompletionDates = await db.getAll(`
         SELECT completion_date, COUNT(*) as count
         FROM exercise_completions
@@ -544,13 +547,11 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
           ? row.completion_date.split('T')[0]
           : toLocalDateString(new Date(row.completion_date));
         completionsByDate[dateStr] = parseInt(row.count);
-        // Merge into global map
         allCompletionsByDate[dateStr] = (allCompletionsByDate[dateStr] || 0) + parseInt(row.count);
       });
 
       const streak = calculateScheduleAwareStreak(completionsByDate, frequency, programStartDate);
 
-      // Completion rate per program
       const now = new Date();
       now.setHours(0, 0, 0, 0);
       const effectiveStartDate = programStartDate || new Date(programCreatedDate);
@@ -587,20 +588,16 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
       });
     }
 
-    // ============================================================
     // AGGREGATE OVERVIEW
-    // ============================================================
     const mergedFrequency = [...allFrequencies];
     const earliestStart = allStartDates.length > 0
       ? new Date(Math.min(...allStartDates.map(d => d.getTime())))
       : null;
 
-    // Aggregate streak across all programs
     const aggregateStreak = mergedFrequency.length > 0
       ? calculateScheduleAwareStreak(allCompletionsByDate, mergedFrequency, earliestStart)
       : 0;
 
-    // Aggregate completion rate
     let aggregateCompletionRate = 0;
     if (totalPrescribedAll > 0) {
       aggregateCompletionRate = Math.min(Math.round((totalCompletedAll / totalPrescribedAll) * 100), 100);
@@ -608,7 +605,6 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
       aggregateCompletionRate = totalCompletedAll > 0 ? 100 : 0;
     }
 
-    // Fetch detailed completions for RPE, pain, weight, activity
     const detailedStartDate = new Date();
     detailedStartDate.setDate(detailedStartDate.getDate() - daysInt);
     const detailedCompletions = await db.getAll(`
@@ -625,10 +621,9 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
       ORDER BY ec.completion_date ASC
     `, [patientId, toLocalDateString(detailedStartDate)]);
 
-    // Total exercises per day (sum across all active programs)
     const totalExercisesPerDay = perProgramData.reduce((sum, p) => sum + p.totalExercises, 0);
 
-    // --- Avg RPE with trend ---
+    // Avg RPE with trend
     const completionsWithRpe = detailedCompletions.filter(c => c.rpe_rating != null && c.rpe_rating > 0);
     let avgRpe = { value: 0, trend: 'stable' };
     if (completionsWithRpe.length > 0) {
@@ -643,7 +638,7 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
       }
     }
 
-    // --- Avg Pain with trend ---
+    // Avg Pain with trend
     const completionsWithPain = detailedCompletions.filter(c => c.pain_level != null && c.pain_level > 0);
     let avgPain = { value: 0, trend: 'stable' };
     if (completionsWithPain.length > 0) {
@@ -658,7 +653,7 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
       }
     }
 
-    // --- Weight Progression ---
+    // Weight Progression
     const weightByExercise = {};
     detailedCompletions.forEach(c => {
       if (c.weight_performed && c.weight_performed > 0) {
@@ -679,7 +674,7 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
       return { exerciseName: name, startWeight: firstWeight, currentWeight: lastWeight, change, changePercent, dataPoints: sorted };
     }).filter(ex => ex.change !== 0 || ex.dataPoints.length > 1);
 
-    // --- Weekly Activity with status ---
+    // Weekly Activity with status
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const weeklyActivity = [];
@@ -692,7 +687,6 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
       const weekday = day.toLocaleDateString('en-US', { weekday: 'short' });
       const count = allCompletionsByDate[dateStr] || 0;
 
-      // Determine status
       let status = 'rest';
       if (day > today) {
         status = 'future';
@@ -707,7 +701,7 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
       weeklyActivity.push({ date: dateStr, dayLabel, weekday, count, status });
     }
 
-    // --- Completion Trend (first week vs last week) ---
+    // Completion Trend
     let completionTrend = 'stable';
     if (weeklyActivity.length >= 7) {
       const firstWeekTotal = weeklyActivity.slice(0, 7).reduce((sum, d) => sum + d.count, 0);
@@ -716,7 +710,7 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
       else if (lastWeekTotal < firstWeekTotal - 2) completionTrend = 'down';
     }
 
-    // --- Alerts ---
+    // Alerts
     const alerts = [];
     const highPainCompletions = completionsWithPain.filter(c => c.pain_level >= 7);
     if (highPainCompletions.length > 0) {
@@ -735,7 +729,7 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
       alerts.push({ severity: 'success', message: 'Patient is progressing well' });
     }
 
-    // --- Next Milestone ---
+    // Next Milestone
     let nextMilestone = null;
     if (aggregateStreak < 7) {
       const daysToGo = 7 - aggregateStreak;
@@ -750,7 +744,7 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
       nextMilestone = { type: 'celebration', value: aggregateStreak, message: `Amazing ${aggregateStreak}-day streak! Keep it going!` };
     }
 
-    // --- Recent Wins ---
+    // Recent Wins
     const recentWins = [];
     const uniqueDates = [...new Set(detailedCompletions.map(c =>
       typeof c.completion_date === 'string' ? c.completion_date.split('T')[0] : toLocalDateString(new Date(c.completion_date))
@@ -780,7 +774,7 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
       recentWins.push({ type: 'streak', message: '30-day streak achieved!', date: todayStr });
     }
 
-    // --- Check-In Summary ---
+    // Check-In Summary
     let checkInSummary = null;
     try {
       const checkInStartDate = new Date();
@@ -800,7 +794,7 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
         };
       }
     } catch (e) {
-      // Check-ins are optional, don't fail the whole response
+      // Check-ins are optional
     }
 
     res.json({
@@ -826,12 +820,14 @@ router.get('/analytics/patient/:patientId', async (req, res) => {
   }
 });
 
-// Delete program
-router.delete('/:programId', async (req, res) => {
+// Delete program (clinician only, with ownership)
+router.delete('/:programId', requireRole('clinician'), requireProgramOwnership, async (req, res) => {
   try {
     const { programId } = req.params;
 
     await db.query('DELETE FROM programs WHERE id = $1', [programId]);
+
+    audit.log(req, 'program_delete', 'program', parseInt(programId));
 
     res.json({ message: 'Program deleted successfully' });
   } catch (error) {
@@ -841,7 +837,6 @@ router.delete('/:programId', async (req, res) => {
 });
 
 // ===== RETIRED PERIODIZATION ENDPOINTS (410 Gone) =====
-
 const goneResponse = (req, res) => {
   res.status(410).json({ error: 'This endpoint has been retired. Use /api/blocks instead.' });
 };
@@ -852,8 +847,8 @@ router.get('/:programId/cycle', goneResponse);
 router.get('/:programId/progression-history', goneResponse);
 router.get('/exercise/:exerciseId/metrics', goneResponse);
 
-// Get exercise completions for a patient (clinician dashboard)
-router.get('/exercise-completions/patient/:patientId', async (req, res) => {
+// Get exercise completions for a patient (clinician or patient self)
+router.get('/exercise-completions/patient/:patientId', requirePatientAccess, async (req, res) => {
   try {
     const { patientId } = req.params;
     const { days } = req.query;
@@ -891,8 +886,8 @@ router.get('/exercise-completions/patient/:patientId', async (req, res) => {
   }
 });
 
-// Get progression logs for all programs of a patient (clinician dashboard)
-router.get('/progression-logs/patient/:patientId', async (req, res) => {
+// Get progression logs for all programs of a patient
+router.get('/progression-logs/patient/:patientId', requirePatientAccess, async (req, res) => {
   try {
     const { patientId } = req.params;
     const { limit } = req.query;
@@ -929,34 +924,5 @@ router.get('/progression-logs/patient/:patientId', async (req, res) => {
 
 // Retired endpoint
 router.patch('/exercise/:exerciseId/override', goneResponse);
-
-// ADMIN: Clear all check-in and completion data (for fresh start)
-// SECURITY: Requires admin secret header to prevent unauthorized data deletion
-router.delete('/admin/clear-data', async (req, res) => {
-  try {
-    // Check for admin authorization
-    const adminSecret = req.headers['x-admin-secret'];
-    const expectedSecret = process.env.ADMIN_SECRET || 'moveify-admin-2024';
-
-    if (!adminSecret || adminSecret !== expectedSecret) {
-      return res.status(403).json({ error: 'Unauthorized: Invalid or missing admin secret' });
-    }
-
-    // Clear all exercise completions
-    const completionsResult = await db.query('DELETE FROM exercise_completions');
-
-    // Clear all daily check-ins
-    const checkInsResult = await db.query('DELETE FROM daily_check_ins');
-
-    res.json({
-      message: 'All check-in and exercise completion data cleared successfully',
-      deletedCompletions: completionsResult.rowCount,
-      deletedCheckIns: checkInsResult.rowCount
-    });
-  } catch (error) {
-    console.error('Clear data error:', error);
-    res.status(500).json({ error: 'Failed to clear data' });
-  }
-});
 
 module.exports = router;

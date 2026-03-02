@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Play, ExternalLink } from 'lucide-react';
 import { API_URL } from '../../config';
+import { getAuthHeaders } from '../../utils/api';
 
 // Convert YouTube URL to embed format
 const convertToEmbedUrl = (url: string): string | null => {
@@ -28,7 +29,6 @@ const convertToEmbedUrl = (url: string): string | null => {
 };
 
 interface AddExerciseModalProps {
-  clinicianId: number;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -116,7 +116,7 @@ const MOVEMENT_TYPE_OPTIONS = [
   'Plantar Flexion'
 ];
 
-export const AddExerciseModal = ({ clinicianId, onClose, onSuccess }: AddExerciseModalProps) => {
+export const AddExerciseModal = ({ onClose, onSuccess }: AddExerciseModalProps) => {
   const [formData, setFormData] = useState({
     name: '',
     category: 'Musculoskeletal',
@@ -159,9 +159,8 @@ export const AddExerciseModal = ({ clinicianId, onClose, onSuccess }: AddExercis
 
       const response = await fetch(`${API_URL}/exercises`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
-          clinicianId,
           name: formData.name,
           category: formData.category,
           difficulty: formData.difficulty,
