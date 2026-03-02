@@ -370,6 +370,14 @@ async function initDatabase() {
       ADD COLUMN IF NOT EXISTS clinician_id INTEGER REFERENCES users(id)
     `);
 
+    // Add health data consent columns to users table
+    await db.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS health_data_consent BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS health_data_consent_date TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS consent_version TEXT
+    `);
+
     // Add weight columns to existing tables (migration for deployed DB)
     console.log('🔄 Running database migrations...');
     await db.query(`

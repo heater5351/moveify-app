@@ -368,11 +368,11 @@ If a breach is **likely to cause serious harm**:
 - **Audit logging** of key operations (login, patient access, program CRUD, completions, check-ins)
 - **No public signup** — users created via clinician invitation only
 - **Input validation** — email format, password minimum length
+- **Explicit health data consent** — required checkbox during patient signup (APP 3), stored with timestamp and version in `users` table
 
 ### Known compliance gaps (TODO)
 
 - **No privacy policy** displayed in-app (APP 1, APP 5)
-- **No explicit consent flow** for health data collection at signup (APP 3)
 - **No data export or deletion** feature for patients (APP 12, APP 13, APP 11)
 - **No documented breach response plan** (NDB scheme)
 - **No data retention policy** — APP 11 requires destroying data no longer needed

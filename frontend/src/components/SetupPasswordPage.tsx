@@ -23,6 +23,7 @@ export const SetupPasswordPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
 
   // Password strength checks
   const hasMinLength = password.length >= 8;
@@ -78,7 +79,7 @@ export const SetupPasswordPage = () => {
       const response = await fetch(`${API_URL}/invitations/set-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password })
+        body: JSON.stringify({ token, password, healthDataConsent: true })
       });
 
       const data = await response.json();
@@ -226,6 +227,21 @@ export const SetupPasswordPage = () => {
             )}
           </div>
 
+          {/* Health data consent */}
+          <div className="bg-slate-50 rounded-lg px-4 py-3 mt-2">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={consentChecked}
+                onChange={(e) => setConsentChecked(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-primary-400 focus:ring-primary-400/30 shrink-0"
+              />
+              <span className="text-xs text-slate-600 leading-relaxed">
+                I consent to Moveify collecting and storing my health data, including exercise performance, pain scores, daily wellness check-ins, and demographic information, for the purpose of managing my exercise rehabilitation program. This data will be accessible to my assigned clinician. I understand I can request access to, correction of, or deletion of my data by contacting my clinician.
+              </span>
+            </label>
+          </div>
+
           {submitError && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
               {submitError}
@@ -234,7 +250,7 @@ export const SetupPasswordPage = () => {
 
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || !hasMinLength || !passwordsMatch}
+            disabled={isSubmitting || !hasMinLength || !passwordsMatch || !consentChecked}
             className="w-full bg-primary-400 hover:bg-primary-500 text-white py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm mt-1"
           >
             {isSubmitting ? 'Creating account...' : 'Create account'}

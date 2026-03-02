@@ -117,7 +117,7 @@ router.get('/validate/:token', async (req, res) => {
 // Set password using invitation token (public — used by setup-password page)
 router.post('/set-password', async (req, res) => {
   try {
-    const { token, password } = req.body;
+    const { token, password, healthDataConsent } = req.body;
 
     if (!token || !password) {
       return res.status(400).json({ error: 'Token and password are required' });
@@ -125,6 +125,10 @@ router.post('/set-password', async (req, res) => {
 
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    if (healthDataConsent !== true) {
+      return res.status(400).json({ error: 'You must consent to health data collection to create an account' });
     }
 
     // Validate invitation
@@ -140,10 +144,10 @@ router.post('/set-password', async (req, res) => {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Update user account with password
+    // Update user account with password and consent
     await db.query(`
       UPDATE users
-      SET password_hash = $1
+      SET password_hash = $1, health_data_consent = TRUE, health_data_consent_date = NOW(), consent_version = '1.0'
       WHERE email = $2 AND role = $3
     `, [passwordHash, invitation.email, invitation.role]);
 
@@ -152,6 +156,9 @@ router.post('/set-password', async (req, res) => {
 
     // Get the user ID
     const user = await db.getOne('SELECT id FROM users WHERE email = $1', [invitation.email]);
+
+    // Audit log consent
+    audit.log(req, 'health_data_consent', 'user', user.id, { consent_version: '1.0' });
 
     res.json({
       message: 'Password set successfully. You can now login.',
