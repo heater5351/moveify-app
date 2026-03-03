@@ -60,7 +60,7 @@ frontend/src/
 backend/
 ├── middleware/
 │   ├── auth.js          # JWT verify, role check, token generation
-│   └── ownership.js     # Patient/program ownership checks
+│   └── ownership.js     # Access control (requirePatientAccess, requireAdmin, requireSelf)
 ├── services/
 │   └── audit.js         # Fire-and-forget audit logging
 ├── routes/              # All API route files
@@ -192,7 +192,7 @@ When adding new state, add it to App.tsx and pass via props. Do not introduce Co
 
 1. **Login:** `POST /api/auth/login` → returns `{ user, token }` → token stored in `localStorage` (`moveify_token`), user stored in `moveify_user`
 2. **Session restoration:** On page load, App.tsx reads token from localStorage and calls `GET /api/auth/me` to validate. If valid, session is restored without re-login.
-3. **Token format:** JWT signed with `JWT_SECRET`, payload `{ id, role, email }`, default expiry `7d`
+3. **Token format:** JWT signed with `JWT_SECRET`, payload `{ id, role, email, is_admin }`, default expiry `7d`
 4. **All authenticated requests** include `Authorization: Bearer <token>` header via `getAuthHeaders()` from `utils/api.ts`
 5. **401 handling:** If any API call returns 401, `utils/api.ts` automatically clears localStorage and redirects to login
 6. **Invitation:** clinician generates invite (requires auth) → creates user row with `password_hash = NULL` → patient receives email link → sets password via `/setup-password`
@@ -202,21 +202,21 @@ When adding new state, add it to App.tsx and pass via props. Do not introduce Co
 
 All backend routes (except public auth routes) are protected by middleware in `backend/middleware/`:
 
-- **`authenticate`** — verifies JWT token, sets `req.user = { id, role, email }`
+- **`authenticate`** — verifies JWT token, sets `req.user = { id, role, email, is_admin }`
 - **`requireRole(...roles)`** — checks `req.user.role` is in allowed list
-- **`requirePatientOwnership`** — verifies clinician owns the patient via `clinician_patients` junction table
-- **`requireProgramOwnership`** — verifies clinician owns the program via `programs.clinician_id`
 - **`requireSelf(paramName)`** — verifies `req.params[paramName]` === `req.user.id` (patient accessing own data)
-- **`requirePatientAccess`** — allows both clinician (via ownership) and patient (via self-access)
+- **`requirePatientAccess`** — any clinician can access any patient; patients can only access their own data
+- **`requireAdmin`** — checks `req.user.is_admin === true` (for admin-only actions like deleting patients)
 
-**When adding new routes:** always apply `authenticate` middleware. Use `requireRole` for role-specific routes. Use ownership middleware for patient data access. Never trust client-supplied IDs for identity — use `req.user.id`.
+**When adding new routes:** always apply `authenticate` middleware. Use `requireRole` for role-specific routes. Use `requireAdmin` for admin-only actions. Never trust client-supplied IDs for identity — use `req.user.id`.
 
-### Clinician-Patient Ownership
+### Shared Access Model
 
-- **`clinician_patients` junction table** links clinicians to their patients (many-to-many)
-- Populated automatically when a clinician invites a patient
-- `GET /api/patients` only returns patients linked to the authenticated clinician
-- A clinician cannot access another clinician's patients
+- **All clinicians see all patients, programs, exercises, and education modules** — there is no per-clinician ownership filtering
+- `clinician_id` is still stored on `programs`, `exercises`, and `invitation_tokens` as an **audit trail** (who created it), but does not gate access
+- The `clinician_patients` junction table still exists in the schema but is **no longer queried** — kept to avoid breaking existing deployments
+- **Admin flag** (`is_admin` boolean on `users` table) controls admin-only actions: deleting patients, future clinician management
+- The first clinician is automatically set as admin during DB initialization
 
 ### Security Hardening
 
@@ -225,7 +225,7 @@ All backend routes (except public auth routes) are protected by middleware in `b
 - **CORS:** Production requires `CORS_ORIGIN` env var (no wildcard). Development defaults to `http://localhost:5173`.
 - **Input validation:** Email format validation on login/invitation, password min 8 chars on set-password
 - **No public signup:** Users can only be created via clinician invitation
-- **No admin endpoints:** The admin clear-data endpoint has been removed
+- **Admin role:** `is_admin` flag on users controls admin-only actions (patient deletion). First clinician is auto-promoted to admin
 
 ### Audit Logging
 
@@ -248,8 +248,8 @@ All routes are prefixed with `/api`. Routes marked with a lock require authentic
 |-----------|--------|---------------|------|
 | `auth.js` | `/api/auth` | `GET /me` | Any authenticated user |
 | `invitations.js` | `/api/invitations` | `POST /generate` | Clinician only |
-| `patients.js` | `/api/patients` | `GET /` (filtered by ownership), `GET /:id`, `DELETE /:id` | Clinician + ownership |
-| `programs.js` | `/api/programs` | `POST /patient/:patientId`, `PUT /:programId`, `DELETE /:programId` | Clinician + ownership |
+| `patients.js` | `/api/patients` | `GET /` (all patients), `GET /:id`, `DELETE /:id` | Clinician (DELETE = admin only) |
+| `programs.js` | `/api/programs` | `POST /patient/:patientId`, `PUT /:programId`, `DELETE /:programId` | Clinician only |
 | `programs.js` | `/api/programs` | `PATCH /exercise/:exerciseId/complete` | Patient only (uses `req.user.id`) |
 | `programs.js` | `/api/programs` | `GET /patient/:patientId`, `GET /analytics/patient/:patientId` | Both roles + access check |
 | `exercises.js` | `/api/exercises` | `GET /`, `POST /`, `PUT /:id`, `DELETE /:id`, favorites | Clinician only |
@@ -257,7 +257,7 @@ All routes are prefixed with `/api`. Routes marked with a lock require authentic
 | `check-ins.js` | `/api/check-ins` | `GET /today/:patientId`, `GET /history/:patientId` | Patient self-access |
 | `check-ins.js` | `/api/check-ins` | `GET /patient/:patientId`, `GET /averages/:patientId` | Both roles + access check |
 | `education.js` | `/api/education` | Module CRUD, categories | Clinician only |
-| `education.js` | `/api/education` | Assign/unassign modules | Clinician + ownership |
+| `education.js` | `/api/education` | Assign/unassign modules | Clinician only |
 | `education.js` | `/api/education` | `POST .../viewed`, `GET /patient/:patientId/modules` | Both roles + access check |
 | `blocks.js` | `/api/blocks` | Templates CRUD, `GET /flags` | Clinician only |
 | `blocks.js` | `/api/blocks` | Block read/prescription | Both roles + access check |
@@ -268,7 +268,7 @@ Defined in `backend/database/init.js`. Key tables:
 
 | Table | Key columns | Notes |
 |-------|-------------|-------|
-| `users` | id, email, password_hash, role (`'clinician'`/`'patient'`), name, dob, phone, condition | Single table for both roles |
+| `users` | id, email, password_hash, role (`'clinician'`/`'patient'`), name, dob, phone, condition, is_admin | Single table for both roles. `is_admin` controls admin privileges for clinicians |
 | `programs` | patient_id, clinician_id, name, frequency, start_date, duration | `frequency` is a **JSON string** (e.g., `'["Mon","Wed","Fri"]'`) — must `JSON.parse()` on read |
 | `program_exercises` | program_id, exercise_name, sets, reps, prescribed_weight, exercise_order | `prescribed_weight` is **nullable** — not all programs track weight |
 | `exercise_completions` | exercise_id, patient_id, completion_date, sets/reps/weight_performed, rpe_rating, pain_level | `completion_date` is **DATE not DATETIME** — only tracks day, not time |
@@ -276,7 +276,7 @@ Defined in `backend/database/init.js`. Key tables:
 | `exercises` | clinician_id, name, category, joint_area, muscle_group, equipment, video_url | Custom exercises. Metadata fields are **comma-separated strings** (e.g., `"Knee, Hip"`) |
 | `block_schedules` | program_id, block_duration (4/6/8 weeks), current_week, status | Periodization blocks |
 | `education_modules` | title, content, category, estimated_duration_minutes, created_by | Text/video education |
-| `clinician_patients` | clinician_id, patient_id | Junction table linking clinicians to their patients. UNIQUE constraint on (clinician_id, patient_id) |
+| `clinician_patients` | clinician_id, patient_id | **Legacy** — still exists in schema but no longer queried. Kept for migration safety |
 | `audit_logs` | user_id, action, resource_type, resource_id, details (JSONB), ip_address | Audit trail for key operations |
 | `invitation_tokens` | ..., clinician_id | Links invitations to the clinician who created them |
 
@@ -360,7 +360,7 @@ If a breach is **likely to cause serious harm**:
 - Non-root Docker container, no hardcoded credentials
 - Passwords hashed with bcrypt
 - **JWT authentication** on all API routes with role-based authorization
-- **Clinician-patient ownership** — clinicians can only access their own patients' data
+- **Admin-gated destructive actions** — only admin clinicians can delete patients
 - **Patients can only access their own data** via self-access checks
 - **Rate limiting** on auth endpoints (10 req/15min) and general API (100 req/min)
 - **Security headers** via helmet (CSP, X-Frame-Options, etc.)
@@ -382,7 +382,7 @@ If a breach is **likely to cause serious harm**:
 
 - **Never log patient health data** (pain scores, conditions, check-in responses) to console or files — use anonymized IDs only
 - **Never expose health data in URLs** (query params, path segments)
-- **Always validate authorization** before returning patient data — a patient must only see their own data, a clinician only their own patients
+- **Always validate authorization** before returning patient data — a patient must only see their own data; any clinician can access any patient
 - **Treat all patient-facing endpoints as security-critical** — validate input, sanitize output, check roles
 - **Do not add analytics, tracking, or third-party scripts** that could access patient health data without explicit legal review
 
