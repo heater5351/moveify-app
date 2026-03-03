@@ -261,6 +261,12 @@ export const SetupPasswordPage = () => {
           Already have an account?{' '}
           <a href="/" className="text-primary-400 hover:text-primary-500 font-medium">Sign in</a>
         </div>
+
+        <div className="mt-3 text-center">
+          <a href="/privacy-policy" className="text-xs text-slate-400 hover:text-slate-500 transition-colors">
+            Privacy Policy
+          </a>
+        </div>
       </div>
     </div>
   );

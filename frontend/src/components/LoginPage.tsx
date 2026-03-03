@@ -186,6 +186,12 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
             </button>
           </div>
         </div>
+
+        <div className="mt-6 text-center">
+          <a href="/privacy-policy" className="text-xs text-slate-400 hover:text-slate-500 transition-colors">
+            Privacy Policy
+          </a>
+        </div>
       </div>
 
       {showForgotPassword && (

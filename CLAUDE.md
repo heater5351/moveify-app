@@ -28,7 +28,7 @@ Moveify is a clinical exercise prescription and patient management platform (sim
 - **jsonwebtoken** for JWT authentication
 - **express-rate-limit** for brute force protection
 - **helmet** for security headers
-- **Resend** for transactional emails
+- **Gmail API** for transactional emails
 - **PM2** for process management in production
 
 ### Deployment
@@ -169,7 +169,7 @@ cd backend && npm start         # Production server
 - `'education'` → EducationLibrary
 - `'analytics'` → ProgressAnalytics
 
-React Router is only used for public/unauthenticated routes: `/` (login), `/setup-password`, `/reset-password`.
+React Router is only used for public/unauthenticated routes: `/` (login), `/setup-password`, `/reset-password`, `/privacy-policy`.
 
 **Do not add new `<Route>` components for authenticated views.** Add new tabs by extending the `currentPage` state pattern.
 
@@ -301,8 +301,10 @@ Defined in `backend/database/init.js`. Key tables:
 | `JWT_EXPIRY` | No | `7d` | JWT token expiration |
 | `CORS_ORIGIN` | Yes (prod) | `http://localhost:5173` (dev) | Allowed frontend origin. **No wildcard in production.** |
 | `FRONTEND_URL` | No | `http://localhost:5173` | Used in invitation/reset email links |
-| `RESEND_API_KEY` | No | — | Resend email API key (emails fail silently without it) |
-| `RESEND_FROM_EMAIL` | No | `onboarding@resend.dev` | Sender address |
+| `GOOGLE_CLIENT_ID` | No | — | Gmail API OAuth client ID (emails fail silently without it) |
+| `GOOGLE_CLIENT_SECRET` | No | — | Gmail API OAuth client secret |
+| `GOOGLE_REFRESH_TOKEN` | No | — | Gmail API OAuth refresh token |
+| `EMAIL_FROM` | No | `ryan@moveifyhealth.com` | Sender email address |
 
 ### Frontend (`frontend/.env`)
 
@@ -372,7 +374,7 @@ If a breach is **likely to cause serious harm**:
 
 ### Known compliance gaps (TODO)
 
-- **No privacy policy** displayed in-app (APP 1, APP 5)
+- ~~**No privacy policy** displayed in-app (APP 1, APP 5)~~ — **DONE:** `/privacy-policy` public route, linked from login and setup-password pages
 - **No data export or deletion** feature for patients (APP 12, APP 13, APP 11)
 - **No documented breach response plan** (NDB scheme)
 - **No data retention policy** — APP 11 requires destroying data no longer needed
