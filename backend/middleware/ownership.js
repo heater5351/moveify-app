@@ -1,57 +1,4 @@
-// Ownership verification middleware for clinician-patient relationships
-const db = require('../database/db');
-
-/**
- * Middleware: verify clinician owns the patient (via clinician_patients junction table)
- * Reads patientId from req.params.patientId
- */
-function requirePatientOwnership(req, res, next) {
-  const clinicianId = req.user.id;
-  const patientId = parseInt(req.params.patientId);
-
-  if (!patientId || isNaN(patientId)) {
-    return res.status(400).json({ error: 'Valid patient ID is required' });
-  }
-
-  db.getOne(
-    'SELECT 1 FROM clinician_patients WHERE clinician_id = $1 AND patient_id = $2',
-    [clinicianId, patientId]
-  ).then(row => {
-    if (!row) {
-      return res.status(403).json({ error: 'You do not have access to this patient' });
-    }
-    next();
-  }).catch(error => {
-    console.error('Ownership check error:', error);
-    res.status(500).json({ error: 'Server error' });
-  });
-}
-
-/**
- * Middleware: verify clinician owns the program (via programs.clinician_id)
- * Reads programId from req.params.programId
- */
-function requireProgramOwnership(req, res, next) {
-  const clinicianId = req.user.id;
-  const programId = parseInt(req.params.programId);
-
-  if (!programId || isNaN(programId)) {
-    return res.status(400).json({ error: 'Valid program ID is required' });
-  }
-
-  db.getOne(
-    'SELECT 1 FROM programs WHERE id = $1 AND clinician_id = $2',
-    [programId, clinicianId]
-  ).then(row => {
-    if (!row) {
-      return res.status(403).json({ error: 'You do not have access to this program' });
-    }
-    next();
-  }).catch(error => {
-    console.error('Program ownership check error:', error);
-    res.status(500).json({ error: 'Server error' });
-  });
-}
+// Access control middleware
 
 /**
  * Middleware: verify the authenticated user IS the resource owner (patient accessing own data)
@@ -68,7 +15,7 @@ function requireSelf(paramName) {
 }
 
 /**
- * Middleware: allow clinician with patient ownership OR the patient themselves
+ * Middleware: allow any clinician OR the patient themselves
  * Reads patientId from req.params.patientId
  */
 function requirePatientAccess(req, res, next) {
@@ -88,29 +35,26 @@ function requirePatientAccess(req, res, next) {
     return next();
   }
 
-  // Clinician accessing their patient's data
+  // Any clinician can access any patient
   if (userRole === 'clinician') {
-    db.getOne(
-      'SELECT 1 FROM clinician_patients WHERE clinician_id = $1 AND patient_id = $2',
-      [userId, patientId]
-    ).then(row => {
-      if (!row) {
-        return res.status(403).json({ error: 'You do not have access to this patient' });
-      }
-      next();
-    }).catch(error => {
-      console.error('Patient access check error:', error);
-      res.status(500).json({ error: 'Server error' });
-    });
-    return;
+    return next();
   }
 
   return res.status(403).json({ error: 'Insufficient permissions' });
 }
 
+/**
+ * Middleware: require admin flag on the authenticated clinician
+ */
+function requireAdmin(req, res, next) {
+  if (!req.user || req.user.role !== 'clinician' || !req.user.is_admin) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
 module.exports = {
-  requirePatientOwnership,
-  requireProgramOwnership,
   requireSelf,
-  requirePatientAccess
+  requirePatientAccess,
+  requireAdmin
 };

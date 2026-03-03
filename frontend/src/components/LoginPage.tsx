@@ -98,7 +98,8 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
             id: user.id,
             email: user.email,
             name: user.name,
-            role: 'clinician'
+            role: 'clinician',
+            isAdmin: !!user.is_admin
           };
           onLogin('clinician', undefined, clinicianUser, token);
         }

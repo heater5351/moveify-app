@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const educationService = require('../services/education-service');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { requirePatientOwnership, requirePatientAccess, requireSelf } = require('../middleware/ownership');
+const { requirePatientAccess, requireSelf } = require('../middleware/ownership');
 
 // All education routes require authentication
 router.use(authenticate);
@@ -124,8 +124,8 @@ router.get('/patient/:patientId/modules', requirePatientAccess, async (req, res)
   }
 });
 
-// Assign a module to a patient (clinician only, with ownership)
-router.post('/patient/:patientId/modules/:moduleId', requireRole('clinician'), requirePatientOwnership, async (req, res) => {
+// Assign a module to a patient (clinician only)
+router.post('/patient/:patientId/modules/:moduleId', requireRole('clinician'), async (req, res) => {
   try {
     const { patientId, moduleId } = req.params;
     await educationService.assignModuleToPatient(
@@ -154,8 +154,8 @@ router.post('/patient/:patientId/modules/:moduleId/viewed', requireSelf('patient
   }
 });
 
-// Unassign a module from a patient (clinician only, with ownership)
-router.delete('/patient/:patientId/modules/:moduleId', requireRole('clinician'), requirePatientOwnership, async (req, res) => {
+// Unassign a module from a patient (clinician only)
+router.delete('/patient/:patientId/modules/:moduleId', requireRole('clinician'), async (req, res) => {
   try {
     const { patientId, moduleId } = req.params;
     await educationService.unassignModuleFromPatient(

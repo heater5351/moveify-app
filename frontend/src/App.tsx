@@ -108,7 +108,7 @@ function App() {
             }
             setUserRole('patient');
           } else {
-            setLoggedInUser({ id: user.id, email: user.email, name: user.name, role: 'clinician' });
+            setLoggedInUser({ id: user.id, email: user.email, name: user.name, role: 'clinician', isAdmin: !!user.is_admin });
             setUserRole('clinician');
           }
           setIsLoggedIn(true);

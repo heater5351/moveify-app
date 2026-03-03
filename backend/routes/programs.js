@@ -3,7 +3,7 @@ const express = require('express');
 const db = require('../database/db');
 const checkInService = require('../services/check-in-service');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { requirePatientOwnership, requireProgramOwnership, requirePatientAccess } = require('../middleware/ownership');
+const { requirePatientAccess } = require('../middleware/ownership');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -98,8 +98,8 @@ router.get('/patient/:patientId', requirePatientAccess, async (req, res) => {
   }
 });
 
-// Create new program for a patient (clinician only, with ownership check)
-router.post('/patient/:patientId', requireRole('clinician'), requirePatientOwnership, async (req, res) => {
+// Create new program for a patient (clinician only)
+router.post('/patient/:patientId', requireRole('clinician'), async (req, res) => {
   const client = await db.getClient();
 
   try {
@@ -180,8 +180,8 @@ router.post('/patient/:patientId', requireRole('clinician'), requirePatientOwner
   }
 });
 
-// Update existing program (clinician only, with program ownership)
-router.put('/:programId', requireRole('clinician'), requireProgramOwnership, async (req, res) => {
+// Update existing program (clinician only)
+router.put('/:programId', requireRole('clinician'), async (req, res) => {
   const client = await db.getClient();
 
   try {
@@ -820,8 +820,8 @@ router.get('/analytics/patient/:patientId', requirePatientAccess, async (req, re
   }
 });
 
-// Delete program (clinician only, with ownership)
-router.delete('/:programId', requireRole('clinician'), requireProgramOwnership, async (req, res) => {
+// Delete program (clinician only)
+router.delete('/:programId', requireRole('clinician'), async (req, res) => {
   try {
     const { programId } = req.params;
 

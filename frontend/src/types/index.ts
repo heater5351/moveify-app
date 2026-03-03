@@ -105,6 +105,7 @@ export type User = {
   email: string;
   name: string;
   role: UserRole;
+  isAdmin?: boolean;
 }
 
 // Block-based periodization types

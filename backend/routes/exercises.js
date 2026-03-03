@@ -8,15 +8,14 @@ const router = express.Router();
 // All exercise routes require authentication and clinician role
 router.use(authenticate, requireRole('clinician'));
 
-// Get all exercises for the authenticated clinician with optional filters
+// Get all custom exercises (shared across all clinicians)
 router.get('/', async (req, res) => {
   try {
-    const clinicianId = req.user.id;
     const { joint_area, muscle_group, movement_type, equipment, position, category, difficulty } = req.query;
 
-    let query = 'SELECT * FROM exercises WHERE clinician_id = $1';
-    let params = [clinicianId];
-    let paramIndex = 2;
+    let query = 'SELECT * FROM exercises WHERE 1=1';
+    let params = [];
+    let paramIndex = 1;
 
     if (joint_area) {
       query += ` AND joint_area LIKE $${paramIndex}`;
@@ -102,23 +101,18 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update an exercise (verify ownership via JWT)
+// Update an exercise (any clinician can edit)
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const clinicianId = req.user.id;
     const {
       name, category, difficulty, duration, description, videoUrl,
       jointArea, muscleGroup, movementType, equipment, position
     } = req.body;
 
-    // Verify ownership
     const existing = await db.getOne('SELECT * FROM exercises WHERE id = $1', [id]);
     if (!existing) {
       return res.status(404).json({ error: 'Exercise not found' });
-    }
-    if (existing.clinician_id !== clinicianId) {
-      return res.status(403).json({ error: 'Not authorized to edit this exercise' });
     }
 
     const result = await db.query(`
@@ -205,19 +199,14 @@ router.delete('/favorites', async (req, res) => {
   }
 });
 
-// Delete an exercise (verify ownership via JWT)
+// Delete an exercise (any clinician can delete)
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const clinicianId = req.user.id;
 
-    // Verify ownership
     const existing = await db.getOne('SELECT * FROM exercises WHERE id = $1', [id]);
     if (!existing) {
       return res.status(404).json({ error: 'Exercise not found' });
-    }
-    if (existing.clinician_id !== clinicianId) {
-      return res.status(403).json({ error: 'Not authorized to delete this exercise' });
     }
 
     await db.query('DELETE FROM exercises WHERE id = $1', [id]);

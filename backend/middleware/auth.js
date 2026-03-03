@@ -15,7 +15,7 @@ if (!JWT_SECRET) {
  */
 function generateToken(user) {
   return jwt.sign(
-    { id: user.id, role: user.role, email: user.email },
+    { id: user.id, role: user.role, email: user.email, is_admin: !!user.is_admin },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRY }
   );
@@ -35,7 +35,7 @@ function authenticate(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = { id: decoded.id, role: decoded.role, email: decoded.email };
+    req.user = { id: decoded.id, role: decoded.role, email: decoded.email, is_admin: !!decoded.is_admin };
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {

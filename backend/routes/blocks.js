@@ -3,7 +3,7 @@ const express = require('express');
 const blockService = require('../services/block-service');
 const templateService = require('../services/template-service');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { requireProgramOwnership } = require('../middleware/ownership');
+// ownership middleware no longer needed for blocks
 const db = require('../database/db');
 
 const router = express.Router();
@@ -140,31 +140,20 @@ router.patch('/flags/:flagId/resolve', requireRole('clinician'), async (req, res
 
 // ===== BLOCK ROUTES =====
 
-// Helper: verify program access (clinician ownership or patient self-access)
+// Helper: verify program access (any clinician allowed, patient = self-access only)
 async function verifyProgramAccess(req, res, next) {
   const programId = parseInt(req.params.programId || req.params.blockScheduleId);
   const userId = req.user.id;
   const role = req.user.role;
 
   try {
+    // Any clinician can access any program
     if (role === 'clinician') {
-      const program = await db.getOne(
-        'SELECT 1 FROM programs WHERE id = $1 AND clinician_id = $2',
-        [programId, userId]
-      );
-      if (!program) {
-        // For block schedule IDs, check via block_schedules -> programs
-        const blockProgram = await db.getOne(
-          `SELECT 1 FROM block_schedules bs
-           JOIN programs p ON bs.program_id = p.id
-           WHERE bs.id = $1 AND p.clinician_id = $2`,
-          [programId, userId]
-        );
-        if (!blockProgram) {
-          return res.status(403).json({ error: 'You do not have access to this program' });
-        }
-      }
-    } else if (role === 'patient') {
+      return next();
+    }
+
+    // Patient: check they own the program
+    if (role === 'patient') {
       const program = await db.getOne(
         'SELECT 1 FROM programs WHERE id = $1 AND patient_id = $2',
         [programId, userId]
@@ -180,16 +169,18 @@ async function verifyProgramAccess(req, res, next) {
           return res.status(403).json({ error: 'You do not have access to this program' });
         }
       }
+      return next();
     }
-    next();
+
+    return res.status(403).json({ error: 'Insufficient permissions' });
   } catch (error) {
     console.error('Program access check error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 }
 
-// Create a block for a program (clinician only, with ownership)
-router.post('/:programId', requireRole('clinician'), requireProgramOwnership, async (req, res) => {
+// Create a block for a program (clinician only)
+router.post('/:programId', requireRole('clinician'), async (req, res) => {
   try {
     const { programId } = req.params;
     const { blockDuration, startDate, exerciseWeeks } = req.body;
@@ -257,7 +248,7 @@ router.patch('/:programId/evaluate', verifyProgramAccess, async (req, res) => {
 });
 
 // Manual override: advance, hold, or regress (clinician only)
-router.patch('/:programId/override', requireRole('clinician'), requireProgramOwnership, async (req, res) => {
+router.patch('/:programId/override', requireRole('clinician'), async (req, res) => {
   try {
     const { programId } = req.params;
     const { action } = req.body;

@@ -2,7 +2,7 @@
 const express = require('express');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { requirePatientOwnership, requirePatientAccess } = require('../middleware/ownership');
+const { requirePatientAccess, requireAdmin } = require('../middleware/ownership');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -172,18 +172,15 @@ async function formatPatientWithPrograms(patient) {
   };
 }
 
-// Get all patients (filtered by clinician ownership) — clinician only
+// Get all patients — clinician only (all clinicians see all patients)
 router.get('/', requireRole('clinician'), async (req, res) => {
   try {
-    const clinicianId = req.user.id;
-
     const patients = await db.getAll(`
-      SELECT u.id, u.email, u.role, u.name, u.dob, u.phone, u.address, u.condition, u.created_at
-      FROM users u
-      INNER JOIN clinician_patients cp ON u.id = cp.patient_id
-      WHERE u.role = 'patient' AND cp.clinician_id = $1
-      ORDER BY u.created_at DESC
-    `, [clinicianId]);
+      SELECT id, email, role, name, dob, phone, address, condition, created_at
+      FROM users
+      WHERE role = 'patient'
+      ORDER BY created_at DESC
+    `);
 
     // Transform to match frontend Patient type and fetch their programs
     const formattedPatients = await Promise.all(
@@ -225,8 +222,8 @@ router.get('/:patientId', requirePatientAccess, async (req, res) => {
   }
 });
 
-// Delete patient by ID (requires ownership) — clinician only
-router.delete('/:patientId', requireRole('clinician'), requirePatientOwnership, async (req, res) => {
+// Delete patient by ID (admin only)
+router.delete('/:patientId', requireRole('clinician'), requireAdmin, async (req, res) => {
   try {
     const { patientId } = req.params;
 

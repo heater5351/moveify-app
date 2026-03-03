@@ -61,7 +61,7 @@ router.post('/login', async (req, res) => {
 router.get('/me', authenticate, async (req, res) => {
   try {
     const user = await db.getOne(
-      'SELECT id, email, role, name, dob, phone, address, condition, created_at FROM users WHERE id = $1',
+      'SELECT id, email, role, name, dob, phone, address, condition, is_admin, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
 

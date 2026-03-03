@@ -54,13 +54,6 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
 
     const patientId = userResult.rows[0].id;
 
-    // Create clinician-patient relationship
-    await db.query(`
-      INSERT INTO clinician_patients (clinician_id, patient_id)
-      VALUES ($1, $2)
-      ON CONFLICT (clinician_id, patient_id) DO NOTHING
-    `, [clinicianId, patientId]);
-
     // Generate invitation URL - use env var in production
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const invitationUrl = `${baseUrl}/setup-password?token=${token}`;

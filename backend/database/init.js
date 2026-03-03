@@ -382,6 +382,12 @@ async function initDatabase() {
       ADD COLUMN IF NOT EXISTS clinician_id INTEGER REFERENCES users(id)
     `);
 
+    // Add is_admin flag to users table
+    await db.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE
+    `);
+
     // Add health data consent columns to users table
     await db.query(`
       ALTER TABLE users
@@ -518,44 +524,16 @@ async function initDatabase() {
     console.log('✅ Database indexes created');
     console.log('✅ Database migrations complete');
 
-    // Backfill clinician_patients from existing programs data
-    console.log('🔄 Backfilling clinician_patients...');
-    const cpCount = await db.getOne('SELECT COUNT(*) as count FROM clinician_patients');
-    if (cpCount && parseInt(cpCount.count) === 0) {
-      // Try to populate from programs.clinician_id
-      const programLinks = await db.getAll(`
-        SELECT DISTINCT clinician_id, patient_id FROM programs
-        WHERE clinician_id IS NOT NULL
-      `);
-      if (programLinks && programLinks.length > 0) {
-        for (const link of programLinks) {
-          await db.query(
-            `INSERT INTO clinician_patients (clinician_id, patient_id)
-             VALUES ($1, $2)
-             ON CONFLICT (clinician_id, patient_id) DO NOTHING`,
-            [link.clinician_id, link.patient_id]
-          );
-        }
-        console.log(`✅ Backfilled ${programLinks.length} clinician-patient relationships from programs`);
-      } else {
-        // Fallback: assign all patients to the first clinician
-        const firstClinician = await db.getOne(
-          "SELECT id FROM users WHERE role = 'clinician' ORDER BY id ASC LIMIT 1"
-        );
-        if (firstClinician) {
-          const patients = await db.getAll(
-            "SELECT id FROM users WHERE role = 'patient'"
-          );
-          for (const patient of patients) {
-            await db.query(
-              `INSERT INTO clinician_patients (clinician_id, patient_id)
-               VALUES ($1, $2)
-               ON CONFLICT (clinician_id, patient_id) DO NOTHING`,
-              [firstClinician.id, patient.id]
-            );
-          }
-          console.log(`✅ Backfilled ${patients.length} patients to clinician ${firstClinician.id}`);
-        }
+    // Backfill: ensure first clinician is admin
+    console.log('🔄 Checking admin backfill...');
+    const adminCount = await db.getOne("SELECT COUNT(*) as count FROM users WHERE role = 'clinician' AND is_admin = TRUE");
+    if (adminCount && parseInt(adminCount.count) === 0) {
+      const firstClinician = await db.getOne(
+        "SELECT id FROM users WHERE role = 'clinician' ORDER BY id ASC LIMIT 1"
+      );
+      if (firstClinician) {
+        await db.query('UPDATE users SET is_admin = TRUE WHERE id = $1', [firstClinician.id]);
+        console.log(`✅ Set clinician ${firstClinician.id} as admin`);
       }
     }
 
