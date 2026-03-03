@@ -1,13 +1,12 @@
 steps:
   # Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
+    dir: 'backend'
     args:
       - 'build'
-      - '-f'
-      - 'backend/Dockerfile'
       - '-t'
       - 'australia-southeast1-docker.pkg.dev/moveify-app/cloud-run-source-deploy/moveify-api'
-      - 'backend'
+      - '.'
 
   # Push to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
