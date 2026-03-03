@@ -1,0 +1,29 @@
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'australia-southeast1-docker.pkg.dev/moveify-app/cloud-run-source-deploy/moveify-api'
+      - './backend'
+
+  # Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'australia-southeast1-docker.pkg.dev/moveify-app/cloud-run-source-deploy/moveify-api'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'moveify-api'
+      - '--image'
+      - 'australia-southeast1-docker.pkg.dev/moveify-app/cloud-run-source-deploy/moveify-api'
+      - '--region'
+      - 'australia-southeast1'
+
+images:
+  - 'australia-southeast1-docker.pkg.dev/moveify-app/cloud-run-source-deploy/moveify-api'
