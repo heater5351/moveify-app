@@ -277,6 +277,16 @@ async function initDatabase() {
       )
     `);
 
+    // Ensure weight columns exist on template tables (for DBs created before these columns were added)
+    await db.query(`
+      ALTER TABLE periodization_templates
+      ADD COLUMN IF NOT EXISTS weight_unit TEXT DEFAULT NULL CHECK(weight_unit IN ('kg', 'percent'))
+    `);
+    await db.query(`
+      ALTER TABLE template_weeks
+      ADD COLUMN IF NOT EXISTS weight_offset REAL
+    `);
+
     // Migration: drop exercise_slot if it exists (templates are now single-exercise progressions)
     await db.query(`ALTER TABLE template_weeks DROP COLUMN IF EXISTS exercise_slot`);
     await db.query(`ALTER TABLE template_weeks DROP CONSTRAINT IF EXISTS template_weeks_template_id_exercise_slot_week_number_key`);

@@ -22,7 +22,8 @@ router.get('/templates', requireRole('clinician'), async (req, res) => {
     res.json({ templates });
   } catch (error) {
     console.error('Get templates error:', error);
-    res.status(500).json({ error: 'Failed to get templates' });
+    const detail = process.env.NODE_ENV !== 'production' ? error.message : undefined;
+    res.status(500).json({ error: 'Failed to get templates', detail });
   }
 });
 
@@ -42,7 +43,8 @@ router.post('/templates', requireRole('clinician'), async (req, res) => {
     res.json({ message: 'Template created successfully', ...result });
   } catch (error) {
     console.error('Create template error:', error);
-    res.status(500).json({ error: 'Failed to create template' });
+    const detail = process.env.NODE_ENV !== 'production' ? error.message : undefined;
+    res.status(500).json({ error: 'Failed to create template', detail });
   }
 });
 

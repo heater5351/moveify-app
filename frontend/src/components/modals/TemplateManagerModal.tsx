@@ -72,7 +72,8 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
         const data = await res.json();
         setTemplates((data.templates || []).map(mapTemplate));
       } else {
-        setError('Failed to load templates');
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Failed to load templates');
       }
     } catch {
       setError('Connection error loading templates');
