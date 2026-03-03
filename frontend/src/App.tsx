@@ -53,7 +53,7 @@ function App() {
   const [editingProgramId, setEditingProgramId] = useState<number | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showBlockBuilderModal, setShowBlockBuilderModal] = useState(false);
-  const [pendingBlockData, setPendingBlockData] = useState<{ duration: number; weeks: ExerciseWeekPrescription[] } | null>(null);
+  const [pendingBlockData, setPendingBlockData] = useState<{ duration: number; weeks: ExerciseWeekPrescription[]; startingWeights?: Record<number, string>; rowTemplateIds?: Record<number, number | ''> } | null>(null);
   const [showDeletePatientConfirm, setShowDeletePatientConfirm] = useState(false);
   const [showDeleteProgramConfirm, setShowDeleteProgramConfirm] = useState(false);
   const [programToDelete, setProgramToDelete] = useState<{ id: number; name: string } | null>(null);
@@ -722,9 +722,11 @@ function App() {
           programExercises={programExercises}
           initialDuration={(pendingBlockData?.duration as 4 | 6 | 8) || 4}
           initialWeeks={pendingBlockData?.weeks || []}
+          initialStartingWeights={pendingBlockData?.startingWeights}
+          initialRowTemplateIds={pendingBlockData?.rowTemplateIds}
           onClose={() => setShowBlockBuilderModal(false)}
-          onSave={(blockDuration, exerciseWeeks) => {
-            setPendingBlockData({ duration: blockDuration, weeks: exerciseWeeks });
+          onSave={(blockDuration, exerciseWeeks, savedStartingWeights, savedRowTemplateIds) => {
+            setPendingBlockData({ duration: blockDuration, weeks: exerciseWeeks, startingWeights: savedStartingWeights, rowTemplateIds: savedRowTemplateIds });
             setShowBlockBuilderModal(false);
           }}
         />

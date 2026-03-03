@@ -8,10 +8,12 @@ import { getAuthHeaders } from '../../utils/api';
 interface BlockBuilderModalProps {
   programExercises: ProgramExercise[];
   onClose: () => void;
-  onSave: (blockDuration: number, exerciseWeeks: ExerciseWeekPrescription[]) => void;
+  onSave: (blockDuration: number, exerciseWeeks: ExerciseWeekPrescription[], startingWeights: Record<number, string>, rowTemplateIds: Record<number, number | ''>) => void;
   // Pre-existing block data for editing
   initialDuration?: 4 | 6 | 8;
   initialWeeks?: ExerciseWeekPrescription[];
+  initialStartingWeights?: Record<number, string>;
+  initialRowTemplateIds?: Record<number, number | ''>;
 }
 
 type CellKey = `${number}-${number}`; // exerciseIdx-weekNum
@@ -28,13 +30,15 @@ export const BlockBuilderModal = ({
   onClose,
   onSave,
   initialDuration = 4,
-  initialWeeks = []
+  initialWeeks = [],
+  initialStartingWeights,
+  initialRowTemplateIds
 }: BlockBuilderModalProps) => {
   const [blockDuration, setBlockDuration] = useState<4 | 6 | 8>(initialDuration);
   const [cells, setCells] = useState<Record<CellKey, CellData>>({});
   const [templates, setTemplates] = useState<PeriodizationTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | ''>('');
-  const [rowTemplateIds, setRowTemplateIds] = useState<Record<number, number | ''>>({});
+  const [rowTemplateIds, setRowTemplateIds] = useState<Record<number, number | ''>>(initialRowTemplateIds || {});
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [startingWeights, setStartingWeights] = useState<Record<number, string>>({});
   // Store applied template weight data per exercise index for reactive recalculation
@@ -74,14 +78,18 @@ export const BlockBuilderModal = ({
     }
     setCells(initial);
 
-    // Initialize starting weights from exercise prescribedWeight
-    const initialWeightsMap: Record<number, string> = {};
-    programExercises.forEach((ex, idx) => {
-      if (ex.prescribedWeight && ex.prescribedWeight > 0) {
-        initialWeightsMap[idx] = String(ex.prescribedWeight);
-      }
-    });
-    setStartingWeights(initialWeightsMap);
+    // Initialize starting weights: use saved values first, fall back to prescribedWeight
+    if (initialStartingWeights && Object.keys(initialStartingWeights).length > 0) {
+      setStartingWeights(initialStartingWeights);
+    } else {
+      const initialWeightsMap: Record<number, string> = {};
+      programExercises.forEach((ex, idx) => {
+        if (ex.prescribedWeight && ex.prescribedWeight > 0) {
+          initialWeightsMap[idx] = String(ex.prescribedWeight);
+        }
+      });
+      setStartingWeights(initialWeightsMap);
+    }
   }, []);
 
   // Map snake_case API response to camelCase frontend types
@@ -268,7 +276,7 @@ export const BlockBuilderModal = ({
 
   const handleSave = () => {
     const exerciseWeeks = buildExerciseWeeks();
-    onSave(blockDuration, exerciseWeeks);
+    onSave(blockDuration, exerciseWeeks, startingWeights, rowTemplateIds);
   };
 
   const weeks = Array.from({ length: blockDuration }, (_, i) => i + 1);
@@ -367,14 +375,9 @@ export const BlockBuilderModal = ({
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr>
-                  <th className="text-left py-2 pr-4 font-medium text-slate-500 text-xs w-40 sticky left-0 bg-white z-20">
+                  <th className="text-left py-2 pr-4 font-medium text-slate-500 text-xs sticky left-0 bg-white z-10" style={{ minWidth: matchingTemplates.length > 0 ? '220px' : '160px' }}>
                     Exercise
                   </th>
-                  {matchingTemplates.length > 0 && (
-                    <th className="text-center pb-2 px-1 font-medium text-slate-500 text-xs w-28 sticky left-40 bg-white z-10">
-                      Template
-                    </th>
-                  )}
                   {weeks.map(w => (
                     <th key={w} className="text-center pb-2 px-1 font-semibold text-slate-600 text-xs min-w-[140px]">
                       Week {w}
@@ -386,24 +389,22 @@ export const BlockBuilderModal = ({
               <tbody>
                 {programExercises.map((exercise, exIdx) => (
                   <tr key={exIdx} className={exIdx % 2 === 0 ? 'bg-slate-50/50' : 'bg-white'}>
-                    <td className="py-2 pr-3 sticky left-0 bg-inherit z-20">
-                      <div className="text-xs font-medium text-slate-700 truncate max-w-[144px]" title={exercise.name}>
+                    <td className="py-2 pr-3 sticky left-0 bg-inherit z-10">
+                      <div className="text-xs font-medium text-slate-700 truncate" style={{ maxWidth: matchingTemplates.length > 0 ? '200px' : '144px' }} title={exercise.name}>
                         {exercise.name}
                       </div>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.5"
-                        value={startingWeights[exIdx] || ''}
-                        onChange={e => setStartingWeights(prev => ({ ...prev, [exIdx]: e.target.value }))}
-                        placeholder="Start wt"
-                        className="mt-1 w-20 px-1.5 py-0.5 border border-emerald-200 rounded text-[10px] text-center focus:outline-none focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 text-emerald-700 bg-emerald-50/50"
-                        title="Starting weight (kg) — used for template weight calculations"
-                      />
-                    </td>
-                    {matchingTemplates.length > 0 && (
-                      <td className="py-1.5 px-1 sticky left-40 bg-inherit z-10">
-                        <div className="relative">
+                      <div className="flex gap-1.5 mt-1 items-center">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={startingWeights[exIdx] || ''}
+                          onChange={e => setStartingWeights(prev => ({ ...prev, [exIdx]: e.target.value }))}
+                          placeholder="Start wt"
+                          className="w-16 px-1.5 py-0.5 border border-emerald-200 rounded text-[10px] text-center focus:outline-none focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 text-emerald-700 bg-emerald-50/50"
+                          title="Starting weight (kg) — used for template weight calculations"
+                        />
+                        {matchingTemplates.length > 0 && (
                           <select
                             value={rowTemplateIds[exIdx] || ''}
                             onChange={e => {
@@ -411,20 +412,19 @@ export const BlockBuilderModal = ({
                               if (val) handleApplyToRow(exIdx, val);
                               else setRowTemplateIds(prev => ({ ...prev, [exIdx]: '' }));
                             }}
-                            className="appearance-none w-full pl-2 pr-6 py-1 border border-slate-200 rounded text-[11px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400 bg-white truncate"
+                            className="flex-1 min-w-0 px-1.5 py-0.5 border border-slate-200 rounded text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400 bg-white truncate"
                             title="Apply a progression template to this exercise"
                           >
-                            <option value="">None</option>
+                            <option value="">Template</option>
                             {matchingTemplates.map(t => (
                               <option key={t.id} value={t.id}>
                                 {t.name}
                               </option>
                             ))}
                           </select>
-                          <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                        </div>
-                      </td>
-                    )}
+                        )}
+                      </div>
+                    </td>
                     {weeks.map(week => {
                       const cell = getCell(exIdx, week);
                       return (
