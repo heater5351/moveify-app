@@ -396,6 +396,37 @@ async function initDatabase() {
       ADD COLUMN IF NOT EXISTS consent_version TEXT
     `);
 
+    // Program templates (reusable exercise lists)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS program_templates (
+        id          SERIAL PRIMARY KEY,
+        name        TEXT NOT NULL,
+        description TEXT,
+        created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at  TIMESTAMP DEFAULT NOW(),
+        updated_at  TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS program_template_exercises (
+        id                SERIAL PRIMARY KEY,
+        template_id       INTEGER NOT NULL REFERENCES program_templates(id) ON DELETE CASCADE,
+        exercise_name     TEXT NOT NULL,
+        exercise_category TEXT,
+        sets              INTEGER NOT NULL,
+        reps              INTEGER NOT NULL,
+        prescribed_weight REAL DEFAULT 0,
+        hold_time         TEXT,
+        instructions      TEXT,
+        image_url         TEXT,
+        exercise_order    INTEGER DEFAULT 0
+      )
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_program_template_exercises_tid
+      ON program_template_exercises(template_id)
+    `);
+
     // Add weight columns to existing tables (migration for deployed DB)
     console.log('🔄 Running database migrations...');
     await db.query(`

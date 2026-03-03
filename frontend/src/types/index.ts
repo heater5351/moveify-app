@@ -215,6 +215,14 @@ export type PatientEducationModule = EducationModule & {
   viewedAt: string | null;
 }
 
+export type ProgramTemplate = {
+  id: number;
+  name: string;
+  description: string | null;
+  exercise_count?: number;
+  created_at: string;
+};
+
 export type BlockStatusResponse = {
   hasBlock: boolean;
   id?: number;

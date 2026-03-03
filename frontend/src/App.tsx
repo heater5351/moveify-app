@@ -20,6 +20,7 @@ import { NotificationModal } from './components/modals/NotificationModal';
 import { ConfirmModal } from './components/modals/ConfirmModal';
 import { ResetPasswordModal } from './components/modals/ResetPasswordModal';
 import { BlockBuilderModal } from './components/modals/BlockBuilderModal';
+import { ProgramTemplateModal } from './components/modals/ProgramTemplateModal';
 import { API_URL } from './config';
 import { getAuthHeaders, setToken, clearAuth, setStoredUser, getToken } from './utils/api';
 
@@ -58,6 +59,7 @@ function App() {
   const [showDeletePatientConfirm, setShowDeletePatientConfirm] = useState(false);
   const [showDeleteProgramConfirm, setShowDeleteProgramConfirm] = useState(false);
   const [programToDelete, setProgramToDelete] = useState<{ id: number; name: string } | null>(null);
+  const [showProgramTemplateModal, setShowProgramTemplateModal] = useState(false);
 
   // Form states
   const [newPatient, setNewPatient] = useState<NewPatient>({
@@ -207,6 +209,47 @@ function App() {
 
   const handleReorderExercises = (newOrder: ProgramExercise[]) => {
     setProgramExercises(newOrder);
+  };
+
+  const handleSaveAsTemplate = async () => {
+    if (programExercises.length === 0) return;
+
+    const name = window.prompt('Enter a name for this template:');
+    if (!name || !name.trim()) return;
+
+    try {
+      const exercises = programExercises.map((ex) => ({
+        exercise_name: ex.name,
+        exercise_category: ex.category || null,
+        sets: ex.sets,
+        reps: ex.reps,
+        prescribed_weight: ex.prescribedWeight || 0,
+        hold_time: ex.holdTime || null,
+        instructions: ex.instructions || null,
+        image_url: null,
+      }));
+
+      const res = await fetch(`${API_URL}/program-templates`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ name: name.trim(), exercises }),
+      });
+
+      if (res.ok) {
+        setNotification({ message: 'Template saved!', type: 'success' });
+      } else {
+        const data = await res.json();
+        setNotification({ message: data.error || 'Failed to save template', type: 'error' });
+      }
+    } catch {
+      setNotification({ message: 'Connection error. Could not save template.', type: 'error' });
+    }
+  };
+
+  const handleLoadTemplate = (exercises: ProgramExercise[]) => {
+    setProgramExercises(exercises);
+    setShowProgramTemplateModal(false);
+    setNotification({ message: 'Template loaded!', type: 'success' });
   };
 
   const handleAssignToPatient = () => {
@@ -718,6 +761,14 @@ function App() {
         />
       )}
 
+      {/* Program Template Modal */}
+      {showProgramTemplateModal && (
+        <ProgramTemplateModal
+          onLoad={handleLoadTemplate}
+          onClose={() => setShowProgramTemplateModal(false)}
+        />
+      )}
+
       {/* Block Builder Modal */}
       {showBlockBuilderModal && programExercises.length > 0 && (
         <BlockBuilderModal
@@ -870,6 +921,8 @@ function App() {
               onConfigureBlock={programExercises.length > 0 ? () => setShowBlockBuilderModal(true) : undefined}
               hasBlock={pendingBlockData !== null}
               onAddExercise={handleAddSingleExercise}
+              onSaveAsTemplate={handleSaveAsTemplate}
+              onLoadTemplate={() => setShowProgramTemplateModal(true)}
             />
           </div>
         </div>

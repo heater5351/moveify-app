@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trash2, X, GripVertical, BarChart2 } from 'lucide-react';
+import { Trash2, X, GripVertical, BarChart2, FolderOpen, Save } from 'lucide-react';
 import type { ProgramExercise, Patient } from '../types/index.ts';
 import {
   DndContext,
@@ -33,6 +33,8 @@ interface ProgramBuilderProps {
   onConfigureBlock?: () => void;
   hasBlock?: boolean;
   onAddExercise?: (exercise: ProgramExercise) => void;
+  onSaveAsTemplate?: () => void;
+  onLoadTemplate?: () => void;
 }
 
 interface SortableExerciseProps {
@@ -153,7 +155,9 @@ export const ProgramBuilder = ({
   onCancelPatientAssignment,
   onConfigureBlock,
   hasBlock = false,
-  onAddExercise
+  onAddExercise,
+  onSaveAsTemplate,
+  onLoadTemplate
 }: ProgramBuilderProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -273,30 +277,54 @@ export const ProgramBuilder = ({
         )}
       </div>
 
-      {programExercises.length > 0 && (
-        <div className="p-5 border-t border-slate-100 space-y-2.5">
-          {onConfigureBlock && (
+      <div className="p-5 border-t border-slate-100 space-y-2.5">
+        {/* Template buttons — always visible */}
+        <div className="flex gap-2">
+          {onLoadTemplate && (
             <button
-              onClick={onConfigureBlock}
-              className="w-full flex items-center justify-center gap-2 border border-primary-300 text-primary-500 hover:bg-primary-50 px-5 py-2.5 rounded-lg font-medium text-sm transition-colors"
+              onClick={onLoadTemplate}
+              className="flex-1 flex items-center justify-center gap-1.5 border border-slate-200 text-slate-600 hover:bg-slate-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
             >
-              <BarChart2 size={15} />
-              {hasBlock ? 'Edit Periodization Block' : 'Configure Block (optional)'}
+              <FolderOpen size={15} />
+              Load Template
             </button>
           )}
-          <button
-            onClick={onAssignToPatient}
-            disabled={!programName.trim()}
-            className="w-full bg-primary-400 hover:bg-primary-500 text-white px-5 py-2.5 rounded-lg font-medium disabled:bg-slate-300 disabled:cursor-not-allowed text-sm transition-colors shadow-sm"
-          >
-            {!programName.trim()
-              ? 'Enter name to assign'
-              : isEditing
-                ? 'Update Program'
-                : 'Assign to Patient'}
-          </button>
+          {onSaveAsTemplate && programExercises.length > 0 && (
+            <button
+              onClick={onSaveAsTemplate}
+              className="flex-1 flex items-center justify-center gap-1.5 border border-slate-200 text-slate-600 hover:bg-slate-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Save size={15} />
+              Save as Template
+            </button>
+          )}
         </div>
-      )}
+
+        {programExercises.length > 0 && (
+          <>
+            {onConfigureBlock && (
+              <button
+                onClick={onConfigureBlock}
+                className="w-full flex items-center justify-center gap-2 border border-primary-300 text-primary-500 hover:bg-primary-50 px-5 py-2.5 rounded-lg font-medium text-sm transition-colors"
+              >
+                <BarChart2 size={15} />
+                {hasBlock ? 'Edit Periodization Block' : 'Configure Block (optional)'}
+              </button>
+            )}
+            <button
+              onClick={onAssignToPatient}
+              disabled={!programName.trim()}
+              className="w-full bg-primary-400 hover:bg-primary-500 text-white px-5 py-2.5 rounded-lg font-medium disabled:bg-slate-300 disabled:cursor-not-allowed text-sm transition-colors shadow-sm"
+            >
+              {!programName.trim()
+                ? 'Enter name to assign'
+                : isEditing
+                  ? 'Update Program'
+                  : 'Assign to Patient'}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 };
