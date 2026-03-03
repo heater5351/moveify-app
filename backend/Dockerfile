@@ -10,6 +10,7 @@ RUN apk add --no-cache python3 make g++ && \
 
 COPY server.js ./
 COPY database/ ./database/
+COPY middleware/ ./middleware/
 COPY routes/ ./routes/
 COPY services/ ./services/
 
