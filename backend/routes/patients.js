@@ -2,13 +2,13 @@
 const express = require('express');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { requirePatientOwnership } = require('../middleware/ownership');
+const { requirePatientOwnership, requirePatientAccess } = require('../middleware/ownership');
 const audit = require('../services/audit');
 
 const router = express.Router();
 
-// All patient routes require authentication and clinician role
-router.use(authenticate, requireRole('clinician'));
+// All patient routes require authentication
+router.use(authenticate);
 
 // Helper to format a patient with their programs (OPTIMIZED - reduces N+1 queries)
 async function formatPatientWithPrograms(patient) {
@@ -172,8 +172,8 @@ async function formatPatientWithPrograms(patient) {
   };
 }
 
-// Get all patients (filtered by clinician ownership)
-router.get('/', async (req, res) => {
+// Get all patients (filtered by clinician ownership) — clinician only
+router.get('/', requireRole('clinician'), async (req, res) => {
   try {
     const clinicianId = req.user.id;
 
@@ -199,8 +199,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get single patient by ID (requires ownership)
-router.get('/:patientId', requirePatientOwnership, async (req, res) => {
+// Get single patient by ID (clinician via ownership OR patient accessing own data)
+router.get('/:patientId', requirePatientAccess, async (req, res) => {
   try {
     const { patientId } = req.params;
 
@@ -225,8 +225,8 @@ router.get('/:patientId', requirePatientOwnership, async (req, res) => {
   }
 });
 
-// Delete patient by ID (requires ownership)
-router.delete('/:patientId', requirePatientOwnership, async (req, res) => {
+// Delete patient by ID (requires ownership) — clinician only
+router.delete('/:patientId', requireRole('clinician'), requirePatientOwnership, async (req, res) => {
   try {
     const { patientId } = req.params;
 
