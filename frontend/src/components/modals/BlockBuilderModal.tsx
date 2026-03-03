@@ -52,7 +52,7 @@ export const BlockBuilderModal = ({
       programExercises.forEach((ex, i) => { if (ex.id) idToIdx[ex.id] = i; });
       initialWeeks.forEach(w => {
         // Try DB ID lookup first, fall back to treating as array index
-        const idx = idToIdx[w.programExerciseId] ?? (w.programExerciseId < programExercises.length ? w.programExerciseId : undefined);
+        const idx = w.programExerciseId < programExercises.length ? w.programExerciseId : idToIdx[w.programExerciseId];
         if (idx !== undefined) {
           const key: CellKey = `${idx}-${w.weekNumber}`;
           initial[key] = {
@@ -367,11 +367,11 @@ export const BlockBuilderModal = ({
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr>
-                  <th className="text-left py-2 pr-4 font-medium text-slate-500 text-xs w-40 sticky left-0 bg-white">
+                  <th className="text-left py-2 pr-4 font-medium text-slate-500 text-xs w-40 sticky left-0 bg-white z-20">
                     Exercise
                   </th>
                   {matchingTemplates.length > 0 && (
-                    <th className="text-center pb-2 px-1 font-medium text-slate-500 text-xs w-28 sticky left-40 bg-white">
+                    <th className="text-center pb-2 px-1 font-medium text-slate-500 text-xs w-28 sticky left-40 bg-white z-10">
                       Template
                     </th>
                   )}
@@ -386,7 +386,7 @@ export const BlockBuilderModal = ({
               <tbody>
                 {programExercises.map((exercise, exIdx) => (
                   <tr key={exIdx} className={exIdx % 2 === 0 ? 'bg-slate-50/50' : 'bg-white'}>
-                    <td className="py-2 pr-3 sticky left-0 bg-inherit">
+                    <td className="py-2 pr-3 sticky left-0 bg-inherit z-20">
                       <div className="text-xs font-medium text-slate-700 truncate max-w-[144px]" title={exercise.name}>
                         {exercise.name}
                       </div>
@@ -402,7 +402,7 @@ export const BlockBuilderModal = ({
                       />
                     </td>
                     {matchingTemplates.length > 0 && (
-                      <td className="py-1.5 px-1 sticky left-40 bg-inherit">
+                      <td className="py-1.5 px-1 sticky left-40 bg-inherit z-10">
                         <div className="relative">
                           <select
                             value={rowTemplateIds[exIdx] || ''}
