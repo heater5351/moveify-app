@@ -26,5 +26,8 @@ steps:
       - '--region'
       - 'australia-southeast1'
 
+options:
+  logging: CLOUD_LOGGING_ONLY
+
 images:
   - 'australia-southeast1-docker.pkg.dev/moveify-app/cloud-run-source-deploy/moveify-api'
