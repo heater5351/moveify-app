@@ -256,6 +256,7 @@ async function initDatabase() {
         block_duration INTEGER NOT NULL CHECK(block_duration IN (4, 6, 8)),
         created_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
         is_global      BOOLEAN NOT NULL DEFAULT FALSE,
+        weight_unit    TEXT DEFAULT NULL CHECK(weight_unit IN ('kg', 'percent')),
         created_at     TIMESTAMP DEFAULT NOW(),
         updated_at     TIMESTAMP DEFAULT NOW()
       )
@@ -271,6 +272,7 @@ async function initDatabase() {
         reps          INTEGER NOT NULL,
         rpe_target    INTEGER CHECK(rpe_target BETWEEN 1 AND 10),
         notes         TEXT,
+        weight_offset REAL,
         UNIQUE(template_id, week_number)
       )
     `);

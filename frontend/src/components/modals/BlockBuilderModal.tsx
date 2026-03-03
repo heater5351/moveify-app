@@ -47,11 +47,12 @@ export const BlockBuilderModal = ({
   useEffect(() => {
     const initial: Record<CellKey, CellData> = {};
     if (initialWeeks.length > 0) {
-      // Map programExerciseId to index
+      // Map programExerciseId to index — supports both DB IDs and array indices
       const idToIdx: Record<number, number> = {};
       programExercises.forEach((ex, i) => { if (ex.id) idToIdx[ex.id] = i; });
       initialWeeks.forEach(w => {
-        const idx = idToIdx[w.programExerciseId];
+        // Try DB ID lookup first, fall back to treating as array index
+        const idx = idToIdx[w.programExerciseId] ?? (w.programExerciseId < programExercises.length ? w.programExerciseId : undefined);
         if (idx !== undefined) {
           const key: CellKey = `${idx}-${w.weekNumber}`;
           initial[key] = {

@@ -47,6 +47,7 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState<TemplateFormData>(makeEmptyForm());
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   // Map snake_case API response to camelCase frontend types
   const mapTemplate = (t: Record<string, unknown>): TemplateWithWeeksData => ({
@@ -70,9 +71,11 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
       if (res.ok) {
         const data = await res.json();
         setTemplates((data.templates || []).map(mapTemplate));
+      } else {
+        setError('Failed to load templates');
       }
     } catch {
-      // Ignore
+      setError('Connection error loading templates');
     } finally {
       setLoading(false);
     }
@@ -115,6 +118,7 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
   const handleDelete = async (templateId: number) => {
     if (!confirm('Delete this template? This cannot be undone.')) return;
     setDeletingId(templateId);
+    setError('');
     try {
       const res = await fetch(`${API_URL}/blocks/templates/${templateId}`, {
         method: 'DELETE',
@@ -124,9 +128,11 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
         setTemplates(prev => prev.filter(t => t.id !== templateId));
         if (expandedId === templateId) setExpandedId(null);
         if (editingId === templateId) { setEditingId(null); setEditForm(null); }
+      } else {
+        setError('Failed to delete template');
       }
     } catch {
-      // Ignore
+      setError('Connection error. Please try again.');
     } finally {
       setDeletingId(null);
     }
@@ -169,6 +175,7 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
   const handleSaveEdit = async () => {
     if (!editForm || !editingId || !editForm.name.trim()) return;
     setSaving(true);
+    setError('');
     try {
       const weeks = editForm.weeks.map((w, i) => ({
         weekNumber: i + 1,
@@ -195,9 +202,12 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
         // Re-expand to show updated data
         setExpandedId(editingId);
         await fetchTemplateWeeks(editingId);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Failed to update template');
       }
     } catch {
-      // Ignore
+      setError('Connection error. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -206,6 +216,7 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
   const handleCreate = async () => {
     if (!createForm.name.trim()) return;
     setSaving(true);
+    setError('');
     try {
       const weeks = createForm.weeks.map((w, i) => ({
         weekNumber: i + 1,
@@ -229,9 +240,12 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
         setCreating(false);
         setCreateForm(makeEmptyForm());
         await fetchTemplates();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Failed to save template');
       }
     } catch {
-      // Ignore
+      setError('Connection error. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -460,6 +474,15 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-sm flex items-center justify-between">
+              <span>{error}</span>
+              <button onClick={() => setError('')} className="text-red-400 hover:text-red-600 ml-3">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
           {/* Create New Template */}
           {!creating ? (
             <button
