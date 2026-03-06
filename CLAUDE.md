@@ -390,7 +390,7 @@ If a breach is **likely to cause serious harm**:
 
 ## Workflow
 
-- **Always commit and push** after completing a task. Don't wait for the user to ask.
+- **Always commit and push after EVERY change.** Do not wait for the user to ask. If you edited files, commit and push immediately — no exceptions. This includes code changes, config changes, docs, and fixes. The user expects Vercel to deploy automatically after each change.
 
 ## Memory
 
