@@ -230,7 +230,12 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
                                   isCurrent ? 'bg-primary-50 font-bold text-primary-700' : 'text-slate-600'
                                 }`}
                               >
-                                {week ? `${week.sets}×${week.reps}` : '—'}
+                                {week ? (
+                                  <>
+                                    {week.sets}×{week.reps}
+                                    {week.weight ? <div className="text-[10px] text-slate-400 font-normal">{week.weight}kg</div> : null}
+                                  </>
+                                ) : '—'}
                               </td>
                             );
                           })}
@@ -244,43 +249,45 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
           </div>
         )}
 
-        {/* Exercise List */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <h4 className="font-semibold text-slate-800 mb-4">Exercises</h4>
-          <div className="space-y-3">
-            {program.exercises.map((exercise, index) => (
-              <div
-                key={index}
-                className={`p-4 rounded-lg ${
-                  exercise.completed
-                    ? 'bg-emerald-50 ring-1 ring-emerald-200'
-                    : 'bg-slate-50 ring-1 ring-slate-200'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h5 className="font-semibold text-slate-800">{exercise.name}</h5>
-                      {exercise.completed && (
-                        <span className="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2 py-1 rounded flex items-center gap-1">
-                          <Check size={14} />
-                          Completed
-                        </span>
+        {/* Exercise List — only shown when no block table */}
+        {!blockData?.hasBlock && (
+          <div className="flex-1 overflow-y-auto p-6">
+            <h4 className="font-semibold text-slate-800 mb-4">Exercises</h4>
+            <div className="space-y-3">
+              {program.exercises.map((exercise, index) => (
+                <div
+                  key={index}
+                  className={`p-4 rounded-lg ${
+                    exercise.completed
+                      ? 'bg-emerald-50 ring-1 ring-emerald-200'
+                      : 'bg-slate-50 ring-1 ring-slate-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h5 className="font-semibold text-slate-800">{exercise.name}</h5>
+                        {exercise.completed && (
+                          <span className="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2 py-1 rounded flex items-center gap-1">
+                            <Check size={14} />
+                            Completed
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-600 mb-2">
+                        <strong>{exercise.sets} sets × {exercise.reps} reps</strong>
+                        {exercise.holdTime && ` · Hold ${exercise.holdTime}`}
+                      </p>
+                      {exercise.instructions && (
+                        <p className="text-sm text-slate-500 italic">{exercise.instructions}</p>
                       )}
                     </div>
-                    <p className="text-sm text-slate-600 mb-2">
-                      <strong>{exercise.sets} sets × {exercise.reps} reps</strong>
-                      {exercise.holdTime && ` · Hold ${exercise.holdTime}`}
-                    </p>
-                    {exercise.instructions && (
-                      <p className="text-sm text-slate-500 italic">{exercise.instructions}</p>
-                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-100">
