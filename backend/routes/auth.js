@@ -84,7 +84,7 @@ router.get('/me', authenticate, async (req, res) => {
 // Update profile (authenticated user)
 router.patch('/profile', authenticate, async (req, res) => {
   try {
-    const { name, email, phone } = req.body;
+    const { name, email, phone, address } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Name is required' });
@@ -106,13 +106,13 @@ router.patch('/profile', authenticate, async (req, res) => {
     }
 
     await db.query(
-      'UPDATE users SET name = $1, email = $2, phone = $3 WHERE id = $4',
-      [name.trim(), email.trim(), phone?.trim() || null, req.user.id]
+      'UPDATE users SET name = $1, email = $2, phone = $3, address = $4 WHERE id = $5',
+      [name.trim(), email.trim(), phone?.trim() || null, address?.trim() || null, req.user.id]
     );
 
     // Fetch updated user to return
     const user = await db.getOne(
-      `SELECT u.id, u.email, u.role, u.name, u.phone, u.is_admin, u.default_location_id,
+      `SELECT u.id, u.email, u.role, u.name, u.phone, u.address, u.is_admin, u.default_location_id,
               l.name AS location_name
        FROM users u
        LEFT JOIN locations l ON u.default_location_id = l.id

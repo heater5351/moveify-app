@@ -24,6 +24,8 @@ import { ChangePasswordModal } from './components/modals/ChangePasswordModal';
 import { EditProfileModal } from './components/modals/EditProfileModal';
 import { AccountDropdown } from './components/AccountDropdown';
 import { PatientAccountDropdown } from './components/PatientAccountDropdown';
+import { PatientAccountPage } from './components/PatientAccountPage';
+import { PatientEditProfileModal } from './components/modals/PatientEditProfileModal';
 import { AdminPanel } from './components/AdminPanel';
 import { API_URL } from './config';
 import { getAuthHeaders, setToken, clearAuth, setStoredUser, getToken } from './utils/api';
@@ -791,7 +793,7 @@ function App() {
         />
       )}
 
-      {/* Edit Profile Modal */}
+      {/* Edit Profile Modal (clinician) */}
       {showEditProfileModal && loggedInUser && (
         <EditProfileModal
           user={loggedInUser}
@@ -799,6 +801,18 @@ function App() {
           onSave={(updatedUser) => {
             setLoggedInUser(updatedUser);
             setStoredUser(updatedUser);
+            setNotification({ message: 'Profile updated!', type: 'success' });
+          }}
+        />
+      )}
+
+      {/* Edit Profile Modal (patient) */}
+      {showEditProfileModal && loggedInPatient && userRole === 'patient' && (
+        <PatientEditProfileModal
+          patient={loggedInPatient}
+          onClose={() => setShowEditProfileModal(false)}
+          onSave={(updated) => {
+            setLoggedInPatient({ ...loggedInPatient, ...updated });
             setNotification({ message: 'Profile updated!', type: 'success' });
           }}
         />
@@ -925,13 +939,23 @@ function App() {
               patient={loggedInPatient}
               onLogout={handleLogout}
               onChangePassword={() => setShowChangePasswordModal(true)}
+              onNavigateAccount={() => setCurrentPage('account')}
             />
           ) : null}
         </div>
       </header>
 
       {/* Main Content Area - Split layout for clinician */}
-      {userRole === 'patient' && loggedInPatient ? (
+      {userRole === 'patient' && loggedInPatient && currentPage === 'account' ? (
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-8" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <PatientAccountPage
+            patient={loggedInPatient}
+            onBack={() => setCurrentPage('exercises')}
+            onEditProfile={() => setShowEditProfileModal(true)}
+            onNotification={(message, type) => setNotification({ message, type })}
+          />
+        </div>
+      ) : userRole === 'patient' && loggedInPatient ? (
         <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-8" style={{ WebkitOverflowScrolling: 'touch' }}>
           <PatientPortal
             patient={loggedInPatient}
