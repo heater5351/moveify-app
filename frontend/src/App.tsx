@@ -23,6 +23,7 @@ import { ProgramTemplateModal } from './components/modals/ProgramTemplateModal';
 import { ChangePasswordModal } from './components/modals/ChangePasswordModal';
 import { EditProfileModal } from './components/modals/EditProfileModal';
 import { AccountDropdown } from './components/AccountDropdown';
+import { PatientAccountDropdown } from './components/PatientAccountDropdown';
 import { AdminPanel } from './components/AdminPanel';
 import { API_URL } from './config';
 import { getAuthHeaders, setToken, clearAuth, setStoredUser, getToken } from './utils/api';
@@ -919,16 +920,13 @@ function App() {
               onChangePassword={() => setShowChangePasswordModal(true)}
               onNavigateAdmin={() => setCurrentPage('admin')}
             />
-          ) : (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg">
-              <div className="w-6 h-6 rounded-full bg-primary-400 flex items-center justify-center text-[11px] font-semibold text-white leading-none">
-                {loggedInPatient?.name?.[0]?.toUpperCase() || 'P'}
-              </div>
-              <span className="text-sm text-white/65 font-medium">
-                {loggedInPatient?.name}
-              </span>
-            </div>
-          )}
+          ) : loggedInPatient ? (
+            <PatientAccountDropdown
+              patient={loggedInPatient}
+              onLogout={handleLogout}
+              onChangePassword={() => setShowChangePasswordModal(true)}
+            />
+          ) : null}
         </div>
       </header>
 
