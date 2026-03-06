@@ -162,13 +162,13 @@ async function evaluateProgression(programId) {
   const block = await getActiveBlock(programId);
   if (!block) return { action: 'no_block' };
 
-  // Too early: less than 7 days since start
+  // Too early: less than 6 days since start (evaluate 1 day before next week)
   const startDate = new Date(block.start_date);
   const daysSinceStart = (Date.now() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-  if (daysSinceStart < 7) return { action: 'too_early', daysSinceStart: Math.round(daysSinceStart) };
+  if (daysSinceStart < 6) return { action: 'too_early', daysSinceStart: Math.round(daysSinceStart) };
 
-  // Calculate expected week from calendar time
-  const expectedWeek = Math.min(Math.floor(daysSinceStart / 7) + 1, block.block_duration);
+  // Calculate expected week from calendar time (evaluate 1 day early so prescription is ready)
+  const expectedWeek = Math.min(Math.floor((daysSinceStart + 1) / 7) + 1, block.block_duration);
   const currentWeek = block.current_week;
 
   if (expectedWeek <= currentWeek) return { action: 'up_to_date', currentWeek };

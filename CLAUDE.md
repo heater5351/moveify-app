@@ -392,6 +392,13 @@ If a breach is **likely to cause serious harm**:
 
 - **Always commit and push** after completing a task. Don't wait for the user to ask.
 
+## Memory
+
+- A persistent memory file exists at `~/.claude/projects/.../memory/MEMORY.md` — it's auto-loaded each conversation.
+- Use it to track: project state, recent work, what's next, user preferences, and key decisions.
+- Keep entries concise. Update after completing significant work so the next session has context.
+- When starting a new session, check MEMORY.md to pick up where we left off.
+
 ## Plugins
 
 When using Claude Code with this project, the following plugins are recommended:

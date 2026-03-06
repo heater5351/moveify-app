@@ -29,6 +29,13 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [_hasCheckedInToday, setHasCheckedInToday] = useState(false);
   const [blockRefreshKey, setBlockRefreshKey] = useState(0);
+  const [blockInfo, setBlockInfo] = useState<{
+    hasBlock: boolean;
+    startDate?: string;
+    currentWeek?: number;
+    blockDuration?: number;
+    status?: string;
+  } | null>(null);
 
   // Check if patient has completed check-in today + trigger block evaluation
   useEffect(() => {
@@ -71,6 +78,32 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
     checkTodayCheckIn();
     triggerEvaluations();
   }, [patient.id]);
+
+  // Fetch block status for the selected program
+  useEffect(() => {
+    const fetchBlockInfo = async () => {
+      const program = patient.assignedPrograms?.[selectedProgramIndex];
+      if (!program?.config?.id) {
+        setBlockInfo(null);
+        return;
+      }
+      try {
+        const response = await fetch(`${API_URL}/blocks/${program.config.id}`, {
+          headers: getAuthHeaders()
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setBlockInfo(data);
+        } else {
+          setBlockInfo(null);
+        }
+      } catch {
+        setBlockInfo(null);
+      }
+    };
+
+    fetchBlockInfo();
+  }, [patient.assignedPrograms, selectedProgramIndex, blockRefreshKey]);
 
   const handleCheckInSubmit = async (checkInData: Omit<DailyCheckIn, 'id' | 'createdAt'>) => {
     try {
@@ -167,6 +200,23 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
     return checkDate >= programStartDate;
   };
 
+  // Determine if the selected date falls in a future block week (prescription not yet released)
+  const isPrescriptionVisible = (): boolean => {
+    if (!blockInfo?.hasBlock || !blockInfo.startDate || !blockInfo.currentWeek || blockInfo.status !== 'active') {
+      return true; // No block — show normal prescription
+    }
+    const blockStart = new Date(blockInfo.startDate);
+    blockStart.setHours(0, 0, 0, 0);
+    const viewDate = new Date(selectedDate);
+    viewDate.setHours(0, 0, 0, 0);
+    const daysSinceBlockStart = (viewDate.getTime() - blockStart.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceBlockStart < 0) return true; // Before block started — show normal
+    const viewingBlockWeek = Math.floor(daysSinceBlockStart / 7) + 1;
+    return viewingBlockWeek <= blockInfo.currentWeek;
+  };
+
+  const showPrescription = isPrescriptionVisible();
+
   const hasExercisesToday = selectedProgram.config.frequency.includes(selectedDayShort) && isDateAfterProgramStart(selectedDate);
 
   // Enrich exercises with completion data for the selected date
@@ -201,7 +251,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
         <p className="text-sm text-slate-500">Let's keep moving forward</p>
 
         {/* View Toggle */}
-        <div className="flex gap-2 mt-5 border-b border-slate-200">
+        <div className="flex mt-5 border-b border-slate-200">
           {[
             { id: 'exercises', label: 'Exercises', icon: <CalendarIcon size={15} /> },
             { id: 'progress', label: 'Progress', icon: <TrendingUp size={15} /> },
@@ -210,7 +260,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
             <button
               key={id}
               onClick={() => setActiveView(id as typeof activeView)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 activeView === id
                   ? 'border-primary-400 text-primary-500'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -411,10 +461,16 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                         </div>
                       </div>
 
-                      {/* Prescribed Sets | Reps | Weight */}
-                      <p className="text-sm sm:text-base text-gray-700 font-semibold mb-3 sm:mb-4">
-                        {exercise.sets} set{exercise.sets !== 1 ? 's' : ''} | {exercise.reps} rep{exercise.reps !== 1 ? 's' : ''}{(exercise.prescribedWeight || 0) > 0 && ` | ${exercise.prescribedWeight} kg`}
-                      </p>
+                      {/* Prescribed Sets | Reps | Weight — blank for future block weeks */}
+                      {showPrescription ? (
+                        <p className="text-sm sm:text-base text-gray-700 font-semibold mb-3 sm:mb-4">
+                          {exercise.sets} set{exercise.sets !== 1 ? 's' : ''} | {exercise.reps} rep{exercise.reps !== 1 ? 's' : ''}{(exercise.prescribedWeight || 0) > 0 && ` | ${exercise.prescribedWeight} kg`}
+                        </p>
+                      ) : (
+                        <p className="text-sm sm:text-base text-gray-300 font-semibold mb-3 sm:mb-4">
+                          &mdash;
+                        </p>
+                      )}
 
                       <div className="mb-3 sm:mb-4 space-y-1.5 sm:space-y-2">
                         <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 sm:line-clamp-none">
@@ -427,7 +483,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                         <button className="w-full sm:flex-1 bg-gradient-to-r from-moveify-teal to-moveify-ocean text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 font-semibold shadow-md hover:shadow-lg transition-all text-sm sm:text-base">
                           Watch Video
                         </button>
-                        {!isProgramCompleted && (
+                        {!isProgramCompleted && showPrescription && (
                           <button
                             onClick={() => {
                               // Calculate the actual date for the selected day
