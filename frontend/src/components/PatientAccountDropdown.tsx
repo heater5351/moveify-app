@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { LogOut, ChevronDown, KeyRound, UserCircle } from 'lucide-react';
+import { LogOut, ChevronDown, KeyRound, UserCircle, Database } from 'lucide-react';
 import type { Patient } from '../types/index';
 
 type PatientAccountDropdownProps = {
@@ -7,9 +7,10 @@ type PatientAccountDropdownProps = {
   onLogout: () => void;
   onChangePassword: () => void;
   onNavigateAccount: () => void;
+  onNavigateData: () => void;
 };
 
-export const PatientAccountDropdown = ({ patient, onLogout, onChangePassword, onNavigateAccount }: PatientAccountDropdownProps) => {
+export const PatientAccountDropdown = ({ patient, onLogout, onChangePassword, onNavigateAccount, onNavigateData }: PatientAccountDropdownProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -61,6 +62,13 @@ export const PatientAccountDropdown = ({ patient, onLogout, onChangePassword, on
             >
               <UserCircle size={15} className="text-slate-400" />
               Account
+            </button>
+            <button
+              onClick={() => { setIsOpen(false); onNavigateData(); }}
+              className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              <Database size={15} className="text-slate-400" />
+              My Data
             </button>
             <button
               onClick={() => { setIsOpen(false); onChangePassword(); }}

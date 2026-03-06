@@ -25,6 +25,7 @@ import { EditProfileModal } from './components/modals/EditProfileModal';
 import { AccountDropdown } from './components/AccountDropdown';
 import { PatientAccountDropdown } from './components/PatientAccountDropdown';
 import { PatientAccountPage } from './components/PatientAccountPage';
+import { PatientDataPage } from './components/PatientDataPage';
 import { PatientEditProfileModal } from './components/modals/PatientEditProfileModal';
 import { AdminPanel } from './components/AdminPanel';
 import { API_URL } from './config';
@@ -940,6 +941,7 @@ function App() {
               onLogout={handleLogout}
               onChangePassword={() => setShowChangePasswordModal(true)}
               onNavigateAccount={() => setCurrentPage('account')}
+              onNavigateData={() => setCurrentPage('mydata')}
             />
           ) : null}
         </div>
@@ -952,6 +954,12 @@ function App() {
             patient={loggedInPatient}
             onBack={() => setCurrentPage('exercises')}
             onEditProfile={() => setShowEditProfileModal(true)}
+          />
+        </div>
+      ) : userRole === 'patient' && loggedInPatient && currentPage === 'mydata' ? (
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-8" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <PatientDataPage
+            onBack={() => setCurrentPage('exercises')}
             onNotification={(message, type) => setNotification({ message, type })}
           />
         </div>
