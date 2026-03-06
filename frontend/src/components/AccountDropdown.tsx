@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { LogOut, ChevronDown, KeyRound, Shield, MapPin } from 'lucide-react';
+import { LogOut, ChevronDown, KeyRound, Shield, MapPin, UserPen } from 'lucide-react';
 import type { User, Location } from '../types/index';
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
@@ -7,11 +7,12 @@ import { getAuthHeaders } from '../utils/api';
 type AccountDropdownProps = {
   user: User;
   onLogout: () => void;
+  onEditProfile: () => void;
   onChangePassword: () => void;
   onNavigateAdmin: () => void;
 };
 
-export const AccountDropdown = ({ user, onLogout, onChangePassword, onNavigateAdmin }: AccountDropdownProps) => {
+export const AccountDropdown = ({ user, onLogout, onEditProfile, onChangePassword, onNavigateAdmin }: AccountDropdownProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(user.defaultLocationId || null);
@@ -130,6 +131,13 @@ export const AccountDropdown = ({ user, onLogout, onChangePassword, onNavigateAd
 
           {/* Actions */}
           <div className="py-1">
+            <button
+              onClick={() => { setIsOpen(false); onEditProfile(); }}
+              className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              <UserPen size={15} className="text-slate-400" />
+              Edit Profile
+            </button>
             <button
               onClick={() => { setIsOpen(false); onChangePassword(); }}
               className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"

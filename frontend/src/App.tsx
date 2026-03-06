@@ -21,6 +21,7 @@ import { ResetPasswordModal } from './components/modals/ResetPasswordModal';
 import { BlockBuilderModal } from './components/modals/BlockBuilderModal';
 import { ProgramTemplateModal } from './components/modals/ProgramTemplateModal';
 import { ChangePasswordModal } from './components/modals/ChangePasswordModal';
+import { EditProfileModal } from './components/modals/EditProfileModal';
 import { AccountDropdown } from './components/AccountDropdown';
 import { AdminPanel } from './components/AdminPanel';
 import { API_URL } from './config';
@@ -63,6 +64,7 @@ function App() {
   const [programToDelete, setProgramToDelete] = useState<{ id: number; name: string } | null>(null);
   const [showProgramTemplateModal, setShowProgramTemplateModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
 
   // Form states
   const [newPatient, setNewPatient] = useState<NewPatient>({
@@ -114,7 +116,7 @@ function App() {
             }
             setUserRole('patient');
           } else {
-            setLoggedInUser({ id: user.id, email: user.email, name: user.name, role: 'clinician', isAdmin: !!user.is_admin, defaultLocationId: user.default_location_id, locationName: user.location_name });
+            setLoggedInUser({ id: user.id, email: user.email, name: user.name, phone: user.phone, role: 'clinician', isAdmin: !!user.is_admin, defaultLocationId: user.default_location_id, locationName: user.location_name });
             setUserRole('clinician');
           }
           setIsLoggedIn(true);
@@ -788,6 +790,19 @@ function App() {
         />
       )}
 
+      {/* Edit Profile Modal */}
+      {showEditProfileModal && loggedInUser && (
+        <EditProfileModal
+          user={loggedInUser}
+          onClose={() => setShowEditProfileModal(false)}
+          onSave={(updatedUser) => {
+            setLoggedInUser(updatedUser);
+            setStoredUser(updatedUser);
+            setNotification({ message: 'Profile updated!', type: 'success' });
+          }}
+        />
+      )}
+
       {/* Change Password Modal */}
       {showChangePasswordModal && (
         <ChangePasswordModal
@@ -900,6 +915,7 @@ function App() {
             <AccountDropdown
               user={loggedInUser}
               onLogout={handleLogout}
+              onEditProfile={() => setShowEditProfileModal(true)}
               onChangePassword={() => setShowChangePasswordModal(true)}
               onNavigateAdmin={() => setCurrentPage('admin')}
             />

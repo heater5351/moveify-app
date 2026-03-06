@@ -81,6 +81,54 @@ router.get('/me', authenticate, async (req, res) => {
   }
 });
 
+// Update profile (authenticated user)
+router.patch('/profile', authenticate, async (req, res) => {
+  try {
+    const { name, email, phone } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    // Check if email is already taken by another user
+    const existing = await db.getOne('SELECT id FROM users WHERE email = $1 AND id != $2', [email.trim(), req.user.id]);
+    if (existing) {
+      return res.status(400).json({ error: 'Email is already in use by another account' });
+    }
+
+    await db.query(
+      'UPDATE users SET name = $1, email = $2, phone = $3 WHERE id = $4',
+      [name.trim(), email.trim(), phone?.trim() || null, req.user.id]
+    );
+
+    // Fetch updated user to return
+    const user = await db.getOne(
+      `SELECT u.id, u.email, u.role, u.name, u.phone, u.is_admin, u.default_location_id,
+              l.name AS location_name
+       FROM users u
+       LEFT JOIN locations l ON u.default_location_id = l.id
+       WHERE u.id = $1`,
+      [req.user.id]
+    );
+
+    audit.log(req, 'profile_update', 'user', req.user.id);
+
+    res.json({ message: 'Profile updated', user });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Change password (authenticated user)
 router.patch('/change-password', authenticate, async (req, res) => {
   try {
