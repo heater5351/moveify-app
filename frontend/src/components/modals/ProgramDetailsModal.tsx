@@ -112,7 +112,7 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
             </div>
             <div>
               <p className="text-slate-400">Duration</p>
-              <p className="font-medium text-slate-800">{program.config.duration}</p>
+              <p className="font-medium text-slate-800 capitalize">{program.config.duration}</p>
             </div>
             <div>
               <p className="text-slate-400">Frequency</p>
