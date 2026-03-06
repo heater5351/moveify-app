@@ -568,6 +568,29 @@ async function initDatabase() {
       ON exercises(equipment)
     `);
 
+    // data_requests — patient data export/deletion requests (APP 12, APP 13)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS data_requests (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        request_type TEXT NOT NULL CHECK(request_type IN ('export', 'deletion')),
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'completed', 'denied')),
+        admin_notes TEXT,
+        processed_by INTEGER REFERENCES users(id),
+        requested_at TIMESTAMP DEFAULT NOW(),
+        processed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_data_requests_user_id
+      ON data_requests(user_id)
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_data_requests_status
+      ON data_requests(status)
+    `);
+
     console.log('✅ Database indexes created');
     console.log('✅ Database migrations complete');
 

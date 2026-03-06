@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, MapPin, Plus, Pencil, Trash2, Shield, ShieldOff } from 'lucide-react';
-import type { Clinician, Location } from '../types/index';
+import { UserPlus, MapPin, Plus, Pencil, Trash2, Shield, ShieldOff, Database, Download, AlertTriangle, Check, X } from 'lucide-react';
+import type { Clinician, Location, DataRequest } from '../types/index';
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
 import { InviteClinicianModal } from './modals/InviteClinicianModal';
@@ -12,7 +12,7 @@ type AdminPanelProps = {
 };
 
 export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) => {
-  const [activeTab, setActiveTab] = useState<'clinicians' | 'locations'>('clinicians');
+  const [activeTab, setActiveTab] = useState<'clinicians' | 'locations' | 'data-requests'>('clinicians');
   const [clinicians, setClinicians] = useState<Clinician[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +23,10 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [locationName, setLocationName] = useState('');
   const [locationAddress, setLocationAddress] = useState('');
+
+  // Data requests
+  const [dataRequests, setDataRequests] = useState<DataRequest[]>([]);
+  const [confirmAction, setConfirmAction] = useState<{ type: 'approve-deletion' | 'execute-deletion'; id: number; name: string } | null>(null);
 
   // Confirm modals
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'clinician' | 'location'; id: number; name: string } | null>(null);
@@ -51,8 +55,20 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
     }
   };
 
+  const fetchDataRequests = async () => {
+    try {
+      const res = await fetch(`${API_URL}/data-requests`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setDataRequests(data.requests);
+      }
+    } catch {
+      // Silently fail
+    }
+  };
+
   useEffect(() => {
-    Promise.all([fetchClinicians(), fetchLocations()]).finally(() => setLoading(false));
+    Promise.all([fetchClinicians(), fetchLocations(), fetchDataRequests()]).finally(() => setLoading(false));
   }, []);
 
   const handleToggleAdmin = async (clinicianId: number) => {
@@ -149,6 +165,119 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
     setShowLocationForm(true);
   };
 
+  const handleApproveExport = async (id: number) => {
+    try {
+      const res = await fetch(`${API_URL}/data-requests/${id}/approve`, {
+        method: 'PATCH',
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchDataRequests();
+        onNotification(data.message, 'success');
+      } else {
+        onNotification(data.error || 'Failed to approve', 'error');
+      }
+    } catch {
+      onNotification('Connection error', 'error');
+    }
+  };
+
+  const handleDenyRequest = async (id: number) => {
+    try {
+      const res = await fetch(`${API_URL}/data-requests/${id}/deny`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchDataRequests();
+        onNotification('Request denied', 'success');
+      } else {
+        onNotification(data.error || 'Failed to deny', 'error');
+      }
+    } catch {
+      onNotification('Connection error', 'error');
+    }
+  };
+
+  const handleApproveDeletion = async (id: number) => {
+    setConfirmAction(null);
+    try {
+      const res = await fetch(`${API_URL}/data-requests/${id}/approve`, {
+        method: 'PATCH',
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchDataRequests();
+        onNotification(data.message, 'success');
+      } else {
+        onNotification(data.error || 'Failed to approve', 'error');
+      }
+    } catch {
+      onNotification('Connection error', 'error');
+    }
+  };
+
+  const handleExecuteDeletion = async (id: number) => {
+    setConfirmAction(null);
+    try {
+      const res = await fetch(`${API_URL}/data-requests/${id}/execute-deletion`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchDataRequests();
+        onNotification(data.message, 'success');
+      } else {
+        onNotification(data.error || 'Failed to execute deletion', 'error');
+      }
+    } catch {
+      onNotification('Connection error', 'error');
+    }
+  };
+
+  const handleDownloadExport = async (id: number) => {
+    try {
+      const res = await fetch(`${API_URL}/data-requests/${id}/download`, {
+        headers: getAuthHeaders()
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const disposition = res.headers.get('Content-Disposition');
+        const filename = disposition?.match(/filename="(.+)"/)?.[1] || `export-${id}.json`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const data = await res.json();
+        onNotification(data.error || 'Download failed', 'error');
+      }
+    } catch {
+      onNotification('Connection error', 'error');
+    }
+  };
+
+  const statusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      pending: 'bg-yellow-50 text-yellow-600',
+      approved: 'bg-blue-50 text-blue-600',
+      completed: 'bg-green-50 text-green-600',
+      denied: 'bg-red-50 text-red-600',
+    };
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${styles[status] || 'bg-slate-100 text-slate-500'}`}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -161,7 +290,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-semibold font-display text-secondary-500">Admin Panel</h1>
-        <p className="text-sm text-slate-500 mt-1">Manage clinicians and clinic locations</p>
+        <p className="text-sm text-slate-500 mt-1">Manage clinicians, locations, and data requests</p>
       </div>
 
       {/* Tabs */}
@@ -185,6 +314,21 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
           }`}
         >
           Locations
+        </button>
+        <button
+          onClick={() => setActiveTab('data-requests')}
+          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors relative ${
+            activeTab === 'data-requests'
+              ? 'bg-white text-secondary-500 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Data Requests
+          {dataRequests.filter(r => r.status === 'pending' || r.status === 'approved').length > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+              {dataRequests.filter(r => r.status === 'pending' || r.status === 'approved').length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -365,6 +509,158 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
             </div>
           )}
         </div>
+      )}
+
+      {/* Data Requests Tab */}
+      {activeTab === 'data-requests' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-slate-500">
+              {dataRequests.length} request{dataRequests.length !== 1 ? 's' : ''}
+              {dataRequests.filter(r => r.status === 'pending').length > 0 && (
+                <span className="text-yellow-600 font-medium">
+                  {' '}({dataRequests.filter(r => r.status === 'pending').length} pending)
+                </span>
+              )}
+            </p>
+          </div>
+
+          {dataRequests.length === 0 ? (
+            <div className="bg-white rounded-xl ring-1 ring-slate-200 p-8 text-center">
+              <Database size={32} className="text-slate-300 mx-auto mb-3" />
+              <p className="text-sm text-slate-500">No data requests yet.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl ring-1 ring-slate-200 overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Patient</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Type</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Requested</th>
+                    <th className="text-right px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dataRequests.map(req => (
+                    <tr key={req.id} className="border-b border-slate-50 last:border-0">
+                      <td className="px-4 py-3">
+                        <span className="text-sm font-medium text-slate-800">{req.patient_name}</span>
+                        <span className="block text-xs text-slate-400">{req.patient_email}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          req.request_type === 'export' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'
+                        }`}>
+                          {req.request_type === 'export' ? <Download size={10} /> : <AlertTriangle size={10} />}
+                          {req.request_type === 'export' ? 'Export' : 'Deletion'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">{statusBadge(req.status)}</td>
+                      <td className="px-4 py-3 text-sm text-slate-500">
+                        {new Date(req.requested_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {/* Pending export: approve or deny */}
+                          {req.status === 'pending' && req.request_type === 'export' && (
+                            <>
+                              <button
+                                onClick={() => handleApproveExport(req.id)}
+                                className="p-1.5 rounded-md text-green-500 hover:bg-green-50 transition-colors"
+                                title="Approve export"
+                              >
+                                <Check size={15} />
+                              </button>
+                              <button
+                                onClick={() => handleDenyRequest(req.id)}
+                                className="p-1.5 rounded-md text-red-400 hover:bg-red-50 transition-colors"
+                                title="Deny request"
+                              >
+                                <X size={15} />
+                              </button>
+                            </>
+                          )}
+
+                          {/* Pending deletion: approve (with confirm) or deny */}
+                          {req.status === 'pending' && req.request_type === 'deletion' && (
+                            <>
+                              <button
+                                onClick={() => setConfirmAction({ type: 'approve-deletion', id: req.id, name: req.patient_name || 'this patient' })}
+                                className="p-1.5 rounded-md text-green-500 hover:bg-green-50 transition-colors"
+                                title="Approve deletion"
+                              >
+                                <Check size={15} />
+                              </button>
+                              <button
+                                onClick={() => handleDenyRequest(req.id)}
+                                className="p-1.5 rounded-md text-red-400 hover:bg-red-50 transition-colors"
+                                title="Deny request"
+                              >
+                                <X size={15} />
+                              </button>
+                            </>
+                          )}
+
+                          {/* Approved deletion: execute */}
+                          {req.status === 'approved' && req.request_type === 'deletion' && (
+                            <button
+                              onClick={() => setConfirmAction({ type: 'execute-deletion', id: req.id, name: req.patient_name || 'this patient' })}
+                              className="px-3 py-1 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors"
+                            >
+                              Execute Deletion
+                            </button>
+                          )}
+
+                          {/* Completed export: download */}
+                          {req.status === 'completed' && req.request_type === 'export' && (
+                            <button
+                              onClick={() => handleDownloadExport(req.id)}
+                              className="p-1.5 rounded-md text-blue-500 hover:bg-blue-50 transition-colors"
+                              title="Download export"
+                            >
+                              <Download size={15} />
+                            </button>
+                          )}
+
+                          {/* Completed/denied: show status icon */}
+                          {(req.status === 'completed' && req.request_type === 'deletion') && (
+                            <span className="p-1.5 text-slate-300"><Check size={15} /></span>
+                          )}
+                          {req.status === 'denied' && (
+                            <span className="p-1.5 text-slate-300"><X size={15} /></span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Confirm Data Action Modal */}
+      {confirmAction && (
+        <ConfirmModal
+          title={confirmAction.type === 'approve-deletion' ? 'Approve Deletion Request' : 'Execute Data Deletion'}
+          message={
+            confirmAction.type === 'approve-deletion'
+              ? `Are you sure you want to approve the data deletion request for ${confirmAction.name}? You will still need to execute the deletion separately.`
+              : `This will permanently delete all health data for ${confirmAction.name} and anonymize their account. This action CANNOT be undone.`
+          }
+          confirmText={confirmAction.type === 'approve-deletion' ? 'Approve' : 'Delete All Data'}
+          cancelText="Cancel"
+          type="danger"
+          onConfirm={() =>
+            confirmAction.type === 'approve-deletion'
+              ? handleApproveDeletion(confirmAction.id)
+              : handleExecuteDeletion(confirmAction.id)
+          }
+          onCancel={() => setConfirmAction(null)}
+        />
       )}
 
       {/* Invite Clinician Modal */}

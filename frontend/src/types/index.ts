@@ -254,6 +254,19 @@ export type BlockStatusResponse = {
   weeks?: BlockWeekRow[];
 }
 
+export type DataRequest = {
+  id: number;
+  user_id: number;
+  request_type: 'export' | 'deletion';
+  status: 'pending' | 'approved' | 'completed' | 'denied';
+  admin_notes: string | null;
+  processed_by: number | null;
+  requested_at: string;
+  processed_at: string | null;
+  patient_name?: string;
+  patient_email?: string;
+}
+
 export type BlockWeekRow = {
   programExerciseId: number;
   exerciseName: string;

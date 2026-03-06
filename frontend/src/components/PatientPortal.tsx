@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Play, Check, TrendingUp, Calendar as CalendarIcon, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { Patient, CompletionData, ProgramExercise, DailyCheckIn } from '../types/index.ts';
+import { Play, Check, TrendingUp, Calendar as CalendarIcon, BookOpen, ChevronLeft, ChevronRight, Database, Download, Trash2, Clock, CheckCircle, XCircle } from 'lucide-react';
+import type { Patient, CompletionData, ProgramExercise, DailyCheckIn, DataRequest } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
 import { ExerciseCompletionModal } from './modals/ExerciseCompletionModal';
@@ -18,7 +18,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   const [selectedWeekDay, setSelectedWeekDay] = useState(new Date().getDay());
   const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, 1 = next week, -1 = previous week
   const [selectedProgramIndex, setSelectedProgramIndex] = useState(0);
-  const [activeView, setActiveView] = useState<'exercises' | 'progress' | 'education'>('exercises');
+  const [activeView, setActiveView] = useState<'exercises' | 'progress' | 'education' | 'mydata'>('exercises');
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<{
     exercise: ProgramExercise;
@@ -36,6 +36,44 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
     blockDuration?: number;
     status?: string;
   } | null>(null);
+  const [dataRequests, setDataRequests] = useState<DataRequest[]>([]);
+  const [dataRequestLoading, setDataRequestLoading] = useState(false);
+
+  // Fetch patient's data requests
+  const fetchMyDataRequests = async () => {
+    try {
+      const response = await fetch(`${API_URL}/data-requests/my`, {
+        headers: getAuthHeaders()
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setDataRequests(data.requests);
+      }
+    } catch {
+      // Silently fail
+    }
+  };
+
+  const handleRequestData = async (type: 'export' | 'deletion') => {
+    setDataRequestLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/data-requests`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ requestType: type })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        await fetchMyDataRequests();
+      } else {
+        alert(data.error || 'Failed to submit request');
+      }
+    } catch {
+      alert('Connection error');
+    } finally {
+      setDataRequestLoading(false);
+    }
+  };
 
   // Check if patient has completed check-in today + trigger block evaluation
   useEffect(() => {
@@ -78,6 +116,13 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
     checkTodayCheckIn();
     triggerEvaluations();
   }, [patient.id]);
+
+  // Fetch data requests when My Data tab is opened
+  useEffect(() => {
+    if (activeView === 'mydata') {
+      fetchMyDataRequests();
+    }
+  }, [activeView]);
 
   // Fetch block status for the selected program
   useEffect(() => {
@@ -256,6 +301,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
             { id: 'exercises', label: 'Exercises', icon: <CalendarIcon size={15} /> },
             { id: 'progress', label: 'Progress', icon: <TrendingUp size={15} /> },
             { id: 'education', label: 'Education', icon: <BookOpen size={15} /> },
+            { id: 'mydata', label: 'My Data', icon: <Database size={15} /> },
           ].map(({ id, label, icon }) => (
             <button
               key={id}
@@ -273,7 +319,96 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
         </div>
       </div>
 
-      {activeView === 'progress' ? (
+      {activeView === 'mydata' ? (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5 sm:p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Your Data Rights</h2>
+            <p className="text-sm text-gray-600 mb-5">
+              Under the Australian Privacy Act, you have the right to access and request deletion of your personal health data.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                onClick={() => handleRequestData('export')}
+                disabled={dataRequestLoading || dataRequests.some(r => r.request_type === 'export' && (r.status === 'pending' || r.status === 'approved'))}
+                className="flex items-center gap-3 p-4 rounded-xl border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download size={20} className="text-blue-500 shrink-0" />
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-blue-800">Request Data Export</p>
+                  <p className="text-xs text-blue-600 mt-0.5">Get a copy of all your data</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (confirm('Are you sure you want to request deletion of all your health data? This cannot be undone once processed.')) {
+                    handleRequestData('deletion');
+                  }
+                }}
+                disabled={dataRequestLoading || dataRequests.some(r => r.request_type === 'deletion' && (r.status === 'pending' || r.status === 'approved'))}
+                className="flex items-center gap-3 p-4 rounded-xl border-2 border-red-200 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 size={20} className="text-red-500 shrink-0" />
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-red-800">Request Data Deletion</p>
+                  <p className="text-xs text-red-600 mt-0.5">Permanently delete your data</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Request History */}
+          {dataRequests.length > 0 && (
+            <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5 sm:p-6">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Request History</h3>
+              <div className="space-y-2">
+                {dataRequests.map(req => (
+                  <div key={req.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div className="flex items-center gap-3">
+                      {req.request_type === 'export' ? (
+                        <Download size={16} className="text-blue-500" />
+                      ) : (
+                        <Trash2 size={16} className="text-red-500" />
+                      )}
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">
+                          Data {req.request_type === 'export' ? 'Export' : 'Deletion'}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {new Date(req.requested_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {req.status === 'pending' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-50 text-yellow-600">
+                          <Clock size={10} /> Pending
+                        </span>
+                      )}
+                      {req.status === 'approved' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-600">
+                          <CheckCircle size={10} /> Approved
+                        </span>
+                      )}
+                      {req.status === 'completed' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-50 text-green-600">
+                          <CheckCircle size={10} /> Completed
+                        </span>
+                      )}
+                      {req.status === 'denied' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-600">
+                          <XCircle size={10} /> Denied
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : activeView === 'progress' ? (
         <ProgressAnalytics patientId={patient.id} apiUrl={API_URL} isPatientView={true} />
       ) : activeView === 'education' ? (
         <PatientEducationModules patientId={patient.id} isPatientView={true} />
