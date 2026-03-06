@@ -158,7 +158,33 @@ async function sendInvitationEmail(toEmail, patientName, invitationUrl) {
   return sendEmail(toEmail, `${firstName}, set up your Moveify account`, htmlBody, textBody);
 }
 
+async function sendClinicianInvitationEmail(toEmail, name, invitationUrl) {
+  const firstName = name.split(' ')[0];
+
+  const htmlBody = wrapEmail(`
+    <h2 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600; color: #132232;">You've been invited to Moveify</h2>
+    <p style="margin: 0 0 20px 0; font-size: 14px; color: #64748b; line-height: 1.6;">
+      Hi ${firstName}, you've been invited to join Moveify as a clinician. Set your password below to access the platform and start managing patient programs.
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr><td align="center" style="padding: 4px 0 20px 0;">
+        <a href="${invitationUrl}" style="display: inline-block; background-color: #46c1c0; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 600;">Set up your account</a>
+      </td></tr>
+    </table>
+    <div style="background-color: #f8fafc; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+      <p style="margin: 0 0 4px 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Your email</p>
+      <p style="margin: 0; font-size: 14px; color: #334155; font-weight: 500;">${toEmail}</p>
+    </div>
+    <p style="margin: 0; font-size: 13px; color: #94a3b8;">This link expires in 7 days. If you weren't expecting this, please disregard.</p>
+  `);
+
+  const textBody = `You've been invited to Moveify\n\nHi ${firstName},\n\nYou've been invited to join Moveify as a clinician.\n\nSet your password here: ${invitationUrl}\n\nYour email: ${toEmail}\n\nThis link expires in 7 days.`;
+
+  return sendEmail(toEmail, `${firstName}, join Moveify as a clinician`, htmlBody, textBody);
+}
+
 module.exports = {
   sendPasswordResetEmail,
   sendInvitationEmail,
+  sendClinicianInvitationEmail,
 };

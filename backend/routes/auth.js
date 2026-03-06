@@ -61,7 +61,12 @@ router.post('/login', async (req, res) => {
 router.get('/me', authenticate, async (req, res) => {
   try {
     const user = await db.getOne(
-      'SELECT id, email, role, name, dob, phone, address, condition, is_admin, created_at FROM users WHERE id = $1',
+      `SELECT u.id, u.email, u.role, u.name, u.dob, u.phone, u.address, u.condition,
+              u.is_admin, u.default_location_id, u.created_at,
+              l.name AS location_name
+       FROM users u
+       LEFT JOIN locations l ON u.default_location_id = l.id
+       WHERE u.id = $1`,
       [req.user.id]
     );
 
@@ -72,6 +77,70 @@ router.get('/me', authenticate, async (req, res) => {
     res.json({ user });
   } catch (error) {
     console.error('Get current user error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Change password (authenticated user)
+router.patch('/change-password', authenticate, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+
+    const user = await db.getOne('SELECT id, password_hash FROM users WHERE id = $1', [req.user.id]);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const validPassword = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, req.user.id]);
+
+    audit.log(req, 'password_change', 'user', req.user.id);
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Set default location (clinician)
+router.patch('/default-location', authenticate, async (req, res) => {
+  try {
+    const { locationId } = req.body;
+
+    // Allow null to clear location
+    if (locationId !== null && locationId !== undefined) {
+      const location = await db.getOne('SELECT id FROM locations WHERE id = $1', [locationId]);
+      if (!location) {
+        return res.status(404).json({ error: 'Location not found' });
+      }
+    }
+
+    await db.query('UPDATE users SET default_location_id = $1 WHERE id = $2', [locationId || null, req.user.id]);
+
+    // Return updated location info
+    let locationName = null;
+    if (locationId) {
+      const loc = await db.getOne('SELECT name FROM locations WHERE id = $1', [locationId]);
+      locationName = loc?.name || null;
+    }
+
+    res.json({ message: 'Default location updated', defaultLocationId: locationId || null, locationName });
+  } catch (error) {
+    console.error('Set default location error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

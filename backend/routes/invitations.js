@@ -120,11 +120,7 @@ router.post('/set-password', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
-    if (healthDataConsent !== true) {
-      return res.status(400).json({ error: 'You must consent to health data collection to create an account' });
-    }
-
-    // Validate invitation
+    // Validate invitation first to check role
     const invitation = await db.getOne(`
       SELECT * FROM invitation_tokens
       WHERE token = $1 AND used = 0 AND expires_at > NOW()
@@ -134,15 +130,26 @@ router.post('/set-password', async (req, res) => {
       return res.status(404).json({ error: 'Invalid or expired invitation' });
     }
 
+    // Only require health data consent for patients
+    if (invitation.role === 'patient' && healthDataConsent !== true) {
+      return res.status(400).json({ error: 'You must consent to health data collection to create an account' });
+    }
+
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Update user account with password and consent
-    await db.query(`
-      UPDATE users
-      SET password_hash = $1, health_data_consent = TRUE, health_data_consent_date = NOW(), consent_version = '1.0'
-      WHERE email = $2 AND role = $3
-    `, [passwordHash, invitation.email, invitation.role]);
+    // Update user account with password (and consent for patients)
+    if (invitation.role === 'patient') {
+      await db.query(`
+        UPDATE users
+        SET password_hash = $1, health_data_consent = TRUE, health_data_consent_date = NOW(), consent_version = '1.0'
+        WHERE email = $2 AND role = $3
+      `, [passwordHash, invitation.email, invitation.role]);
+    } else {
+      await db.query(`
+        UPDATE users SET password_hash = $1 WHERE email = $2 AND role = $3
+      `, [passwordHash, invitation.email, invitation.role]);
+    }
 
     // Mark invitation as used
     await db.query('UPDATE invitation_tokens SET used = 1 WHERE token = $1', [token]);

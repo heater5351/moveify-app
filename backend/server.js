@@ -15,6 +15,7 @@ const exerciseRoutes = require('./routes/exercises');
 const educationRoutes = require('./routes/education');
 const blockRoutes = require('./routes/blocks');
 const programTemplateRoutes = require('./routes/program-templates');
+const adminRoutes = require('./routes/admin');
 
 // Import database init
 const { initDatabase } = require('./database/init');
@@ -76,6 +77,7 @@ app.use('/api/exercises', exerciseRoutes);
 app.use('/api/education', educationRoutes);
 app.use('/api/blocks', blockRoutes);
 app.use('/api/program-templates', programTemplateRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Test route
 app.get('/', (req, res) => {

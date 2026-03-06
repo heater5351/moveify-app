@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, useSearchParams, useNavigate } from 'react-router-dom';
-import { LogOut } from 'lucide-react';
 import type { Patient, ProgramExercise, ProgramConfig, UserRole, NewPatient, CompletionData, User, ExerciseWeekPrescription } from './types/index.ts';
 import { LoginPage } from './components/LoginPage';
 import { SetupPasswordPage } from './components/SetupPasswordPage';
@@ -21,6 +20,9 @@ import { ConfirmModal } from './components/modals/ConfirmModal';
 import { ResetPasswordModal } from './components/modals/ResetPasswordModal';
 import { BlockBuilderModal } from './components/modals/BlockBuilderModal';
 import { ProgramTemplateModal } from './components/modals/ProgramTemplateModal';
+import { ChangePasswordModal } from './components/modals/ChangePasswordModal';
+import { AccountDropdown } from './components/AccountDropdown';
+import { AdminPanel } from './components/AdminPanel';
 import { API_URL } from './config';
 import { getAuthHeaders, setToken, clearAuth, setStoredUser, getToken } from './utils/api';
 
@@ -29,7 +31,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>('');
   const [loggedInPatient, setLoggedInPatient] = useState<Patient | null>(null);
-  const [_loggedInUser, setLoggedInUser] = useState<User | null>(null);
+  const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
   const [isRestoringSession, setIsRestoringSession] = useState(true);
 
   // Navigation state
@@ -60,6 +62,7 @@ function App() {
   const [showDeleteProgramConfirm, setShowDeleteProgramConfirm] = useState(false);
   const [programToDelete, setProgramToDelete] = useState<{ id: number; name: string } | null>(null);
   const [showProgramTemplateModal, setShowProgramTemplateModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   // Form states
   const [newPatient, setNewPatient] = useState<NewPatient>({
@@ -111,7 +114,7 @@ function App() {
             }
             setUserRole('patient');
           } else {
-            setLoggedInUser({ id: user.id, email: user.email, name: user.name, role: 'clinician', isAdmin: !!user.is_admin });
+            setLoggedInUser({ id: user.id, email: user.email, name: user.name, role: 'clinician', isAdmin: !!user.is_admin, defaultLocationId: user.default_location_id, locationName: user.location_name });
             setUserRole('clinician');
           }
           setIsLoggedIn(true);
@@ -785,6 +788,14 @@ function App() {
         />
       )}
 
+      {/* Change Password Modal */}
+      {showChangePasswordModal && (
+        <ChangePasswordModal
+          onClose={() => setShowChangePasswordModal(false)}
+          onSuccess={() => setNotification({ message: 'Password changed successfully!', type: 'success' })}
+        />
+      )}
+
       {/* Notification Modal */}
       {notification && (
         <NotificationModal
@@ -869,27 +880,39 @@ function App() {
                 >
                   Education
                 </button>
+                {loggedInUser?.isAdmin && (
+                  <button
+                    onClick={() => setCurrentPage('admin')}
+                    className={`px-5 text-sm font-medium border-b-2 transition-colors ${
+                      currentPage === 'admin'
+                        ? 'border-moveify-teal text-white'
+                        : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/20'
+                    }`}
+                  >
+                    Admin
+                  </button>
+                )}
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-1">
+          {userRole === 'clinician' && loggedInUser ? (
+            <AccountDropdown
+              user={loggedInUser}
+              onLogout={handleLogout}
+              onChangePassword={() => setShowChangePasswordModal(true)}
+              onNavigateAdmin={() => setCurrentPage('admin')}
+            />
+          ) : (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg">
               <div className="w-6 h-6 rounded-full bg-primary-400 flex items-center justify-center text-[11px] font-semibold text-white leading-none">
-                {userRole === 'clinician' ? 'C' : (loggedInPatient?.name?.[0]?.toUpperCase() || 'P')}
+                {loggedInPatient?.name?.[0]?.toUpperCase() || 'P'}
               </div>
               <span className="text-sm text-white/65 font-medium">
-                {userRole === 'clinician' ? 'Clinician' : loggedInPatient?.name}
+                {loggedInPatient?.name}
               </span>
             </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-all text-sm"
-            >
-              <LogOut size={15} />
-              Sign out
-            </button>
-          </div>
+          )}
         </div>
       </header>
 
@@ -925,6 +948,13 @@ function App() {
               onLoadTemplate={() => setShowProgramTemplateModal(true)}
             />
           </div>
+        </div>
+      ) : currentPage === 'admin' && loggedInUser?.isAdmin ? (
+        <div className="flex-1 overflow-y-auto px-6 py-7">
+          <AdminPanel
+            currentUserId={loggedInUser.id}
+            onNotification={(message, type) => setNotification({ message, type })}
+          />
         </div>
       ) : currentPage === 'education' ? (
         <div className="flex-1 overflow-y-auto px-6 py-7">

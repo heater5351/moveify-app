@@ -427,6 +427,22 @@ async function initDatabase() {
       ON program_template_exercises(template_id)
     `);
 
+    // Locations table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS locations (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        address TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    // Add default_location_id to users
+    await db.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS default_location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL
+    `);
+
     // Add weight columns to existing tables (migration for deployed DB)
     console.log('🔄 Running database migrations...');
     await db.query(`

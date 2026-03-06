@@ -106,6 +106,25 @@ export type User = {
   name: string;
   role: UserRole;
   isAdmin?: boolean;
+  defaultLocationId?: number | null;
+  locationName?: string | null;
+}
+
+export type Location = {
+  id: number;
+  name: string;
+  address: string | null;
+  created_at: string;
+}
+
+export type Clinician = {
+  id: number;
+  name: string;
+  email: string;
+  is_admin: boolean;
+  default_location_id: number | null;
+  location_name: string | null;
+  created_at: string;
 }
 
 // Block-based periodization types
