@@ -4,11 +4,12 @@ export const exercises: Exercise[] = [
   // Squat Variations
   {
     id: 1,
-    name: 'Bodyweight Squat',
+    name: 'Squat with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
     difficulty: 'Beginner',
-    description: 'Feet shoulder-width apart, toes slightly out. Push hips back, bend knees to lower down. Keep chest up, weight in heels. Drive through heels to stand. Knees track over toes throughout.',
+    description: 'Stand with feet shoulder-width apart and toes slightly turned out. Push your hips back and bend your knees to lower until thighs are parallel to the floor. Keep your chest up and weight through your heels. Drive through your feet to return to standing.',
+    videoUrl: 'https://www.youtube.com/embed/Jo7rLNNxy4o',
     jointArea: 'Hip, Knee',
     muscleGroup: 'Quadriceps, Glutes',
     movementType: 'Flexion, Extension',
@@ -1008,6 +1009,36 @@ export const exercises: Exercise[] = [
     muscleGroup: 'Triceps',
     movementType: 'Extension',
     equipment: 'Dumbbells',
+    position: 'Standing'
+  },
+
+  // Filmed exercises (with video)
+  {
+    id: 77,
+    name: 'Single Leg Squat with Bodyweight',
+    category: 'Musculoskeletal',
+    duration: '3 sets x 8 reps per leg',
+    difficulty: 'Advanced',
+    description: 'Stand on one leg with the other foot hovering off the ground. Slowly bend your standing knee and push your hips back to lower as far as you can control. Keep your knee tracking over your toes and your trunk upright. Push through your foot to return to standing.',
+    videoUrl: 'https://www.youtube.com/embed/g0BXJB2NP4g',
+    jointArea: 'Hip, Knee',
+    muscleGroup: 'Quadriceps, Glutes',
+    movementType: 'Flexion, Extension',
+    equipment: 'Bodyweight',
+    position: 'Standing'
+  },
+  {
+    id: 78,
+    name: 'Isometric Wall Squat (Wall Sit)',
+    category: 'Musculoskeletal',
+    duration: '3 sets x 30-60 seconds',
+    difficulty: 'Beginner',
+    description: 'Lean your back flat against a wall and slide down until your knees are at roughly 90 degrees. Keep your feet shoulder-width apart and flat on the floor. Press your lower back into the wall and hold the position. Breathe steadily throughout.',
+    videoUrl: 'https://www.youtube.com/embed/tXS68Fi7AUM',
+    jointArea: 'Hip, Knee',
+    muscleGroup: 'Quadriceps, Glutes',
+    movementType: 'Isometric',
+    equipment: 'Bodyweight',
     position: 'Standing'
   }
 ];
