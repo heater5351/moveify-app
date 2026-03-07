@@ -173,8 +173,12 @@ async function formatPatientWithPrograms(patient) {
 }
 
 // Get all patients — clinician only (all clinicians see all patients)
+// Batched: 4 queries total regardless of patient count
 router.get('/', requireRole('clinician'), async (req, res) => {
   try {
+    const today = new Date().toISOString().split('T')[0];
+
+    // 1. All patients
     const patients = await db.getAll(`
       SELECT id, email, role, name, dob, phone, address, condition, created_at
       FROM users
@@ -182,10 +186,145 @@ router.get('/', requireRole('clinician'), async (req, res) => {
       ORDER BY created_at DESC
     `);
 
-    // Transform to match frontend Patient type and fetch their programs
-    const formattedPatients = await Promise.all(
-      patients.map(patient => formatPatientWithPrograms(patient))
+    if (patients.length === 0) {
+      audit.log(req, 'patients_list', 'patient', null, { count: 0 });
+      return res.json({ patients: [] });
+    }
+
+    const patientIds = patients.map(p => p.id);
+
+    // 2. All programs for all patients
+    const allPrograms = await db.getAll(
+      `SELECT * FROM programs WHERE patient_id = ANY($1) ORDER BY created_at DESC`,
+      [patientIds]
     );
+
+    const programIds = allPrograms.map(p => p.id);
+
+    // 3. All exercises for all programs
+    let allExercises = [];
+    if (programIds.length > 0) {
+      allExercises = await db.getAll(
+        `SELECT * FROM program_exercises WHERE program_id = ANY($1) ORDER BY program_id, exercise_order ASC`,
+        [programIds]
+      );
+    }
+
+    // 4. All completions for all patients
+    const exerciseIds = allExercises.map(e => e.id);
+    let allCompletions = [];
+    if (exerciseIds.length > 0) {
+      allCompletions = await db.getAll(
+        `SELECT
+          exercise_id,
+          patient_id,
+          completion_date,
+          sets_performed as "setsPerformed",
+          reps_performed as "repsPerformed",
+          weight_performed as "weightPerformed",
+          rpe_rating as "rpeRating",
+          pain_level as "painLevel",
+          notes
+         FROM exercise_completions
+         WHERE exercise_id = ANY($1)
+         ORDER BY completion_date DESC`,
+        [exerciseIds]
+      );
+    }
+
+    // Index completions by exercise_id
+    const completionsByExercise = {};
+    allCompletions.forEach(c => {
+      if (!completionsByExercise[c.exercise_id]) {
+        completionsByExercise[c.exercise_id] = [];
+      }
+      completionsByExercise[c.exercise_id].push(c);
+    });
+
+    // Index exercises by program_id
+    const exercisesByProgram = {};
+    allExercises.forEach(ex => {
+      if (!exercisesByProgram[ex.program_id]) {
+        exercisesByProgram[ex.program_id] = [];
+      }
+
+      const exCompletions = completionsByExercise[ex.id] || [];
+      const todayCompletion = exCompletions.find(c => c.completion_date === today);
+
+      const allExCompletions = {};
+      exCompletions.forEach(c => {
+        const dateKey = typeof c.completion_date === 'string'
+          ? c.completion_date.split('T')[0]
+          : new Date(c.completion_date).toISOString().split('T')[0];
+        allExCompletions[dateKey] = {
+          setsPerformed: c.setsPerformed,
+          repsPerformed: c.repsPerformed,
+          weightPerformed: c.weightPerformed,
+          rpeRating: c.rpeRating,
+          painLevel: c.painLevel,
+          notes: c.notes
+        };
+      });
+
+      exercisesByProgram[ex.program_id].push({
+        id: ex.id,
+        name: ex.exercise_name,
+        category: ex.exercise_category,
+        sets: ex.sets,
+        reps: ex.reps,
+        prescribedWeight: ex.prescribed_weight || 0,
+        holdTime: ex.hold_time,
+        instructions: ex.instructions,
+        image: ex.image_url,
+        completed: !!todayCompletion,
+        completionData: todayCompletion ? {
+          setsPerformed: todayCompletion.setsPerformed,
+          repsPerformed: todayCompletion.repsPerformed,
+          weightPerformed: todayCompletion.weightPerformed,
+          rpeRating: todayCompletion.rpeRating,
+          painLevel: todayCompletion.painLevel,
+          notes: todayCompletion.notes
+        } : null,
+        allCompletions: allExCompletions,
+        enablePeriodization: ex.auto_adjust_enabled !== false
+      });
+    });
+
+    // Index programs by patient_id
+    const programsByPatient = {};
+    allPrograms.forEach(p => {
+      if (!programsByPatient[p.patient_id]) {
+        programsByPatient[p.patient_id] = [];
+      }
+      programsByPatient[p.patient_id].push({
+        config: {
+          id: p.id,
+          name: p.name,
+          startDate: p.start_date,
+          frequency: p.frequency ? JSON.parse(p.frequency) : [],
+          duration: p.duration,
+          customEndDate: p.custom_end_date,
+          trackActualPerformance: p.track_actual_performance === true,
+          trackRpe: p.track_rpe === true,
+          trackPainLevel: p.track_pain === true
+        },
+        exercises: exercisesByProgram[p.id] || []
+      });
+    });
+
+    // Assemble final result
+    const formattedPatients = patients.map(patient => ({
+      id: patient.id,
+      name: patient.name,
+      email: patient.email,
+      dob: patient.dob || '',
+      age: patient.dob ? new Date().getFullYear() - new Date(patient.dob).getFullYear() : 0,
+      condition: patient.condition || '',
+      phone: patient.phone || '',
+      address: patient.address || '',
+      dateAdded: patient.created_at,
+      assignedPrograms: programsByPatient[patient.id] || []
+    }));
 
     audit.log(req, 'patients_list', 'patient', null, { count: formattedPatients.length });
 

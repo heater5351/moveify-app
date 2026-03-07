@@ -13,7 +13,8 @@
     "pm2:logs": "pm2 logs moveify-backend",
     "pm2:status": "pm2 status",
     "pm2:monit": "pm2 monit",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.11",
-    "pm2": "^6.0.14"
+    "pm2": "^6.0.14",
+    "vitest": "^4.0.18"
   }
 }
