@@ -522,7 +522,27 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
                     className="bg-white rounded-xl shadow-sm border-2 border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer aspect-square flex flex-col"
                   >
                     {/* Video Thumbnail */}
-                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 basis-2/3 flex items-center justify-center relative">
+                    <div
+                      className="bg-gradient-to-br from-purple-500 to-purple-600 basis-2/3 flex items-center justify-center relative group/card"
+                      onMouseEnter={(e) => {
+                        const video = e.currentTarget.querySelector('video');
+                        if (video) video.play().catch(() => {});
+                      }}
+                      onMouseLeave={(e) => {
+                        const video = e.currentTarget.querySelector('video');
+                        if (video) { video.pause(); video.currentTime = 0; }
+                      }}
+                    >
+                      {exercise.videoUrl && !exercise.videoUrl.includes('youtube.com') && (
+                        <video
+                          src={exercise.videoUrl}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          muted
+                          loop
+                          playsInline
+                          preload="metadata"
+                        />
+                      )}
                       {/* Favorite Star */}
                       <button
                         onClick={(e) => {
@@ -539,9 +559,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
                       >
                         <Star size={18} fill={favorites.has(`${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`) ? 'currentColor' : 'none'} />
                       </button>
-                      {exercise.videoUrl ? (
-                        <Play className="text-white" size={40} fill="white" />
-                      ) : (
+                      {!exercise.videoUrl && (
                         <Play className="text-white/50" size={56} />
                       )}
                       {/* Add to Program Button */}
@@ -599,7 +617,27 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
                   className="bg-white rounded-xl shadow-sm border-2 border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer aspect-square flex flex-col"
                 >
                   {/* Video Thumbnail */}
-                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 basis-2/3 flex items-center justify-center relative">
+                  <div
+                    className="bg-gradient-to-br from-blue-500 to-blue-600 basis-2/3 flex items-center justify-center relative group/card"
+                    onMouseEnter={(e) => {
+                      const video = e.currentTarget.querySelector('video');
+                      if (video) video.play().catch(() => {});
+                    }}
+                    onMouseLeave={(e) => {
+                      const video = e.currentTarget.querySelector('video');
+                      if (video) { video.pause(); video.currentTime = 0; }
+                    }}
+                  >
+                    {exercise.videoUrl && !exercise.videoUrl.includes('youtube.com') && (
+                      <video
+                        src={exercise.videoUrl}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        muted
+                        loop
+                        playsInline
+                        preload="metadata"
+                      />
+                    )}
                     {/* Favorite Star */}
                     <button
                       onClick={(e) => {
@@ -616,9 +654,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
                     >
                       <Star size={18} fill={favorites.has(`${exercise.isCustom ? 'custom' : 'default'}-${exercise.id}`) ? 'currentColor' : 'none'} />
                     </button>
-                    {exercise.videoUrl ? (
-                      <Play className="text-white" size={40} fill="white" />
-                    ) : (
+                    {!exercise.videoUrl && (
                       <Play className="text-white/50" size={56} />
                     )}
                     {/* Add to Program Button */}
