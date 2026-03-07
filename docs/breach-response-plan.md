@@ -2,7 +2,7 @@
 
 **Version:** 1.0
 **Last reviewed:** 2026-03-07
-**Owner:** Moveify Health Pty Ltd
+**Owner:** Moveify Health Solutions
 **Review frequency:** Annually or after any breach incident
 
 This plan addresses obligations under the **Notifiable Data Breaches (NDB) scheme** (Part IIIC of the Privacy Act 1988) and the **Australian Privacy Principles (APP 11)**.
@@ -37,9 +37,9 @@ This plan addresses obligations under the **Notifiable Data Breaches (NDB) schem
 For a small team, one person may fill multiple roles. The key requirement is that someone is clearly designated as Breach Lead before an incident occurs.
 
 **Current assignments:**
-- Breach Lead: _[Assign name]_
-- Technical Lead: _[Assign name]_
-- Communications Lead: _[Assign name]_
+- Breach Lead: Ryan Heath
+- Technical Lead: Ryan Heath
+- Communications Lead: Ryan Heath
 
 ---
 
