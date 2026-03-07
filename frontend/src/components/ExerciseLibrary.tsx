@@ -78,12 +78,22 @@ const ExerciseDetailModal = ({
         {/* Video Player (larger) */}
         {exercise.videoUrl && (
           <div className="aspect-video bg-black">
-            <iframe
-              src={exercise.videoUrl}
-              className="w-full h-full"
-              allowFullScreen
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            />
+            {exercise.videoUrl.includes('youtube.com') ? (
+              <iframe
+                src={exercise.videoUrl}
+                className="w-full h-full"
+                allowFullScreen
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              />
+            ) : (
+              <video
+                src={exercise.videoUrl}
+                className="w-full h-full"
+                controls
+                playsInline
+                preload="metadata"
+              />
+            )}
           </div>
         )}
 
