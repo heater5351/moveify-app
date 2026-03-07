@@ -377,7 +377,7 @@ If a breach is **likely to cause serious harm**:
 - ~~**No privacy policy** displayed in-app (APP 1, APP 5)~~ — **DONE:** `/privacy-policy` public route, linked from login and setup-password pages
 - ~~**No data export or deletion** feature for patients (APP 12, APP 13, APP 11)~~ — **DONE**
 - ~~**No documented breach response plan** (NDB scheme)~~ — **DONE:** `docs/breach-response-plan.md`
-- **No data retention policy** — APP 11 requires destroying data no longer needed
+- ~~**No data retention policy** — APP 11 requires destroying data no longer needed~~ — **DONE:** `docs/data-retention-policy.md`
 - **IAM permissions not yet reviewed** for least-privilege
 
 ### Development guidelines
