@@ -24,8 +24,22 @@ const { initDatabase } = require('./database/init');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Security headers
-app.use(helmet());
+// Security headers with strict CSP
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'", process.env.CORS_ORIGIN || 'http://localhost:5173'],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    }
+  }
+}));
 
 // CORS Configuration
 const isProduction = process.env.NODE_ENV === 'production';
@@ -56,6 +70,8 @@ const authLimiter = rateLimit({
 
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/invitations/validate', authLimiter);
+app.use('/api/invitations/set-password', authLimiter);
 
 // Rate limiting — general API
 const apiLimiter = rateLimit({

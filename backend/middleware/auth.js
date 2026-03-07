@@ -34,7 +34,7 @@ function authenticate(req, res, next) {
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     req.user = { id: decoded.id, role: decoded.role, email: decoded.email, is_admin: !!decoded.is_admin };
     next();
   } catch (error) {

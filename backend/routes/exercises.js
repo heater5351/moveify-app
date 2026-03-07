@@ -17,29 +17,32 @@ router.get('/', async (req, res) => {
     let params = [];
     let paramIndex = 1;
 
+    // Sanitize filter values — strip wildcard characters to prevent LIKE abuse
+    const sanitizeFilter = (val) => val.replace(/[%_]/g, '');
+
     if (joint_area) {
       query += ` AND joint_area LIKE $${paramIndex}`;
-      params.push(`%${joint_area}%`);
+      params.push(`%${sanitizeFilter(joint_area)}%`);
       paramIndex++;
     }
     if (muscle_group) {
       query += ` AND muscle_group LIKE $${paramIndex}`;
-      params.push(`%${muscle_group}%`);
+      params.push(`%${sanitizeFilter(muscle_group)}%`);
       paramIndex++;
     }
     if (movement_type) {
       query += ` AND movement_type LIKE $${paramIndex}`;
-      params.push(`%${movement_type}%`);
+      params.push(`%${sanitizeFilter(movement_type)}%`);
       paramIndex++;
     }
     if (equipment) {
       query += ` AND equipment LIKE $${paramIndex}`;
-      params.push(`%${equipment}%`);
+      params.push(`%${sanitizeFilter(equipment)}%`);
       paramIndex++;
     }
     if (position) {
       query += ` AND position LIKE $${paramIndex}`;
-      params.push(`%${position}%`);
+      params.push(`%${sanitizeFilter(position)}%`);
       paramIndex++;
     }
     if (category) {

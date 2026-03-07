@@ -1,5 +1,6 @@
 // Data request routes — patient data export/deletion (APP 12, APP 13 compliance)
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/ownership');
@@ -9,10 +10,18 @@ const router = express.Router();
 
 router.use(authenticate);
 
+// Rate limit data request creation (5 per hour per user)
+const dataRequestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => `data-req-${req.user?.id || req.ip}`,
+  message: { error: 'Too many data requests. Please try again later.' }
+});
+
 // ===== PATIENT ENDPOINTS =====
 
 // Create a data request (patient only)
-router.post('/', requireRole('patient'), async (req, res) => {
+router.post('/', requireRole('patient'), dataRequestLimiter, async (req, res) => {
   try {
     const { requestType } = req.body;
     const userId = req.user.id;

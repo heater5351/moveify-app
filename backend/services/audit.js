@@ -19,7 +19,7 @@ function log(req, action, resourceType, resourceId = null, details = null) {
     [userId, action, resourceType, resourceId, details ? JSON.stringify(details) : null, ipAddress]
   ).catch(error => {
     // Never fail the request — log and move on
-    console.error('Audit log write failed:', error.message);
+    console.error('CRITICAL: Audit log write failed:', error.message, { action, resourceType, resourceId });
   });
 }
 

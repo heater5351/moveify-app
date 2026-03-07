@@ -22,7 +22,7 @@ router.get('/templates', requireRole('clinician'), async (req, res) => {
     res.json({ templates });
   } catch (error) {
     console.error('Get templates error:', error);
-    const detail = process.env.NODE_ENV !== 'production' ? error.message : undefined;
+    const detail = process.env.NODE_ENV === 'development' ? error.message : undefined;
     res.status(500).json({ error: 'Failed to get templates', detail });
   }
 });
@@ -43,13 +43,13 @@ router.post('/templates', requireRole('clinician'), async (req, res) => {
     res.json({ message: 'Template created successfully', ...result });
   } catch (error) {
     console.error('Create template error:', error);
-    const detail = process.env.NODE_ENV !== 'production' ? error.message : undefined;
+    const detail = process.env.NODE_ENV === 'development' ? error.message : undefined;
     res.status(500).json({ error: 'Failed to create template', detail });
   }
 });
 
 // Get a specific template with weeks
-router.get('/templates/:id', async (req, res) => {
+router.get('/templates/:id', requireRole('clinician'), async (req, res) => {
   try {
     const { id } = req.params;
     const template = await templateService.getTemplate(parseInt(id));
@@ -99,7 +99,7 @@ router.delete('/templates/:id', requireRole('clinician'), async (req, res) => {
 });
 
 // Apply a template
-router.post('/templates/:id/apply', async (req, res) => {
+router.post('/templates/:id/apply', requireRole('clinician'), async (req, res) => {
   try {
     const { id } = req.params;
     const result = await templateService.applyTemplate(parseInt(id));
@@ -143,6 +143,9 @@ router.patch('/flags/:flagId/resolve', requireRole('clinician'), async (req, res
 // Helper: verify program access (any clinician allowed, patient = self-access only)
 async function verifyProgramAccess(req, res, next) {
   const programId = parseInt(req.params.programId || req.params.blockScheduleId);
+  if (isNaN(programId) || programId <= 0) {
+    return res.status(400).json({ error: 'Valid program ID is required' });
+  }
   const userId = req.user.id;
   const role = req.user.role;
 

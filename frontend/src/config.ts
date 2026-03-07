@@ -9,7 +9,11 @@ const getApiUrl = () => {
   }
 
   // Fallback for local development - use current hostname
+  // WARNING: This fallback uses HTTP — only safe for local development
   const hostname = window.location.hostname;
+  if (window.location.protocol === 'https:') {
+    console.warn('VITE_API_URL not set — falling back to HTTP API URL. Set VITE_API_URL for production.');
+  }
   return `http://${hostname}:3000/api`;
 };
 

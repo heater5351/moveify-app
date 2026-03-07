@@ -24,17 +24,13 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
-    // Find user
+    // Find user — always run bcrypt to prevent timing-based email enumeration
     const user = await db.getOne('SELECT * FROM users WHERE email = $1', [email]);
-    if (!user) {
-      audit.log(req, 'login_failure', 'user', null, { email, reason: 'user_not_found' });
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
+    const DUMMY_HASH = '$2b$10$dummyhashtopreventtimingattackenumeration00000000000';
+    const validPassword = await bcrypt.compare(password, user?.password_hash || DUMMY_HASH);
 
-    // Check password
-    const validPassword = await bcrypt.compare(password, user.password_hash);
-    if (!validPassword) {
-      audit.log(req, 'login_failure', 'user', user.id, { reason: 'invalid_password' });
+    if (!user || !validPassword) {
+      audit.log(req, 'login_failure', 'user', user?.id || null, { email, reason: user ? 'invalid_password' : 'user_not_found' });
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -154,6 +150,9 @@ router.patch('/change-password', authenticate, async (req, res) => {
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, req.user.id]);
+
+    // Invalidate any outstanding password reset tokens
+    await db.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [req.user.id]);
 
     audit.log(req, 'password_change', 'user', req.user.id);
 
