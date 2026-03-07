@@ -89,7 +89,7 @@ export const TermsPage = () => {
             </p>
             <ul className="text-sm text-slate-600 leading-relaxed space-y-2 list-disc pl-5">
               <li>They are solely responsible for the clinical appropriateness and safety of any exercise program they prescribe through the platform.</li>
-              <li>They hold current and valid registration with the Australian Health Practitioner Regulation Agency (AHPRA) or equivalent regulatory body for their profession.</li>
+              <li>They hold current and valid registration or accreditation with the relevant professional body for their profession (e.g., AHPRA for physiotherapists, ESSA for exercise physiologists).</li>
               <li>They will only invite patients who are under their active clinical care.</li>
               <li>They will comply with their professional code of conduct and all applicable laws when using the platform, including obligations under the <em>Privacy Act 1988</em> (Cth).</li>
               <li>They are responsible for obtaining any patient consent required by their professional obligations, beyond the health data consent obtained by Moveify during account setup.</li>
@@ -164,7 +164,7 @@ export const TermsPage = () => {
           <section>
             <h2 className="text-base font-semibold font-display text-secondary-500 mb-2">13. Governing law</h2>
             <p className="text-sm text-slate-600 leading-relaxed">
-              These terms are governed by the laws of the State of Queensland, Australia. You submit to the non-exclusive jurisdiction of the courts of Queensland and any courts entitled to hear appeals from those courts.
+              These terms are governed by the laws of the State of South Australia. You submit to the non-exclusive jurisdiction of the courts of South Australia and any courts entitled to hear appeals from those courts.
             </p>
           </section>
 
