@@ -4,6 +4,7 @@ import type { Patient, ProgramExercise, ProgramConfig, UserRole, NewPatient, Com
 import { LoginPage } from './components/LoginPage';
 import { SetupPasswordPage } from './components/SetupPasswordPage';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
+import { TermsPage } from './components/TermsPage';
 import { ExerciseLibrary } from './components/ExerciseLibrary';
 import { PatientsPage } from './components/PatientsPage';
 import { PatientProfile } from './components/PatientProfile';
@@ -683,6 +684,7 @@ function App() {
       <>
         <Routes>
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
           <Route path="/setup-password" element={<SetupPasswordPage />} />
           <Route path="/reset-password" element={<LoginPage onLogin={handleLogin} />} />
           <Route path="/" element={<LoginPage onLogin={handleLogin} />} />

@@ -268,6 +268,10 @@ export const SetupPasswordPage = () => {
           <a href="/privacy-policy" className="text-xs text-slate-400 hover:text-slate-500 transition-colors">
             Privacy Policy
           </a>
+          <span className="text-xs text-slate-300 mx-1.5">|</span>
+          <a href="/terms" className="text-xs text-slate-400 hover:text-slate-500 transition-colors">
+            Terms and Conditions
+          </a>
         </div>
       </div>
     </div>
