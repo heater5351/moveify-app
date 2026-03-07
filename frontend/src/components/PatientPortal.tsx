@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Play, Check, TrendingUp, Calendar as CalendarIcon, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Play, Check, TrendingUp, Calendar as CalendarIcon, BookOpen, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type { Patient, CompletionData, ProgramExercise, DailyCheckIn } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
@@ -8,6 +8,7 @@ import DailyCheckInModal from './modals/DailyCheckInModal';
 import BlockProgressBanner from './BlockProgressBanner';
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
+import { exercises as defaultExercises } from '../data/exercises';
 
 interface PatientPortalProps {
   patient: Patient;
@@ -36,6 +37,21 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
     blockDuration?: number;
     status?: string;
   } | null>(null);
+  const [videoModal, setVideoModal] = useState<{ url: string; name: string } | null>(null);
+
+  // Build a lookup map from exercise name to video URL
+  const videoUrlMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const ex of defaultExercises) {
+      if (ex.videoUrl) map.set(ex.name.toLowerCase(), ex.videoUrl);
+    }
+    return map;
+  }, []);
+
+  const getVideoUrl = (exerciseName: string): string | null => {
+    return videoUrlMap.get(exerciseName.toLowerCase()) || null;
+  };
+
   // Check if patient has completed check-in today + trigger block evaluation
   useEffect(() => {
     const checkTodayCheckIn = async () => {
@@ -430,11 +446,27 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                   {/* Mobile: Stacked layout, Desktop: Side-by-side */}
                   <div className="flex flex-col sm:flex-row">
                     {/* Video Thumbnail */}
-                    <div className="relative w-full sm:w-48 lg:w-52 h-40 sm:h-36 bg-gradient-to-br from-moveify-teal via-moveify-ocean to-moveify-navy flex items-center justify-center flex-shrink-0">
-                      <div className="absolute inset-0 bg-black opacity-10"></div>
+                    <div
+                      className="relative w-full sm:w-48 lg:w-52 h-40 sm:h-36 bg-gradient-to-br from-moveify-teal via-moveify-ocean to-moveify-navy flex items-center justify-center flex-shrink-0 cursor-pointer"
+                      onClick={(e) => {
+                        const url = getVideoUrl(exercise.name);
+                        if (url) { e.stopPropagation(); setVideoModal({ url, name: exercise.name }); }
+                      }}
+                    >
+                      {getVideoUrl(exercise.name) ? (
+                        <video
+                          src={`${getVideoUrl(exercise.name)}#t=1`}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-black opacity-10"></div>
+                      )}
                       <Play className="text-white relative z-10 drop-shadow-lg" size={48} />
                       {exercise.completed && (
-                        <div className="absolute top-3 right-3 bg-green-500 text-white rounded-full p-1.5 sm:p-2 shadow-lg">
+                        <div className="absolute top-3 right-3 bg-green-500 text-white rounded-full p-1.5 sm:p-2 shadow-lg z-10">
                           <Check size={16} className="sm:w-5 sm:h-5" />
                         </div>
                       )}
@@ -479,7 +511,18 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
 
                       {/* Buttons - Stack on mobile, side-by-side on desktop */}
                       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                        <button className="w-full sm:flex-1 bg-gradient-to-r from-moveify-teal to-moveify-ocean text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 font-semibold shadow-md hover:shadow-lg transition-all text-sm sm:text-base">
+                        <button
+                          onClick={() => {
+                            const url = getVideoUrl(exercise.name);
+                            if (url) setVideoModal({ url, name: exercise.name });
+                          }}
+                          disabled={!getVideoUrl(exercise.name)}
+                          className={`w-full sm:flex-1 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all text-sm sm:text-base ${
+                            getVideoUrl(exercise.name)
+                              ? 'bg-gradient-to-r from-moveify-teal to-moveify-ocean text-white hover:from-blue-700 hover:to-blue-800'
+                              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                          }`}
+                        >
                           Watch Video
                         </button>
                         {!isProgramCompleted && showPrescription && (
@@ -537,6 +580,34 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
             setSelectedExercise(null);
           }}
         />
+      )}
+
+      {/* Video Playback Modal */}
+      {videoModal && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setVideoModal(null)}
+        >
+          <div
+            className="relative w-full max-w-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setVideoModal(null)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+            >
+              <X size={28} />
+            </button>
+            <p className="text-white text-sm font-medium mb-2">{videoModal.name}</p>
+            <video
+              src={videoModal.url}
+              className="w-full rounded-xl"
+              controls
+              autoPlay
+              playsInline
+            />
+          </div>
+        </div>
       )}
     </div>
   );
