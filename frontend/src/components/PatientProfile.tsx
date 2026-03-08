@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown } from 'lucide-react';
+import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown, CalendarDays } from 'lucide-react';
 import type { Patient, ClinicianFlag, BlockStatusResponse } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
+import { DailyActivityView } from './DailyActivityView';
 import { AssignEducationModal } from './modals/AssignEducationModal';
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
@@ -18,7 +19,7 @@ interface PatientProfileProps {
 }
 
 export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram }: PatientProfileProps) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'education'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'daily' | 'analytics' | 'education'>('overview');
   const [showAssignEducationModal, setShowAssignEducationModal] = useState(false);
   const [educationModulesRefreshKey, setEducationModulesRefreshKey] = useState(0);
   const [flags, setFlags] = useState<ClinicianFlag[]>([]);
@@ -141,6 +142,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
         <div className="flex gap-1">
           {[
             { id: 'overview', label: 'Overview', icon: <User size={15} /> },
+            { id: 'daily', label: 'Daily Activity', icon: <CalendarDays size={15} /> },
             { id: 'analytics', label: 'Progress Analytics', icon: <TrendingUp size={15} /> },
             { id: 'education', label: 'Education', icon: <BookOpen size={15} /> },
           ].map(({ id, label, icon }) => (
@@ -322,6 +324,8 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
             )}
           </div>
         </div>
+      ) : activeTab === 'daily' ? (
+        <DailyActivityView patientId={patient.id} />
       ) : activeTab === 'analytics' ? (
         <ProgressAnalytics patientId={patient.id} apiUrl={API_URL} />
       ) : (

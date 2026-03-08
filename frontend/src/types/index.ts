@@ -267,6 +267,22 @@ export type DataRequest = {
   patient_email?: string;
 }
 
+// Daily Activity view types (clinician per-day drill-down)
+export type ExerciseCompletion = {
+  id: number;
+  exerciseName: string;
+  completionDate: string;
+  setsPerformed: number;
+  repsPerformed: number;
+  weightPerformed: number | null;
+  prescribedSets: number;
+  prescribedReps: number;
+  prescribedWeight: number | null;
+  rpeRating: number | null;
+  painLevel: number | null;
+  notes: string | null;
+}
+
 export type BlockWeekRow = {
   programExerciseId: number;
   exerciseName: string;
