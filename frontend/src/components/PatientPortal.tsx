@@ -603,6 +603,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
               src={videoModal.url}
               className="w-full rounded-xl"
               controls
+              muted
               autoPlay
               playsInline
             />

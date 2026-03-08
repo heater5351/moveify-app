@@ -136,6 +136,7 @@ const ExerciseDetailModal = ({
                 src={exercise.videoUrl}
                 className="w-full h-full"
                 controls
+                muted
                 playsInline
                 preload="metadata"
               />
