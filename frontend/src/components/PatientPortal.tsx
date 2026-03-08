@@ -40,16 +40,20 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   const [videoModal, setVideoModal] = useState<{ url: string; name: string; description?: string } | null>(null);
 
   // Build a lookup map from exercise name to video URL
-  const videoUrlMap = useMemo(() => {
-    const map = new Map<string, string>();
+  const exerciseLookup = useMemo(() => {
+    const map = new Map<string, { videoUrl: string; description: string }>();
     for (const ex of defaultExercises) {
-      if (ex.videoUrl) map.set(ex.name.toLowerCase(), ex.videoUrl);
+      if (ex.videoUrl) map.set(ex.name.toLowerCase(), { videoUrl: ex.videoUrl, description: ex.description });
     }
     return map;
   }, []);
 
   const getVideoUrl = (exerciseName: string): string | null => {
-    return videoUrlMap.get(exerciseName.toLowerCase()) || null;
+    return exerciseLookup.get(exerciseName.toLowerCase())?.videoUrl || null;
+  };
+
+  const getExerciseDescription = (exerciseName: string): string | undefined => {
+    return exerciseLookup.get(exerciseName.toLowerCase())?.description;
   };
 
   // Check if patient has completed check-in today + trigger block evaluation
@@ -450,7 +454,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                       className="relative w-full sm:w-48 lg:w-52 h-40 sm:h-36 bg-gradient-to-br from-moveify-teal via-moveify-ocean to-moveify-navy flex items-center justify-center flex-shrink-0 cursor-pointer"
                       onClick={(e) => {
                         const url = getVideoUrl(exercise.name);
-                        if (url) { e.stopPropagation(); setVideoModal({ url, name: exercise.name, description: exercise.description }); }
+                        if (url) { e.stopPropagation(); setVideoModal({ url, name: exercise.name, description: getExerciseDescription(exercise.name) }); }
                       }}
                     >
                       {getVideoUrl(exercise.name) ? (
