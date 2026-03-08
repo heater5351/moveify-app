@@ -23,7 +23,6 @@ export const SetupPasswordPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [consentChecked, setConsentChecked] = useState(false);
 
   // Password strength checks
   const hasMinLength = password.length >= 8;
@@ -229,19 +228,12 @@ export const SetupPasswordPage = () => {
 
           {/* Health data consent (patients only) */}
           {invitationData.role === 'patient' && (
-            <div className="bg-slate-50 rounded-lg px-4 py-3 mt-2">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={consentChecked}
-                  onChange={(e) => setConsentChecked(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-primary-400 focus:ring-primary-400/30 shrink-0"
-                />
-                <span className="text-xs text-slate-600 leading-relaxed">
-                  I consent to Moveify collecting and storing my health data, including exercise performance, pain scores, daily wellness check-ins, and demographic information, for the purpose of managing my exercise rehabilitation program. This data will be accessible to my assigned clinician. I understand I can request access to, correction of, or deletion of my data by contacting my clinician.
-                </span>
-              </label>
-            </div>
+            <p className="text-xs text-slate-500 leading-relaxed mt-2">
+              By creating your account, you agree that you have read and understood the{' '}
+              <a href="/privacy-policy" target="_blank" className="text-primary-400 hover:text-primary-500 font-medium">Privacy Policy</a>
+              {' '}and{' '}
+              <a href="/terms" target="_blank" className="text-primary-400 hover:text-primary-500 font-medium">Terms and Conditions</a>.
+            </p>
           )}
 
           {submitError && (
@@ -252,7 +244,7 @@ export const SetupPasswordPage = () => {
 
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || !hasMinLength || !passwordsMatch || (invitationData.role === 'patient' && !consentChecked)}
+            disabled={isSubmitting || !hasMinLength || !passwordsMatch}
             className="w-full bg-primary-400 hover:bg-primary-500 text-white py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm mt-1"
           >
             {isSubmitting ? 'Creating account...' : 'Create account'}
