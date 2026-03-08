@@ -142,8 +142,8 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
         <div className="flex gap-1">
           {[
             { id: 'overview', label: 'Overview', icon: <User size={15} /> },
-            { id: 'daily', label: 'Daily Activity', icon: <CalendarDays size={15} /> },
             { id: 'analytics', label: 'Progress Analytics', icon: <TrendingUp size={15} /> },
+            { id: 'daily', label: 'Daily Activity', icon: <CalendarDays size={15} /> },
             { id: 'education', label: 'Education', icon: <BookOpen size={15} /> },
           ].map(({ id, label, icon }) => (
             <button
@@ -324,10 +324,10 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
             )}
           </div>
         </div>
-      ) : activeTab === 'daily' ? (
-        <DailyActivityView patientId={patient.id} />
       ) : activeTab === 'analytics' ? (
         <ProgressAnalytics patientId={patient.id} apiUrl={API_URL} />
+      ) : activeTab === 'daily' ? (
+        <DailyActivityView patientId={patient.id} />
       ) : (
         <div>
           <div className="flex items-center justify-between mb-5">
