@@ -4,6 +4,36 @@ import type { NewPatient } from '../../types/index.ts';
 import { API_URL } from '../../config';
 import { getAuthHeaders } from '../../utils/api';
 
+// Convert YYYY-MM-DD to DD/MM/YYYY for display
+const toDisplayDate = (isoDate: string): string => {
+  if (!isoDate) return '';
+  const [y, m, d] = isoDate.split('-');
+  if (!y || !m || !d) return isoDate;
+  return `${d}/${m}/${y}`;
+};
+
+// Validate and convert DD/MM/YYYY to YYYY-MM-DD, returns null if invalid
+const parseDisplayDate = (display: string): string | null => {
+  const cleaned = display.replace(/\D/g, '');
+  if (cleaned.length !== 8) return null;
+  const day = parseInt(cleaned.slice(0, 2), 10);
+  const month = parseInt(cleaned.slice(2, 4), 10);
+  const year = parseInt(cleaned.slice(4, 8), 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > new Date().getFullYear()) return null;
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  if (date > new Date()) return null;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
+
+// Auto-format input as DD/MM/YYYY while typing
+const formatDobInput = (value: string, prevValue: string): string => {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
+};
+
 interface AddPatientModalProps {
   newPatient: NewPatient;
   onUpdate: (patient: NewPatient) => void;
@@ -16,6 +46,8 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
   const [invitationSent, setInvitationSent] = useState(false);
   const [expiresAt, setExpiresAt] = useState('');
   const [error, setError] = useState('');
+  const [dobDisplay, setDobDisplay] = useState(toDisplayDate(newPatient.dob));
+  const [dobError, setDobError] = useState('');
 
   const handleGenerateInvitation = async () => {
     setError('');
@@ -129,11 +161,41 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
               Date of Birth <span className="text-red-500">*</span>
             </label>
             <input
-              type="date"
-              value={newPatient.dob}
-              onChange={(e) => onUpdate({ ...newPatient, dob: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+              type="text"
+              inputMode="numeric"
+              value={dobDisplay}
+              onChange={(e) => {
+                const formatted = formatDobInput(e.target.value, dobDisplay);
+                setDobDisplay(formatted);
+                setDobError('');
+                // Auto-validate when fully typed
+                if (formatted.replace(/\D/g, '').length === 8) {
+                  const iso = parseDisplayDate(formatted);
+                  if (iso) {
+                    onUpdate({ ...newPatient, dob: iso });
+                    setDobError('');
+                  } else {
+                    onUpdate({ ...newPatient, dob: '' });
+                    setDobError('Invalid date');
+                  }
+                } else {
+                  onUpdate({ ...newPatient, dob: '' });
+                }
+              }}
+              onBlur={() => {
+                if (dobDisplay && !newPatient.dob) {
+                  setDobError('Invalid date');
+                }
+              }}
+              maxLength={10}
+              placeholder="DD/MM/YYYY"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent ${
+                dobError ? 'border-red-400' : 'border-gray-300'
+              }`}
             />
+            {dobError && (
+              <p className="text-red-500 text-sm mt-1">{dobError}</p>
+            )}
           </div>
 
           <div>
