@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Play, Check, TrendingUp, Calendar as CalendarIcon, BookOpen, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Play, Check, TrendingUp, Calendar as CalendarIcon, BookOpen, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X } from 'lucide-react';
 import type { Patient, CompletionData, ProgramExercise, DailyCheckIn } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
@@ -20,6 +20,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, 1 = next week, -1 = previous week
   const [selectedProgramIndex, setSelectedProgramIndex] = useState(0);
   const [activeView, setActiveView] = useState<'exercises' | 'progress' | 'education'>('exercises');
+  const [expandedInstruction, setExpandedInstruction] = useState<number | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<{
     exercise: ProgramExercise;
@@ -503,28 +504,22 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                         </p>
                       )}
 
-                      <div className="mb-3 sm:mb-4 space-y-1.5 sm:space-y-2">
-                        <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 sm:line-clamp-none">
+                      {/* Expandable Instructions */}
+                      <button
+                        onClick={() => setExpandedInstruction(expandedInstruction === index ? null : index)}
+                        className="flex items-center gap-1.5 text-sm text-primary-500 hover:text-primary-600 font-medium mb-3 sm:mb-4 transition-colors"
+                      >
+                        {expandedInstruction === index ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        {expandedInstruction === index ? 'Hide instructions' : 'Show instructions'}
+                      </button>
+                      {expandedInstruction === index && (
+                        <p className="text-sm text-gray-600 leading-relaxed mb-3 sm:mb-4">
                           {exercise.description}
                         </p>
-                      </div>
+                      )}
 
-                      {/* Buttons - Stack on mobile, side-by-side on desktop */}
+                      {/* Buttons */}
                       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                        <button
-                          onClick={() => {
-                            const url = getVideoUrl(exercise.name);
-                            if (url) setVideoModal({ url, name: exercise.name });
-                          }}
-                          disabled={!getVideoUrl(exercise.name)}
-                          className={`w-full sm:flex-1 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all text-sm sm:text-base ${
-                            getVideoUrl(exercise.name)
-                              ? 'bg-gradient-to-r from-moveify-teal to-moveify-ocean text-white hover:from-blue-700 hover:to-blue-800'
-                              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                          }`}
-                        >
-                          Watch Video
-                        </button>
                         {!isProgramCompleted && showPrescription && (
                           <button
                             onClick={() => {
