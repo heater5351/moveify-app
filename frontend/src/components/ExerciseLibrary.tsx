@@ -112,9 +112,6 @@ const ExerciseDetailModal = ({
         <div className="flex items-center justify-between p-4 border-b">
           <div>
             <h3 className="font-semibold text-xl text-gray-900">{exercise.name}</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-sm text-gray-500">{exercise.duration}</span>
-            </div>
           </div>
           <button
             onClick={onClose}
