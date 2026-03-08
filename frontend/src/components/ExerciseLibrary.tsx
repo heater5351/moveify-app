@@ -649,7 +649,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
                 >
                   {/* Video Thumbnail */}
                   <div
-                    className="bg-gradient-to-br from-blue-500 to-blue-600 basis-2/3 flex items-center justify-center relative group/card"
+                    className="bg-white basis-2/3 flex items-center justify-center relative group/card"
                   >
                     {exercise.videoUrl && !exercise.videoUrl.includes('youtube.com') && (
                       <LazyVideoCard src={exercise.videoUrl} />
