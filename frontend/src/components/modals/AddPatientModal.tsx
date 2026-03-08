@@ -165,7 +165,7 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
               inputMode="numeric"
               value={dobDisplay}
               onChange={(e) => {
-                const formatted = formatDobInput(e.target.value, dobDisplay);
+                const formatted = formatDobInput(e.target.value);
                 setDobDisplay(formatted);
                 setDobError('');
                 // Auto-validate when fully typed
