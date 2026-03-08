@@ -451,7 +451,7 @@ export const exercises: Exercise[] = [
     duration: '3 sets x 10 reps per side',
     difficulty: 'Intermediate',
     description: 'Start in a forearm plank position with your body in a straight line. Lift your right arm and left leg simultaneously, hold briefly, then return. Alternate to your left arm and right leg. Keep your hips level and avoid rotating your torso.',
-    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Plank%20With%20Alternating%20Arm%20And%20Leg%20Lifts%20With%20Bodyweight',
+    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Plank%20With%20Alternating%20Arm%20and%20Leg%20Lifts%20With%20Bodyweight',
     jointArea: 'Spine, Hip, Shoulder',
     muscleGroup: 'Core, Glutes, Deltoids',
     movementType: 'Isometric, Extension',
