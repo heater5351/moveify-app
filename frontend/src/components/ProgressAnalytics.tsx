@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, TrendingDown, Minus, Flame, BarChart3, Heart, Zap, Trophy, AlertTriangle, CheckCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Flame, BarChart3, Heart, Zap, Trophy, AlertTriangle, CheckCircle, CalendarDays } from 'lucide-react';
 import { getAuthHeaders } from '../utils/api';
+import { DailyActivityView } from './DailyActivityView';
 
 // ── Centralized Threshold Constants (Bug Fix) ──────────────────────────
 const PAIN_THRESHOLDS = { low: 3, moderate: 6 }; // <=3 green, 4-6 yellow, >6 red
@@ -84,6 +85,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<7 | 14 | 30>(30);
+  const [subView, setSubView] = useState<'summary' | 'daily'>('summary');
 
   const [overviewData, setOverviewData] = useState<OverviewData | null>(null);
   const [progressionLogs, setProgressionLogs] = useState<ProgressionLog[]>([]);
@@ -279,12 +281,44 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
     );
   }
 
+  // ── Sub-view toggle (clinician only) ─────────────────────────────
+  const subViewToggle = (
+    <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
+      <button
+        onClick={() => setSubView('summary')}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+          subView === 'summary' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+        }`}
+      >
+        <TrendingUp size={13} />
+        Summary
+      </button>
+      <button
+        onClick={() => setSubView('daily')}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+          subView === 'daily' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+        }`}
+      >
+        <CalendarDays size={13} />
+        Daily Activity
+      </button>
+    </div>
+  );
+
   // ══════════════════════════════════════════════════════════════════
   // CLINICIAN VIEW
   // ══════════════════════════════════════════════════════════════════
   return (
     <div className="space-y-5">
-      {timeRangeSelector}
+      <div className="flex items-center justify-between">
+        {subViewToggle}
+        {subView === 'summary' && timeRangeSelector}
+      </div>
+
+      {subView === 'daily' ? (
+        <DailyActivityView patientId={patientId} />
+      ) : (
+      <>
 
       {/* Alert Banner */}
       {stats.alerts.length > 0 && (
@@ -509,6 +543,8 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
             );
           })}
         </div>
+      )}
+      </>
       )}
     </div>
   );
