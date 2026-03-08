@@ -27,7 +27,7 @@ const parseDisplayDate = (display: string): string | null => {
 };
 
 // Auto-format input as DD/MM/YYYY while typing
-const formatDobInput = (value: string, prevValue: string): string => {
+const formatDobInput = (value: string): string => {
   const digits = value.replace(/\D/g, '');
   if (digits.length <= 2) return digits;
   if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
