@@ -2,7 +2,10 @@
 const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
+// Session durations by role
+const EXPIRY_PATIENT = '14d';
+const EXPIRY_CLINICIAN = '12h';
+const EXPIRY_CLINICIAN_REMEMBER = '7d';
 
 // Fail fast if JWT_SECRET is not configured
 if (!JWT_SECRET) {
@@ -12,12 +15,22 @@ if (!JWT_SECRET) {
 
 /**
  * Generate a JWT token for a user
+ * @param {object} options - Optional: { rememberMe: boolean }
  */
-function generateToken(user) {
+function generateToken(user, options = {}) {
+  let expiresIn;
+  if (user.role === 'patient') {
+    expiresIn = EXPIRY_PATIENT;
+  } else if (options.rememberMe) {
+    expiresIn = EXPIRY_CLINICIAN_REMEMBER;
+  } else {
+    expiresIn = EXPIRY_CLINICIAN;
+  }
+
   return jwt.sign(
     { id: user.id, role: user.role, email: user.email, is_admin: !!user.is_admin },
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRY }
+    { expiresIn }
   );
 }
 

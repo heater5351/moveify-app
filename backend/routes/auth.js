@@ -12,7 +12,7 @@ const router = express.Router();
 // Login route — returns JWT token
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password required' });
@@ -34,8 +34,8 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Generate JWT
-    const token = generateToken(user);
+    // Generate JWT (patient always 14d, clinician 12h or 7d with rememberMe)
+    const token = generateToken(user, { rememberMe: !!rememberMe });
 
     // Return user data (without password)
     const { password_hash, ...userData } = user;

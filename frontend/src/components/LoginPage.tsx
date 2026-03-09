@@ -13,6 +13,7 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
   const [loginError, setLoginError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   // Helper function to retry fetch with exponential backoff
   const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 2) => {
@@ -45,7 +46,7 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
       const response = await fetchWithRetry(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
         signal: controller.signal
       });
 
@@ -161,6 +162,16 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
               className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 transition-all text-slate-900 placeholder:text-slate-400 bg-white text-sm"
             />
           </div>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-300 text-primary-400 focus:ring-primary-400/30 cursor-pointer"
+            />
+            <span className="text-sm text-slate-500">Remember me for 7 days</span>
+          </label>
 
           {loginError && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
