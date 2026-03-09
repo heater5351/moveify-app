@@ -400,6 +400,11 @@ If a breach is **likely to cause serious harm**:
 ## Workflow
 
 - **Always commit and push after EVERY change.** Do not wait for the user to ask. If you edited files, commit and push immediately — no exceptions. This includes code changes, config changes, docs, and fixes. The user expects Vercel to deploy automatically after each change.
+- **Always redeploy the backend after backend changes.** If you modified any file in `backend/`, redeploy to Cloud Run immediately after pushing — do not ask the user. Frontend deploys automatically via Vercel, but backend requires manual deployment. Run this command:
+  ```
+  gcloud run deploy moveify-backend --source backend/ --region australia-southeast1 --platform managed --allow-unauthenticated --add-cloudsql-instances moveify-app:australia-southeast1:moveify-db
+  ```
+  If `gcloud auth` has expired, run `gcloud auth login` first. The deploy takes ~3-5 minutes.
 
 ## Memory
 
