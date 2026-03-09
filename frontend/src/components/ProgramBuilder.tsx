@@ -54,6 +54,8 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
     isDragging,
   } = useSortable({ id: `exercise-${index}` });
 
+  const [setsInput, setSetsInput] = useState<string>(String(exercise.sets));
+  const [repsInput, setRepsInput] = useState<string>(String(exercise.reps));
   const [weightInputValue, setWeightInputValue] = useState<string>(
     String(exercise.prescribedWeight || '')
   );
@@ -92,8 +94,19 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
           <input
             type="number"
             min="1"
-            value={exercise.sets}
-            onChange={(e) => onUpdate(index, 'sets', parseInt(e.target.value) || 0)}
+            value={setsInput}
+            onChange={(e) => {
+              setSetsInput(e.target.value);
+              const num = parseInt(e.target.value);
+              if (!isNaN(num)) onUpdate(index, 'sets', num);
+            }}
+            onBlur={() => {
+              const num = parseInt(setsInput);
+              if (isNaN(num) || num < 1) {
+                setSetsInput(String(exercise.sets || 1));
+                onUpdate(index, 'sets', exercise.sets || 1);
+              }
+            }}
             className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 text-sm text-slate-800 transition-all"
           />
         </div>
@@ -102,8 +115,19 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
           <input
             type="number"
             min="1"
-            value={exercise.reps}
-            onChange={(e) => onUpdate(index, 'reps', parseInt(e.target.value) || 0)}
+            value={repsInput}
+            onChange={(e) => {
+              setRepsInput(e.target.value);
+              const num = parseInt(e.target.value);
+              if (!isNaN(num)) onUpdate(index, 'reps', num);
+            }}
+            onBlur={() => {
+              const num = parseInt(repsInput);
+              if (isNaN(num) || num < 1) {
+                setRepsInput(String(exercise.reps || 1));
+                onUpdate(index, 'reps', exercise.reps || 1);
+              }
+            }}
             className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 text-sm text-slate-800 transition-all"
           />
         </div>
