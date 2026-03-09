@@ -171,6 +171,16 @@ function App() {
     }
   }, [patients]);
 
+  // Sync viewingPatient when patients array updates (e.g., after program create/edit)
+  useEffect(() => {
+    if (viewingPatient) {
+      const updatedPatient = patients.find(p => p.id === viewingPatient.id);
+      if (updatedPatient) {
+        setViewingPatient(updatedPatient);
+      }
+    }
+  }, [patients]);
+
   // Handlers
   const handleLogin = (role: UserRole, patient?: Patient, user?: User, token?: string) => {
     if (token) {
@@ -359,23 +369,8 @@ function App() {
         }
 
         // Refresh patient list to get updated program data
+        // The useEffect hooks watching `patients` will sync viewingPatient and loggedInPatient
         await fetchPatients();
-
-        // Update viewing patient if needed
-        if (viewingPatient) {
-          const updated = patients.find(p => p.id === viewingPatient.id);
-          if (updated) {
-            setViewingPatient(updated);
-          }
-        }
-
-        // Update logged in patient if they're the one being assigned
-        if (loggedInPatient && loggedInPatient.id === selectedPatient.id) {
-          const updatedPatient = patients.find(p => p.id === selectedPatient.id);
-          if (updatedPatient) {
-            setLoggedInPatient(updatedPatient);
-          }
-        }
 
         setShowProgramConfigModal(false);
         setSelectedPatient(null);
