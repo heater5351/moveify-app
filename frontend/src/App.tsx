@@ -147,6 +147,19 @@ function App() {
       });
       const data = await response.json();
       if (response.ok) {
+        // DEBUG: Log first patient's first exercise to check duration/rest fields
+        const firstPatientWithProgram = data.patients?.find((p: Patient) => p.assignedPrograms?.length > 0);
+        if (firstPatientWithProgram) {
+          const firstEx = firstPatientWithProgram.assignedPrograms[0]?.exercises?.[0];
+          if (firstEx) {
+            console.log('[DEBUG] fetchPatients - sample exercise from API:', {
+              name: firstEx.name,
+              prescribedDuration: firstEx.prescribedDuration,
+              restDuration: firstEx.restDuration,
+              sets: firstEx.sets, reps: firstEx.reps
+            });
+          }
+        }
         setPatients(data.patients);
       }
     } catch (error) {
@@ -218,6 +231,9 @@ function App() {
   };
 
   const handleUpdateExercise = (index: number, field: 'sets' | 'reps' | 'weight' | 'duration' | 'rest' | 'instructions', value: number | string) => {
+    if (field === 'duration' || field === 'rest') {
+      console.log(`[DEBUG] handleUpdateExercise: index=${index}, field=${field}, value=${value}`);
+    }
     setProgramExercises(prev => prev.map((ex, i) => {
       if (i !== index) return ex;
       if (field === 'weight') return { ...ex, prescribedWeight: value as number };
@@ -295,6 +311,17 @@ function App() {
     try {
       // Check if we're editing or creating
       const isEditing = editingProgramId !== null;
+
+      // DEBUG: Log what we're sending
+      console.log('[DEBUG] programExercises before API call:', programExercises.map(ex => ({
+        name: ex.name,
+        sets: ex.sets,
+        reps: ex.reps,
+        prescribedDuration: ex.prescribedDuration,
+        restDuration: ex.restDuration,
+        prescribedWeight: ex.prescribedWeight,
+        instructions: ex.instructions
+      })));
 
       let response;
       if (isEditing) {
@@ -413,6 +440,16 @@ function App() {
     setEditingProgramId(program.config.id || null);
     setSelectedPatient(viewingPatient);
     setProgramName(program.config.name || '');
+    // DEBUG: Log exercises loaded for editing
+    console.log('[DEBUG] Loading exercises for edit:', program.exercises.map(ex => ({
+      name: ex.name,
+      sets: ex.sets,
+      reps: ex.reps,
+      prescribedDuration: ex.prescribedDuration,
+      restDuration: ex.restDuration,
+      prescribedWeight: ex.prescribedWeight,
+      instructions: ex.instructions
+    })));
     setProgramExercises(program.exercises);
     setProgramConfig({
       startDate: program.config.startDate,
