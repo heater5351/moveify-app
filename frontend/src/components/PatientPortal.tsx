@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Play, Check, TrendingUp, Calendar as CalendarIcon, BookOpen, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Play, Check, TrendingUp, Calendar as CalendarIcon, BookOpen, ChevronLeft, ChevronRight, X, Info } from 'lucide-react';
 import type { Patient, CompletionData, ProgramExercise, DailyCheckIn } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
@@ -9,6 +9,7 @@ import BlockProgressBanner from './BlockProgressBanner';
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
 import { exercises as defaultExercises } from '../data/exercises';
+import { formatDuration, getExerciseType } from '../utils/duration';
 
 interface PatientPortalProps {
   patient: Patient;
@@ -508,18 +509,41 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
 
                       {/* Prescribed Sets | Reps | Weight — blank for future block weeks */}
                       {showPrescription ? (
-                        <p className="text-sm sm:text-base text-gray-700 font-semibold mb-3 sm:mb-4">
-                          {exercise.sets} set{exercise.sets !== 1 ? 's' : ''} | {exercise.reps} rep{exercise.reps !== 1 ? 's' : ''}{(exercise.prescribedWeight || 0) > 0 && ` | ${exercise.prescribedWeight} kg`}
-                        </p>
+                        <div className="mb-3 sm:mb-4">
+                          <p className="text-sm sm:text-base text-gray-700 font-semibold">
+                            {(() => {
+                              const exType = getExerciseType(exercise);
+                              if (exType === 'cardio') {
+                                return exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : 'As prescribed';
+                              }
+                              if (exType === 'duration') {
+                                const dur = exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : '—';
+                                return `${exercise.sets} set${exercise.sets !== 1 ? 's' : ''} | ${dur}`;
+                              }
+                              // reps
+                              return `${exercise.sets} set${exercise.sets !== 1 ? 's' : ''} | ${exercise.reps} rep${exercise.reps !== 1 ? 's' : ''}${(exercise.prescribedWeight || 0) > 0 ? ` | ${exercise.prescribedWeight} kg` : ''}`;
+                            })()}
+                          </p>
+                          {(exercise.restDuration || 0) > 0 && (
+                            <p className="text-xs text-slate-500 mt-0.5">Rest: {formatDuration(exercise.restDuration!)}</p>
+                          )}
+                        </div>
                       ) : (
                         <p className="text-sm sm:text-base text-gray-300 font-semibold mb-3 sm:mb-4">
                           &mdash;
                         </p>
                       )}
 
-                      <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 mb-3 sm:mb-4">
+                      <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 mb-2">
                         {exercise.description}
                       </p>
+
+                      {exercise.instructions && (
+                        <div className="flex items-start gap-1.5 bg-primary-50 rounded-lg px-3 py-2 mb-3 sm:mb-4">
+                          <Info size={14} className="text-primary-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-primary-700">{exercise.instructions}</p>
+                        </div>
+                      )}
 
                       {/* Buttons */}
                       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">

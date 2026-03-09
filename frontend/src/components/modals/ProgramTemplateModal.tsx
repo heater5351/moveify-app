@@ -16,6 +16,8 @@ type TemplateDetail = ProgramTemplate & {
     sets: number;
     reps: number;
     prescribed_weight: number;
+    prescribed_duration: number | null;
+    rest_duration: number | null;
     hold_time: string | null;
     instructions: string | null;
     image_url: string | null;
@@ -99,6 +101,8 @@ export const ProgramTemplateModal = ({ onLoad, onClose }: ProgramTemplateModalPr
       sets: ex.sets,
       reps: ex.reps,
       prescribedWeight: ex.prescribed_weight || 0,
+      prescribedDuration: ex.prescribed_duration || undefined,
+      restDuration: ex.rest_duration || undefined,
       holdTime: ex.hold_time || undefined,
       instructions: ex.instructions || undefined,
       completed: false,

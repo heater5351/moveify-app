@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Search, Play, Plus, Trash2, X, Star, Filter } from 'lucide-react';
 import type { ProgramExercise, Exercise, ExerciseFilters } from '../types/index.ts';
 import { exercises as defaultExercises } from '../data/exercises';
+import { getExerciseType } from '../utils/duration';
 import { AddExerciseModal } from './modals/AddExerciseModal';
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
@@ -81,6 +82,18 @@ const mergeAndSort = (a: string[], b: string[]): string[] => {
   return Array.from(new Set([...a, ...b])).sort();
 };
 
+// Create a ProgramExercise with appropriate defaults based on exercise type
+const toProgramExercise = (exercise: Exercise): ProgramExercise => {
+  const exType = getExerciseType(exercise);
+  if (exType === 'cardio') {
+    return { ...exercise, sets: 1, reps: 0, prescribedDuration: 1200, completed: false };
+  }
+  if (exType === 'duration') {
+    return { ...exercise, sets: 3, reps: 0, prescribedDuration: 30, completed: false };
+  }
+  return toProgramExercise(exercise);
+};
+
 // Exercise Detail Modal Component
 const ExerciseDetailModal = ({
   exercise,
@@ -154,7 +167,7 @@ const ExerciseDetailModal = ({
         <div className="p-4 border-t bg-gray-50">
           <button
             onClick={() => {
-              onAddToProgram([{ ...exercise, sets: 3, reps: 10, completed: false }]);
+              onAddToProgram([toProgramExercise(exercise)]);
               onClose();
             }}
             className="w-full py-3 rounded-lg font-medium transition-colors bg-moveify-teal text-white hover:bg-moveify-teal-dark"
@@ -563,7 +576,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
                     onClick={() => setDetailModal(exercise)}
                     draggable
                     onDragStart={(e) => {
-                      e.dataTransfer.setData('application/exercise', JSON.stringify({ ...exercise, sets: 3, reps: 10, completed: false }));
+                      e.dataTransfer.setData('application/exercise', JSON.stringify(toProgramExercise(exercise)));
                       e.dataTransfer.effectAllowed = 'copy';
                     }}
                     className="bg-white rounded-xl shadow-sm border-2 border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer aspect-square flex flex-col"
@@ -598,7 +611,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onAddToProgram([{ ...exercise, sets: 3, reps: 10, completed: false }]);
+                          onAddToProgram([toProgramExercise(exercise)]);
                         }}
                         className="absolute top-3 right-3 p-2 rounded-full transition-colors bg-white/90 text-gray-400 hover:text-moveify-teal"
                         title="Add to program"
@@ -643,7 +656,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
                   onClick={() => setDetailModal(exercise)}
                   draggable
                   onDragStart={(e) => {
-                    e.dataTransfer.setData('application/exercise', JSON.stringify({ ...exercise, sets: 3, reps: 10, completed: false }));
+                    e.dataTransfer.setData('application/exercise', JSON.stringify(toProgramExercise(exercise)));
                     e.dataTransfer.effectAllowed = 'copy';
                   }}
                   className="bg-white rounded-xl shadow-sm border-2 border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer aspect-square flex flex-col"
@@ -678,7 +691,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onAddToProgram([{ ...exercise, sets: 3, reps: 10, completed: false }]);
+                        onAddToProgram([toProgramExercise(exercise)]);
                       }}
                       className="absolute top-3 right-3 p-2 rounded-full transition-colors bg-white/90 text-gray-400 hover:text-moveify-teal"
                       title="Add to program"

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
 import type { ProgramExercise, ProgramConfig, CompletionData } from '../../types/index.ts';
+import { formatDuration, getExerciseType } from '../../utils/duration.ts';
 
 interface ExerciseCompletionModalProps {
   exercise: ProgramExercise;
@@ -20,6 +21,8 @@ export const ExerciseCompletionModal = ({
   onComplete,
   onCancel
 }: ExerciseCompletionModalProps) => {
+  const exerciseType = getExerciseType(exercise);
+
   // Initialize with existing data or prescribed values
   const [setsPerformed, setSetsPerformed] = useState<number>(
     existingCompletion?.setsPerformed || exercise.sets
@@ -39,6 +42,14 @@ export const ExerciseCompletionModal = ({
   const [weightInputValue, setWeightInputValue] = useState<string>(
     String(existingCompletion?.weightPerformed ?? exercise.prescribedWeight ?? '')
   );
+  const [durationPerformed, setDurationPerformed] = useState<number>(
+    existingCompletion?.durationPerformed ?? exercise.prescribedDuration ?? 0
+  );
+  const [durationInputValue, setDurationInputValue] = useState<string>(() => {
+    const val = existingCompletion?.durationPerformed ?? exercise.prescribedDuration ?? 0;
+    if (exerciseType === 'cardio') return val ? String(Math.round(val / 60)) : '';
+    return val ? String(val) : '';
+  });
   const [rpeRating, setRpeRating] = useState<number | undefined>(
     existingCompletion?.rpeRating
   );
@@ -64,9 +75,32 @@ export const ExerciseCompletionModal = ({
     setWeightPerformed(weight);
   }, [exercise.prescribedWeight, existingCompletion?.weightPerformed]);
 
+  useEffect(() => {
+    const dur = existingCompletion?.durationPerformed ?? exercise.prescribedDuration ?? 0;
+    setDurationPerformed(dur);
+    if (exerciseType === 'cardio') {
+      setDurationInputValue(dur ? String(Math.round(dur / 60)) : '');
+    } else {
+      setDurationInputValue(dur ? String(dur) : '');
+    }
+  }, [exercise.prescribedDuration, existingCompletion?.durationPerformed, exerciseType]);
+
+  const prescribedLabel = (() => {
+    if (exerciseType === 'cardio') {
+      return exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : 'As prescribed';
+    }
+    if (exerciseType === 'duration') {
+      const dur = exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : '—';
+      return `${exercise.sets} sets × ${dur}`;
+    }
+    // reps
+    let label = `${exercise.sets} sets × ${exercise.reps} reps`;
+    if ((exercise.prescribedWeight || 0) > 0) label += ` @ ${exercise.prescribedWeight} kg`;
+    return label;
+  })();
+
   const handleQuickComplete = () => {
-    // "Completed as Prescribed" - use prescribed values
-    onComplete({
+    const data: CompletionData = {
       setsPerformed: exercise.sets,
       repsPerformed: exercise.reps,
       weightPerformed: exercise.prescribedWeight || 0,
@@ -74,11 +108,15 @@ export const ExerciseCompletionModal = ({
       painLevel,
       notes: notes || undefined,
       completionDate: selectedDate?.toISOString().split('T')[0]
-    });
+    };
+    if (exerciseType !== 'reps') {
+      data.durationPerformed = exercise.prescribedDuration || 0;
+    }
+    onComplete(data);
   };
 
   const handleSaveCompletion = () => {
-    onComplete({
+    const data: CompletionData = {
       setsPerformed,
       repsPerformed,
       weightPerformed,
@@ -86,7 +124,11 @@ export const ExerciseCompletionModal = ({
       painLevel,
       notes: notes || undefined,
       completionDate: selectedDate?.toISOString().split('T')[0]
-    });
+    };
+    if (exerciseType !== 'reps') {
+      data.durationPerformed = durationPerformed;
+    }
+    onComplete(data);
   };
 
   return (
@@ -105,10 +147,7 @@ export const ExerciseCompletionModal = ({
           </div>
           <p className="text-base font-semibold text-gray-700">{exercise.name}</p>
           <p className="text-sm text-gray-600 mt-2 bg-white px-3 py-2 rounded-lg inline-block">
-            Prescribed: <span className="font-bold text-moveify-teal">
-              {exercise.sets} sets × {exercise.reps} reps
-              {(exercise.prescribedWeight || 0) > 0 && ` @ ${exercise.prescribedWeight} kg`}
-            </span>
+            Prescribed: <span className="font-bold text-moveify-teal">{prescribedLabel}</span>
           </p>
         </div>
 
@@ -134,123 +173,165 @@ export const ExerciseCompletionModal = ({
 
           {/* Performance Details */}
           <div className="space-y-4">
-            {/* Sets Performed */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Sets Performed
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={setsInputValue}
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow empty string and positive integers only
-                  if (value === '' || /^\d*$/.test(value)) {
-                    setSetsInputValue(value);
-                    const numValue = parseInt(value);
-                    setSetsPerformed(isNaN(numValue) ? 0 : numValue);
-                  }
-                }}
-                onBlur={() => {
-                  // Format on blur to ensure valid number
-                  const numValue = parseInt(setsInputValue);
-                  if (isNaN(numValue) || setsInputValue === '') {
-                    setSetsInputValue('0');
-                    setSetsPerformed(0);
-                  } else {
-                    setSetsInputValue(String(numValue));
-                    setSetsPerformed(numValue);
-                  }
-                }}
-                placeholder={String(exercise.sets)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-moveify-teal focus:border-moveify-teal shadow-sm transition-all font-medium text-lg"
-              />
-            </div>
+            {/* Sets Performed — not for cardio */}
+            {exerciseType !== 'cardio' && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Sets Performed
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={setsInputValue}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d*$/.test(value)) {
+                      setSetsInputValue(value);
+                      const numValue = parseInt(value);
+                      setSetsPerformed(isNaN(numValue) ? 0 : numValue);
+                    }
+                  }}
+                  onBlur={() => {
+                    const numValue = parseInt(setsInputValue);
+                    if (isNaN(numValue) || setsInputValue === '') {
+                      setSetsInputValue('0');
+                      setSetsPerformed(0);
+                    } else {
+                      setSetsInputValue(String(numValue));
+                      setSetsPerformed(numValue);
+                    }
+                  }}
+                  placeholder={String(exercise.sets)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-moveify-teal focus:border-moveify-teal shadow-sm transition-all font-medium text-lg"
+                />
+              </div>
+            )}
 
-            {/* Reps Performed */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Reps Performed
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={repsInputValue}
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow empty string and positive integers only
-                  if (value === '' || /^\d*$/.test(value)) {
-                    setRepsInputValue(value);
-                    const numValue = parseInt(value);
-                    setRepsPerformed(isNaN(numValue) ? 0 : numValue);
-                  }
-                }}
-                onBlur={() => {
-                  // Format on blur to ensure valid number
-                  const numValue = parseInt(repsInputValue);
-                  if (isNaN(numValue) || repsInputValue === '') {
-                    setRepsInputValue('0');
-                    setRepsPerformed(0);
-                  } else {
-                    setRepsInputValue(String(numValue));
-                    setRepsPerformed(numValue);
-                  }
-                }}
-                placeholder={String(exercise.reps)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-moveify-teal focus:border-moveify-teal shadow-sm transition-all font-medium text-lg"
-              />
-            </div>
+            {/* Reps Performed — only for reps type */}
+            {exerciseType === 'reps' && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Reps Performed
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={repsInputValue}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d*$/.test(value)) {
+                      setRepsInputValue(value);
+                      const numValue = parseInt(value);
+                      setRepsPerformed(isNaN(numValue) ? 0 : numValue);
+                    }
+                  }}
+                  onBlur={() => {
+                    const numValue = parseInt(repsInputValue);
+                    if (isNaN(numValue) || repsInputValue === '') {
+                      setRepsInputValue('0');
+                      setRepsPerformed(0);
+                    } else {
+                      setRepsInputValue(String(numValue));
+                      setRepsPerformed(numValue);
+                    }
+                  }}
+                  placeholder={String(exercise.reps)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-moveify-teal focus:border-moveify-teal shadow-sm transition-all font-medium text-lg"
+                />
+              </div>
+            )}
 
-            {/* Weight Performed */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Weight Used (kg)
-              </label>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={weightInputValue}
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow empty string, numbers, and decimal point
-                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                    setWeightInputValue(value);
-                    // Update the actual weight value
-                    const numValue = parseFloat(value);
-                    setWeightPerformed(isNaN(numValue) ? 0 : numValue);
+            {/* Duration Performed — for duration and cardio types */}
+            {exerciseType !== 'reps' && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Duration ({exerciseType === 'cardio' ? 'minutes' : 'seconds'})
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={durationInputValue}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d*$/.test(value)) {
+                      setDurationInputValue(value);
+                      const numValue = parseInt(value);
+                      const seconds = exerciseType === 'cardio' ? (isNaN(numValue) ? 0 : numValue * 60) : (isNaN(numValue) ? 0 : numValue);
+                      setDurationPerformed(seconds);
+                    }
+                  }}
+                  onBlur={() => {
+                    const numValue = parseInt(durationInputValue);
+                    if (isNaN(numValue) || durationInputValue === '') {
+                      setDurationInputValue('0');
+                      setDurationPerformed(0);
+                    } else {
+                      setDurationInputValue(String(numValue));
+                    }
+                  }}
+                  placeholder={exercise.prescribedDuration
+                    ? String(exerciseType === 'cardio' ? Math.round(exercise.prescribedDuration / 60) : exercise.prescribedDuration)
+                    : '0'
                   }
-                }}
-                onBlur={() => {
-                  // Format on blur to ensure valid number
-                  const numValue = parseFloat(weightInputValue);
-                  if (isNaN(numValue) || weightInputValue === '') {
-                    setWeightInputValue('0');
-                    setWeightPerformed(0);
-                  } else {
-                    setWeightInputValue(String(numValue));
-                    setWeightPerformed(numValue);
-                  }
-                }}
-                placeholder={exercise.prescribedWeight ? String(exercise.prescribedWeight) : '0'}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-moveify-teal focus:border-moveify-teal shadow-sm transition-all font-medium text-lg"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                {exercise.prescribedWeight && exercise.prescribedWeight > 0
-                  ? `Prescribed: ${exercise.prescribedWeight} kg (Enter 0 for bodyweight)`
-                  : 'Enter 0 for bodyweight exercises'}
-              </p>
-              {(exercise.prescribedWeight || 0) > 0 && weightPerformed !== (exercise.prescribedWeight || 0) && (
-                <p className={`text-xs mt-1 font-medium ${weightPerformed > (exercise.prescribedWeight || 0) ? 'text-green-600' : 'text-orange-600'}`}>
-                  {weightPerformed > (exercise.prescribedWeight || 0)
-                    ? `+${(weightPerformed - (exercise.prescribedWeight || 0)).toFixed(1)} kg above prescribed`
-                    : `${((exercise.prescribedWeight || 0) - weightPerformed).toFixed(1)} kg below prescribed`}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-moveify-teal focus:border-moveify-teal shadow-sm transition-all font-medium text-lg"
+                />
+                {exercise.prescribedDuration && exercise.prescribedDuration > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Prescribed: {formatDuration(exercise.prescribedDuration)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Weight Performed — only for reps type */}
+            {exerciseType === 'reps' && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Weight Used (kg)
+                </label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={weightInputValue}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      setWeightInputValue(value);
+                      const numValue = parseFloat(value);
+                      setWeightPerformed(isNaN(numValue) ? 0 : numValue);
+                    }
+                  }}
+                  onBlur={() => {
+                    const numValue = parseFloat(weightInputValue);
+                    if (isNaN(numValue) || weightInputValue === '') {
+                      setWeightInputValue('0');
+                      setWeightPerformed(0);
+                    } else {
+                      setWeightInputValue(String(numValue));
+                      setWeightPerformed(numValue);
+                    }
+                  }}
+                  placeholder={exercise.prescribedWeight ? String(exercise.prescribedWeight) : '0'}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-moveify-teal focus:border-moveify-teal shadow-sm transition-all font-medium text-lg"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {exercise.prescribedWeight && exercise.prescribedWeight > 0
+                    ? `Prescribed: ${exercise.prescribedWeight} kg (Enter 0 for bodyweight)`
+                    : 'Enter 0 for bodyweight exercises'}
                 </p>
-              )}
-            </div>
+                {(exercise.prescribedWeight || 0) > 0 && weightPerformed !== (exercise.prescribedWeight || 0) && (
+                  <p className={`text-xs mt-1 font-medium ${weightPerformed > (exercise.prescribedWeight || 0) ? 'text-green-600' : 'text-orange-600'}`}>
+                    {weightPerformed > (exercise.prescribedWeight || 0)
+                      ? `+${(weightPerformed - (exercise.prescribedWeight || 0)).toFixed(1)} kg above prescribed`
+                      : `${((exercise.prescribedWeight || 0) - weightPerformed).toFixed(1)} kg below prescribed`}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* RPE Rating (if enabled) */}
             {programConfig.trackRpe && (

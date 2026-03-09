@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Trash2, X, GripVertical, BarChart2, FolderOpen, Save } from 'lucide-react';
 import type { ProgramExercise, Patient } from '../types/index.ts';
+import { formatDuration, getExerciseType } from '../utils/duration.ts';
 import {
   DndContext,
   closestCenter,
@@ -26,7 +27,7 @@ interface ProgramBuilderProps {
   isEditing: boolean;
   onProgramNameChange: (name: string) => void;
   onRemoveExercise: (index: number) => void;
-  onUpdateExercise: (index: number, field: 'sets' | 'reps' | 'weight', value: number) => void;
+  onUpdateExercise: (index: number, field: 'sets' | 'reps' | 'weight' | 'duration' | 'rest' | 'instructions', value: number | string) => void;
   onReorderExercises: (newOrder: ProgramExercise[]) => void;
   onAssignToPatient: () => void;
   onCancelPatientAssignment: () => void;
@@ -41,7 +42,7 @@ interface SortableExerciseProps {
   exercise: ProgramExercise;
   index: number;
   onRemove: (index: number) => void;
-  onUpdate: (index: number, field: 'sets' | 'reps' | 'weight', value: number) => void;
+  onUpdate: (index: number, field: 'sets' | 'reps' | 'weight' | 'duration' | 'rest' | 'instructions', value: number | string) => void;
 }
 
 const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerciseProps) => {
@@ -54,17 +55,34 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
     isDragging,
   } = useSortable({ id: `exercise-${index}` });
 
+  const exerciseType = getExerciseType(exercise);
+
   const [setsInput, setSetsInput] = useState<string>(String(exercise.sets));
   const [repsInput, setRepsInput] = useState<string>(String(exercise.reps));
   const [weightInputValue, setWeightInputValue] = useState<string>(
     String(exercise.prescribedWeight || '')
   );
+  const [durationInput, setDurationInput] = useState<string>(
+    exerciseType === 'cardio'
+      ? String(exercise.prescribedDuration ? Math.round(exercise.prescribedDuration / 60) : '')
+      : String(exercise.prescribedDuration || '')
+  );
+  const [restInput, setRestInput] = useState<string>(
+    String(exercise.restDuration || '')
+  );
+  const [instructionsInput, setInstructionsInput] = useState<string>(
+    exercise.instructions || ''
+  );
+  const [showNotes, setShowNotes] = useState(!!exercise.instructions);
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  // Duration display helper for the label
+  const durationLabel = exerciseType === 'cardio' ? 'Min' : 'Sec';
 
   return (
     <div ref={setNodeRef} style={style} className="bg-white ring-1 ring-slate-200 p-4 rounded-lg">
@@ -78,7 +96,14 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
           >
             <GripVertical size={18} />
           </button>
-          <h3 className="font-medium text-slate-800 text-sm truncate">{exercise.name}</h3>
+          <div className="min-w-0">
+            <h3 className="font-medium text-slate-800 text-sm truncate">{exercise.name}</h3>
+            {exerciseType !== 'reps' && (
+              <span className="text-xs text-primary-500 font-medium">
+                {exerciseType === 'duration' ? 'Timed' : 'Cardio'}
+              </span>
+            )}
+          </div>
         </div>
         <button
           onClick={() => onRemove(index)}
@@ -88,80 +113,180 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
         </button>
       </div>
 
-      <div className="flex gap-2 mb-3">
-        <div className="flex-1">
-          <label className="text-xs text-slate-400 block mb-1">Sets</label>
-          <input
-            type="number"
-            min="1"
-            value={setsInput}
-            onChange={(e) => {
-              setSetsInput(e.target.value);
-              const num = parseInt(e.target.value);
-              if (!isNaN(num)) onUpdate(index, 'sets', num);
-            }}
-            onBlur={() => {
-              const num = parseInt(setsInput);
-              if (isNaN(num) || num < 1) {
-                setSetsInput(String(exercise.sets || 1));
-                onUpdate(index, 'sets', exercise.sets || 1);
-              }
-            }}
-            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 text-sm text-slate-800 transition-all"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="text-xs text-slate-400 block mb-1">Reps</label>
-          <input
-            type="number"
-            min="1"
-            value={repsInput}
-            onChange={(e) => {
-              setRepsInput(e.target.value);
-              const num = parseInt(e.target.value);
-              if (!isNaN(num)) onUpdate(index, 'reps', num);
-            }}
-            onBlur={() => {
-              const num = parseInt(repsInput);
-              if (isNaN(num) || num < 1) {
-                setRepsInput(String(exercise.reps || 1));
-                onUpdate(index, 'reps', exercise.reps || 1);
-              }
-            }}
-            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 text-sm text-slate-800 transition-all"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="text-xs text-slate-400 block mb-1">kg</label>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={weightInputValue}
-            onChange={(e) => {
-              const value = e.target.value;
-              // Allow empty string, numbers, and decimal point
-              if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                setWeightInputValue(value);
-                const numValue = parseFloat(value);
-                onUpdate(index, 'weight', isNaN(numValue) ? 0 : numValue);
-              }
-            }}
-            onBlur={() => {
-              // Format on blur to ensure valid number
-              const numValue = parseFloat(weightInputValue);
-              if (isNaN(numValue) || weightInputValue === '') {
-                setWeightInputValue('0');
-                onUpdate(index, 'weight', 0);
-              } else {
-                setWeightInputValue(String(numValue));
-              }
-            }}
-            placeholder="0"
-            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 text-sm text-slate-800 transition-all"
-          />
-        </div>
+      <div className="flex gap-2 mb-2">
+        {/* Sets — shown for reps and duration, not cardio */}
+        {exerciseType !== 'cardio' && (
+          <div className="flex-1">
+            <label className="text-xs text-slate-400 block mb-1">Sets</label>
+            <input
+              type="number"
+              min="1"
+              value={setsInput}
+              onChange={(e) => {
+                setSetsInput(e.target.value);
+                const num = parseInt(e.target.value);
+                if (!isNaN(num)) onUpdate(index, 'sets', num);
+              }}
+              onBlur={() => {
+                const num = parseInt(setsInput);
+                if (isNaN(num) || num < 1) {
+                  setSetsInput(String(exercise.sets || 1));
+                  onUpdate(index, 'sets', exercise.sets || 1);
+                }
+              }}
+              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 text-sm text-slate-800 transition-all"
+            />
+          </div>
+        )}
+
+        {/* Reps — only for reps type */}
+        {exerciseType === 'reps' && (
+          <div className="flex-1">
+            <label className="text-xs text-slate-400 block mb-1">Reps</label>
+            <input
+              type="number"
+              min="1"
+              value={repsInput}
+              onChange={(e) => {
+                setRepsInput(e.target.value);
+                const num = parseInt(e.target.value);
+                if (!isNaN(num)) onUpdate(index, 'reps', num);
+              }}
+              onBlur={() => {
+                const num = parseInt(repsInput);
+                if (isNaN(num) || num < 1) {
+                  setRepsInput(String(exercise.reps || 1));
+                  onUpdate(index, 'reps', exercise.reps || 1);
+                }
+              }}
+              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 text-sm text-slate-800 transition-all"
+            />
+          </div>
+        )}
+
+        {/* Duration — shown for duration and cardio types */}
+        {(exerciseType === 'duration' || exerciseType === 'cardio') && (
+          <div className="flex-1">
+            <label className="text-xs text-slate-400 block mb-1">{durationLabel}</label>
+            <input
+              type="number"
+              min="1"
+              value={durationInput}
+              onChange={(e) => {
+                setDurationInput(e.target.value);
+                const num = parseInt(e.target.value);
+                if (!isNaN(num)) {
+                  // Cardio: input is minutes, store as seconds
+                  const seconds = exerciseType === 'cardio' ? num * 60 : num;
+                  onUpdate(index, 'duration', seconds);
+                }
+              }}
+              onBlur={() => {
+                const num = parseInt(durationInput);
+                if (isNaN(num) || num < 1) {
+                  setDurationInput('');
+                  onUpdate(index, 'duration', 0);
+                }
+              }}
+              placeholder={exerciseType === 'cardio' ? '20' : '30'}
+              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 text-sm text-slate-800 transition-all"
+            />
+          </div>
+        )}
+
+        {/* Weight — only for reps type */}
+        {exerciseType === 'reps' && (
+          <div className="flex-1">
+            <label className="text-xs text-slate-400 block mb-1">kg</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={weightInputValue}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                  setWeightInputValue(value);
+                  const numValue = parseFloat(value);
+                  onUpdate(index, 'weight', isNaN(numValue) ? 0 : numValue);
+                }
+              }}
+              onBlur={() => {
+                const numValue = parseFloat(weightInputValue);
+                if (isNaN(numValue) || weightInputValue === '') {
+                  setWeightInputValue('0');
+                  onUpdate(index, 'weight', 0);
+                } else {
+                  setWeightInputValue(String(numValue));
+                }
+              }}
+              placeholder="0"
+              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 text-sm text-slate-800 transition-all"
+            />
+          </div>
+        )}
+
+        {/* Rest — shown for reps and duration, not cardio */}
+        {exerciseType !== 'cardio' && (
+          <div className="flex-1">
+            <label className="text-xs text-slate-400 block mb-1">Rest</label>
+            <input
+              type="number"
+              min="0"
+              value={restInput}
+              onChange={(e) => {
+                setRestInput(e.target.value);
+                const num = parseInt(e.target.value);
+                onUpdate(index, 'rest', isNaN(num) ? 0 : num);
+              }}
+              onBlur={() => {
+                const num = parseInt(restInput);
+                if (isNaN(num) || restInput === '') {
+                  setRestInput('');
+                  onUpdate(index, 'rest', 0);
+                }
+              }}
+              placeholder="60"
+              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 text-sm text-slate-800 transition-all"
+            />
+          </div>
+        )}
       </div>
 
+      {/* Prescription summary */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-slate-400">
+          {exerciseType === 'cardio' && exercise.prescribedDuration
+            ? formatDuration(exercise.prescribedDuration)
+            : exerciseType === 'duration' && exercise.prescribedDuration
+            ? `${exercise.sets} × ${formatDuration(exercise.prescribedDuration)}`
+            : null}
+          {exerciseType !== 'cardio' && exercise.restDuration
+            ? ` · ${formatDuration(exercise.restDuration)} rest`
+            : null}
+        </p>
+        <button
+          onClick={() => setShowNotes(!showNotes)}
+          className="text-xs text-primary-400 hover:text-primary-600 transition-colors"
+        >
+          {showNotes ? 'Hide notes' : '+ Notes'}
+        </button>
+      </div>
+
+      {/* Instructions/Notes */}
+      {showNotes && (
+        <div className="mt-2">
+          <textarea
+            value={instructionsInput}
+            onChange={(e) => {
+              setInstructionsInput(e.target.value);
+              onUpdate(index, 'instructions', e.target.value);
+            }}
+            rows={2}
+            placeholder="Notes for patient (e.g., Focus on keeping hips level)"
+            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 text-xs text-slate-700 transition-all resize-none"
+          />
+        </div>
+      )}
     </div>
   );
 };

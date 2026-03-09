@@ -84,6 +84,8 @@ router.get('/patient/:patientId', requirePatientAccess, async (req, res) => {
           sets: ex.sets,
           reps: ex.reps,
           prescribedWeight: ex.prescribed_weight || 0,
+          prescribedDuration: ex.prescribed_duration || null,
+          restDuration: ex.rest_duration || null,
           holdTime: ex.hold_time,
           instructions: ex.instructions,
           image: ex.image_url,
@@ -147,8 +149,8 @@ router.post('/patient/:patientId', requireRole('clinician'), async (req, res) =>
       await client.query(`
         INSERT INTO program_exercises (
           program_id, exercise_name, exercise_category, sets, reps, prescribed_weight,
-          hold_time, instructions, image_url, exercise_order
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          hold_time, instructions, image_url, exercise_order, prescribed_duration, rest_duration
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       `, [
         programId,
         exercise.name,
@@ -159,7 +161,9 @@ router.post('/patient/:patientId', requireRole('clinician'), async (req, res) =>
         exercise.holdTime || '',
         exercise.instructions || '',
         exercise.image || '',
-        index
+        index,
+        exercise.prescribedDuration || null,
+        exercise.restDuration || null
       ]);
     }
 
@@ -242,8 +246,8 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
           UPDATE program_exercises
           SET exercise_category = $1, sets = $2, reps = $3, prescribed_weight = $4,
               hold_time = $5, instructions = $6, image_url = $7, exercise_order = $8,
-              auto_adjust_enabled = $9
-          WHERE id = $10
+              auto_adjust_enabled = $9, prescribed_duration = $10, rest_duration = $11
+          WHERE id = $12
         `, [
           exercise.category || '',
           exercise.sets,
@@ -254,6 +258,8 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
           exercise.image || '',
           index,
           exercise.enablePeriodization !== undefined ? exercise.enablePeriodization : false,
+          exercise.prescribedDuration || null,
+          exercise.restDuration || null,
           existingId
         ]);
         updatedExerciseIds.add(existingId);
@@ -261,8 +267,9 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
         await client.query(`
           INSERT INTO program_exercises (
             program_id, exercise_name, exercise_category, sets, reps, prescribed_weight,
-            hold_time, instructions, image_url, exercise_order, auto_adjust_enabled
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            hold_time, instructions, image_url, exercise_order, auto_adjust_enabled,
+            prescribed_duration, rest_duration
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         `, [
           programId,
           exercise.name,
@@ -274,7 +281,9 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
           exercise.instructions || '',
           exercise.image || '',
           index,
-          exercise.enablePeriodization !== undefined ? exercise.enablePeriodization : false
+          exercise.enablePeriodization !== undefined ? exercise.enablePeriodization : false,
+          exercise.prescribedDuration || null,
+          exercise.restDuration || null
         ]);
       }
     }
@@ -318,6 +327,7 @@ router.patch('/exercise/:exerciseId/complete', requireRole('patient'), async (re
       setsPerformed,
       repsPerformed,
       weightPerformed,
+      durationPerformed,
       rpeRating,
       painLevel,
       notes,
@@ -350,13 +360,14 @@ router.patch('/exercise/:exerciseId/complete', requireRole('patient'), async (re
       await db.query(`
         INSERT INTO exercise_completions (
           exercise_id, patient_id, completion_date,
-          sets_performed, reps_performed, weight_performed, rpe_rating, pain_level, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          sets_performed, reps_performed, weight_performed, duration_performed, rpe_rating, pain_level, notes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (exercise_id, patient_id, completion_date)
         DO UPDATE SET
           sets_performed = EXCLUDED.sets_performed,
           reps_performed = EXCLUDED.reps_performed,
           weight_performed = EXCLUDED.weight_performed,
+          duration_performed = EXCLUDED.duration_performed,
           rpe_rating = EXCLUDED.rpe_rating,
           pain_level = EXCLUDED.pain_level,
           notes = EXCLUDED.notes
@@ -367,6 +378,7 @@ router.patch('/exercise/:exerciseId/complete', requireRole('patient'), async (re
         setsPerformed || null,
         repsPerformed || null,
         weightPerformed || null,
+        durationPerformed || null,
         rpeRating || null,
         painLevel || null,
         notes || null
@@ -394,7 +406,7 @@ router.get('/exercise/:exerciseId/completion/:patientId/today', requirePatientAc
     const today = toLocalDateString(new Date());
 
     const completion = await db.getOne(`
-      SELECT sets_performed, reps_performed, weight_performed, rpe_rating, pain_level, notes
+      SELECT sets_performed, reps_performed, weight_performed, duration_performed, rpe_rating, pain_level, notes
       FROM exercise_completions
       WHERE exercise_id = $1 AND patient_id = $2 AND completion_date = $3
     `, [exerciseId, patientId, today]);
@@ -866,9 +878,11 @@ router.get('/exercise-completions/patient/:patientId', requirePatientAccess, asy
         ec.sets_performed as "setsPerformed",
         ec.reps_performed as "repsPerformed",
         ec.weight_performed as "weightPerformed",
+        ec.duration_performed as "durationPerformed",
         pe.sets as "prescribedSets",
         pe.reps as "prescribedReps",
         pe.prescribed_weight as "prescribedWeight",
+        pe.prescribed_duration as "prescribedDuration",
         ec.rpe_rating as "rpeRating",
         ec.pain_level as "painLevel",
         ec.notes

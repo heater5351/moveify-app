@@ -56,6 +56,7 @@ async function formatPatientWithPrograms(patient) {
         sets_performed as "setsPerformed",
         reps_performed as "repsPerformed",
         weight_performed as "weightPerformed",
+        duration_performed as "durationPerformed",
         rpe_rating as "rpeRating",
         pain_level as "painLevel",
         notes
@@ -119,6 +120,7 @@ async function formatPatientWithPrograms(patient) {
           setsPerformed: c.setsPerformed,
           repsPerformed: c.repsPerformed,
           weightPerformed: c.weightPerformed,
+          durationPerformed: c.durationPerformed,
           rpeRating: c.rpeRating,
           painLevel: c.painLevel,
           notes: c.notes
@@ -132,6 +134,8 @@ async function formatPatientWithPrograms(patient) {
       sets: ex.sets,
       reps: ex.reps,
       prescribedWeight: ex.prescribed_weight || 0,
+      prescribedDuration: ex.prescribed_duration || null,
+      restDuration: ex.rest_duration || null,
       holdTime: ex.hold_time,
       instructions: ex.instructions,
       image: ex.image_url,
@@ -222,6 +226,7 @@ router.get('/', requireRole('clinician'), async (req, res) => {
           sets_performed as "setsPerformed",
           reps_performed as "repsPerformed",
           weight_performed as "weightPerformed",
+          duration_performed as "durationPerformed",
           rpe_rating as "rpeRating",
           pain_level as "painLevel",
           notes
@@ -260,6 +265,7 @@ router.get('/', requireRole('clinician'), async (req, res) => {
           setsPerformed: c.setsPerformed,
           repsPerformed: c.repsPerformed,
           weightPerformed: c.weightPerformed,
+          durationPerformed: c.durationPerformed,
           rpeRating: c.rpeRating,
           painLevel: c.painLevel,
           notes: c.notes
@@ -273,6 +279,8 @@ router.get('/', requireRole('clinician'), async (req, res) => {
         sets: ex.sets,
         reps: ex.reps,
         prescribedWeight: ex.prescribed_weight || 0,
+        prescribedDuration: ex.prescribed_duration || null,
+        restDuration: ex.rest_duration || null,
         holdTime: ex.hold_time,
         instructions: ex.instructions,
         image: ex.image_url,

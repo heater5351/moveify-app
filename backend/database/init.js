@@ -568,6 +568,15 @@ async function initDatabase() {
       ON exercises(equipment)
     `);
 
+    // Duration-based exercise support + rest duration
+    console.log('🔄 Adding duration/rest columns...');
+    await db.query(`ALTER TABLE program_exercises ADD COLUMN IF NOT EXISTS prescribed_duration INTEGER`);
+    await db.query(`ALTER TABLE program_exercises ADD COLUMN IF NOT EXISTS rest_duration INTEGER`);
+    await db.query(`ALTER TABLE exercise_completions ADD COLUMN IF NOT EXISTS duration_performed INTEGER`);
+    await db.query(`ALTER TABLE exercises ADD COLUMN IF NOT EXISTS exercise_type TEXT DEFAULT 'reps'`);
+    await db.query(`ALTER TABLE program_template_exercises ADD COLUMN IF NOT EXISTS prescribed_duration INTEGER`);
+    await db.query(`ALTER TABLE program_template_exercises ADD COLUMN IF NOT EXISTS rest_duration INTEGER`);
+
     // data_requests — patient data export/deletion requests (APP 12, APP 13)
     await db.query(`
       CREATE TABLE IF NOT EXISTS data_requests (

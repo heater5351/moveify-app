@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Heart, Dumbbell, Moon, Zap, Frown, Meh, Smile } from 'lucide-react';
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
+import { formatDuration } from '../utils/duration';
 import type { DailyCheckIn, ExerciseCompletion } from '../types/index.ts';
 
 // ── Color helpers (matching ProgressAnalytics thresholds) ────────────
@@ -324,15 +325,23 @@ export const DailyActivityView = ({ patientId }: DailyActivityViewProps) => {
                   <div>
                     <p className="text-slate-400 mb-1">Prescribed</p>
                     <p className="font-medium text-slate-600">
-                      {c.prescribedSets} x {c.prescribedReps}
-                      {c.prescribedWeight ? ` @ ${c.prescribedWeight}kg` : ''}
+                      {c.prescribedDuration && c.prescribedDuration > 0
+                        ? (c.prescribedSets > 1
+                            ? `${c.prescribedSets} x ${formatDuration(c.prescribedDuration)}`
+                            : formatDuration(c.prescribedDuration))
+                        : `${c.prescribedSets} x ${c.prescribedReps}${c.prescribedWeight ? ` @ ${c.prescribedWeight}kg` : ''}`
+                      }
                     </p>
                   </div>
                   <div>
                     <p className="text-slate-400 mb-1">Actual</p>
                     <p className="font-medium text-slate-800">
-                      {c.setsPerformed} x {c.repsPerformed}
-                      {c.weightPerformed ? ` @ ${c.weightPerformed}kg` : ''}
+                      {c.durationPerformed && c.durationPerformed > 0
+                        ? (c.setsPerformed > 1
+                            ? `${c.setsPerformed} x ${formatDuration(c.durationPerformed)}`
+                            : formatDuration(c.durationPerformed))
+                        : `${c.setsPerformed} x ${c.repsPerformed}${c.weightPerformed ? ` @ ${c.weightPerformed}kg` : ''}`
+                      }
                     </p>
                   </div>
                 </div>

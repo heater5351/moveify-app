@@ -41,6 +41,7 @@ router.get('/:id', async (req, res) => {
 
     const exercises = await db.query(
       `SELECT exercise_name, exercise_category, sets, reps, prescribed_weight,
+              prescribed_duration, rest_duration,
               hold_time, instructions, image_url, exercise_order
        FROM program_template_exercises
        WHERE template_id = $1
@@ -78,8 +79,8 @@ router.post('/', async (req, res) => {
       const ex = exercises[i];
       await client.query(
         `INSERT INTO program_template_exercises
-           (template_id, exercise_name, exercise_category, sets, reps, prescribed_weight, hold_time, instructions, image_url, exercise_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+           (template_id, exercise_name, exercise_category, sets, reps, prescribed_weight, prescribed_duration, rest_duration, hold_time, instructions, image_url, exercise_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
         [
           templateId,
           ex.exercise_name,
@@ -87,6 +88,8 @@ router.post('/', async (req, res) => {
           ex.sets,
           ex.reps,
           ex.prescribed_weight || 0,
+          ex.prescribed_duration || null,
+          ex.rest_duration || null,
           ex.hold_time || null,
           ex.instructions || null,
           ex.image_url || null,
@@ -132,8 +135,8 @@ router.put('/:id', async (req, res) => {
       const ex = exercises[i];
       await client.query(
         `INSERT INTO program_template_exercises
-           (template_id, exercise_name, exercise_category, sets, reps, prescribed_weight, hold_time, instructions, image_url, exercise_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+           (template_id, exercise_name, exercise_category, sets, reps, prescribed_weight, prescribed_duration, rest_duration, hold_time, instructions, image_url, exercise_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
         [
           id,
           ex.exercise_name,
@@ -141,6 +144,8 @@ router.put('/:id', async (req, res) => {
           ex.sets,
           ex.reps,
           ex.prescribed_weight || 0,
+          ex.prescribed_duration || null,
+          ex.rest_duration || null,
           ex.hold_time || null,
           ex.instructions || null,
           ex.image_url || null,

@@ -207,12 +207,18 @@ function App() {
     setProgramExercises(programExercises.filter((_, i) => i !== index));
   };
 
-  const handleUpdateExercise = (index: number, field: 'sets' | 'reps' | 'weight', value: number) => {
+  const handleUpdateExercise = (index: number, field: 'sets' | 'reps' | 'weight' | 'duration' | 'rest' | 'instructions', value: number | string) => {
     const updated = [...programExercises];
     if (field === 'weight') {
-      updated[index].prescribedWeight = value;
+      updated[index].prescribedWeight = value as number;
+    } else if (field === 'duration') {
+      updated[index].prescribedDuration = value as number;
+    } else if (field === 'rest') {
+      updated[index].restDuration = value as number;
+    } else if (field === 'instructions') {
+      updated[index].instructions = value as string;
     } else {
-      updated[index][field] = value;
+      updated[index][field] = value as number;
     }
     setProgramExercises(updated);
   };
@@ -234,6 +240,8 @@ function App() {
         sets: ex.sets,
         reps: ex.reps,
         prescribed_weight: ex.prescribedWeight || 0,
+        prescribed_duration: ex.prescribedDuration || null,
+        rest_duration: ex.restDuration || null,
         hold_time: ex.holdTime || null,
         instructions: ex.instructions || null,
         image_url: null,
@@ -632,6 +640,7 @@ function App() {
               setsPerformed: completionData?.setsPerformed,
               repsPerformed: completionData?.repsPerformed,
               weightPerformed: completionData?.weightPerformed,
+              durationPerformed: completionData?.durationPerformed,
               rpeRating: completionData?.rpeRating,
               painLevel: completionData?.painLevel,
               notes: completionData?.notes,

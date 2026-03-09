@@ -1,5 +1,7 @@
 // Core data types for the Moveify App
 
+export type ExerciseType = 'reps' | 'duration' | 'cardio';
+
 export type Exercise = {
   id: number;
   name: string;
@@ -8,6 +10,7 @@ export type Exercise = {
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   description: string;
   videoUrl?: string; // YouTube embed URL
+  exerciseType?: ExerciseType; // 'reps' (default), 'duration' (timed holds), 'cardio' (duration only)
   // Filter metadata (optional, for custom exercises)
   jointArea?: string; // Comma-separated values (e.g., "Knee, Hip")
   muscleGroup?: string; // Comma-separated values (e.g., "Quadriceps, Glutes")
@@ -40,6 +43,7 @@ export type CompletionData = {
   setsPerformed?: number;
   repsPerformed?: number;
   weightPerformed?: number;
+  durationPerformed?: number; // seconds
   rpeRating?: number;
   painLevel?: number;
   notes?: string;
@@ -50,6 +54,8 @@ export type ProgramExercise = Exercise & {
   sets: number;
   reps: number;
   prescribedWeight?: number;
+  prescribedDuration?: number; // seconds
+  restDuration?: number; // seconds
   completed: boolean;
   holdTime?: string;
   instructions?: string;
@@ -275,9 +281,11 @@ export type ExerciseCompletion = {
   setsPerformed: number;
   repsPerformed: number;
   weightPerformed: number | null;
+  durationPerformed: number | null;
   prescribedSets: number;
   prescribedReps: number;
   prescribedWeight: number | null;
+  prescribedDuration: number | null;
   rpeRating: number | null;
   painLevel: number | null;
   notes: string | null;

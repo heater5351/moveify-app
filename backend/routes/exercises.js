@@ -73,7 +73,7 @@ router.post('/', async (req, res) => {
     const clinicianId = req.user.id;
     const {
       name, category, difficulty, duration, description, videoUrl,
-      jointArea, muscleGroup, movementType, equipment, position
+      jointArea, muscleGroup, movementType, equipment, position, exerciseType
     } = req.body;
 
     if (!name || !category || !difficulty || !duration || !description) {
@@ -85,16 +85,20 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Invalid difficulty level' });
     }
 
+    const validExerciseTypes = ['reps', 'duration', 'cardio'];
+    const safeExerciseType = validExerciseTypes.includes(exerciseType) ? exerciseType : 'reps';
+
     const result = await db.query(`
       INSERT INTO exercises (
         clinician_id, name, category, difficulty, duration, description, video_url,
-        joint_area, muscle_group, movement_type, equipment, position
+        joint_area, muscle_group, movement_type, equipment, position, exercise_type
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `, [
       clinicianId, name, category, difficulty, duration, description, videoUrl || null,
-      jointArea || null, muscleGroup || null, movementType || null, equipment || null, position || null
+      jointArea || null, muscleGroup || null, movementType || null, equipment || null, position || null,
+      safeExerciseType
     ]);
 
     res.status(201).json(result.rows[0]);
@@ -110,7 +114,7 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const {
       name, category, difficulty, duration, description, videoUrl,
-      jointArea, muscleGroup, movementType, equipment, position
+      jointArea, muscleGroup, movementType, equipment, position, exerciseType
     } = req.body;
 
     const existing = await db.getOne('SELECT * FROM exercises WHERE id = $1', [id]);
@@ -118,16 +122,20 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Exercise not found' });
     }
 
+    const validExerciseTypes = ['reps', 'duration', 'cardio'];
+    const safeExerciseType = validExerciseTypes.includes(exerciseType) ? exerciseType : 'reps';
+
     const result = await db.query(`
       UPDATE exercises
       SET name = $1, category = $2, difficulty = $3, duration = $4, description = $5, video_url = $6,
-          joint_area = $7, muscle_group = $8, movement_type = $9, equipment = $10, position = $11
-      WHERE id = $12
+          joint_area = $7, muscle_group = $8, movement_type = $9, equipment = $10, position = $11,
+          exercise_type = $12
+      WHERE id = $13
       RETURNING *
     `, [
       name, category, difficulty, duration, description, videoUrl || null,
       jointArea || null, muscleGroup || null, movementType || null, equipment || null, position || null,
-      id
+      safeExerciseType, id
     ]);
 
     res.json(result.rows[0]);
