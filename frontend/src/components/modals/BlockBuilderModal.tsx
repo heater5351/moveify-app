@@ -4,6 +4,7 @@ import type { ProgramExercise, PeriodizationTemplate, ExerciseWeekPrescription }
 import { TemplateManagerModal } from './TemplateManagerModal';
 import { API_URL } from '../../config';
 import { getAuthHeaders } from '../../utils/api';
+import { getExerciseType } from '../../utils/duration';
 
 interface BlockBuilderModalProps {
   programExercises: ProgramExercise[];
@@ -23,6 +24,8 @@ interface CellData {
   reps: string;
   rpe: string;
   weight: string;
+  duration: string;
+  rest: string;
 }
 
 export const BlockBuilderModal = ({
@@ -63,16 +66,25 @@ export const BlockBuilderModal = ({
             sets: String(w.sets),
             reps: String(w.reps),
             rpe: w.rpeTarget ? String(w.rpeTarget) : '',
-            weight: w.weight ? String(w.weight) : ''
+            weight: w.weight ? String(w.weight) : '',
+            duration: w.duration ? String(w.duration) : '',
+            rest: w.restDuration ? String(w.restDuration) : ''
           };
         }
       });
     } else {
-      // Pre-fill with exercise baseline sets/reps
+      // Pre-fill with exercise baseline sets/reps/duration/rest
       programExercises.forEach((ex, idx) => {
         for (let week = 1; week <= blockDuration; week++) {
           const key: CellKey = `${idx}-${week}`;
-          initial[key] = { sets: String(ex.sets || 3), reps: String(ex.reps || 10), rpe: '', weight: '' };
+          initial[key] = {
+            sets: String(ex.sets || 3),
+            reps: String(ex.reps || 10),
+            rpe: '',
+            weight: '',
+            duration: ex.prescribedDuration ? String(ex.prescribedDuration) : '',
+            rest: ex.restDuration ? String(ex.restDuration) : ''
+          };
         }
       });
     }
@@ -129,7 +141,7 @@ export const BlockBuilderModal = ({
 
   const getCell = (exIdx: number, week: number): CellData => {
     const key: CellKey = `${exIdx}-${week}`;
-    return cells[key] || { sets: '', reps: '', rpe: '', weight: '' };
+    return cells[key] || { sets: '', reps: '', rpe: '', weight: '', duration: '', rest: '' };
   };
 
   const setCell = (exIdx: number, week: number, field: keyof CellData, value: string) => {
@@ -151,7 +163,11 @@ export const BlockBuilderModal = ({
         for (let week = blockDuration + 1; week <= d; week++) {
           const key: CellKey = `${idx}-${week}`;
           if (!cells[key]) {
-            additions[key] = { sets: String(ex.sets || 3), reps: String(ex.reps || 10), rpe: '', weight: '' };
+            additions[key] = {
+              sets: String(ex.sets || 3), reps: String(ex.reps || 10), rpe: '', weight: '',
+              duration: ex.prescribedDuration ? String(ex.prescribedDuration) : '',
+              rest: ex.restDuration ? String(ex.restDuration) : ''
+            };
           }
         }
       });
@@ -194,17 +210,21 @@ export const BlockBuilderModal = ({
       const newCells: Record<CellKey, CellData> = {};
       exerciseIndices.forEach(idx => {
         const startWeight = parseFloat(startingWeights[idx]) || 0;
-        data.weeks.forEach((w: { weekNumber: number; sets: number; reps: number; rpeTarget?: number | null; weightOffset?: number | null }) => {
+        data.weeks.forEach((w: { weekNumber: number; sets: number; reps: number; rpeTarget?: number | null; weightOffset?: number | null; duration?: number | null; restDuration?: number | null }) => {
           const key: CellKey = `${idx}-${w.weekNumber}`;
           let weightStr = '';
           if (data.weightUnit && w.weightOffset != null) {
             weightStr = calcWeight(startWeight, w.weightOffset, data.weightUnit);
           }
+          // Preserve existing duration/rest if template doesn't specify them
+          const existing = cells[key];
           newCells[key] = {
             sets: String(w.sets),
             reps: String(w.reps),
             rpe: w.rpeTarget ? String(w.rpeTarget) : '',
-            weight: weightStr
+            weight: weightStr,
+            duration: w.duration ? String(w.duration) : (existing?.duration || ''),
+            rest: w.restDuration ? String(w.restDuration) : (existing?.rest || '')
           };
         });
       });
@@ -255,19 +275,24 @@ export const BlockBuilderModal = ({
   const buildExerciseWeeks = (): ExerciseWeekPrescription[] => {
     const weeks: ExerciseWeekPrescription[] = [];
     programExercises.forEach((ex, idx) => {
+      const exType = getExerciseType(ex);
       for (let week = 1; week <= blockDuration; week++) {
         const cell = getCell(idx, week);
-        const sets = parseInt(cell.sets) || ex.sets || 3;
-        const reps = parseInt(cell.reps) || ex.reps || 10;
+        const sets = exType === 'cardio' ? 1 : (parseInt(cell.sets) || ex.sets || 3);
+        const reps = exType === 'duration' || exType === 'cardio' ? 0 : (parseInt(cell.reps) || ex.reps || 10);
         const rpe = parseInt(cell.rpe) || undefined;
-        const weight = parseFloat(cell.weight) || null;
+        const weight = exType === 'cardio' ? null : (parseFloat(cell.weight) || null);
+        const duration = parseInt(cell.duration) || null;
+        const restDuration = exType === 'cardio' ? null : (parseInt(cell.rest) || null);
         weeks.push({
           programExerciseId: idx,
           weekNumber: week,
           sets,
           reps,
           rpeTarget: rpe ?? null,
-          weight
+          weight,
+          duration,
+          restDuration
         });
       }
     });
@@ -381,29 +406,35 @@ export const BlockBuilderModal = ({
                   {weeks.map(w => (
                     <th key={w} className="text-center pb-2 px-1 font-semibold text-slate-600 text-xs min-w-[140px]">
                       Week {w}
-                      <div className="text-[10px] font-normal text-slate-400 mt-0.5">Sets x Reps (RPE) [kg]</div>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {programExercises.map((exercise, exIdx) => (
+                {programExercises.map((exercise, exIdx) => {
+                  const exType = getExerciseType(exercise);
+                  return (
                   <tr key={exIdx} className={exIdx % 2 === 0 ? 'bg-slate-50/50' : 'bg-white'}>
                     <td className="py-2 pr-3 sticky left-0 bg-inherit z-10">
                       <div className="text-xs font-medium text-slate-700 truncate" style={{ maxWidth: matchingTemplates.length > 0 ? '200px' : '144px' }} title={exercise.name}>
                         {exercise.name}
                       </div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        {exType === 'cardio' ? 'Duration (min)' : exType === 'duration' ? 'Sets × Dur(s) (RPE) [Rest]' : 'Sets × Reps (RPE) [kg] [Rest]'}
+                      </div>
                       <div className="flex gap-1.5 mt-1 items-center">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.5"
-                          value={startingWeights[exIdx] || ''}
-                          onChange={e => setStartingWeights(prev => ({ ...prev, [exIdx]: e.target.value }))}
-                          placeholder="Start wt"
-                          className="w-16 px-1.5 py-0.5 border border-emerald-200 rounded text-[10px] text-center focus:outline-none focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 text-emerald-700 bg-emerald-50/50"
-                          title="Starting weight (kg) — used for template weight calculations"
-                        />
+                        {exType !== 'cardio' && (
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            value={startingWeights[exIdx] || ''}
+                            onChange={e => setStartingWeights(prev => ({ ...prev, [exIdx]: e.target.value }))}
+                            placeholder="Start wt"
+                            className="w-16 px-1.5 py-0.5 border border-emerald-200 rounded text-[10px] text-center focus:outline-none focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 text-emerald-700 bg-emerald-50/50"
+                            title="Starting weight (kg) — used for template weight calculations"
+                          />
+                        )}
                         {matchingTemplates.length > 0 && (
                           <select
                             value={rowTemplateIds[exIdx] || ''}
@@ -429,54 +460,134 @@ export const BlockBuilderModal = ({
                       const cell = getCell(exIdx, week);
                       return (
                         <td key={week} className="py-1.5 px-1">
-                          <div className="flex gap-1 items-center">
-                            <input
-                              type="number"
-                              min="1"
-                              max="20"
-                              value={cell.sets}
-                              onChange={e => setCell(exIdx, week, 'sets', e.target.value)}
-                              placeholder="S"
-                              className="w-10 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400"
-                              title="Sets"
-                            />
-                            <span className="text-slate-300 text-xs">x</span>
-                            <input
-                              type="number"
-                              min="1"
-                              max="50"
-                              value={cell.reps}
-                              onChange={e => setCell(exIdx, week, 'reps', e.target.value)}
-                              placeholder="R"
-                              className="w-10 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400"
-                              title="Reps"
-                            />
-                            <input
-                              type="number"
-                              min="1"
-                              max="10"
-                              value={cell.rpe}
-                              onChange={e => setCell(exIdx, week, 'rpe', e.target.value)}
-                              placeholder="RPE"
-                              className="w-12 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 text-amber-700"
-                              title="RPE Target (1-10)"
-                            />
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.5"
-                              value={cell.weight}
-                              onChange={e => setCell(exIdx, week, 'weight', e.target.value)}
-                              placeholder="kg"
-                              className="w-12 px-1.5 py-1 border border-emerald-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 text-emerald-700 bg-emerald-50/30"
-                              title="Weight (kg)"
-                            />
-                          </div>
+                          {exType === 'cardio' ? (
+                            /* Cardio: duration(min) + RPE only */
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="number"
+                                min="1"
+                                value={cell.duration}
+                                onChange={e => setCell(exIdx, week, 'duration', e.target.value)}
+                                placeholder="sec"
+                                className="w-14 px-1.5 py-1 border border-blue-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 text-blue-700 bg-blue-50/30"
+                                title="Duration (seconds)"
+                              />
+                              <span className="text-slate-300 text-[10px]">s</span>
+                              <input
+                                type="number"
+                                min="1"
+                                max="10"
+                                value={cell.rpe}
+                                onChange={e => setCell(exIdx, week, 'rpe', e.target.value)}
+                                placeholder="RPE"
+                                className="w-12 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 text-amber-700"
+                                title="RPE Target (1-10)"
+                              />
+                            </div>
+                          ) : exType === 'duration' ? (
+                            /* Duration: sets × duration(s) + RPE + rest */
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="number"
+                                min="1"
+                                max="20"
+                                value={cell.sets}
+                                onChange={e => setCell(exIdx, week, 'sets', e.target.value)}
+                                placeholder="S"
+                                className="w-10 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400"
+                                title="Sets"
+                              />
+                              <span className="text-slate-300 text-xs">×</span>
+                              <input
+                                type="number"
+                                min="1"
+                                value={cell.duration}
+                                onChange={e => setCell(exIdx, week, 'duration', e.target.value)}
+                                placeholder="sec"
+                                className="w-12 px-1.5 py-1 border border-blue-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 text-blue-700 bg-blue-50/30"
+                                title="Duration (seconds)"
+                              />
+                              <input
+                                type="number"
+                                min="1"
+                                max="10"
+                                value={cell.rpe}
+                                onChange={e => setCell(exIdx, week, 'rpe', e.target.value)}
+                                placeholder="RPE"
+                                className="w-12 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 text-amber-700"
+                                title="RPE Target (1-10)"
+                              />
+                              <input
+                                type="number"
+                                min="0"
+                                value={cell.rest}
+                                onChange={e => setCell(exIdx, week, 'rest', e.target.value)}
+                                placeholder="rest"
+                                className="w-12 px-1.5 py-1 border border-violet-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-violet-400 focus:border-violet-400 text-violet-700 bg-violet-50/30"
+                                title="Rest duration (seconds)"
+                              />
+                            </div>
+                          ) : (
+                            /* Reps: sets × reps + RPE + weight + rest */
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="number"
+                                min="1"
+                                max="20"
+                                value={cell.sets}
+                                onChange={e => setCell(exIdx, week, 'sets', e.target.value)}
+                                placeholder="S"
+                                className="w-10 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400"
+                                title="Sets"
+                              />
+                              <span className="text-slate-300 text-xs">×</span>
+                              <input
+                                type="number"
+                                min="1"
+                                max="50"
+                                value={cell.reps}
+                                onChange={e => setCell(exIdx, week, 'reps', e.target.value)}
+                                placeholder="R"
+                                className="w-10 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400"
+                                title="Reps"
+                              />
+                              <input
+                                type="number"
+                                min="1"
+                                max="10"
+                                value={cell.rpe}
+                                onChange={e => setCell(exIdx, week, 'rpe', e.target.value)}
+                                placeholder="RPE"
+                                className="w-12 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 text-amber-700"
+                                title="RPE Target (1-10)"
+                              />
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.5"
+                                value={cell.weight}
+                                onChange={e => setCell(exIdx, week, 'weight', e.target.value)}
+                                placeholder="kg"
+                                className="w-12 px-1.5 py-1 border border-emerald-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 text-emerald-700 bg-emerald-50/30"
+                                title="Weight (kg)"
+                              />
+                              <input
+                                type="number"
+                                min="0"
+                                value={cell.rest}
+                                onChange={e => setCell(exIdx, week, 'rest', e.target.value)}
+                                placeholder="rest"
+                                className="w-12 px-1.5 py-1 border border-violet-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-violet-400 focus:border-violet-400 text-violet-700 bg-violet-50/30"
+                                title="Rest duration (seconds)"
+                              />
+                            </div>
+                          )}
                         </td>
                       );
                     })}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

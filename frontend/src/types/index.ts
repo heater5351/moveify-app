@@ -153,6 +153,8 @@ export type ExerciseWeekPrescription = {
   rpeTarget?: number | null;
   weight?: number | null;
   notes?: string | null;
+  duration?: number | null;
+  restDuration?: number | null;
 }
 
 export type PeriodizationTemplate = {
@@ -176,6 +178,8 @@ export type TemplateWeek = {
   rpeTarget?: number | null;
   weightOffset?: number | null;
   notes?: string | null;
+  duration?: number | null;
+  restDuration?: number | null;
 }
 
 // Convenience type for template with weeks loaded
@@ -300,4 +304,6 @@ export type BlockWeekRow = {
   rpeTarget?: number | null;
   weight?: number | null;
   notes?: string | null;
+  duration?: number | null;
+  restDuration?: number | null;
 }

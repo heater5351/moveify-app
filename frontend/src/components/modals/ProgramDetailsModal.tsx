@@ -37,7 +37,9 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
         rpeTarget: w.rpe_target ?? w.rpeTarget ?? null,
         weight: w.weight ?? null,
         notes: w.notes ?? null,
-      }));
+        duration: w.duration ?? null,
+        restDuration: w.rest_duration ?? w.restDuration ?? null,
+      })) as BlockWeekRow[];
       setBlockData({
         hasBlock: data.has_block ?? data.hasBlock ?? false,
         id: data.id,
@@ -231,12 +233,29 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
                                   isCurrent ? 'bg-primary-50 font-bold text-primary-700' : 'text-slate-600'
                                 }`}
                               >
-                                {week ? (
-                                  <>
-                                    {week.sets}×{week.reps}
-                                    {week.weight ? <div className="text-[10px] text-slate-400 font-normal">{week.weight}kg</div> : null}
-                                  </>
-                                ) : '—'}
+                                {week ? (() => {
+                                  // Find matching program exercise to determine type
+                                  const progEx = program.exercises.find(e => e.id === exId);
+                                  const exType = progEx ? getExerciseType(progEx) : 'reps';
+                                  if (exType === 'cardio') {
+                                    return <>{week.duration ? formatDuration(week.duration) : `${week.sets}×${week.reps}`}</>;
+                                  }
+                                  if (exType === 'duration') {
+                                    return (
+                                      <>
+                                        {week.sets}×{week.duration ? formatDuration(week.duration) : `${week.reps}`}
+                                        {week.restDuration ? <div className="text-[10px] text-slate-400 font-normal">Rest {formatDuration(week.restDuration)}</div> : null}
+                                      </>
+                                    );
+                                  }
+                                  return (
+                                    <>
+                                      {week.sets}×{week.reps}
+                                      {week.weight ? <div className="text-[10px] text-slate-400 font-normal">{week.weight}kg</div> : null}
+                                      {week.restDuration ? <div className="text-[10px] text-violet-400 font-normal">Rest {formatDuration(week.restDuration)}</div> : null}
+                                    </>
+                                  );
+                                })() : '—'}
                               </td>
                             );
                           })}

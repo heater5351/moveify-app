@@ -13,6 +13,8 @@ interface WeekData {
   reps: string;
   rpe: string;
   weightOffset: string;
+  duration: string;
+  rest: string;
 }
 
 interface TemplateFormData {
@@ -24,10 +26,10 @@ interface TemplateFormData {
 }
 
 interface TemplateWithWeeksData extends PeriodizationTemplate {
-  weeks?: { week_number: number; sets: number; reps: number; rpe_target?: number | null; weight_offset?: number | null }[];
+  weeks?: { week_number: number; sets: number; reps: number; rpe_target?: number | null; weight_offset?: number | null; duration?: number | null; rest_duration?: number | null }[];
 }
 
-const emptyWeek = (): WeekData => ({ sets: '3', reps: '10', rpe: '', weightOffset: '' });
+const emptyWeek = (): WeekData => ({ sets: '3', reps: '10', rpe: '', weightOffset: '', duration: '', rest: '' });
 
 const makeEmptyForm = (duration: 4 | 6 | 8 = 4): TemplateFormData => ({
   name: '',
@@ -153,7 +155,7 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
       weightUnit: template.weightUnit || 'kg',
       weeks: Array.from({ length: template.blockDuration }, (_, i) => {
         const w = weeks!.find((wk: { week_number: number }) => wk.week_number === i + 1);
-        return w ? { sets: String(w.sets), reps: String(w.reps), rpe: w.rpe_target ? String(w.rpe_target) : '', weightOffset: w.weight_offset != null ? String(w.weight_offset) : '' } : emptyWeek();
+        return w ? { sets: String(w.sets), reps: String(w.reps), rpe: w.rpe_target ? String(w.rpe_target) : '', weightOffset: w.weight_offset != null ? String(w.weight_offset) : '', duration: w.duration ? String(w.duration) : '', rest: w.rest_duration ? String(w.rest_duration) : '' } : emptyWeek();
       })
     });
   };
@@ -183,7 +185,9 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
         sets: parseInt(w.sets) || 3,
         reps: parseInt(w.reps) || 10,
         rpeTarget: parseInt(w.rpe) || null,
-        weightOffset: w.weightOffset !== '' ? parseFloat(w.weightOffset) : null
+        weightOffset: w.weightOffset !== '' ? parseFloat(w.weightOffset) : null,
+        duration: parseInt(w.duration) || null,
+        restDuration: parseInt(w.rest) || null
       }));
       const res = await fetch(`${API_URL}/blocks/templates/${editingId}`, {
         method: 'PUT',
@@ -224,7 +228,9 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
         sets: parseInt(w.sets) || 3,
         reps: parseInt(w.reps) || 10,
         rpeTarget: parseInt(w.rpe) || null,
-        weightOffset: w.weightOffset !== '' ? parseFloat(w.weightOffset) : null
+        weightOffset: w.weightOffset !== '' ? parseFloat(w.weightOffset) : null,
+        duration: parseInt(w.duration) || null,
+        restDuration: parseInt(w.rest) || null
       }));
       const res = await fetch(`${API_URL}/blocks/templates`, {
         method: 'POST',
@@ -296,12 +302,24 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
                 title={`Weight offset (${form.weightUnit === 'kg' ? 'kg' : '%'})`}
                 className="w-14 px-1.5 py-1 border border-emerald-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 text-emerald-700 bg-emerald-50/50"
               />
+              <input
+                type="number" min="1" value={w.duration}
+                onChange={e => updateWeekField(form, setForm, i, 'duration', e.target.value)}
+                placeholder="dur(s)" title="Duration (seconds)"
+                className="w-14 px-1.5 py-1 border border-blue-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 text-blue-700 bg-blue-50/50"
+              />
+              <input
+                type="number" min="0" value={w.rest}
+                onChange={e => updateWeekField(form, setForm, i, 'rest', e.target.value)}
+                placeholder="rest(s)" title="Rest duration (seconds)"
+                className="w-14 px-1.5 py-1 border border-violet-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-violet-400 focus:border-violet-400 text-violet-700 bg-violet-50/50"
+              />
             </div>
           </div>
         ))}
       </div>
       <div className="flex gap-4 mt-1 text-[10px] text-slate-400">
-        <span>Sets</span><span>Reps</span><span>RPE</span><span className="text-emerald-500">Wt offset</span>
+        <span>Sets</span><span>Reps</span><span>RPE</span><span className="text-emerald-500">Wt offset</span><span className="text-blue-500">Duration</span><span className="text-violet-500">Rest</span>
       </div>
     </div>
   );
@@ -342,13 +360,15 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
     </div>
   );
 
-  const formatWeekSummary = (weeks: { week_number: number; sets: number; reps: number; rpe_target?: number | null; weight_offset?: number | null }[], weightUnit?: 'kg' | 'percent' | null) => {
+  const formatWeekSummary = (weeks: { week_number: number; sets: number; reps: number; rpe_target?: number | null; weight_offset?: number | null; duration?: number | null; rest_duration?: number | null }[], weightUnit?: 'kg' | 'percent' | null) => {
     return weeks
       .sort((a, b) => a.week_number - b.week_number)
       .map(w => {
         const rpe = w.rpe_target ? ` @RPE${w.rpe_target}` : '';
         const wt = w.weight_offset != null ? ` ${w.weight_offset >= 0 ? '+' : ''}${w.weight_offset}${weightUnit === 'percent' ? '%' : 'kg'}` : '';
-        return `W${w.week_number}: ${w.sets}x${w.reps}${rpe}${wt}`;
+        const dur = w.duration ? ` ${w.duration}s` : '';
+        const rest = w.rest_duration ? ` R${w.rest_duration}s` : '';
+        return `W${w.week_number}: ${w.sets}x${w.reps}${dur}${rpe}${wt}${rest}`;
       })
       .join('  |  ');
   };

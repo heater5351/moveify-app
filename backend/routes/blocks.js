@@ -272,7 +272,7 @@ router.patch('/:programId/override', requireRole('clinician'), async (req, res) 
 router.patch('/:blockScheduleId/cell', requireRole('clinician'), verifyProgramAccess, async (req, res) => {
   try {
     const { blockScheduleId } = req.params;
-    const { programExerciseId, weekNumber, sets, reps, rpeTarget, weight, notes } = req.body;
+    const { programExerciseId, weekNumber, sets, reps, rpeTarget, weight, notes, duration, restDuration } = req.body;
 
     if (!programExerciseId || !weekNumber) {
       return res.status(400).json({ error: 'programExerciseId and weekNumber are required' });
@@ -282,7 +282,7 @@ router.patch('/:blockScheduleId/cell', requireRole('clinician'), verifyProgramAc
       parseInt(blockScheduleId),
       parseInt(programExerciseId),
       parseInt(weekNumber),
-      { sets, reps, rpeTarget, weight, notes },
+      { sets, reps, rpeTarget, weight, notes, duration, restDuration },
       req.user.id
     );
 

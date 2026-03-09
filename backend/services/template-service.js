@@ -32,12 +32,13 @@ async function createTemplate(name, description, blockDuration, weeks, clinician
 
     for (const w of weeks) {
       await client.query(`
-        INSERT INTO template_weeks (template_id, week_number, sets, reps, rpe_target, notes, weight_offset)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO template_weeks (template_id, week_number, sets, reps, rpe_target, notes, weight_offset, duration, rest_duration)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT (template_id, week_number)
         DO UPDATE SET sets = EXCLUDED.sets, reps = EXCLUDED.reps,
-          rpe_target = EXCLUDED.rpe_target, notes = EXCLUDED.notes, weight_offset = EXCLUDED.weight_offset
-      `, [templateId, w.weekNumber, w.sets, w.reps, w.rpeTarget || null, w.notes || null, w.weightOffset != null ? w.weightOffset : null]);
+          rpe_target = EXCLUDED.rpe_target, notes = EXCLUDED.notes, weight_offset = EXCLUDED.weight_offset,
+          duration = EXCLUDED.duration, rest_duration = EXCLUDED.rest_duration
+      `, [templateId, w.weekNumber, w.sets, w.reps, w.rpeTarget || null, w.notes || null, w.weightOffset != null ? w.weightOffset : null, w.duration || null, w.restDuration || null]);
     }
 
     await client.query('COMMIT');
@@ -94,9 +95,9 @@ async function updateTemplate(templateId, name, description, blockDuration, week
 
     for (const w of weeks) {
       await client.query(`
-        INSERT INTO template_weeks (template_id, week_number, sets, reps, rpe_target, notes, weight_offset)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `, [templateId, w.weekNumber, w.sets, w.reps, w.rpeTarget || null, w.notes || null, w.weightOffset != null ? w.weightOffset : null]);
+        INSERT INTO template_weeks (template_id, week_number, sets, reps, rpe_target, notes, weight_offset, duration, rest_duration)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `, [templateId, w.weekNumber, w.sets, w.reps, w.rpeTarget || null, w.notes || null, w.weightOffset != null ? w.weightOffset : null, w.duration || null, w.restDuration || null]);
     }
 
     await client.query('COMMIT');
@@ -124,7 +125,9 @@ async function applyTemplate(templateId) {
       sets: w.sets,
       reps: w.reps,
       rpeTarget: w.rpe_target,
-      weightOffset: w.weight_offset != null ? w.weight_offset : null
+      weightOffset: w.weight_offset != null ? w.weight_offset : null,
+      duration: w.duration || null,
+      restDuration: w.rest_duration || null
     }))
   };
 }

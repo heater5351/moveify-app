@@ -577,6 +577,13 @@ async function initDatabase() {
     await db.query(`ALTER TABLE program_template_exercises ADD COLUMN IF NOT EXISTS prescribed_duration INTEGER`);
     await db.query(`ALTER TABLE program_template_exercises ADD COLUMN IF NOT EXISTS rest_duration INTEGER`);
 
+    // Duration & rest progression in block periodization
+    console.log('🔄 Adding duration/rest to block periodization tables...');
+    await db.query(`ALTER TABLE exercise_block_weeks ADD COLUMN IF NOT EXISTS duration INTEGER`);
+    await db.query(`ALTER TABLE exercise_block_weeks ADD COLUMN IF NOT EXISTS rest_duration INTEGER`);
+    await db.query(`ALTER TABLE template_weeks ADD COLUMN IF NOT EXISTS duration INTEGER`);
+    await db.query(`ALTER TABLE template_weeks ADD COLUMN IF NOT EXISTS rest_duration INTEGER`);
+
     // data_requests — patient data export/deletion requests (APP 12, APP 13)
     await db.query(`
       CREATE TABLE IF NOT EXISTS data_requests (
