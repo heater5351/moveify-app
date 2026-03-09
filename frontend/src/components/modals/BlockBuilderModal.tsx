@@ -276,14 +276,15 @@ export const BlockBuilderModal = ({
     const weeks: ExerciseWeekPrescription[] = [];
     programExercises.forEach((ex, idx) => {
       const exType = getExerciseType(ex);
+      const isDuration = exType === 'duration' || exType === 'cardio';
       for (let week = 1; week <= blockDuration; week++) {
         const cell = getCell(idx, week);
-        const sets = exType === 'cardio' ? 1 : (parseInt(cell.sets) || ex.sets || 3);
-        const reps = exType === 'duration' || exType === 'cardio' ? 0 : (parseInt(cell.reps) || ex.reps || 10);
+        const sets = parseInt(cell.sets) || ex.sets || 3;
+        const reps = isDuration ? 0 : (parseInt(cell.reps) || ex.reps || 10);
         const rpe = parseInt(cell.rpe) || undefined;
-        const weight = exType === 'cardio' ? null : (parseFloat(cell.weight) || null);
+        const weight = isDuration ? null : (parseFloat(cell.weight) || null);
         const duration = parseInt(cell.duration) || null;
-        const restDuration = exType === 'cardio' ? null : (parseInt(cell.rest) || null);
+        const restDuration = parseInt(cell.rest) || null;
         weeks.push({
           programExerciseId: idx,
           weekNumber: week,
@@ -318,7 +319,7 @@ export const BlockBuilderModal = ({
       />
     )}
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl">
+      <div className="bg-white rounded-xl w-full max-w-6xl max-h-[90vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <div>
@@ -400,11 +401,11 @@ export const BlockBuilderModal = ({
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr>
-                  <th className="text-left py-2 pr-4 font-medium text-slate-500 text-xs sticky left-0 bg-white z-10" style={{ minWidth: matchingTemplates.length > 0 ? '220px' : '160px' }}>
+                  <th className="text-left py-3 pr-4 font-medium text-slate-500 text-xs sticky left-0 bg-white z-10" style={{ minWidth: matchingTemplates.length > 0 ? '230px' : '170px' }}>
                     Exercise
                   </th>
                   {weeks.map(w => (
-                    <th key={w} className="text-center pb-2 px-1 font-semibold text-slate-600 text-xs min-w-[140px]">
+                    <th key={w} className="text-center pb-3 px-2 font-semibold text-slate-600 text-xs min-w-[160px]">
                       Week {w}
                     </th>
                   ))}
@@ -413,17 +414,18 @@ export const BlockBuilderModal = ({
               <tbody>
                 {programExercises.map((exercise, exIdx) => {
                   const exType = getExerciseType(exercise);
+                  const isDuration = exType === 'duration' || exType === 'cardio';
                   return (
                   <tr key={exIdx} className={exIdx % 2 === 0 ? 'bg-slate-50/50' : 'bg-white'}>
-                    <td className="py-2 pr-3 sticky left-0 bg-inherit z-10">
-                      <div className="text-xs font-medium text-slate-700 truncate" style={{ maxWidth: matchingTemplates.length > 0 ? '200px' : '144px' }} title={exercise.name}>
+                    <td className="py-3 pr-4 sticky left-0 bg-inherit z-10">
+                      <div className="text-xs font-medium text-slate-700 truncate" style={{ maxWidth: matchingTemplates.length > 0 ? '210px' : '154px' }} title={exercise.name}>
                         {exercise.name}
                       </div>
                       <div className="text-[10px] text-slate-400 mt-0.5">
-                        {exType === 'cardio' ? 'Duration (min)' : exType === 'duration' ? 'Sets × Dur(s) (RPE) [Rest]' : 'Sets × Reps (RPE) [kg] [Rest]'}
+                        {isDuration ? 'Sets × Dur(s) (RPE) [Rest]' : 'Sets × Reps (RPE) [kg] [Rest]'}
                       </div>
-                      <div className="flex gap-1.5 mt-1 items-center">
-                        {exType !== 'cardio' && (
+                      <div className="flex gap-1.5 mt-1.5 items-center">
+                        {!isDuration && (
                           <input
                             type="number"
                             min="0"
@@ -431,7 +433,7 @@ export const BlockBuilderModal = ({
                             value={startingWeights[exIdx] || ''}
                             onChange={e => setStartingWeights(prev => ({ ...prev, [exIdx]: e.target.value }))}
                             placeholder="Start wt"
-                            className="w-16 px-1.5 py-0.5 border border-emerald-200 rounded text-[10px] text-center focus:outline-none focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 text-emerald-700 bg-emerald-50/50"
+                            className="w-16 px-1.5 py-1 border border-emerald-200 rounded text-[10px] text-center focus:outline-none focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 text-emerald-700 bg-emerald-50/50"
                             title="Starting weight (kg) — used for template weight calculations"
                           />
                         )}
@@ -443,7 +445,7 @@ export const BlockBuilderModal = ({
                               if (val) handleApplyToRow(exIdx, val);
                               else setRowTemplateIds(prev => ({ ...prev, [exIdx]: '' }));
                             }}
-                            className="flex-1 min-w-0 px-1.5 py-0.5 border border-slate-200 rounded text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400 bg-white truncate"
+                            className="flex-1 min-w-0 px-1.5 py-1 border border-slate-200 rounded text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400 bg-white truncate"
                             title="Apply a progression template to this exercise"
                           >
                             <option value="">Template</option>
@@ -459,34 +461,10 @@ export const BlockBuilderModal = ({
                     {weeks.map(week => {
                       const cell = getCell(exIdx, week);
                       return (
-                        <td key={week} className="py-1.5 px-1">
-                          {exType === 'cardio' ? (
-                            /* Cardio: duration(min) + RPE only */
-                            <div className="flex gap-1 items-center">
-                              <input
-                                type="number"
-                                min="1"
-                                value={cell.duration}
-                                onChange={e => setCell(exIdx, week, 'duration', e.target.value)}
-                                placeholder="sec"
-                                className="w-14 px-1.5 py-1 border border-blue-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 text-blue-700 bg-blue-50/30"
-                                title="Duration (seconds)"
-                              />
-                              <span className="text-slate-300 text-[10px]">s</span>
-                              <input
-                                type="number"
-                                min="1"
-                                max="10"
-                                value={cell.rpe}
-                                onChange={e => setCell(exIdx, week, 'rpe', e.target.value)}
-                                placeholder="RPE"
-                                className="w-12 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 text-amber-700"
-                                title="RPE Target (1-10)"
-                              />
-                            </div>
-                          ) : exType === 'duration' ? (
-                            /* Duration: sets × duration(s) + RPE + rest */
-                            <div className="flex gap-1 items-center">
+                        <td key={week} className="py-2 px-2">
+                          {isDuration ? (
+                            /* Duration / Cardio: sets × duration(s) + RPE + rest */
+                            <div className="flex gap-1.5 items-center">
                               <input
                                 type="number"
                                 min="1"
@@ -494,7 +472,7 @@ export const BlockBuilderModal = ({
                                 value={cell.sets}
                                 onChange={e => setCell(exIdx, week, 'sets', e.target.value)}
                                 placeholder="S"
-                                className="w-10 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400"
+                                className="w-11 px-1.5 py-1.5 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400"
                                 title="Sets"
                               />
                               <span className="text-slate-300 text-xs">×</span>
@@ -504,7 +482,7 @@ export const BlockBuilderModal = ({
                                 value={cell.duration}
                                 onChange={e => setCell(exIdx, week, 'duration', e.target.value)}
                                 placeholder="sec"
-                                className="w-12 px-1.5 py-1 border border-blue-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 text-blue-700 bg-blue-50/30"
+                                className="w-14 px-1.5 py-1.5 border border-blue-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 text-blue-700 bg-blue-50/30"
                                 title="Duration (seconds)"
                               />
                               <input
@@ -514,7 +492,7 @@ export const BlockBuilderModal = ({
                                 value={cell.rpe}
                                 onChange={e => setCell(exIdx, week, 'rpe', e.target.value)}
                                 placeholder="RPE"
-                                className="w-12 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 text-amber-700"
+                                className="w-12 px-1.5 py-1.5 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 text-amber-700"
                                 title="RPE Target (1-10)"
                               />
                               <input
@@ -523,13 +501,13 @@ export const BlockBuilderModal = ({
                                 value={cell.rest}
                                 onChange={e => setCell(exIdx, week, 'rest', e.target.value)}
                                 placeholder="rest"
-                                className="w-12 px-1.5 py-1 border border-violet-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-violet-400 focus:border-violet-400 text-violet-700 bg-violet-50/30"
+                                className="w-12 px-1.5 py-1.5 border border-violet-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-violet-400 focus:border-violet-400 text-violet-700 bg-violet-50/30"
                                 title="Rest duration (seconds)"
                               />
                             </div>
                           ) : (
                             /* Reps: sets × reps + RPE + weight + rest */
-                            <div className="flex gap-1 items-center">
+                            <div className="flex gap-1.5 items-center">
                               <input
                                 type="number"
                                 min="1"
@@ -537,7 +515,7 @@ export const BlockBuilderModal = ({
                                 value={cell.sets}
                                 onChange={e => setCell(exIdx, week, 'sets', e.target.value)}
                                 placeholder="S"
-                                className="w-10 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400"
+                                className="w-11 px-1.5 py-1.5 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400"
                                 title="Sets"
                               />
                               <span className="text-slate-300 text-xs">×</span>
@@ -548,7 +526,7 @@ export const BlockBuilderModal = ({
                                 value={cell.reps}
                                 onChange={e => setCell(exIdx, week, 'reps', e.target.value)}
                                 placeholder="R"
-                                className="w-10 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400"
+                                className="w-11 px-1.5 py-1.5 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-400 focus:border-primary-400"
                                 title="Reps"
                               />
                               <input
@@ -558,7 +536,7 @@ export const BlockBuilderModal = ({
                                 value={cell.rpe}
                                 onChange={e => setCell(exIdx, week, 'rpe', e.target.value)}
                                 placeholder="RPE"
-                                className="w-12 px-1.5 py-1 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 text-amber-700"
+                                className="w-12 px-1.5 py-1.5 border border-slate-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 text-amber-700"
                                 title="RPE Target (1-10)"
                               />
                               <input
@@ -568,7 +546,7 @@ export const BlockBuilderModal = ({
                                 value={cell.weight}
                                 onChange={e => setCell(exIdx, week, 'weight', e.target.value)}
                                 placeholder="kg"
-                                className="w-12 px-1.5 py-1 border border-emerald-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 text-emerald-700 bg-emerald-50/30"
+                                className="w-12 px-1.5 py-1.5 border border-emerald-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 text-emerald-700 bg-emerald-50/30"
                                 title="Weight (kg)"
                               />
                               <input
@@ -577,7 +555,7 @@ export const BlockBuilderModal = ({
                                 value={cell.rest}
                                 onChange={e => setCell(exIdx, week, 'rest', e.target.value)}
                                 placeholder="rest"
-                                className="w-12 px-1.5 py-1 border border-violet-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-violet-400 focus:border-violet-400 text-violet-700 bg-violet-50/30"
+                                className="w-12 px-1.5 py-1.5 border border-violet-200 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-violet-400 focus:border-violet-400 text-violet-700 bg-violet-50/30"
                                 title="Rest duration (seconds)"
                               />
                             </div>

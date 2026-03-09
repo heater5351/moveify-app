@@ -237,14 +237,11 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
                                   // Find matching program exercise to determine type
                                   const progEx = program.exercises.find(e => e.id === exId);
                                   const exType = progEx ? getExerciseType(progEx) : 'reps';
-                                  if (exType === 'cardio') {
-                                    return <>{week.duration ? formatDuration(week.duration) : `${week.sets}×${week.reps}`}</>;
-                                  }
-                                  if (exType === 'duration') {
+                                  if (exType === 'cardio' || exType === 'duration') {
                                     return (
                                       <>
                                         {week.sets}×{week.duration ? formatDuration(week.duration) : `${week.reps}`}
-                                        {week.restDuration ? <div className="text-[10px] text-slate-400 font-normal">Rest {formatDuration(week.restDuration)}</div> : null}
+                                        {week.restDuration ? <div className="text-[10px] text-violet-400 font-normal">Rest {formatDuration(week.restDuration)}</div> : null}
                                       </>
                                     );
                                   }
