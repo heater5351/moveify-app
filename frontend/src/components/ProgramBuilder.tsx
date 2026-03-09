@@ -114,8 +114,8 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
       </div>
 
       <div className="flex gap-2 mb-2">
-        {/* Sets — shown for reps and duration, not cardio */}
-        {exerciseType !== 'cardio' && (
+        {/* Sets — shown for all exercise types */}
+        {(
           <div className="flex-1">
             <label className="text-xs text-slate-400 block mb-1">Sets</label>
             <input
@@ -225,8 +225,8 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
           </div>
         )}
 
-        {/* Rest — shown for reps and duration, not cardio */}
-        {exerciseType !== 'cardio' && (
+        {/* Rest — shown for all exercise types */}
+        {(
           <div className="flex-1">
             <label className="text-xs text-slate-400 block mb-1">Rest</label>
             <input
@@ -255,12 +255,10 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
       {/* Prescription summary */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-slate-400">
-          {exerciseType === 'cardio' && exercise.prescribedDuration
-            ? formatDuration(exercise.prescribedDuration)
-            : exerciseType === 'duration' && exercise.prescribedDuration
+          {(exerciseType === 'cardio' || exerciseType === 'duration') && exercise.prescribedDuration
             ? `${exercise.sets} × ${formatDuration(exercise.prescribedDuration)}`
             : null}
-          {exerciseType !== 'cardio' && exercise.restDuration
+          {exercise.restDuration
             ? ` · ${formatDuration(exercise.restDuration)} rest`
             : null}
         </p>
