@@ -4,6 +4,15 @@
 
 Moveify is a clinical exercise prescription and patient management platform (similar to Physitrack, VALD MoveHealth). It enables clinicians to build exercise programs and assign them to patients, who can then log completions, track progress, and complete daily wellness check-ins.
 
+**⚠ PRODUCTION APP WITH REAL PATIENTS.** Real patients are actively using this app. When making changes:
+- **Never delete or rename exercises** that are in assigned programs — this breaks completion history
+- **Never drop/alter DB columns** without safe migrations (use defaults, nullable columns, `IF NOT EXISTS`)
+- **Never make destructive schema changes** without confirming with the user first
+- **Backend redeployments** cause brief downtime (~30s) — prefer deploying outside business hours (AEST)
+- **Frontend changes** deploy instantly via Vercel and are low-risk (patient sees updates on refresh)
+- **Test breaking changes locally first** — don't experiment on production data
+- If unsure whether a change could affect existing patient data or programs, ask before proceeding
+
 ## Architecture
 
 **Monorepo** with two directories:
