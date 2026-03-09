@@ -208,19 +208,14 @@ function App() {
   };
 
   const handleUpdateExercise = (index: number, field: 'sets' | 'reps' | 'weight' | 'duration' | 'rest' | 'instructions', value: number | string) => {
-    const updated = [...programExercises];
-    if (field === 'weight') {
-      updated[index].prescribedWeight = value as number;
-    } else if (field === 'duration') {
-      updated[index].prescribedDuration = value as number;
-    } else if (field === 'rest') {
-      updated[index].restDuration = value as number;
-    } else if (field === 'instructions') {
-      updated[index].instructions = value as string;
-    } else {
-      updated[index][field] = value as number;
-    }
-    setProgramExercises(updated);
+    setProgramExercises(prev => prev.map((ex, i) => {
+      if (i !== index) return ex;
+      if (field === 'weight') return { ...ex, prescribedWeight: value as number };
+      if (field === 'duration') return { ...ex, prescribedDuration: value as number };
+      if (field === 'rest') return { ...ex, restDuration: value as number };
+      if (field === 'instructions') return { ...ex, instructions: value as string };
+      return { ...ex, [field]: value as number };
+    }));
   };
 
   const handleReorderExercises = (newOrder: ProgramExercise[]) => {
@@ -429,7 +424,10 @@ function App() {
       customStartDate: program.config.customStartDate || '',
       frequency: program.config.frequency,
       duration: program.config.duration,
-      customEndDate: program.config.customEndDate || ''
+      customEndDate: program.config.customEndDate || '',
+      trackActualPerformance: program.config.trackActualPerformance,
+      trackRpe: program.config.trackRpe,
+      trackPainLevel: program.config.trackPainLevel
     });
     // Fetch existing block data for this program
     setPendingBlockData(null);

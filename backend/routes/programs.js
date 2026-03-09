@@ -84,8 +84,8 @@ router.get('/patient/:patientId', requirePatientAccess, async (req, res) => {
           sets: ex.sets,
           reps: ex.reps,
           prescribedWeight: ex.prescribed_weight || 0,
-          prescribedDuration: ex.prescribed_duration || null,
-          restDuration: ex.rest_duration || null,
+          prescribedDuration: ex.prescribed_duration ?? null,
+          restDuration: ex.rest_duration ?? null,
           holdTime: ex.hold_time,
           instructions: ex.instructions,
           image: ex.image_url,
@@ -145,6 +145,10 @@ router.post('/patient/:patientId', requireRole('clinician'), async (req, res) =>
     // Insert exercises
     for (let index = 0; index < exercises.length; index++) {
       const exercise = exercises[index];
+      const duration = exercise.prescribedDuration != null ? exercise.prescribedDuration : null;
+      const rest = exercise.restDuration != null ? exercise.restDuration : null;
+
+      console.log(`Exercise "${exercise.name}": duration=${duration}, rest=${rest}, instructions=${exercise.instructions ? 'yes' : 'no'}`);
 
       await client.query(`
         INSERT INTO program_exercises (
@@ -162,8 +166,8 @@ router.post('/patient/:patientId', requireRole('clinician'), async (req, res) =>
         exercise.instructions || '',
         exercise.image || '',
         index,
-        exercise.prescribedDuration || null,
-        exercise.restDuration || null
+        duration,
+        rest
       ]);
     }
 
@@ -240,6 +244,10 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
     for (let index = 0; index < exercises.length; index++) {
       const exercise = exercises[index];
       const existingId = existingExerciseMap.get(exercise.name);
+      const duration = exercise.prescribedDuration != null ? exercise.prescribedDuration : null;
+      const rest = exercise.restDuration != null ? exercise.restDuration : null;
+
+      console.log(`[UPDATE] Exercise "${exercise.name}": duration=${duration}, rest=${rest}`);
 
       if (existingId) {
         await client.query(`
@@ -258,8 +266,8 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
           exercise.image || '',
           index,
           exercise.enablePeriodization !== undefined ? exercise.enablePeriodization : false,
-          exercise.prescribedDuration || null,
-          exercise.restDuration || null,
+          duration,
+          rest,
           existingId
         ]);
         updatedExerciseIds.add(existingId);
@@ -282,8 +290,8 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
           exercise.image || '',
           index,
           exercise.enablePeriodization !== undefined ? exercise.enablePeriodization : false,
-          exercise.prescribedDuration || null,
-          exercise.restDuration || null
+          duration,
+          rest
         ]);
       }
     }
