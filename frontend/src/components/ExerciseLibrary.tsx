@@ -91,7 +91,7 @@ const toProgramExercise = (exercise: Exercise): ProgramExercise => {
   if (exType === 'duration') {
     return { ...exercise, sets: 3, reps: 0, prescribedDuration: 30, completed: false };
   }
-  return toProgramExercise(exercise);
+  return { ...exercise, sets: 3, reps: 10, completed: false };
 };
 
 // Exercise Detail Modal Component
