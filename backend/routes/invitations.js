@@ -33,6 +33,9 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
 
     const clinicianId = req.user.id;
 
+    // Invalidate any previous invitation tokens for this email
+    await db.query(`UPDATE invitation_tokens SET used = 1 WHERE email = $1 AND used = 0`, [email]);
+
     // Generate unique token
     const token = crypto.randomBytes(32).toString('hex');
 
@@ -63,7 +66,7 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
       await sendInvitationEmail(email, name, invitationUrl);
     } catch (emailError) {
       console.error('Failed to send invitation email:', emailError);
-      // Still return success — invitation was created, email just failed
+      return res.status(500).json({ error: 'Invitation created but failed to send email. Please check email configuration.' });
     }
 
     audit.log(req, 'patient_invite', 'patient', patientId, { email });
