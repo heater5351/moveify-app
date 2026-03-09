@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Check, ChevronLeft, ChevronRight, Pause } from 'lucide-react';
+import { X, Check, ChevronLeft, ChevronRight, Pause, Info } from 'lucide-react';
 import type { AssignedProgram, BlockStatusResponse, BlockWeekRow } from '../../types/index.ts';
+import { formatDuration, getExerciseType } from '../../utils/duration';
 import { API_URL } from '../../config';
 import { getAuthHeaders } from '../../utils/api';
 
@@ -274,12 +275,30 @@ export const ProgramDetailsModal = ({ program, patientName, onClose }: ProgramDe
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-slate-600 mb-2">
-                        <strong>{exercise.sets} sets × {exercise.reps} reps</strong>
+                      <p className="text-sm text-slate-600 mb-1">
+                        <strong>
+                          {(() => {
+                            const exType = getExerciseType(exercise);
+                            if (exType === 'cardio') {
+                              return exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : 'As prescribed';
+                            }
+                            if (exType === 'duration') {
+                              const dur = exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : '—';
+                              return `${exercise.sets} set${exercise.sets !== 1 ? 's' : ''} × ${dur}`;
+                            }
+                            return `${exercise.sets} sets × ${exercise.reps} reps${(exercise.prescribedWeight || 0) > 0 ? ` · ${exercise.prescribedWeight} kg` : ''}`;
+                          })()}
+                        </strong>
                         {exercise.holdTime && ` · Hold ${exercise.holdTime}`}
                       </p>
+                      {(exercise.restDuration || 0) > 0 && (
+                        <p className="text-xs text-slate-400 mb-1">Rest: {formatDuration(exercise.restDuration!)}</p>
+                      )}
                       {exercise.instructions && (
-                        <p className="text-sm text-slate-500 italic">{exercise.instructions}</p>
+                        <div className="flex items-start gap-1.5 bg-primary-50 rounded-md px-2.5 py-1.5 mt-1">
+                          <Info size={12} className="text-primary-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-primary-700">{exercise.instructions}</p>
+                        </div>
                       )}
                     </div>
                   </div>
