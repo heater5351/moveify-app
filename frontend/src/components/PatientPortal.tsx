@@ -236,6 +236,16 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
 
   const showPrescription = isPrescriptionVisible();
 
+  // Check if selected date is too far in the future to allow completion (more than 1 day ahead)
+  const isFutureDate = (): boolean => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(23, 59, 59, 999);
+    return selectedDate > tomorrow;
+  };
+
+  const canComplete = !isFutureDate();
+
   const hasExercisesToday = selectedProgram.config.frequency.includes(selectedDayShort) && isDateAfterProgramStart(selectedDate);
 
   // Enrich exercises with completion data for the selected date
@@ -513,7 +523,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
 
                       {/* Buttons */}
                       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                        {!isProgramCompleted && showPrescription && (
+                        {!isProgramCompleted && showPrescription && canComplete && (
                           <button
                             onClick={() => {
                               // Calculate the actual date for the selected day
@@ -535,6 +545,9 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                           >
                             {exercise.completed ? 'Edit' : 'Mark Complete'}
                           </button>
+                        )}
+                        {!isProgramCompleted && showPrescription && !canComplete && (
+                          <p className="text-xs text-slate-400 italic">Available to complete on the day</p>
                         )}
                       </div>
                     </div>
