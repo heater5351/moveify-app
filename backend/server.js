@@ -104,7 +104,7 @@ app.get('/', (req, res) => {
 
 // Health check route (used by Railway)
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.json({ status: 'OK', version: '2.1.0-duration', timestamp: new Date().toISOString() });
 });
 
 // Error handling middleware - must be last
