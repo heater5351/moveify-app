@@ -54,6 +54,7 @@ const EQUIPMENT_OPTIONS = [
   'Medicine Ball',
   'Foam Roller',
   'Stability Ball',
+  'Cable',
   'Support'
 ];
 
