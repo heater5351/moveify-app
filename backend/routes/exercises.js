@@ -11,7 +11,7 @@ router.use(authenticate, requireRole('clinician'));
 // Get all custom exercises (shared across all clinicians)
 router.get('/', async (req, res) => {
   try {
-    const { joint_area, muscle_group, movement_type, equipment, position, category, difficulty } = req.query;
+    const { joint_area, muscle_group, movement_type, equipment, position, category } = req.query;
 
     let query = 'SELECT * FROM exercises WHERE 1=1';
     let params = [];
@@ -50,12 +50,6 @@ router.get('/', async (req, res) => {
       params.push(category);
       paramIndex++;
     }
-    if (difficulty) {
-      query += ` AND difficulty = $${paramIndex}`;
-      params.push(difficulty);
-      paramIndex++;
-    }
-
     query += ' ORDER BY created_at DESC';
 
     const exercises = await db.getAll(query, params);
@@ -72,17 +66,12 @@ router.post('/', async (req, res) => {
   try {
     const clinicianId = req.user.id;
     const {
-      name, category, difficulty, duration, description, videoUrl,
+      name, category, duration, description, videoUrl,
       jointArea, muscleGroup, movementType, equipment, position, exerciseType
     } = req.body;
 
-    if (!name || !category || !difficulty || !duration || !description) {
+    if (!name || !category || !duration || !description) {
       return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    const validDifficulties = ['Beginner', 'Intermediate', 'Advanced'];
-    if (!validDifficulties.includes(difficulty)) {
-      return res.status(400).json({ error: 'Invalid difficulty level' });
     }
 
     const validExerciseTypes = ['reps', 'duration', 'cardio'];
@@ -93,10 +82,10 @@ router.post('/', async (req, res) => {
         clinician_id, name, category, difficulty, duration, description, video_url,
         joint_area, muscle_group, movement_type, equipment, position, exercise_type
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      VALUES ($1, $2, $3, 'Beginner', $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `, [
-      clinicianId, name, category, difficulty, duration, description, videoUrl || null,
+      clinicianId, name, category, duration, description, videoUrl || null,
       jointArea || null, muscleGroup || null, movementType || null, equipment || null, position || null,
       safeExerciseType
     ]);
@@ -113,7 +102,7 @@ router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const {
-      name, category, difficulty, duration, description, videoUrl,
+      name, category, duration, description, videoUrl,
       jointArea, muscleGroup, movementType, equipment, position, exerciseType
     } = req.body;
 
@@ -127,13 +116,13 @@ router.put('/:id', async (req, res) => {
 
     const result = await db.query(`
       UPDATE exercises
-      SET name = $1, category = $2, difficulty = $3, duration = $4, description = $5, video_url = $6,
-          joint_area = $7, muscle_group = $8, movement_type = $9, equipment = $10, position = $11,
-          exercise_type = $12
-      WHERE id = $13
+      SET name = $1, category = $2, duration = $3, description = $4, video_url = $5,
+          joint_area = $6, muscle_group = $7, movement_type = $8, equipment = $9, position = $10,
+          exercise_type = $11
+      WHERE id = $12
       RETURNING *
     `, [
-      name, category, difficulty, duration, description, videoUrl || null,
+      name, category, duration, description, videoUrl || null,
       jointArea || null, muscleGroup || null, movementType || null, equipment || null, position || null,
       safeExerciseType, id
     ]);

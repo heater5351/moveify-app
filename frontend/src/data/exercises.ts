@@ -7,7 +7,7 @@ export const exercises: Exercise[] = [
     name: 'Squat with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Beginner',
+
     description: 'Stand with feet shoulder-width apart and toes slightly turned out. Push your hips back and bend your knees to lower until thighs are parallel to the floor. Keep your chest up and weight through your heels. Drive through your feet to return to standing.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Squat%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -21,7 +21,7 @@ export const exercises: Exercise[] = [
     name: 'Back Squat with Barbell',
     category: 'Musculoskeletal',
     duration: '4 sets x 8 reps',
-    difficulty: 'Intermediate',
+
     description: 'Position the bar on your upper back and grip it outside your shoulders. Unrack and step back with feet shoulder-width apart. Brace your core, push your hips back and bend your knees to lower until thighs are parallel or below. Keep your knees out and chest up. Drive through mid-foot to stand.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Back%20Squat%20With%20Barbell',
     jointArea: 'Hip, Knee',
@@ -35,7 +35,7 @@ export const exercises: Exercise[] = [
     name: 'Bulgarian Split Squat with Dumbbells',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Intermediate',
+
     description: 'Hold a dumbbell in each hand with your rear foot elevated on a bench. Position your front foot far enough forward that your knee stays over your toes at the bottom. Lower until your back knee nearly touches the floor. Drive through your front heel to return. Keep your torso upright throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Bulgarian%20Split%20Squat%20With%20Dumbbells',
     jointArea: 'Hip, Knee',
@@ -51,7 +51,7 @@ export const exercises: Exercise[] = [
     name: 'Deadlift with Barbell',
     category: 'Musculoskeletal',
     duration: '4 sets x 6 reps',
-    difficulty: 'Intermediate',
+
     description: 'Stand with feet hip-width apart and the bar over mid-foot. Hinge at the hips and grip the bar just outside your knees. Keep your chest up and lats tight. Push the floor away with your legs and lock your hips and knees at the top. Lower with control. Maintain a neutral spine throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Deadlift%20With%20Barbell',
     jointArea: 'Hip, Knee',
@@ -65,7 +65,7 @@ export const exercises: Exercise[] = [
     name: 'Romanian Deadlift with Barbell',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps',
-    difficulty: 'Intermediate',
+
     description: 'Start standing with the bar at hip height. Push your hips back with a slight knee bend. Lower the bar along your thighs keeping it close to your body. Feel the stretch in your hamstrings. Stop when your back starts to round or at mid-shin. Drive your hips forward to return.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Romanian%20Deadlift%20With%20Barbell',
     jointArea: 'Hip, Knee',
@@ -79,7 +79,7 @@ export const exercises: Exercise[] = [
     name: 'Single Leg Deadlift with Dumbbells',
     category: 'Musculoskeletal',
     duration: '3 sets x 8 reps per leg',
-    difficulty: 'Advanced',
+
     description: 'Stand on one leg holding a dumbbell in each hand with a slight knee bend. Hinge at the hip and extend your other leg back for balance. Lower the weights toward the floor keeping your hips square. Feel the stretch in the hamstring and glute of your standing leg. Return to standing.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Leg%20Deadlift%20With%20Dumbbells',
     jointArea: 'Hip, Knee',
@@ -95,7 +95,7 @@ export const exercises: Exercise[] = [
     name: 'Calf Raise with Bodyweight',
     category: 'Musculoskeletal',
     duration: '4 sets x 15 reps',
-    difficulty: 'Beginner',
+
     description: 'Stand with feet hip-width apart. Rise up onto your toes as high as possible. Hold briefly at the top and squeeze your calves. Lower back down with control. Keep your legs straight throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Calf%20Raise%20With%20Bodyweight',
     jointArea: 'Ankle',
@@ -111,7 +111,7 @@ export const exercises: Exercise[] = [
     name: 'Step Down with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Intermediate',
+
     description: 'Stand on a box or step. Lower your opposite foot toward the floor with control. Tap the floor lightly then push through your standing leg to return. Keep your knee aligned over your toes throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Step%20Down%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -127,7 +127,7 @@ export const exercises: Exercise[] = [
     name: 'Single Leg Squat with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 8 reps per leg',
-    difficulty: 'Advanced',
+
     description: 'Stand on one leg with the other foot hovering off the ground. Slowly bend your standing knee and push your hips back to lower as far as you can control. Keep your knee tracking over your toes and your trunk upright. Push through your foot to return to standing.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Wall%20Sit%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -141,7 +141,7 @@ export const exercises: Exercise[] = [
     name: 'Wall Sit with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 30-60 seconds',
-    difficulty: 'Beginner',
+
     exerciseType: 'duration',
     description: 'Lean your back flat against a wall and slide down until your knees are at roughly 90 degrees. Keep your feet shoulder-width apart and flat on the floor. Press your lower back into the wall and hold the position. Breathe steadily throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Leg%20Squat%20With%20Bodyweight',
@@ -156,7 +156,7 @@ export const exercises: Exercise[] = [
     name: 'Forward Lunge with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Beginner',
+
     description: 'Stand tall with feet hip-width apart. Step forward into a lunge, lowering your back knee toward the floor. Keep your front knee tracking over your toes and your trunk upright. Push through your front heel to return to the starting position.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Forward%20Lunge%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -170,7 +170,7 @@ export const exercises: Exercise[] = [
     name: 'Hip Hinge with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Beginner',
+
     description: 'Stand with feet hip-width apart and a slight bend in your knees. Push your hips back while keeping your back flat and chest up. Lower your torso until you feel a stretch in your hamstrings. Drive your hips forward to return to standing.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Hip%20Hinge%20With%20Bodyweight',
     jointArea: 'Hip',
@@ -184,7 +184,7 @@ export const exercises: Exercise[] = [
     name: 'Single Leg Calf Raise with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps per leg',
-    difficulty: 'Intermediate',
+
     description: 'Stand on one leg with the other foot off the ground. Rise up onto your toes as high as possible. Hold briefly at the top and squeeze your calf. Lower back down with control. Use a wall or rail for balance if needed.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Leg%20Calf%20Raise%20With%20Bodyweight',
     jointArea: 'Ankle',
@@ -198,7 +198,7 @@ export const exercises: Exercise[] = [
     name: 'Sit To Stand with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Beginner',
+
     description: 'Sit on a chair or bench with your feet flat on the floor. Lean forward slightly and drive through your heels to stand up without using your hands. Control the movement as you sit back down. Keep your chest up throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Sit%20To%20Stand%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -212,7 +212,7 @@ export const exercises: Exercise[] = [
     name: 'Split Squat with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Beginner',
+
     description: 'Stand in a split stance with one foot forward and one back. Lower your back knee toward the floor while keeping your front knee over your toes. Keep your torso upright and core engaged. Push through your front foot to return to the top.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Split%20Squat%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -226,7 +226,7 @@ export const exercises: Exercise[] = [
     name: 'Staggered Deadlift with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per side',
-    difficulty: 'Intermediate',
+
     description: 'Stand with one foot slightly behind the other, most of your weight on the front leg. Hinge at the hips and lower your torso while keeping your back flat. Feel the stretch in the hamstring of your front leg. Drive your hips forward to return to standing.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Staggered%20Deadlift%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -240,7 +240,7 @@ export const exercises: Exercise[] = [
     name: 'Staggered Sit To Stand with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per side',
-    difficulty: 'Intermediate',
+
     description: 'Sit on a chair with one foot slightly ahead of the other. Drive through your front heel to stand, using the back foot only for balance. Control the movement as you lower back to seated. Keep your chest up and avoid leaning to one side.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Staggered%20Sit%20To%20Stand%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -254,7 +254,7 @@ export const exercises: Exercise[] = [
     name: 'Alternating Split Squat Jumps with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Advanced',
+
     description: 'Start in a split squat position with one foot forward. Jump explosively and switch legs mid-air, landing softly with the opposite foot forward. Absorb the landing by bending both knees. Keep your torso upright and arms swinging naturally for momentum.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Alternating%20Split%20Squat%20Jumps%20With%20Bodyweight',
     jointArea: 'Hip, Knee, Ankle',
@@ -268,7 +268,7 @@ export const exercises: Exercise[] = [
     name: 'Bent Over Row with Dumbbells',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps',
-    difficulty: 'Beginner',
+
     description: 'Stand with feet hip-width apart holding a dumbbell in each hand. Hinge at the hips until your torso is roughly 45 degrees. Let the dumbbells hang at arm\'s length. Pull both dumbbells toward your hips, squeezing your shoulder blades together. Lower with control.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Bent%20Over%20Row%20With%20Dumbbells',
     jointArea: 'Shoulder, Elbow',
@@ -282,7 +282,7 @@ export const exercises: Exercise[] = [
     name: 'Bicep Curl To Shoulder Press with Dumbbells',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps',
-    difficulty: 'Intermediate',
+
     description: 'Stand holding dumbbells at your sides. Curl the weights up to your shoulders then press them overhead until your arms are fully extended. Lower back to your shoulders, then down to your sides with control. Keep your core braced throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Bicep%20Curl%20To%20Shoulder%20Press%20With%20Dumbbells',
     jointArea: 'Elbow, Shoulder',
@@ -296,7 +296,7 @@ export const exercises: Exercise[] = [
     name: 'Calf Raise Hold with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 20-30 seconds',
-    difficulty: 'Beginner',
+
     exerciseType: 'duration',
     description: 'Stand with feet hip-width apart. Rise up onto your toes as high as possible and hold that position. Keep your legs straight and squeeze your calves at the top. Breathe steadily and maintain balance throughout the hold.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Calf%20Raise%20Hold%20With%20Bodyweight',
@@ -311,7 +311,7 @@ export const exercises: Exercise[] = [
     name: 'Calf Raise with Support',
     category: 'Musculoskeletal',
     duration: '3 sets x 15 reps',
-    difficulty: 'Beginner',
+
     description: 'Stand near a wall or rail for balance. Rise up onto your toes as high as possible. Hold briefly at the top and squeeze your calves. Lower back down with control. Use the support lightly for balance only, not to assist the movement.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Calf%20Raise%20With%20Support',
     jointArea: 'Ankle',
@@ -325,7 +325,7 @@ export const exercises: Exercise[] = [
     name: 'Chest Press with Dumbbells',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps',
-    difficulty: 'Beginner',
+
     description: 'Lie on a flat bench holding a dumbbell in each hand at chest level. Press the weights up until your arms are fully extended. Lower the dumbbells back to chest level with control. Keep your feet flat on the floor and your back pressed into the bench.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Chest%20Press%20With%20Dumbbells',
     jointArea: 'Shoulder, Elbow',
@@ -339,7 +339,7 @@ export const exercises: Exercise[] = [
     name: 'Child\'s Pose',
     category: 'Musculoskeletal',
     duration: '3 sets x 30-60 seconds',
-    difficulty: 'Beginner',
+
     exerciseType: 'duration',
     description: 'Kneel on the floor with your toes together and knees apart. Sit your hips back toward your heels and walk your hands forward along the floor. Rest your forehead on the ground and relax your arms. Breathe deeply into your back and hold the stretch.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Child%27s%20Pose',
@@ -354,7 +354,7 @@ export const exercises: Exercise[] = [
     name: 'Curtsy Lunge with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Intermediate',
+
     description: 'Stand with feet hip-width apart. Step one foot behind and across your body into a curtsy position. Lower your back knee toward the floor while keeping your front knee tracking over your toes. Push through your front heel to return to standing. Keep your torso upright throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Curtsy%20Lunge%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -368,7 +368,7 @@ export const exercises: Exercise[] = [
     name: 'Drop Jump with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 6 reps',
-    difficulty: 'Advanced',
+
     description: 'Stand on a low box or step. Step off the edge and land on both feet with soft knees. Immediately jump up as high as possible upon landing. Focus on spending minimal time on the ground. Land softly with bent knees to absorb the impact.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Drop%20Jump%20With%20Bodyweight',
     jointArea: 'Hip, Knee, Ankle',
@@ -382,7 +382,7 @@ export const exercises: Exercise[] = [
     name: 'Hip Abduction On Step with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps per leg',
-    difficulty: 'Beginner',
+
     description: 'Stand on a step or box on one leg. Let your other leg hang off the side. Lower your hanging hip by allowing your pelvis to drop, then lift it back up by engaging your glute on the standing side. Keep your standing leg straight and torso upright.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Hip%20Abduction%20On%20Step%20With%20Bodyweight',
     jointArea: 'Hip',
@@ -396,7 +396,7 @@ export const exercises: Exercise[] = [
     name: 'Incline Chest Press with Dumbbells',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps',
-    difficulty: 'Intermediate',
+
     description: 'Lie on an incline bench set to 30-45 degrees, holding a dumbbell in each hand at chest level. Press the weights up until your arms are fully extended. Lower the dumbbells back to chest level with control. Keep your feet flat on the floor throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Incline%20Chest%20Press%20With%20Dumbbells',
     jointArea: 'Shoulder, Elbow',
@@ -410,7 +410,7 @@ export const exercises: Exercise[] = [
     name: 'Kneeling Calf Raise with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 15 reps',
-    difficulty: 'Beginner',
+
     description: 'Kneel on the floor with your toes tucked under. Sit your hips back onto your heels, then push up through your toes to raise your knees off the ground slightly. Lower back down with control. This targets the soleus muscle of the calf.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Kneeling%20Calf%20Raise%20With%20Bodyweight',
     jointArea: 'Ankle',
@@ -424,7 +424,7 @@ export const exercises: Exercise[] = [
     name: 'Lateral Step Down Tap with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Intermediate',
+
     description: 'Stand on a step or box on one leg. Slowly bend your standing knee to lower your other foot toward the floor to the side. Lightly tap the floor then push back up through your standing leg. Keep your knee tracking over your toes and your trunk upright.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Lateral%20Step%20Down%20Tap%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -438,7 +438,7 @@ export const exercises: Exercise[] = [
     name: 'Lateral Step Up with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Beginner',
+
     description: 'Stand beside a step or box. Place your nearest foot on the step and drive through that leg to step up. Bring your other foot up to meet it, then step back down with control. Keep your chest up and avoid pushing off with your bottom foot.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Lateral%20Step%20Up%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -452,7 +452,7 @@ export const exercises: Exercise[] = [
     name: 'Plank with Alternating Arm and Leg Lifts with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per side',
-    difficulty: 'Intermediate',
+
     description: 'Start in a forearm plank position with your body in a straight line. Lift your right arm and left leg simultaneously, hold briefly, then return. Alternate to your left arm and right leg. Keep your hips level and avoid rotating your torso.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Plank%20With%20Alternating%20Arm%20and%20Leg%20Lifts%20With%20Bodyweight',
     jointArea: 'Spine, Hip, Shoulder',
@@ -466,7 +466,7 @@ export const exercises: Exercise[] = [
     name: 'Romanian Deadlift with Dumbbells',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps',
-    difficulty: 'Intermediate',
+
     description: 'Stand holding a dumbbell in each hand in front of your thighs. Push your hips back with a slight knee bend, lowering the dumbbells along your legs. Keep the weights close to your body and your back flat. Stop when you feel a hamstring stretch, then drive your hips forward to return.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Romanian%20Deadlift%20With%20Dumbbells',
     jointArea: 'Hip, Knee',
@@ -480,7 +480,7 @@ export const exercises: Exercise[] = [
     name: 'Running',
     category: 'Musculoskeletal',
     duration: 'As prescribed',
-    difficulty: 'Beginner',
+
     exerciseType: 'cardio',
     description: 'Run at a comfortable pace with an upright posture. Land with your foot under your body and maintain a slight forward lean. Keep your arms relaxed and swinging naturally. Breathe rhythmically and maintain a cadence that allows you to hold a conversation.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Running',
@@ -495,7 +495,7 @@ export const exercises: Exercise[] = [
     name: 'Side Plank with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 20-30 seconds per side',
-    difficulty: 'Intermediate',
+
     exerciseType: 'duration',
     description: 'Lie on your side with your forearm on the ground and your elbow under your shoulder. Stack your feet and lift your hips off the floor to form a straight line from head to feet. Hold the position, keeping your core engaged. Breathe steadily throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Side%20Plank%20With%20Bodyweight',
@@ -510,7 +510,7 @@ export const exercises: Exercise[] = [
     name: 'Single Arm Bent Over Row with Dumbbell',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per arm',
-    difficulty: 'Beginner',
+
     description: 'Place one hand and knee on a bench for support. Hold a dumbbell in your free hand, letting it hang at arm\'s length. Pull the dumbbell toward your hip, keeping your elbow close to your body. Squeeze your shoulder blade at the top and lower with control.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Arm%20Bent%20Over%20Row%20With%20Dumbbell',
     jointArea: 'Shoulder, Elbow',
@@ -524,7 +524,7 @@ export const exercises: Exercise[] = [
     name: 'Single Leg Calf Raise Hold with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 20-30 seconds per leg',
-    difficulty: 'Intermediate',
+
     exerciseType: 'duration',
     description: 'Stand on one leg and rise up onto your toes as high as possible. Hold this position at the top, squeezing your calf. Keep your balance using a wall or rail if needed. Breathe steadily and maintain a straight standing leg throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Leg%20Calf%20Raise%20Hold%20With%20Bodyweight',
@@ -539,7 +539,7 @@ export const exercises: Exercise[] = [
     name: 'Single Leg Calf Raise with Support',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps per leg',
-    difficulty: 'Intermediate',
+
     description: 'Stand on one leg near a wall or rail for balance. Rise up onto your toes as high as possible. Hold briefly at the top and squeeze your calf. Lower back down with control. Use the support for balance only, not to assist the lift.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Leg%20Calf%20Raise%20With%20Support',
     jointArea: 'Ankle',
@@ -553,7 +553,7 @@ export const exercises: Exercise[] = [
     name: 'Single Leg Deadlift with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Intermediate',
+
     description: 'Stand on one leg with a slight knee bend. Hinge at the hip, extending your other leg behind you for balance. Lower your torso until you feel a stretch in the hamstring of your standing leg. Keep your hips square and back flat. Return to standing with control.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Leg%20Deadlift%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -567,7 +567,7 @@ export const exercises: Exercise[] = [
     name: 'Single Leg Deadlift with Dumbbell',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Intermediate',
+
     description: 'Stand on one leg holding a dumbbell in the opposite hand. Hinge at the hip, extending your free leg behind you. Lower the dumbbell toward the floor while keeping your back flat and hips square. Return to standing by driving your hips forward.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Leg%20Deadlift%20With%20Dumbbell',
     jointArea: 'Hip, Knee',
@@ -581,7 +581,7 @@ export const exercises: Exercise[] = [
     name: 'Single Leg Sit To Stand with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 8 reps per leg',
-    difficulty: 'Intermediate',
+
     description: 'Sit on a chair with one foot flat on the floor and the other leg extended or hovering. Drive through your planted foot to stand up on one leg without using your hands. Lower back down with control. Keep your chest up and knee tracking over your toes.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Leg%20Sit%20To%20Stand%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -595,7 +595,7 @@ export const exercises: Exercise[] = [
     name: 'Single Leg Sit To Stand with Dumbbell',
     category: 'Musculoskeletal',
     duration: '3 sets x 8 reps per leg',
-    difficulty: 'Advanced',
+
     description: 'Sit on a chair holding a dumbbell at your chest. Extend one leg forward and drive through your planted foot to stand on one leg. Lower back down with control. Keep your chest up and maintain balance throughout the movement.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Leg%20Sit%20To%20Stand%20With%20Dumbbell',
     jointArea: 'Hip, Knee',
@@ -609,7 +609,7 @@ export const exercises: Exercise[] = [
     name: 'Single Leg Squat with Support',
     category: 'Musculoskeletal',
     duration: '3 sets x 8 reps per leg',
-    difficulty: 'Intermediate',
+
     description: 'Stand on one leg near a wall, rail, or TRX for support. Slowly bend your standing knee and push your hips back to lower as far as you can control. Use the support to assist balance and depth. Push through your foot to return to standing.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Leg%20Squat%20With%20Support',
     jointArea: 'Hip, Knee',
@@ -623,7 +623,7 @@ export const exercises: Exercise[] = [
     name: 'Sit To Stand with Dumbbell',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Beginner',
+
     description: 'Sit on a chair holding a dumbbell at your chest with both hands. Lean forward slightly and drive through your heels to stand up. Control the movement as you sit back down. Keep the dumbbell close to your chest and your back straight throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Sit%20To%20Stand%20With%20Dumbbell',
     jointArea: 'Hip, Knee',
@@ -637,7 +637,7 @@ export const exercises: Exercise[] = [
     name: 'Split Squat with Dumbbell',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Intermediate',
+
     description: 'Stand in a split stance holding one dumbbell at your chest. Lower your back knee toward the floor while keeping your front knee over your toes. Push through your front foot to return to the top. Keep your torso upright and core engaged throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Split%20Squat%20With%20Dumbbell',
     jointArea: 'Hip, Knee',
@@ -651,7 +651,7 @@ export const exercises: Exercise[] = [
     name: 'Split Squat with Dumbbells',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Intermediate',
+
     description: 'Stand in a split stance holding a dumbbell in each hand at your sides. Lower your back knee toward the floor while keeping your front knee over your toes. Push through your front foot to return to the top. Keep your torso upright throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Split%20Squat%20With%20Dumbbells',
     jointArea: 'Hip, Knee',
@@ -665,7 +665,7 @@ export const exercises: Exercise[] = [
     name: 'Squat with Dumbbell',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Beginner',
+
     description: 'Stand with feet shoulder-width apart holding one dumbbell at your chest with both hands. Push your hips back and bend your knees to squat down. Keep your chest up and elbows inside your knees. Drive through your feet to return to standing.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Squat%20With%20Dumbbell',
     jointArea: 'Hip, Knee',
@@ -679,7 +679,7 @@ export const exercises: Exercise[] = [
     name: 'Staggered Sit To Stand with Dumbbell',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per side',
-    difficulty: 'Intermediate',
+
     description: 'Sit on a chair holding a dumbbell at your chest with one foot slightly ahead of the other. Drive through your front heel to stand, using the back foot for balance only. Control the descent back to seated. Keep your chest up throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Staggered%20Sit%20To%20Stand%20With%20Dumbbell',
     jointArea: 'Hip, Knee',
@@ -693,7 +693,7 @@ export const exercises: Exercise[] = [
     name: 'Step Down Tap with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Beginner',
+
     description: 'Stand on a step or box on one leg. Slowly bend your standing knee to lower your other foot toward the floor in front. Lightly tap the floor with your heel then push back up through your standing leg. Keep your knee aligned over your toes.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Step%20Down%20Tap%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -707,7 +707,7 @@ export const exercises: Exercise[] = [
     name: 'Step Up with Bodyweight',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Beginner',
+
     description: 'Stand in front of a step or box. Place one foot on the step and drive through that leg to step up. Bring your other foot up to meet it, then step back down with control. Avoid pushing off with your bottom foot. Keep your chest up throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Step%20Up%20With%20Bodyweight',
     jointArea: 'Hip, Knee',
@@ -721,7 +721,7 @@ export const exercises: Exercise[] = [
     name: 'Step Up with Dumbbell',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Intermediate',
+
     description: 'Stand in front of a step or box holding one dumbbell at your chest. Place one foot on the step and drive through that leg to step up. Step back down with control. Keep your torso upright and avoid using momentum from your bottom leg.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Step%20Up%20With%20Dumbbell',
     jointArea: 'Hip, Knee',
@@ -735,7 +735,7 @@ export const exercises: Exercise[] = [
     name: 'Step Up with Dumbbells',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per leg',
-    difficulty: 'Intermediate',
+
     description: 'Stand in front of a step or box holding a dumbbell in each hand at your sides. Place one foot on the step and drive through that leg to step up. Step back down with control. Keep your chest up and arms straight throughout.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Step%20Up%20With%20Dumbbells',
     jointArea: 'Hip, Knee',
@@ -749,7 +749,7 @@ export const exercises: Exercise[] = [
     name: 'Thread The Needle',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per side',
-    difficulty: 'Beginner',
+
     description: 'Start on all fours. Reach one arm under your body toward the opposite side, rotating your upper back. Follow with your eyes. Return and reach the same arm up toward the ceiling, opening your chest. Move slowly and breathe with each rotation.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Thread%20The%20Needle',
     jointArea: 'Spine, Shoulder',
@@ -763,7 +763,7 @@ export const exercises: Exercise[] = [
     name: 'Walking',
     category: 'Musculoskeletal',
     duration: 'As prescribed',
-    difficulty: 'Beginner',
+
     exerciseType: 'cardio',
     description: 'Walk at a comfortable, steady pace with an upright posture. Swing your arms naturally and land with your heel striking first. Maintain a consistent stride length and breathe naturally throughout. Progress by increasing duration, pace, or adding inclines.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Walking',
@@ -778,7 +778,7 @@ export const exercises: Exercise[] = [
     name: 'Kneeling Lat Pullover with Cable Bar',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Intermediate',
+
     description: 'Kneel facing a cable machine with the pulley set high. Grip the bar with both hands and arms extended overhead. Keeping your arms straight, pull the bar down in an arc toward your thighs, squeezing your lats. Slowly return to the start position with control.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Kneeling%20Lat%20Pullover%20With%20Cable%20Bar',
     jointArea: 'Shoulder',
@@ -792,7 +792,7 @@ export const exercises: Exercise[] = [
     name: 'Kneeling Lat Pullover with Cable Rope',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Intermediate',
+
     description: 'Kneel facing a cable machine with the pulley set high. Grip the rope attachment with both hands overhead. Keeping your arms straight, pull the rope down in an arc toward your thighs, squeezing your lats. Slowly return to the start position with control.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Kneeling%20Lat%20Pullover%20With%20Cable%20Rope',
     jointArea: 'Shoulder',
@@ -806,7 +806,7 @@ export const exercises: Exercise[] = [
     name: 'Kneeling Single Arm High Row with Cable Handle',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per arm',
-    difficulty: 'Intermediate',
+
     description: 'Kneel facing a cable machine with the pulley set high. Grip the handle with one hand and pull it down and back toward your hip, driving your elbow behind you. Keep your torso stable and avoid rotating. Slowly return and repeat on both sides.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Kneeling%20Single%20Arm%20High%20Row%20With%20Cable%20Handle',
     jointArea: 'Shoulder, Elbow',
@@ -820,7 +820,7 @@ export const exercises: Exercise[] = [
     name: 'Kneeling Single Arm Low Row with Cable Handle',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per arm',
-    difficulty: 'Intermediate',
+
     description: 'Kneel facing a cable machine with the pulley set low. Grip the handle with one hand and pull it back toward your hip, driving your elbow behind you. Keep your torso stable and avoid rotating. Slowly return and repeat on both sides.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Kneeling%20Single%20Arm%20Low%20Row%20With%20Cable%20Handle',
     jointArea: 'Shoulder, Elbow',
@@ -834,7 +834,7 @@ export const exercises: Exercise[] = [
     name: 'Kneeling Single Arm Mid Row with Cable Handle',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per arm',
-    difficulty: 'Intermediate',
+
     description: 'Kneel facing a cable machine with the pulley set at mid height. Grip the handle with one hand and pull it back toward your hip, driving your elbow behind you. Keep your torso stable and avoid rotating. Slowly return and repeat on both sides.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Kneeling%20Single%20Arm%20Mid%20Row%20With%20Cable%20Handle',
     jointArea: 'Shoulder, Elbow',
@@ -848,7 +848,7 @@ export const exercises: Exercise[] = [
     name: 'Seated Face Pull with Cable Rope',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Beginner',
+
     description: 'Sit facing a cable machine with the pulley set at face height. Grip the rope with both hands, palms facing each other. Pull the rope toward your face, separating your hands and squeezing your shoulder blades together. Keep your elbows high. Slowly return to start.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Seated%20Face%20Pull%20With%20Cable%20Rope',
     jointArea: 'Shoulder',
@@ -862,7 +862,7 @@ export const exercises: Exercise[] = [
     name: 'Seated Mid Row with Cable Bar',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Beginner',
+
     description: 'Sit facing a cable machine with the pulley at mid height. Grip the bar with both hands at shoulder width. Pull the bar toward your torso, squeezing your shoulder blades together. Keep your back straight and avoid leaning back excessively. Slowly return.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Seated%20Mid%20Row%20With%20Cable%20Bar',
     jointArea: 'Shoulder, Elbow',
@@ -876,7 +876,7 @@ export const exercises: Exercise[] = [
     name: 'Seated Mid Row with Cable Rope',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Beginner',
+
     description: 'Sit facing a cable machine with the pulley at mid height. Grip the rope with both hands, palms facing each other. Pull the rope toward your torso, squeezing your shoulder blades together. Keep your back straight and avoid leaning back excessively. Slowly return.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Seated%20Mid%20Row%20With%20Cable%20Rope',
     jointArea: 'Shoulder, Elbow',
@@ -890,7 +890,7 @@ export const exercises: Exercise[] = [
     name: 'Seated Single Arm Row with Cable Handle',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per arm',
-    difficulty: 'Intermediate',
+
     description: 'Sit facing a cable machine with the pulley at mid height. Grip the handle with one hand. Pull the handle toward your torso, squeezing your shoulder blade back. Keep your trunk stable and avoid rotating. Slowly return and repeat on both sides.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Seated%20Single%20Arm%20Row%20With%20Cable%20Handle',
     jointArea: 'Shoulder, Elbow',
@@ -904,7 +904,7 @@ export const exercises: Exercise[] = [
     name: 'Single Arm Tricep Pushdown with Cable Rope',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps per arm',
-    difficulty: 'Beginner',
+
     description: 'Stand facing a cable machine with the pulley set high. Grip the rope with one hand, elbow tucked at your side. Extend your arm down by straightening your elbow, squeezing your tricep at the bottom. Slowly return to the start and repeat on both sides.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Arm%20Tricep%20Pushdown%20With%20Cable%20Rope',
     jointArea: 'Elbow',
@@ -918,7 +918,7 @@ export const exercises: Exercise[] = [
     name: 'Split Stance Single Arm High Row with Cable Handle',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per arm',
-    difficulty: 'Intermediate',
+
     description: 'Stand in a split stance facing a cable machine with the pulley set high. Grip the handle with one hand and pull it down and back toward your hip. Keep your torso stable and avoid rotating. Slowly return and repeat on both sides.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Split%20Stance%20Single%20Arm%20High%20Row%20With%20Cable%20Handle',
     jointArea: 'Shoulder, Elbow',
@@ -932,7 +932,7 @@ export const exercises: Exercise[] = [
     name: 'Split Stance Single Arm Low Row with Cable Handle',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per arm',
-    difficulty: 'Intermediate',
+
     description: 'Stand in a split stance facing a cable machine with the pulley set low. Grip the handle with one hand and pull it back toward your hip. Keep your torso stable and avoid rotating. Slowly return and repeat on both sides.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Split%20Stance%20Single%20Arm%20Low%20Row%20With%20Cable%20Handle',
     jointArea: 'Shoulder, Elbow',
@@ -946,7 +946,7 @@ export const exercises: Exercise[] = [
     name: 'Split Stance Single Arm Mid Row with Cable Handle',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per arm',
-    difficulty: 'Intermediate',
+
     description: 'Stand in a split stance facing a cable machine with the pulley set at mid height. Grip the handle with one hand and pull it back toward your hip. Keep your torso stable and avoid rotating. Slowly return and repeat on both sides.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Split%20Stance%20Single%20Arm%20Mid%20Row%20With%20Cable%20Handle',
     jointArea: 'Shoulder, Elbow',
@@ -960,7 +960,7 @@ export const exercises: Exercise[] = [
     name: 'Standing Face Pull and External Rotation with Cable Ropes',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Intermediate',
+
     description: 'Stand facing a cable machine with the pulley set at face height. Grip the rope with both hands. Pull the rope toward your face while externally rotating your shoulders, ending with your hands beside your ears and elbows high. Squeeze your shoulder blades together. Slowly return.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Standing%20Face%20Pull%20And%20External%20Rotation%20With%20Cable%20Ropes',
     jointArea: 'Shoulder',
@@ -974,7 +974,7 @@ export const exercises: Exercise[] = [
     name: 'Standing Face Pull with Cable Rope',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Beginner',
+
     description: 'Stand facing a cable machine with the pulley set at face height. Grip the rope with both hands, palms facing each other. Pull the rope toward your face, separating your hands and squeezing your shoulder blades together. Keep your elbows high. Slowly return.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Standing%20Face%20Pull%20With%20Cable%20Rope',
     jointArea: 'Shoulder',
@@ -988,7 +988,7 @@ export const exercises: Exercise[] = [
     name: 'Standing Lat Pullover with Cable Bar',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Intermediate',
+
     description: 'Stand facing a cable machine with the pulley set high. Grip the bar with both hands and arms extended overhead. Keeping your arms straight, pull the bar down in an arc toward your thighs, squeezing your lats. Slowly return to the start position with control.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Standing%20Lat%20Pullover%20With%20Cable%20Bar',
     jointArea: 'Shoulder',
@@ -1002,7 +1002,7 @@ export const exercises: Exercise[] = [
     name: 'Standing Lat Pullover with Cable Rope',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Intermediate',
+
     description: 'Stand facing a cable machine with the pulley set high. Grip the rope with both hands overhead. Keeping your arms straight, pull the rope down in an arc toward your thighs, squeezing your lats. Slowly return to the start position with control.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Standing%20Lat%20Pullover%20With%20Cable%20Rope',
     jointArea: 'Shoulder',
@@ -1016,7 +1016,7 @@ export const exercises: Exercise[] = [
     name: 'Standing Mid Row with Cable Bar',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Beginner',
+
     description: 'Stand facing a cable machine with the pulley at mid height. Grip the bar with both hands at shoulder width. Pull the bar toward your torso, squeezing your shoulder blades together. Keep your back straight and knees slightly bent. Slowly return.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Standing%20Mid%20Row%20With%20Cable%20Bar',
     jointArea: 'Shoulder, Elbow',
@@ -1030,7 +1030,7 @@ export const exercises: Exercise[] = [
     name: 'Standing Mid Row with Cable Rope',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Beginner',
+
     description: 'Stand facing a cable machine with the pulley at mid height. Grip the rope with both hands, palms facing each other. Pull the rope toward your torso, squeezing your shoulder blades together. Keep your back straight and knees slightly bent. Slowly return.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Standing%20Mid%20Row%20With%20Cable%20Rope',
     jointArea: 'Shoulder, Elbow',
@@ -1044,7 +1044,7 @@ export const exercises: Exercise[] = [
     name: 'Standing Single Arm Lat Pullover with Cable Rope',
     category: 'Musculoskeletal',
     duration: '3 sets x 10 reps per arm',
-    difficulty: 'Intermediate',
+
     description: 'Stand facing a cable machine with the pulley set high. Grip the rope with one hand, arm extended overhead. Keeping your arm straight, pull the rope down in an arc toward your hip, squeezing your lat. Slowly return and repeat on both sides.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Standing%20Single%20Arm%20Lat%20Pullover%20With%20Cable%20Rope',
     jointArea: 'Shoulder',
@@ -1058,7 +1058,7 @@ export const exercises: Exercise[] = [
     name: 'Tricep Pushdown with Cable Bar',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Beginner',
+
     description: 'Stand facing a cable machine with the pulley set high. Grip the bar with both hands, elbows tucked at your sides. Extend your arms down by straightening your elbows, squeezing your triceps at the bottom. Slowly return to the start position.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Tricep%20Pushdown%20With%20Cable%20Bar',
     jointArea: 'Elbow',
@@ -1072,7 +1072,7 @@ export const exercises: Exercise[] = [
     name: 'Tricep Pushdown with Cable Rope',
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
-    difficulty: 'Beginner',
+
     description: 'Stand facing a cable machine with the pulley set high. Grip the rope with both hands, palms facing each other, elbows tucked at your sides. Extend your arms down and separate the rope ends at the bottom, squeezing your triceps. Slowly return to start.',
     videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Tricep%20Pushdown%20With%20Cable%20Rope',
     jointArea: 'Elbow',

@@ -42,8 +42,6 @@ const CATEGORIES = [
   'Flexibility'
 ];
 
-const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced'];
-
 const EQUIPMENT_OPTIONS = [
   'Bodyweight',
   'Dumbbells',
@@ -121,7 +119,6 @@ export const AddExerciseModal = ({ onClose, onSuccess }: AddExerciseModalProps) 
   const [formData, setFormData] = useState({
     name: '',
     category: 'Musculoskeletal',
-    difficulty: 'Beginner',
     duration: '',
     description: '',
     videoUrl: '',
@@ -164,7 +161,6 @@ export const AddExerciseModal = ({ onClose, onSuccess }: AddExerciseModalProps) 
         body: JSON.stringify({
           name: formData.name,
           category: formData.category,
-          difficulty: formData.difficulty,
           duration: formData.duration,
           description: formData.description,
           videoUrl: embedUrl || '',
@@ -215,37 +211,20 @@ export const AddExerciseModal = ({ onClose, onSuccess }: AddExerciseModalProps) 
             />
           </div>
 
-          {/* Category and Difficulty Row */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Category <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
-              >
-                {CATEGORIES.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Difficulty <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={formData.difficulty}
-                onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
-              >
-                {DIFFICULTIES.map(diff => (
-                  <option key={diff} value={diff}>{diff}</option>
-                ))}
-              </select>
-            </div>
+          {/* Category */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Category <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={formData.category}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
+            >
+              {CATEGORIES.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
           </div>
 
           {/* Duration */}

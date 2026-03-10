@@ -251,7 +251,6 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
           name: string;
           category: string;
           duration: string;
-          difficulty: string;
           description: string;
           video_url?: string;
           joint_area?: string;
@@ -265,7 +264,6 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
           name: ex.name,
           category: ex.category,
           duration: ex.duration,
-          difficulty: ex.difficulty,
           description: ex.description,
           videoUrl: ex.video_url,
           jointArea: ex.joint_area,

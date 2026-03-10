@@ -144,7 +144,7 @@ Key entities and their relationships:
 
 - **Patient** — has demographics (name, DOB, condition, contact info), has many AssignedPrograms
 - **AssignedProgram** — has ProgramConfig (dates, frequency, duration) and many ProgramExercises
-- **Exercise** — defined by name, joint area, muscle group, equipment, difficulty, video URL
+- **Exercise** — defined by name, joint area, muscle group, equipment, video URL
 - **ProgramExercise** — Exercise + prescription (sets, reps, weight, periodization)
 - **CompletionData** — logged per exercise (sets performed, RPE 1-10, pain 0-10, notes, date)
 - **DailyCheckIn** — patient wellness (mood, pain, energy, sleep ratings)

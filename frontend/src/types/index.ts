@@ -7,7 +7,7 @@ export type Exercise = {
   name: string;
   category: string;
   duration: string;
-  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  difficulty?: 'Beginner' | 'Intermediate' | 'Advanced';
   description: string;
   videoUrl?: string; // YouTube embed URL
   exerciseType?: ExerciseType; // 'reps' (default), 'duration' (timed holds), 'cardio' (duration only)
@@ -35,7 +35,6 @@ export type ExerciseFilters = {
   movementType?: string;
   equipment?: string;
   position?: string;
-  difficulty?: string;
   showFavoritesOnly?: boolean;
 }
 

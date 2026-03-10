@@ -96,7 +96,6 @@ export const ProgramTemplateModal = ({ onLoad, onClose }: ProgramTemplateModalPr
       name: ex.exercise_name,
       category: ex.exercise_category || '',
       duration: '',
-      difficulty: 'Intermediate' as const,
       description: ex.instructions || '',
       sets: ex.sets,
       reps: ex.reps,
