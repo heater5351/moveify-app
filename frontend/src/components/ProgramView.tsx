@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { ArrowLeft, MoreVertical, Check, ChevronLeft, ChevronRight, Pause, Info, Play } from 'lucide-react';
 import type { AssignedProgram, BlockStatusResponse, BlockWeekRow } from '../types/index.ts';
 import { formatDuration, getExerciseType } from '../utils/duration';
+import { exercises as defaultExercises } from '../data/exercises';
 import { LazyVideoCard } from './LazyVideoCard';
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
@@ -19,6 +20,18 @@ export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, on
   const completedCount = program.exercises.filter(e => e.completed).length;
   const totalExercises = program.exercises.length;
   const completionPercentage = totalExercises > 0 ? Math.round((completedCount / totalExercises) * 100) : 0;
+
+  // Build name→videoUrl lookup from default exercises
+  const videoUrlMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const ex of defaultExercises) {
+      if (ex.videoUrl) map.set(ex.name.toLowerCase(), ex.videoUrl);
+    }
+    return map;
+  }, []);
+
+  const getVideoUrl = (exercise: { name: string; videoUrl?: string }) =>
+    exercise.videoUrl || videoUrlMap.get(exercise.name.toLowerCase());
 
   const [blockData, setBlockData] = useState<BlockStatusResponse | null>(null);
   const [overrideLoading, setOverrideLoading] = useState(false);
@@ -344,11 +357,14 @@ export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, on
             >
               {/* Video thumbnail */}
               <div className="w-28 h-20 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 relative flex items-center justify-center">
-                {exercise.videoUrl && !exercise.videoUrl.includes('youtube.com') ? (
-                  <LazyVideoCard src={exercise.videoUrl} className="absolute inset-0" />
-                ) : (
-                  <Play className="text-slate-300" size={24} />
-                )}
+                {(() => {
+                  const url = getVideoUrl(exercise);
+                  return url && !url.includes('youtube.com') ? (
+                    <LazyVideoCard src={url} className="absolute inset-0" />
+                  ) : (
+                    <Play className="text-slate-300" size={24} />
+                  );
+                })()}
               </div>
 
               {/* Exercise info */}
