@@ -115,8 +115,7 @@ router.post('/templates/:id/apply', requireRole('clinician'), async (req, res) =
 // Get unresolved flags for the authenticated clinician
 router.get('/flags', requireRole('clinician'), async (req, res) => {
   try {
-    const clinicianId = req.user.id;
-    const flags = await blockService.getUnresolvedFlags(clinicianId);
+    const flags = await blockService.getUnresolvedFlags();
     res.json({ flags });
   } catch (error) {
     console.error('Get flags error:', error);

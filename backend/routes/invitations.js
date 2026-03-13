@@ -33,29 +33,43 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
 
     const clinicianId = req.user.id;
 
-    // Invalidate any previous invitation tokens for this email
-    await db.query(`UPDATE invitation_tokens SET used = 1 WHERE email = $1 AND used = 0`, [email]);
-
     // Generate unique token
     const token = crypto.randomBytes(32).toString('hex');
 
     // Set expiration (7 days from now)
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Save invitation (always patient role)
-    await db.query(`
-      INSERT INTO invitation_tokens (token, email, role, name, dob, phone, address, condition, expires_at, clinician_id)
-      VALUES ($1, $2, 'patient', $3, $4, $5, $6, $7, $8, $9)
-    `, [token, email, name, dob, phone, address, condition, expiresAt, clinicianId]);
+    // Use transaction to ensure token + user are created atomically
+    const client = await db.getClient();
+    let patientId;
+    try {
+      await client.query('BEGIN');
 
-    // Create user immediately with null password (they'll set it when accepting invitation)
-    const userResult = await db.query(`
-      INSERT INTO users (email, password_hash, role, name, dob, phone, address, condition)
-      VALUES ($1, NULL, 'patient', $2, $3, $4, $5, $6)
-      RETURNING id
-    `, [email, name, dob, phone, address, condition]);
+      // Invalidate any previous invitation tokens for this email
+      await client.query(`UPDATE invitation_tokens SET used = 1 WHERE email = $1 AND used = 0`, [email]);
 
-    const patientId = userResult.rows[0].id;
+      // Save invitation (always patient role)
+      await client.query(`
+        INSERT INTO invitation_tokens (token, email, role, name, dob, phone, address, condition, expires_at, clinician_id)
+        VALUES ($1, $2, 'patient', $3, $4, $5, $6, $7, $8, $9)
+      `, [token, email, name, dob, phone, address, condition, expiresAt, clinicianId]);
+
+      // Create user immediately with null password (they'll set it when accepting invitation)
+      const userResult = await client.query(`
+        INSERT INTO users (email, password_hash, role, name, dob, phone, address, condition)
+        VALUES ($1, NULL, 'patient', $2, $3, $4, $5, $6)
+        RETURNING id
+      `, [email, name, dob, phone, address, condition]);
+
+      patientId = userResult.rows[0].id;
+
+      await client.query('COMMIT');
+    } catch (txError) {
+      await client.query('ROLLBACK');
+      throw txError;
+    } finally {
+      client.release();
+    }
 
     // Generate invitation URL - use env var in production
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';

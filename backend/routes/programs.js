@@ -233,7 +233,11 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
       'SELECT id, exercise_name FROM program_exercises WHERE program_id = $1 ORDER BY exercise_order ASC',
       [programId]
     );
-    const existingExerciseMap = new Map(
+    // Build lookup by ID (preferred) and by name (fallback for new exercises)
+    const existingExerciseById = new Map(
+      existingExercises.rows.map(ex => [ex.id, ex])
+    );
+    const existingExerciseByName = new Map(
       existingExercises.rows.map(ex => [ex.exercise_name, ex.id])
     );
 
@@ -243,7 +247,10 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
     // Update or insert exercises (preserve existing IDs where possible)
     for (let index = 0; index < exercises.length; index++) {
       const exercise = exercises[index];
-      const existingId = existingExerciseMap.get(exercise.name);
+      // Prefer matching by ID (handles duplicate names), fall back to name
+      const existingId = (exercise.id && existingExerciseById.has(exercise.id))
+        ? exercise.id
+        : existingExerciseByName.get(exercise.name);
       const duration = exercise.prescribedDuration != null ? exercise.prescribedDuration : null;
       const rest = exercise.restDuration != null ? exercise.restDuration : null;
 
@@ -383,13 +390,13 @@ router.patch('/exercise/:exerciseId/complete', requireRole('patient'), async (re
         exerciseId,
         patientId,
         dateToUse,
-        setsPerformed || null,
-        repsPerformed || null,
-        weightPerformed || null,
-        durationPerformed || null,
-        rpeRating || null,
-        painLevel || null,
-        notes || null
+        setsPerformed ?? null,
+        repsPerformed ?? null,
+        weightPerformed ?? null,
+        durationPerformed ?? null,
+        rpeRating ?? null,
+        painLevel ?? null,
+        notes ?? null
       ]);
 
       audit.log(req, 'exercise_complete', 'exercise_completion', parseInt(exerciseId), { date: dateToUse });

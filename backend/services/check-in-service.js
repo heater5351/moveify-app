@@ -103,7 +103,8 @@ async function submitCheckIn(checkInData) {
  * Get today's check-in for a patient
  */
 async function getTodayCheckIn(patientId) {
-  const today = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   const checkIn = await db.getOne(`
     SELECT * FROM daily_check_ins

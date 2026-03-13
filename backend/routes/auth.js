@@ -267,9 +267,9 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
-    // Find valid token
+    // Atomically claim the token (prevents race condition with concurrent requests)
     const resetToken = await db.getOne(
-      'SELECT * FROM password_reset_tokens WHERE token = $1 AND used = FALSE AND expires_at > NOW()',
+      'UPDATE password_reset_tokens SET used = TRUE WHERE token = $1 AND used = FALSE AND expires_at > NOW() RETURNING *',
       [token]
     );
 
@@ -282,9 +282,6 @@ router.post('/reset-password', async (req, res) => {
 
     // Update user's password
     await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, resetToken.user_id]);
-
-    // Mark token as used
-    await db.query('UPDATE password_reset_tokens SET used = TRUE WHERE id = $1', [resetToken.id]);
 
     audit.log(req, 'password_reset', 'user', resetToken.user_id);
 

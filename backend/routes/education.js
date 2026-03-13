@@ -13,8 +13,7 @@ router.get('/modules', requireRole('clinician'), async (req, res) => {
   try {
     const { category } = req.query;
     const modules = await educationService.getAllModules({
-      category,
-      createdBy: req.user.id
+      category
     });
     res.json({ modules });
   } catch (error) {

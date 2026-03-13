@@ -10,9 +10,37 @@ const router = express.Router();
 // All patient routes require authentication
 router.use(authenticate);
 
+// Timezone-safe date string (avoids UTC shift from toISOString)
+function toLocalDateString(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Normalize pg DATE column to YYYY-MM-DD string (pg may return Date object or string)
+function normalizeDateStr(d) {
+  if (!d) return '';
+  if (typeof d === 'string') return d.split('T')[0];
+  return toLocalDateString(d);
+}
+
+// Accurate age calculation accounting for month and day
+function calculateAge(dob) {
+  if (!dob) return 0;
+  const birth = new Date(dob);
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const monthDiff = now.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age;
+}
+
 // Helper to format a patient with their programs (OPTIMIZED - reduces N+1 queries)
 async function formatPatientWithPrograms(patient) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalDateString(new Date());
 
   // Get ALL programs with their data in ONE query
   const programs = await db.getAll(
@@ -26,7 +54,7 @@ async function formatPatientWithPrograms(patient) {
       name: patient.name,
       email: patient.email,
       dob: patient.dob || '',
-      age: patient.dob ? new Date().getFullYear() - new Date(patient.dob).getFullYear() : 0,
+      age: calculateAge(patient.dob),
       condition: patient.condition || '',
       phone: patient.phone || '',
       address: patient.address || '',
@@ -71,7 +99,7 @@ async function formatPatientWithPrograms(patient) {
   // Create a Map for O(1) lookup with completion data
   const completionDataMap = new Map();
   completions.forEach(c => {
-    const key = `${c.exercise_id}-${c.completion_date}`;
+    const key = `${c.exercise_id}-${normalizeDateStr(c.completion_date)}`;
     completionDataMap.set(key, {
       setsPerformed: c.setsPerformed,
       repsPerformed: c.repsPerformed,
@@ -86,7 +114,7 @@ async function formatPatientWithPrograms(patient) {
   // Also create a map for today's completions for backwards compatibility
   const todayCompletionMap = new Map(
     completions
-      .filter(c => c.completion_date === today)
+      .filter(c => normalizeDateStr(c.completion_date) === today)
       .map(c => [c.exercise_id, {
         setsPerformed: c.setsPerformed,
         repsPerformed: c.repsPerformed,
@@ -112,9 +140,7 @@ async function formatPatientWithPrograms(patient) {
     completions
       .filter(c => c.exercise_id === ex.id)
       .forEach(c => {
-        const dateKey = typeof c.completion_date === 'string'
-          ? c.completion_date.split('T')[0]
-          : new Date(c.completion_date).toISOString().split('T')[0];
+        const dateKey = normalizeDateStr(c.completion_date);
 
         allExerciseCompletions[dateKey] = {
           setsPerformed: c.setsPerformed,
@@ -167,7 +193,7 @@ async function formatPatientWithPrograms(patient) {
     name: patient.name,
     email: patient.email,
     dob: patient.dob || '',
-    age: patient.dob ? new Date().getFullYear() - new Date(patient.dob).getFullYear() : 0,
+    age: calculateAge(patient.dob),
     condition: patient.condition || '',
     phone: patient.phone || '',
     address: patient.address || '',
@@ -180,7 +206,7 @@ async function formatPatientWithPrograms(patient) {
 // Batched: 4 queries total regardless of patient count
 router.get('/', requireRole('clinician'), async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = toLocalDateString(new Date());
 
     // 1. All patients
     const patients = await db.getAll(`
@@ -254,13 +280,11 @@ router.get('/', requireRole('clinician'), async (req, res) => {
       }
 
       const exCompletions = completionsByExercise[ex.id] || [];
-      const todayCompletion = exCompletions.find(c => c.completion_date === today);
+      const todayCompletion = exCompletions.find(c => normalizeDateStr(c.completion_date) === today);
 
       const allExCompletions = {};
       exCompletions.forEach(c => {
-        const dateKey = typeof c.completion_date === 'string'
-          ? c.completion_date.split('T')[0]
-          : new Date(c.completion_date).toISOString().split('T')[0];
+        const dateKey = normalizeDateStr(c.completion_date);
         allExCompletions[dateKey] = {
           setsPerformed: c.setsPerformed,
           repsPerformed: c.repsPerformed,
@@ -326,7 +350,7 @@ router.get('/', requireRole('clinician'), async (req, res) => {
       name: patient.name,
       email: patient.email,
       dob: patient.dob || '',
-      age: patient.dob ? new Date().getFullYear() - new Date(patient.dob).getFullYear() : 0,
+      age: calculateAge(patient.dob),
       condition: patient.condition || '',
       phone: patient.phone || '',
       address: patient.address || '',

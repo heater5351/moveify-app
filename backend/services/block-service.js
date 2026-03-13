@@ -193,8 +193,10 @@ async function evaluateProgression(programId) {
     // Compute this week's calendar date range
     const weekStartMs = startDate.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000;
     const weekEndMs = startDate.getTime() + week * 7 * 24 * 60 * 60 * 1000;
-    const weekStartStr = new Date(weekStartMs).toISOString().split('T')[0];
-    const weekEndStr = new Date(weekEndMs).toISOString().split('T')[0];
+    const wsDate = new Date(weekStartMs);
+    const weDate = new Date(weekEndMs);
+    const weekStartStr = `${wsDate.getFullYear()}-${String(wsDate.getMonth() + 1).padStart(2, '0')}-${String(wsDate.getDate()).padStart(2, '0')}`;
+    const weekEndStr = `${weDate.getFullYear()}-${String(weDate.getMonth() + 1).padStart(2, '0')}-${String(weDate.getDate()).padStart(2, '0')}`;
 
     // Fetch daily check-ins for this week's date range
     const checkIns = await db.getAll(`
@@ -423,15 +425,15 @@ async function overrideCell(blockScheduleId, programExerciseId, weekNumber, data
 /**
  * Get unresolved flags for a clinician's patients.
  */
-async function getUnresolvedFlags(clinicianId) {
+async function getUnresolvedFlags() {
   return db.getAll(`
     SELECT cf.*, u.name as patient_name, p.name as program_name
     FROM clinician_flags cf
     JOIN users u ON cf.patient_id = u.id
     JOIN programs p ON cf.program_id = p.id
-    WHERE p.clinician_id = $1 AND cf.resolved = FALSE
+    WHERE cf.resolved = FALSE
     ORDER BY cf.created_at DESC
-  `, [clinicianId]);
+  `);
 }
 
 /**

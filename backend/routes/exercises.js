@@ -54,7 +54,18 @@ router.get('/', async (req, res) => {
 
     const exercises = await db.getAll(query, params);
 
-    res.json(exercises);
+    // Map snake_case DB columns to camelCase for frontend
+    res.json(exercises.map(ex => ({
+      ...ex,
+      videoUrl: ex.video_url,
+      exerciseType: ex.exercise_type,
+      jointArea: ex.joint_area,
+      muscleGroup: ex.muscle_group,
+      movementType: ex.movement_type,
+      imageUrl: ex.image_url,
+      clinicianId: ex.clinician_id,
+      createdAt: ex.created_at,
+    })));
   } catch (error) {
     console.error('Get exercises error:', error);
     res.status(500).json({ error: 'Server error' });

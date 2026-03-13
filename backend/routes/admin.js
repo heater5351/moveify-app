@@ -117,20 +117,34 @@ router.post('/clinicians/invite', async (req, res) => {
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Save invitation with clinician role
-    await db.query(`
-      INSERT INTO invitation_tokens (token, email, role, name, expires_at, clinician_id)
-      VALUES ($1, $2, 'clinician', $3, $4, $5)
-    `, [token, email, name, expiresAt, req.user.id]);
+    // Use transaction to ensure token + user are created atomically
+    const client = await db.getClient();
+    let newClinicianId;
+    try {
+      await client.query('BEGIN');
 
-    // Create user with null password
-    const userResult = await db.query(`
-      INSERT INTO users (email, password_hash, role, name)
-      VALUES ($1, NULL, 'clinician', $2)
-      RETURNING id
-    `, [email, name]);
+      // Save invitation with clinician role
+      await client.query(`
+        INSERT INTO invitation_tokens (token, email, role, name, expires_at, clinician_id)
+        VALUES ($1, $2, 'clinician', $3, $4, $5)
+      `, [token, email, name, expiresAt, req.user.id]);
 
-    const newClinicianId = userResult.rows[0].id;
+      // Create user with null password
+      const userResult = await client.query(`
+        INSERT INTO users (email, password_hash, role, name)
+        VALUES ($1, NULL, 'clinician', $2)
+        RETURNING id
+      `, [email, name]);
+
+      newClinicianId = userResult.rows[0].id;
+
+      await client.query('COMMIT');
+    } catch (txError) {
+      await client.query('ROLLBACK');
+      throw txError;
+    } finally {
+      client.release();
+    }
 
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const invitationUrl = `${baseUrl}/setup-password?token=${token}`;

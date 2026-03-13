@@ -2,12 +2,20 @@
 const db = require('../database/db');
 const checkInService = require('./check-in-service');
 
+// Timezone-safe date string (avoids UTC shift from toISOString)
+function toLocalDateString(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 /**
  * Initialize a periodization cycle for a program
  * Called when a program is created
  */
 async function initializeCycle(programId, blockType = 'standard') {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalDateString(new Date());
   const totalWeeks = blockType === 'introductory' ? 4 : 6;
   const blockNumber = blockType === 'introductory' ? 0 : 1;
 
@@ -143,8 +151,8 @@ function checkProgressionGates(metrics, blockType) {
 async function getWeeklyMetrics(exerciseId, patientId) {
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const startDate = sevenDaysAgo.toISOString().split('T')[0];
-  const endDate = new Date().toISOString().split('T')[0];
+  const startDate = toLocalDateString(sevenDaysAgo);
+  const endDate = toLocalDateString(new Date());
 
   // Get exercise completion metrics
   const exerciseMetrics = await db.getOne(`
@@ -289,7 +297,7 @@ async function progressProgram(programId) {
         UPDATE program_exercises
         SET sets = $1, reps = $2, last_adjusted_date = $3
         WHERE id = $4
-      `, [newSets, newReps, new Date().toISOString().split('T')[0], exercise.id]);
+      `, [newSets, newReps, toLocalDateString(new Date()), exercise.id]);
 
       // Log adjustment
       await db.query(`
@@ -358,7 +366,7 @@ async function progressProgram(programId) {
         programId,
         'standard',
         cycle.block_number + 1,
-        new Date().toISOString().split('T')[0],
+        toLocalDateString(new Date()),
         1,
         6,
         newIntensity

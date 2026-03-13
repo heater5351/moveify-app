@@ -235,7 +235,7 @@ function App() {
   };
 
   const handleAddToProgram = (exercises: ProgramExercise[]) => {
-    setProgramExercises([...programExercises, ...exercises]);
+    setProgramExercises(prev => [...prev, ...exercises]);
   };
 
   const handleAddSingleExercise = (exercise: ProgramExercise) => {
@@ -243,7 +243,7 @@ function App() {
   };
 
   const handleRemoveFromProgram = (index: number) => {
-    setProgramExercises(programExercises.filter((_, i) => i !== index));
+    setProgramExercises(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleUpdateExercise = (index: number, field: 'sets' | 'reps' | 'weight' | 'duration' | 'rest' | 'instructions', value: number | string) => {
@@ -865,7 +865,7 @@ function App() {
       )}
 
       {/* Edit Profile Modal (clinician) */}
-      {showEditProfileModal && loggedInUser && (
+      {showEditProfileModal && loggedInUser && userRole === 'clinician' && (
         <EditProfileModal
           user={loggedInUser}
           onClose={() => setShowEditProfileModal(false)}

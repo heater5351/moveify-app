@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2, X, GripVertical, BarChart2, FolderOpen, Save } from 'lucide-react';
 import type { ProgramExercise, Patient } from '../types/index.ts';
 import { formatDuration, getExerciseType } from '../utils/duration.ts';
@@ -74,6 +74,20 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
     exercise.instructions || ''
   );
   const [showNotes, setShowNotes] = useState(!!exercise.instructions);
+
+  // Sync local state when exercise props change (e.g., template load, block data applied)
+  useEffect(() => {
+    setSetsInput(String(exercise.sets));
+    setRepsInput(String(exercise.reps));
+    setWeightInputValue(String(exercise.prescribedWeight || ''));
+    setDurationInput(
+      exerciseType === 'cardio'
+        ? String(exercise.prescribedDuration ? Math.round(exercise.prescribedDuration / 60) : '')
+        : String(exercise.prescribedDuration || '')
+    );
+    setRestInput(String(exercise.restDuration || ''));
+    setInstructionsInput(exercise.instructions || '');
+  }, [exercise.sets, exercise.reps, exercise.prescribedWeight, exercise.prescribedDuration, exercise.restDuration, exercise.instructions, exerciseType]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
