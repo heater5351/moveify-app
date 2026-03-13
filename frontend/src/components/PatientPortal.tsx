@@ -8,6 +8,7 @@ import DailyCheckInModal from './modals/DailyCheckInModal';
 import BlockProgressBanner from './BlockProgressBanner';
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
+import { toLocalDateString } from '../utils/date.ts';
 import { exercises as defaultExercises } from '../data/exercises';
 import { formatDuration, getExerciseType } from '../utils/duration';
 
@@ -190,7 +191,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   };
   const selectedDayShort = daysOfWeek[selectedWeekDay];
   const selectedDate = weekDates[selectedWeekDay];
-  const selectedDateString = selectedDate.toISOString().split('T')[0];
+  const selectedDateString = toLocalDateString(selectedDate);
 
   const selectedProgram = patient.assignedPrograms[selectedProgramIndex];
 
@@ -331,7 +332,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                   >
                     <div className="font-semibold text-sm sm:text-base">{program.config.name}</div>
                     <div className="text-xs mt-1.5 sm:mt-2 opacity-90">
-                      {program.exercises.filter(e => !!e.allCompletions?.[todayDate.toISOString().split('T')[0]]).length}/{program.exercises.length} completed today
+                      {program.exercises.filter(e => !!e.allCompletions?.[toLocalDateString(todayDate)]).length}/{program.exercises.length} completed today
                     </div>
                   </button>
                 ))}

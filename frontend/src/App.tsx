@@ -31,6 +31,7 @@ import { PatientEditProfileModal } from './components/modals/PatientEditProfileM
 import { AdminPanel } from './components/AdminPanel';
 import { API_URL } from './config';
 import { getAuthHeaders, setToken, clearAuth, setStoredUser, getToken } from './utils/api';
+import { toLocalDateString } from './utils/date.ts';
 
 function App() {
   // Authentication state
@@ -385,7 +386,7 @@ function App() {
                 headers: getAuthHeaders(),
                 body: JSON.stringify({
                   blockDuration: pendingBlockData.duration,
-                  startDate: new Date().toISOString().split('T')[0],
+                  startDate: toLocalDateString(new Date()),
                   exerciseWeeks: remappedWeeks
                 })
               });

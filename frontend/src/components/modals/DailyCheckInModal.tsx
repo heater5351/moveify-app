@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import { toLocalDateString } from '../../utils/date.ts';
 
 type CheckInData = {
   patientId: number;
@@ -67,7 +68,7 @@ export default function DailyCheckInModal({ isOpen, onClose, onSubmit, patientId
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = toLocalDateString(new Date());
       await onSubmit({
         patientId,
         checkInDate: today,

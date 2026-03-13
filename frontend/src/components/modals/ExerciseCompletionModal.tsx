@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
 import type { ProgramExercise, ProgramConfig, CompletionData } from '../../types/index.ts';
 import { formatDuration, getExerciseType } from '../../utils/duration.ts';
+import { toLocalDateString } from '../../utils/date.ts';
 
 interface ExerciseCompletionModalProps {
   exercise: ProgramExercise;
@@ -107,7 +108,7 @@ export const ExerciseCompletionModal = ({
       rpeRating,
       painLevel,
       notes: notes || undefined,
-      completionDate: selectedDate?.toISOString().split('T')[0]
+      completionDate: selectedDate ? toLocalDateString(selectedDate) : undefined
     };
     if (exerciseType !== 'reps') {
       data.durationPerformed = exercise.prescribedDuration || 0;
@@ -123,7 +124,7 @@ export const ExerciseCompletionModal = ({
       rpeRating,
       painLevel,
       notes: notes || undefined,
-      completionDate: selectedDate?.toISOString().split('T')[0]
+      completionDate: selectedDate ? toLocalDateString(selectedDate) : undefined
     };
     if (exerciseType !== 'reps') {
       data.durationPerformed = durationPerformed;

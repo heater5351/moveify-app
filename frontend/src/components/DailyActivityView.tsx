@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Heart, Dumbbell, Moon, Zap, Frown, Meh, Smil
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
 import { formatDuration } from '../utils/duration';
+import { toLocalDateString } from '../utils/date.ts';
 import type { DailyCheckIn, ExerciseCompletion } from '../types/index.ts';
 
 // ── Color helpers (matching ProgressAnalytics thresholds) ────────────
@@ -36,14 +37,6 @@ const getFeelingIcon = (val: number) => {
 const getFeelingLabel = (val: number) => {
   const labels: Record<number, string> = { 1: 'Very Poor', 2: 'Poor', 3: 'Okay', 4: 'Good', 5: 'Great' };
   return labels[val] || '';
-};
-
-// ── Date helpers ─────────────────────────────────────────────────────
-const toLocalDateString = (d: Date) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 };
 
 const formatDisplayDate = (dateStr: string) => {
