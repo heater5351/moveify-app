@@ -323,70 +323,28 @@ Defined in `backend/database/init.js`. Key tables:
 
 ## Known Technical Debt
 
-- **N+1 queries** in `patients.js` patient loading — no SQL joins used
 - **No error boundaries** for API failures — only React render errors caught by `ErrorBoundary.tsx`
-- **No test framework** — when adding tests, prefer Vitest (matches Vite ecosystem)
 
 ## Important Notes
 
 - The app is a **SPA with client-side routing** — all routes rewrite to index.html (configured in vercel.json)
-- The exercise library has 25+ built-in exercises in `data/exercises.ts` — clinicians can also create custom exercises
-- Page layouts should use `h-screen` with flex containers for proper scrolling (see recent git history for scroll fixes)
+- The exercise library has 100+ built-in exercises in `data/exercises.ts` — clinicians can also create custom exercises
+- Page layouts should use `h-screen` with flex containers for proper scrolling
+- Tests use **Vitest** — backend tests in `backend/tests/*.test.mjs`, frontend tests colocated (e.g., `src/utils/api.test.ts`)
 
 ## Privacy & Compliance (Australian Privacy Act 1988)
 
 Moveify stores **sensitive health information** (patient demographics, conditions, pain scores, exercise completions, daily wellness check-ins). This carries legal obligations under Australian law. When writing code that touches patient data, always consider these requirements.
 
-### Why the Privacy Act applies
+### Key rules
 
-- Health data is classified as **"sensitive information"** under the Privacy Act — the highest protection tier
-- **Health service providers are NOT exempt** from the Privacy Act regardless of revenue (the normal $3M small business exemption does not apply to health service providers — Privacy Act s6D(4))
-- Australia has **no controller/processor distinction** (unlike GDPR). Any entity that *holds* personal information is an APP entity with full obligations. This means both the clinics using Moveify AND Moveify as the platform are almost certainly covered, since Moveify holds the data
-- **Conservative position:** treat Moveify as fully covered by the Privacy Act and all 13 APPs. Consult a privacy lawyer to confirm the exact classification
+- Moveify is fully covered by the Privacy Act and all 13 APPs (health data = sensitive information, no small business exemption for health service providers)
+- **Do not move Cloud SQL to a non-Australian region** without legal review (data must stay in `australia-southeast1`)
+- Compliance docs: `docs/breach-response-plan.md`, `docs/data-retention-policy.md`
+- Privacy policy at `/privacy-policy`, data export/deletion feature exists, health data consent on signup
 
-### Key obligations (Australian Privacy Principles)
+### Remaining compliance gap
 
-| APP | Requirement | What it means for Moveify |
-|-----|-------------|---------------------------|
-| **APP 3** | Collection — only collect sensitive info with consent and if reasonably necessary | Must have explicit consent flow; don't collect health data beyond what's needed |
-| **APP 5** | Notification — tell individuals what you collect, why, and who gets it | Requires a privacy policy displayed in-app |
-| **APP 6** | Use & disclosure — only for the primary purpose it was collected for | Don't repurpose patient health data (e.g., analytics, marketing) without consent |
-| **APP 8** | Cross-border disclosure — accountable if overseas recipient mishandles data | Data is in `australia-southeast1` (Sydney) so this is currently a non-issue. **Do not move Cloud SQL to a non-Australian region without legal review** |
-| **APP 11** | Security — take "reasonable steps" to protect from misuse, loss, unauthorized access | Encryption at rest/transit (Cloud SQL + Cloud Run defaults), access controls, bcrypt hashing, patching |
-| **APP 12** | Access — individuals can request access to their data | Need a data export/access mechanism |
-| **APP 13** | Correction — individuals can request correction of their data | Need ability for patients to request corrections |
-
-### Notifiable Data Breaches (NDB) scheme
-
-If a breach is **likely to cause serious harm**:
-1. **Assess** within **30 calendar days** of becoming aware (s26WH)
-2. **Notify the OAIC and all affected individuals** "as soon as practicable" after forming a reasonable belief the breach is eligible (s26WK, s26WL) — there is no fixed day count, but the OAIC enforces this strictly
-3. Health sector is the #1 reported breach category (~20% of all NDB notifications)
-
-### Current technical safeguards (in place)
-
-- Encryption at rest (Cloud SQL default) and in transit (HTTPS/TLS on Cloud Run)
-- Automated daily backups with 7-day retention
-- Data stored in `australia-southeast1` — no cross-border transfer
-- Non-root Docker container, no hardcoded credentials
-- Passwords hashed with bcrypt
-- **JWT authentication** on all API routes with role-based authorization
-- **Admin-gated destructive actions** — only admin clinicians can delete patients
-- **Patients can only access their own data** via self-access checks
-- **Rate limiting** on auth endpoints (10 req/15min) and general API (100 req/min)
-- **Security headers** via helmet (CSP, X-Frame-Options, etc.)
-- **CORS hardened** — no wildcard in production
-- **Audit logging** of key operations (login, patient access, program CRUD, completions, check-ins)
-- **No public signup** — users created via clinician invitation only
-- **Input validation** — email format, password minimum length
-- **Explicit health data consent** — required checkbox during patient signup (APP 3), stored with timestamp and version in `users` table
-
-### Known compliance gaps (TODO)
-
-- ~~**No privacy policy** displayed in-app (APP 1, APP 5)~~ — **DONE:** `/privacy-policy` public route, linked from login and setup-password pages
-- ~~**No data export or deletion** feature for patients (APP 12, APP 13, APP 11)~~ — **DONE**
-- ~~**No documented breach response plan** (NDB scheme)~~ — **DONE:** `docs/breach-response-plan.md`
-- ~~**No data retention policy** — APP 11 requires destroying data no longer needed~~ — **DONE:** `docs/data-retention-policy.md`
 - **IAM permissions not yet reviewed** for least-privilege
 
 ### Development guidelines
@@ -399,23 +357,14 @@ If a breach is **likely to cause serious harm**:
 
 ## Workflow
 
-- **Always commit AND push after EVERY change.** Do not wait for the user to ask. If you edited files, commit and `git push` immediately — no exceptions. The `/commit-commands:commit` skill only creates the commit — you MUST run `git push` yourself immediately after. Never leave commits unpushed. This includes code changes, config changes, docs, and fixes. The user expects Vercel to deploy automatically after each push.
-- **Always redeploy the backend after backend changes.** If you modified any file in `backend/`, redeploy to Cloud Run immediately after pushing — do not ask the user. Frontend deploys automatically via Vercel, but backend requires manual deployment. Run this command:
-  ```
-  gcloud run deploy moveify-backend --source backend/ --region australia-southeast1 --platform managed --allow-unauthenticated --add-cloudsql-instances moveify-app:australia-southeast1:moveify-db
-  ```
-  If `gcloud auth` has expired, run `gcloud auth login` first. The deploy takes ~3-5 minutes.
+**⚠ CRITICAL: After EVERY change, you MUST commit AND `git push` in the same step. No exceptions. Do NOT wait for the user to tell you to push.**
 
-## Memory
+1. Use `/commit-commands:commit` to create the commit
+2. **Immediately** run `git push` — the commit skill does NOT push for you
+3. Frontend auto-deploys via Vercel on push. Never leave commits unpushed.
 
-- A persistent memory file exists at `~/.claude/projects/.../memory/MEMORY.md` — it's auto-loaded each conversation.
-- Use it to track: project state, recent work, what's next, user preferences, and key decisions.
-- Keep entries concise. Update after completing significant work so the next session has context.
-- When starting a new session, check MEMORY.md to pick up where we left off.
-
-## Plugins
-
-When using Claude Code with this project, the following plugins are recommended:
-
-- `frontend-design` — for generating UI components and layouts. Use when building new pages, redesigning existing views, or creating component mockups.
-- `commit-commands` — for streamlined git workflows. Use `/commit-commands:commit` for commits.
+**Backend changes:** If you modified any file in `backend/`, redeploy to Cloud Run immediately after pushing:
+```
+gcloud run deploy moveify-backend --source backend/ --region australia-southeast1 --platform managed --allow-unauthenticated --add-cloudsql-instances moveify-app:australia-southeast1:moveify-db
+```
+If `gcloud auth` has expired, run `gcloud auth login` first.
