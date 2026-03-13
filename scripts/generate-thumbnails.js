@@ -25,8 +25,9 @@ const os = require('os');
 
 const BUCKET_NAME = 'moveify-exercise-videos';
 const FRAME_TIME = '5'; // seconds into the video
-const QUALITY = '5'; // ffmpeg jpg quality (2-31, lower = better)
+const QUALITY = '2'; // ffmpeg jpg quality (2-31, lower = better)
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
+const FORCE = process.argv.includes('--force'); // Regenerate all thumbnails
 
 async function main() {
   const storage = new Storage();
@@ -47,12 +48,14 @@ async function main() {
   for (const file of videos) {
     const thumbName = `${file.name}.jpg`;
 
-    // Check if thumbnail already exists
-    const [exists] = await bucket.file(thumbName).exists();
-    if (exists) {
-      console.log(`  SKIP ${file.name} (thumbnail exists)`);
-      skipped++;
-      continue;
+    // Check if thumbnail already exists (skip unless --force)
+    if (!FORCE) {
+      const [exists] = await bucket.file(thumbName).exists();
+      if (exists) {
+        console.log(`  SKIP ${file.name} (thumbnail exists)`);
+        skipped++;
+        continue;
+      }
     }
 
     const videoPath = path.join(tmpDir, 'video');
@@ -65,7 +68,7 @@ async function main() {
 
       // Extract frame with ffmpeg
       execSync(
-        `"${FFMPEG}" -y -ss ${FRAME_TIME} -i "${videoPath}" -frames:v 1 -q:v ${QUALITY} -vf "scale=320:-1" "${thumbPath}"`,
+        `"${FFMPEG}" -y -ss ${FRAME_TIME} -i "${videoPath}" -frames:v 1 -q:v ${QUALITY} -vf "scale=640:-1" "${thumbPath}"`,
         { stdio: 'pipe' }
       );
 
