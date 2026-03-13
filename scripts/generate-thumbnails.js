@@ -24,7 +24,7 @@ const path = require('path');
 const os = require('os');
 
 const BUCKET_NAME = 'moveify-exercise-videos';
-const FRAME_TIME = '0.5'; // seconds into the video
+const FRAME_TIME = '5'; // seconds into the video
 const QUALITY = '5'; // ffmpeg jpg quality (2-31, lower = better)
 
 async function main() {
