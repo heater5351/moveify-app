@@ -21,7 +21,6 @@ interface PatientPortalProps {
 export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps) => {
   const [selectedWeekDay, setSelectedWeekDay] = useState(new Date().getDay());
   const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, 1 = next week, -1 = previous week
-  const [selectedProgramIndex, setSelectedProgramIndex] = useState(0);
   const [activeView, setActiveView] = useState<'exercises' | 'progress' | 'education'>('exercises');
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<{
@@ -33,13 +32,13 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [_hasCheckedInToday, setHasCheckedInToday] = useState(false);
   const [blockRefreshKey, setBlockRefreshKey] = useState(0);
-  const [blockInfo, setBlockInfo] = useState<{
+  const [blockInfoMap, setBlockInfoMap] = useState<Map<number, {
     hasBlock: boolean;
     startDate?: string;
     currentWeek?: number;
     blockDuration?: number;
     status?: string;
-  } | null>(null);
+  }>>(new Map());
   const [videoModal, setVideoModal] = useState<{ url: string; name: string; description?: string } | null>(null);
 
   // Build a lookup map from exercise name to video URL
@@ -101,31 +100,29 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
     triggerEvaluations();
   }, [patient.id]);
 
-  // Fetch block status for the selected program
+  // Fetch block status for all programs
   useEffect(() => {
-    const fetchBlockInfo = async () => {
-      const program = patient.assignedPrograms?.[selectedProgramIndex];
-      if (!program?.config?.id) {
-        setBlockInfo(null);
-        return;
-      }
-      try {
-        const response = await fetch(`${API_URL}/blocks/${program.config.id}`, {
-          headers: getAuthHeaders()
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setBlockInfo(data);
-        } else {
-          setBlockInfo(null);
+    const fetchAllBlockInfo = async () => {
+      const newMap = new Map<number, typeof blockInfoMap extends Map<number, infer V> ? V : never>();
+      for (const program of patient.assignedPrograms || []) {
+        if (!program.config?.id) continue;
+        try {
+          const response = await fetch(`${API_URL}/blocks/${program.config.id}`, {
+            headers: getAuthHeaders()
+          });
+          if (response.ok) {
+            const data = await response.json();
+            newMap.set(program.config.id, data);
+          }
+        } catch {
+          // Silent
         }
-      } catch {
-        setBlockInfo(null);
       }
+      setBlockInfoMap(newMap);
     };
 
-    fetchBlockInfo();
-  }, [patient.assignedPrograms, selectedProgramIndex, blockRefreshKey]);
+    fetchAllBlockInfo();
+  }, [patient.assignedPrograms, blockRefreshKey]);
 
   const handleCheckInSubmit = async (checkInData: Omit<DailyCheckIn, 'id' | 'createdAt'>) => {
     try {
@@ -194,50 +191,42 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   const selectedDate = weekDates[selectedWeekDay];
   const selectedDateString = toLocalDateString(selectedDate);
 
-  const selectedProgram = patient.assignedPrograms[selectedProgramIndex];
-
-  // Parse program start date (handles both date strings and legacy 'today'/'tomorrow' values)
-  const getProgramStartDate = (): Date | null => {
-    const startDateValue = selectedProgram.config.startDate;
+  // Helper: parse a program's start date
+  const getProgramStartDate = (program: typeof patient.assignedPrograms[0]): Date | null => {
+    const startDateValue = program.config.startDate;
     if (!startDateValue) return null;
-
-    // If it's already a date string (YYYY-MM-DD format)
     if (typeof startDateValue === 'string' && startDateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
       const parsed = new Date(startDateValue);
       parsed.setHours(0, 0, 0, 0);
       return !isNaN(parsed.getTime()) ? parsed : null;
     }
-
-    // Legacy values - can't determine actual date, return null (show all days)
     return null;
   };
 
-  const programStartDate = getProgramStartDate();
-
-  // Check if a date is on or after program start date
-  const isDateAfterProgramStart = (date: Date): boolean => {
-    if (!programStartDate) return true; // If no valid start date, show all
+  // Helper: check if a date is on or after a program's start date
+  const isDateAfterProgramStart = (date: Date, program: typeof patient.assignedPrograms[0]): boolean => {
+    const startDate = getProgramStartDate(program);
+    if (!startDate) return true;
     const checkDate = new Date(date);
     checkDate.setHours(0, 0, 0, 0);
-    return checkDate >= programStartDate;
+    return checkDate >= startDate;
   };
 
-  // Determine if the selected date falls in a future block week (prescription not yet released)
-  const isPrescriptionVisible = (): boolean => {
+  // Helper: check if prescription is visible for a program on the selected date
+  const isPrescriptionVisibleForProgram = (program: typeof patient.assignedPrograms[0]): boolean => {
+    const blockInfo = program.config.id ? blockInfoMap.get(program.config.id) : null;
     if (!blockInfo?.hasBlock || !blockInfo.startDate || !blockInfo.currentWeek || blockInfo.status !== 'active') {
-      return true; // No block — show normal prescription
+      return true;
     }
     const blockStart = new Date(blockInfo.startDate);
     blockStart.setHours(0, 0, 0, 0);
     const viewDate = new Date(selectedDate);
     viewDate.setHours(0, 0, 0, 0);
     const daysSinceBlockStart = (viewDate.getTime() - blockStart.getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceBlockStart < 0) return true; // Before block started — show normal
+    if (daysSinceBlockStart < 0) return true;
     const viewingBlockWeek = Math.floor(daysSinceBlockStart / 7) + 1;
     return viewingBlockWeek <= blockInfo.currentWeek;
   };
-
-  const showPrescription = isPrescriptionVisible();
 
   // Check if selected date is too far in the future to allow completion (more than 1 day ahead)
   const isFutureDate = (): boolean => {
@@ -249,21 +238,53 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
 
   const canComplete = !isFutureDate();
 
-  const hasExercisesToday = selectedProgram.config.frequency.includes(selectedDayShort) && isDateAfterProgramStart(selectedDate);
+  // Build merged exercise list grouped by program for the selected day
+  type ProgramGroup = {
+    programName: string;
+    programIndex: number;
+    programId?: number;
+    isCompleted: boolean;
+    showPrescription: boolean;
+    exercises: (ProgramExercise & { originalIndex: number })[];
+  };
 
-  // Enrich exercises with completion data for the selected date
-  const todaysExercises = hasExercisesToday
-    ? selectedProgram.exercises.map(ex => {
+  const programGroups: ProgramGroup[] = useMemo(() => {
+    const groups: ProgramGroup[] = [];
+    for (let pi = 0; pi < patient.assignedPrograms.length; pi++) {
+      const program = patient.assignedPrograms[pi];
+      const isScheduled = program.config.frequency.includes(selectedDayShort) && isDateAfterProgramStart(selectedDate, program);
+      if (!isScheduled) continue;
+
+      const enrichedExercises = program.exercises.map((ex, ei) => {
         const completionForDate = ex.allCompletions?.[selectedDateString];
         return {
           ...ex,
           completed: !!completionForDate,
-          completionData: completionForDate || null
+          completionData: completionForDate || null,
+          originalIndex: ei,
         };
-      })
-    : [];
+      });
 
-  const isProgramCompleted = selectedProgram.config.duration === 'completed';
+      groups.push({
+        programName: program.config.name || `Program ${pi + 1}`,
+        programIndex: pi,
+        programId: program.config.id,
+        isCompleted: program.config.duration === 'completed',
+        showPrescription: isPrescriptionVisibleForProgram(program),
+        exercises: enrichedExercises,
+      });
+    }
+    return groups;
+  }, [patient.assignedPrograms, selectedDayShort, selectedDateString, selectedDate, blockInfoMap]);
+
+  const hasExercisesToday = programGroups.length > 0;
+
+  // Check if ANY program is scheduled on a given day (for calendar dots)
+  const isDayScheduled = (day: string, date: Date): boolean => {
+    return patient.assignedPrograms.some(
+      program => program.config.frequency.includes(day) && isDateAfterProgramStart(date, program)
+    );
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
@@ -311,35 +332,12 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
         <PatientEducationModules patientId={patient.id} isPatientView={true} />
       ) : (
         <>
-          {/* Block Progress Banner */}
-          {selectedProgram?.id && (
-            <BlockProgressBanner programId={selectedProgram.id} refreshKey={blockRefreshKey} />
-          )}
-
-          {/* Program Selector */}
-          {patient.assignedPrograms.length > 1 && (
-            <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
-              <label className="block text-sm font-semibold text-gray-700 mb-3">Your Programs:</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-                {patient.assignedPrograms.map((program, index) => (
-                  <button
-                    key={program.config.id}
-                    onClick={() => setSelectedProgramIndex(index)}
-                    className={`p-3 sm:p-4 rounded-xl font-medium transition-all text-left shadow-sm ${
-                      selectedProgramIndex === index
-                        ? 'bg-gradient-to-br from-moveify-teal to-moveify-ocean text-white shadow-lg'
-                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
-                    }`}
-                  >
-                    <div className="font-semibold text-sm sm:text-base">{program.config.name}</div>
-                    <div className="text-xs mt-1.5 sm:mt-2 opacity-90">
-                      {program.exercises.filter(e => !!e.allCompletions?.[toLocalDateString(todayDate)]).length}/{program.exercises.length} completed today
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Block Progress Banners — show for all programs with blocks */}
+          {patient.assignedPrograms.map(program => (
+            program.config.id ? (
+              <BlockProgressBanner key={program.config.id} programId={program.config.id} refreshKey={blockRefreshKey} />
+            ) : null
+          ))}
 
           {/* Week View - Optimized for mobile with navigation */}
           <div className="bg-white rounded-xl shadow-md border border-gray-200 p-3 sm:p-6 mb-4 sm:mb-6">
@@ -384,8 +382,8 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                 const date = weekDates[index];
                 const isTodayDate = isToday(date);
                 const isSelected = index === selectedWeekDay;
-                // Only show green dot if day matches frequency AND date is >= program start date
-                const hasDot = selectedProgram.config.frequency.includes(day) && isDateAfterProgramStart(date);
+                // Show green dot if ANY program is scheduled on this day
+                const hasDot = isDayScheduled(day, date);
                 const dayNum = date.getDate();
                 const isPast = date < todayDate && !isTodayDate;
 
@@ -436,141 +434,154 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
               <span className="sm:hidden">{dayNames[selectedWeekDay]}</span>
               {selectedWeekDay === today && <span className="text-moveify-teal"> (Today)</span>}
             </h2>
-
-            {isProgramCompleted && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 mb-4">
-                <p className="text-green-800 font-medium text-sm sm:text-base">✓ Program Completed</p>
-                <p className="text-green-700 text-xs sm:text-sm">Great job! You've completed this program.</p>
-              </div>
-            )}
           </div>
 
-          {/* Exercises Display - Card-based layout */}
+          {/* Exercises Display - Grouped by program */}
           {!hasExercisesToday ? (
             <div className="bg-gray-50 rounded-xl p-8 sm:p-12 text-center">
               <p className="text-gray-500 text-base sm:text-lg">No exercises scheduled for {dayNames[selectedWeekDay]}</p>
-              <p className="text-gray-400 text-xs sm:text-sm mt-2">
-                Scheduled days: {selectedProgram.config.frequency.join(', ')}
-              </p>
+              <p className="text-gray-400 text-xs sm:text-sm mt-2">Check other days on the calendar above</p>
             </div>
           ) : (
-            <div className="space-y-4 sm:space-y-5">
-              {todaysExercises.map((exercise, index) => (
-                <div
-                  key={index}
-                  className={`bg-white rounded-xl sm:rounded-2xl shadow-md sm:shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all ${isProgramCompleted ? 'opacity-75' : ''}`}
-                >
-                  {/* Mobile: Stacked layout, Desktop: Side-by-side */}
-                  <div className="flex flex-col sm:flex-row">
-                    {/* Video Thumbnail */}
-                    <div
-                      className="relative w-full sm:w-48 lg:w-52 h-40 sm:h-36 bg-gradient-to-br from-moveify-teal via-moveify-ocean to-moveify-navy flex items-center justify-center flex-shrink-0 cursor-pointer"
-                      onClick={(e) => {
-                        const url = getVideoUrl(exercise.name);
-                        if (url) { e.stopPropagation(); setVideoModal({ url, name: exercise.name, description: getExerciseDescription(exercise.name) }); }
-                      }}
-                    >
-                      {getVideoUrl(exercise.name) ? (
-                        <LazyVideoCard src={getVideoUrl(exercise.name)!} className="absolute inset-0" />
-                      ) : (
-                        <div className="absolute inset-0 bg-black opacity-10"></div>
-                      )}
-                      <Play className="text-white relative z-10 drop-shadow-lg" size={48} />
-                      {exercise.completed && (
-                        <div className="absolute top-3 right-3 bg-green-500 text-white rounded-full p-1.5 sm:p-2 shadow-lg z-10">
-                          <Check size={16} className="sm:w-5 sm:h-5" />
-                        </div>
+            <div className="space-y-6">
+              {programGroups.map((group) => (
+                <div key={group.programIndex}>
+                  {/* Program Header — always show when multiple programs have exercises today */}
+                  {programGroups.length > 1 && (
+                    <div className="flex items-center gap-3 mb-3">
+                      <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">{group.programName}</h3>
+                      <div className="flex-1 h-px bg-slate-200" />
+                      {group.isCompleted && (
+                        <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Completed</span>
                       )}
                     </div>
+                  )}
 
-                    {/* Exercise Details */}
-                    <div className="flex-1 p-4 sm:p-5 lg:p-6">
-                      <div className="flex items-start justify-between mb-3 sm:mb-4">
-                        <div className="flex-1">
-                          <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{exercise.name}</h3>
+                  {group.isCompleted && programGroups.length <= 1 && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 mb-4">
+                      <p className="text-green-800 font-medium text-sm sm:text-base">Program Completed</p>
+                      <p className="text-green-700 text-xs sm:text-sm">Great job! You've completed this program.</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-4 sm:space-y-5">
+                    {group.exercises.map((exercise) => (
+                      <div
+                        key={`${group.programIndex}-${exercise.originalIndex}`}
+                        className={`bg-white rounded-xl sm:rounded-2xl shadow-md sm:shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all ${group.isCompleted ? 'opacity-75' : ''}`}
+                      >
+                        {/* Mobile: Stacked layout, Desktop: Side-by-side */}
+                        <div className="flex flex-col sm:flex-row">
+                          {/* Video Thumbnail */}
+                          <div
+                            className="relative w-full sm:w-48 lg:w-52 h-40 sm:h-36 bg-gradient-to-br from-moveify-teal via-moveify-ocean to-moveify-navy flex items-center justify-center flex-shrink-0 cursor-pointer"
+                            onClick={(e) => {
+                              const url = getVideoUrl(exercise.name);
+                              if (url) { e.stopPropagation(); setVideoModal({ url, name: exercise.name, description: getExerciseDescription(exercise.name) }); }
+                            }}
+                          >
+                            {getVideoUrl(exercise.name) ? (
+                              <LazyVideoCard src={getVideoUrl(exercise.name)!} className="absolute inset-0" />
+                            ) : (
+                              <div className="absolute inset-0 bg-black opacity-10"></div>
+                            )}
+                            <Play className="text-white relative z-10 drop-shadow-lg" size={48} />
                             {exercise.completed && (
-                              <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-lg">
-                                ✓ Done
-                              </span>
+                              <div className="absolute top-3 right-3 bg-green-500 text-white rounded-full p-1.5 sm:p-2 shadow-lg z-10">
+                                <Check size={16} className="sm:w-5 sm:h-5" />
+                              </div>
                             )}
-                            {isProgramCompleted && (
-                              <span className="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded-lg">
-                                Ended
-                              </span>
+                          </div>
+
+                          {/* Exercise Details */}
+                          <div className="flex-1 p-4 sm:p-5 lg:p-6">
+                            <div className="flex items-start justify-between mb-3 sm:mb-4">
+                              <div className="flex-1">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                  <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{exercise.name}</h3>
+                                  {exercise.completed && (
+                                    <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-lg">
+                                      Done
+                                    </span>
+                                  )}
+                                  {group.isCompleted && (
+                                    <span className="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded-lg">
+                                      Ended
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Prescribed Sets | Reps | Weight — blank for future block weeks */}
+                            {group.showPrescription ? (
+                              <div className="mb-3 sm:mb-4">
+                                <p className="text-sm sm:text-base text-gray-700 font-semibold">
+                                  {(() => {
+                                    const exType = getExerciseType(exercise);
+                                    if (exType === 'cardio') {
+                                      return exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : 'As prescribed';
+                                    }
+                                    if (exType === 'duration') {
+                                      const dur = exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : '—';
+                                      return `${exercise.sets} set${exercise.sets !== 1 ? 's' : ''} | ${dur}`;
+                                    }
+                                    return `${exercise.sets} set${exercise.sets !== 1 ? 's' : ''} | ${exercise.reps} rep${exercise.reps !== 1 ? 's' : ''}${(exercise.prescribedWeight || 0) > 0 ? ` | ${exercise.prescribedWeight} kg` : ''}`;
+                                  })()}
+                                </p>
+                                {(exercise.restDuration || 0) > 0 && (
+                                  <p className="text-xs text-slate-500 mt-0.5">Rest: {formatDuration(exercise.restDuration!)}</p>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-sm sm:text-base text-gray-300 font-semibold mb-3 sm:mb-4">
+                                &mdash;
+                              </p>
                             )}
+
+                            <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 mb-2">
+                              {exercise.description}
+                            </p>
+
+                            {exercise.instructions && (
+                              <div className="flex items-start gap-1.5 bg-primary-50 rounded-lg px-3 py-2 mb-3 sm:mb-4">
+                                <Info size={14} className="text-primary-500 mt-0.5 flex-shrink-0" />
+                                <p className="text-xs text-primary-700">{exercise.instructions}</p>
+                              </div>
+                            )}
+
+                            {/* Buttons */}
+                            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                              {!group.isCompleted && group.showPrescription && canComplete && (
+                                <button
+                                  onClick={() => {
+                                    const weekDates = getDatesForWeek(weekOffset);
+                                    const selectedDate = weekDates[selectedWeekDay];
+
+                                    setSelectedExercise({
+                                      exercise,
+                                      exerciseIndex: exercise.originalIndex,
+                                      programIndex: group.programIndex,
+                                      selectedDate
+                                    });
+                                    setShowCompletionModal(true);
+                                  }}
+                                  className={`w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold transition-all shadow-md hover:shadow-lg text-sm sm:text-base ${exercise.completed
+                                    ? 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700'
+                                    : 'bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-blue-400'
+                                    }`}
+                                >
+                                  {exercise.completed ? 'Edit' : 'Mark Complete'}
+                                </button>
+                              )}
+                              {!group.isCompleted && group.showPrescription && !canComplete && (
+                                <p className="text-xs text-slate-400 italic">Available to complete on the day</p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
-
-                      {/* Prescribed Sets | Reps | Weight — blank for future block weeks */}
-                      {showPrescription ? (
-                        <div className="mb-3 sm:mb-4">
-                          <p className="text-sm sm:text-base text-gray-700 font-semibold">
-                            {(() => {
-                              const exType = getExerciseType(exercise);
-                              if (exType === 'cardio') {
-                                return exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : 'As prescribed';
-                              }
-                              if (exType === 'duration') {
-                                const dur = exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : '—';
-                                return `${exercise.sets} set${exercise.sets !== 1 ? 's' : ''} | ${dur}`;
-                              }
-                              // reps
-                              return `${exercise.sets} set${exercise.sets !== 1 ? 's' : ''} | ${exercise.reps} rep${exercise.reps !== 1 ? 's' : ''}${(exercise.prescribedWeight || 0) > 0 ? ` | ${exercise.prescribedWeight} kg` : ''}`;
-                            })()}
-                          </p>
-                          {(exercise.restDuration || 0) > 0 && (
-                            <p className="text-xs text-slate-500 mt-0.5">Rest: {formatDuration(exercise.restDuration!)}</p>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-sm sm:text-base text-gray-300 font-semibold mb-3 sm:mb-4">
-                          &mdash;
-                        </p>
-                      )}
-
-                      <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 mb-2">
-                        {exercise.description}
-                      </p>
-
-                      {exercise.instructions && (
-                        <div className="flex items-start gap-1.5 bg-primary-50 rounded-lg px-3 py-2 mb-3 sm:mb-4">
-                          <Info size={14} className="text-primary-500 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs text-primary-700">{exercise.instructions}</p>
-                        </div>
-                      )}
-
-                      {/* Buttons */}
-                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                        {!isProgramCompleted && showPrescription && canComplete && (
-                          <button
-                            onClick={() => {
-                              // Calculate the actual date for the selected day
-                              const weekDates = getDatesForWeek(weekOffset);
-                              const selectedDate = weekDates[selectedWeekDay];
-
-                              setSelectedExercise({
-                                exercise,
-                                exerciseIndex: index,
-                                programIndex: selectedProgramIndex,
-                                selectedDate
-                              });
-                              setShowCompletionModal(true);
-                            }}
-                            className={`w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold transition-all shadow-md hover:shadow-lg text-sm sm:text-base ${exercise.completed
-                              ? 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700'
-                              : 'bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-blue-400'
-                              }`}
-                          >
-                            {exercise.completed ? 'Edit' : 'Mark Complete'}
-                          </button>
-                        )}
-                        {!isProgramCompleted && showPrescription && !canComplete && (
-                          <p className="text-xs text-slate-400 italic">Available to complete on the day</p>
-                        )}
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
               ))}
