@@ -1,0 +1,385 @@
+import { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, MoreVertical, Check, ChevronLeft, ChevronRight, Pause, Info, Play } from 'lucide-react';
+import type { AssignedProgram, BlockStatusResponse, BlockWeekRow } from '../types/index.ts';
+import { formatDuration, getExerciseType } from '../utils/duration';
+import { LazyVideoCard } from './LazyVideoCard';
+import { API_URL } from '../config';
+import { getAuthHeaders } from '../utils/api';
+
+interface ProgramViewProps {
+  program: AssignedProgram;
+  patientName: string;
+  onBack: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onDuplicate: () => void;
+}
+
+export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, onDuplicate }: ProgramViewProps) => {
+  const completedCount = program.exercises.filter(e => e.completed).length;
+  const totalExercises = program.exercises.length;
+  const completionPercentage = totalExercises > 0 ? Math.round((completedCount / totalExercises) * 100) : 0;
+
+  const [blockData, setBlockData] = useState<BlockStatusResponse | null>(null);
+  const [overrideLoading, setOverrideLoading] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowActionsMenu(false);
+      }
+    };
+    if (showActionsMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showActionsMenu]);
+
+  const fetchBlockData = async () => {
+    const pid = program.config.id;
+    if (!pid) return;
+    try {
+      const res = await fetch(`${API_URL}/blocks/${pid}`, {
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const weeks: BlockWeekRow[] = (data.weeks || []).map((w: Record<string, unknown>) => ({
+        programExerciseId: w.program_exercise_id ?? w.programExerciseId,
+        exerciseName: w.exercise_name ?? w.exerciseName,
+        weekNumber: w.week_number ?? w.weekNumber,
+        sets: w.sets,
+        reps: w.reps,
+        rpeTarget: w.rpe_target ?? w.rpeTarget ?? null,
+        weight: w.weight ?? null,
+        notes: w.notes ?? null,
+        duration: w.duration ?? null,
+        restDuration: w.rest_duration ?? w.restDuration ?? null,
+      })) as BlockWeekRow[];
+      setBlockData({
+        hasBlock: data.has_block ?? data.hasBlock ?? false,
+        id: data.id,
+        programId: data.program_id ?? data.programId,
+        blockDuration: data.block_duration ?? data.blockDuration,
+        startDate: data.start_date ?? data.startDate,
+        currentWeek: data.current_week ?? data.currentWeek,
+        status: data.status,
+        weeks,
+      });
+    } catch {
+      // Silent — block section won't render
+    }
+  };
+
+  useEffect(() => {
+    fetchBlockData();
+  }, [program.config.id]);
+
+  const handleOverride = async (action: 'regress' | 'hold' | 'advance') => {
+    const pid = program.config.id;
+    if (!pid) return;
+    setOverrideLoading(true);
+    try {
+      await fetch(`${API_URL}/blocks/${pid}/override`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ action }),
+      });
+      await fetchBlockData();
+    } catch {
+      // Silent
+    } finally {
+      setOverrideLoading(false);
+    }
+  };
+
+  const renderPrescription = (exercise: typeof program.exercises[0]) => {
+    const exType = getExerciseType(exercise);
+    if (exType === 'cardio') {
+      return exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : 'As prescribed';
+    }
+    if (exType === 'duration') {
+      const dur = exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : '--';
+      return `${exercise.sets} set${exercise.sets !== 1 ? 's' : ''} x ${dur}`;
+    }
+    return `${exercise.sets} sets x ${exercise.reps} reps${(exercise.prescribedWeight || 0) > 0 ? ` · ${exercise.prescribedWeight} kg` : ''}`;
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft size={20} className="text-slate-600" />
+          </button>
+          <div>
+            <p className="text-sm text-slate-500">{patientName}</p>
+            <h1 className="text-2xl font-bold font-display text-slate-800">{program.config.name}</h1>
+          </div>
+        </div>
+
+        {/* Actions menu */}
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setShowActionsMenu(!showActionsMenu)}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <MoreVertical size={20} className="text-slate-600" />
+          </button>
+          {showActionsMenu && (
+            <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg ring-1 ring-slate-200 py-1 w-44 z-10">
+              <button
+                onClick={() => { setShowActionsMenu(false); onDuplicate(); }}
+                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Duplicate Program
+              </button>
+              <button
+                onClick={() => { setShowActionsMenu(false); onEdit(); }}
+                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Edit Program
+              </button>
+              <button
+                onClick={() => { setShowActionsMenu(false); onDelete(); }}
+                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+              >
+                Delete Program
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Config summary */}
+      <div className="bg-white rounded-xl ring-1 ring-slate-200 p-5 mb-6">
+        <div className="grid grid-cols-3 gap-6 text-sm mb-4">
+          <div>
+            <p className="text-slate-400">Start Date</p>
+            <p className="font-medium text-slate-800">{program.config.startDate}</p>
+          </div>
+          <div>
+            <p className="text-slate-400">Duration</p>
+            <p className="font-medium text-slate-800 capitalize">{program.config.duration}</p>
+          </div>
+          <div>
+            <p className="text-slate-400">Frequency</p>
+            <p className="font-medium text-slate-800">
+              {program.config.frequency.length > 0
+                ? program.config.frequency.join(', ')
+                : 'As needed'}
+            </p>
+          </div>
+        </div>
+        {/* Progress bar */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 bg-slate-200 rounded-full h-2">
+            <div
+              className="bg-primary-400 h-2 rounded-full transition-all"
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+          <span className="text-sm text-slate-500 whitespace-nowrap">
+            {completedCount}/{totalExercises} completed ({completionPercentage}%)
+          </span>
+        </div>
+      </div>
+
+      {/* Block Periodization Section */}
+      {blockData?.hasBlock && (
+        <div className="bg-white rounded-xl ring-1 ring-slate-200 p-5 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold text-slate-800">Block Periodization</h2>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                blockData.status === 'active'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : blockData.status === 'paused'
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-slate-100 text-slate-600'
+              }`}>
+                {blockData.status && blockData.status.charAt(0).toUpperCase() + blockData.status.slice(1)}
+              </span>
+            </div>
+            <span className="text-sm font-medium text-slate-600">
+              Week {blockData.currentWeek} / {blockData.blockDuration}
+            </span>
+          </div>
+
+          {/* Block progress bar */}
+          <div className="w-full bg-slate-200 rounded-full h-2 mb-4">
+            <div
+              className="bg-primary-400 h-2 rounded-full transition-all"
+              style={{ width: `${((blockData.currentWeek || 1) / (blockData.blockDuration || 1)) * 100}%` }}
+            />
+          </div>
+
+          {/* Override buttons */}
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={() => handleOverride('regress')}
+              disabled={overrideLoading || blockData.currentWeek === 1}
+              className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-red-200 text-red-600 hover:bg-red-50"
+            >
+              <ChevronLeft size={14} />
+              Regress Week
+            </button>
+            <button
+              onClick={() => handleOverride('hold')}
+              disabled={overrideLoading}
+              className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-amber-200 text-amber-600 hover:bg-amber-50"
+            >
+              <Pause size={14} />
+              Hold Week
+            </button>
+            <button
+              onClick={() => handleOverride('advance')}
+              disabled={overrideLoading || blockData.currentWeek === blockData.blockDuration}
+              className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+            >
+              Advance Week
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          {/* Week-by-week grid */}
+          {blockData.weeks && blockData.weeks.length > 0 && (() => {
+            const uniqueExercises = [...new Map(
+              blockData.weeks!.map(w => [w.programExerciseId, w.exerciseName])
+            )];
+            const weekCount = blockData.blockDuration || 1;
+            const weeksByExercise = new Map<number, Map<number, BlockWeekRow>>();
+            for (const w of blockData.weeks!) {
+              if (!weeksByExercise.has(w.programExerciseId)) {
+                weeksByExercise.set(w.programExerciseId, new Map());
+              }
+              weeksByExercise.get(w.programExerciseId)!.set(w.weekNumber, w);
+            }
+
+            return (
+              <div className="overflow-x-auto -mx-1">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200">
+                      <th className="text-left py-2 px-2 font-semibold text-slate-600 min-w-[140px]">Exercise</th>
+                      {Array.from({ length: weekCount }, (_, i) => (
+                        <th
+                          key={i + 1}
+                          className={`text-center py-2 px-2 font-semibold min-w-[60px] ${
+                            i + 1 === blockData.currentWeek
+                              ? 'bg-primary-50 text-primary-600'
+                              : 'text-slate-500'
+                          }`}
+                        >
+                          Wk {i + 1}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {uniqueExercises.map(([exId, exName]) => (
+                      <tr key={exId} className="border-b border-slate-100">
+                        <td className="py-2 px-2 font-medium text-slate-700 truncate max-w-[140px]">{exName}</td>
+                        {Array.from({ length: weekCount }, (_, i) => {
+                          const week = weeksByExercise.get(exId)?.get(i + 1);
+                          const isCurrent = i + 1 === blockData.currentWeek;
+                          return (
+                            <td
+                              key={i + 1}
+                              className={`text-center py-2 px-2 ${
+                                isCurrent ? 'bg-primary-50 font-bold text-primary-700' : 'text-slate-600'
+                              }`}
+                            >
+                              {week ? (() => {
+                                const progEx = program.exercises.find(e => e.id === exId);
+                                const exType = progEx ? getExerciseType(progEx) : 'reps';
+                                if (exType === 'cardio' || exType === 'duration') {
+                                  return (
+                                    <>
+                                      {week.sets}x{week.duration ? formatDuration(week.duration) : `${week.reps}`}
+                                      {week.restDuration ? <div className="text-[10px] text-violet-400 font-normal">Rest {formatDuration(week.restDuration)}</div> : null}
+                                    </>
+                                  );
+                                }
+                                return (
+                                  <>
+                                    {week.sets}x{week.reps}
+                                    {week.weight ? <div className="text-[10px] text-slate-400 font-normal">{week.weight}kg</div> : null}
+                                    {week.restDuration ? <div className="text-[10px] text-violet-400 font-normal">Rest {formatDuration(week.restDuration)}</div> : null}
+                                  </>
+                                );
+                              })() : '--'}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Exercise List */}
+      <div className="mb-8">
+        <h2 className="font-semibold text-slate-800 mb-4">Exercises ({totalExercises})</h2>
+        <div className="space-y-3">
+          {program.exercises.map((exercise, index) => (
+            <div
+              key={index}
+              className={`bg-white rounded-xl ring-1 p-4 flex gap-4 ${
+                exercise.completed
+                  ? 'ring-emerald-200 bg-emerald-50/50'
+                  : 'ring-slate-200'
+              }`}
+            >
+              {/* Video thumbnail */}
+              <div className="w-28 h-20 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 relative flex items-center justify-center">
+                {exercise.videoUrl && !exercise.videoUrl.includes('youtube.com') ? (
+                  <LazyVideoCard src={exercise.videoUrl} className="absolute inset-0" />
+                ) : (
+                  <Play className="text-slate-300" size={24} />
+                )}
+              </div>
+
+              {/* Exercise info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-slate-800 truncate">{exercise.name}</h3>
+                  {exercise.completed && (
+                    <span className="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2 py-0.5 rounded flex items-center gap-1 flex-shrink-0">
+                      <Check size={12} />
+                      Done
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-600 mb-1">
+                  <strong>{renderPrescription(exercise)}</strong>
+                  {exercise.holdTime && ` · Hold ${exercise.holdTime}`}
+                </p>
+                {(exercise.restDuration || 0) > 0 && (
+                  <p className="text-xs text-slate-400 mb-1">Rest: {formatDuration(exercise.restDuration!)}</p>
+                )}
+                {exercise.instructions && (
+                  <div className="flex items-start gap-1.5 bg-primary-50 rounded-md px-2.5 py-1.5 mt-1">
+                    <Info size={12} className="text-primary-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-primary-700">{exercise.instructions}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};

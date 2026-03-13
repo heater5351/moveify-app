@@ -15,7 +15,7 @@ import { AddPatientModal } from './components/modals/AddPatientModal';
 import { EditPatientModal } from './components/modals/EditPatientModal';
 import { PatientSelectionModal } from './components/modals/PatientSelectionModal';
 import { ProgramConfigModal } from './components/modals/ProgramConfigModal';
-import { ProgramDetailsModal } from './components/modals/ProgramDetailsModal';
+import { ProgramView } from './components/ProgramView';
 import { NotificationModal } from './components/modals/NotificationModal';
 import { ConfirmModal } from './components/modals/ConfirmModal';
 import { ResetPasswordModal } from './components/modals/ResetPasswordModal';
@@ -58,7 +58,6 @@ function App() {
   const [showEditPatientModal, setShowEditPatientModal] = useState(false);
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [showProgramConfigModal, setShowProgramConfigModal] = useState(false);
-  const [showProgramDetailsModal, setShowProgramDetailsModal] = useState(false);
   const [viewingProgramIndex, setViewingProgramIndex] = useState<number | null>(null);
   const [editingProgramIndex, setEditingProgramIndex] = useState<number | null>(null);
   const [editingProgramId, setEditingProgramId] = useState<number | null>(null);
@@ -491,6 +490,32 @@ function App() {
     setViewingPatient(null);
   };
 
+  const handleDuplicateProgram = (programIndex: number) => {
+    if (!viewingPatient) return;
+
+    const program = viewingPatient.assignedPrograms[programIndex];
+    // Not editing — this is a new program
+    setEditingProgramIndex(null);
+    setEditingProgramId(null);
+    setSelectedPatient(null); // Clinician picks a new patient
+    setProgramName((program.config.name || '') + ' (Copy)');
+    setProgramExercises(program.exercises.map(ex => ({ ...ex, completed: false, completionData: null, allCompletions: {} })));
+    setProgramConfig({
+      startDate: 'today',
+      customStartDate: '',
+      frequency: program.config.frequency,
+      duration: program.config.duration,
+      customEndDate: '',
+      trackActualPerformance: program.config.trackActualPerformance,
+      trackRpe: program.config.trackRpe,
+      trackPainLevel: program.config.trackPainLevel
+    });
+    setPendingBlockData(null);
+    setCurrentPage('exercises');
+    setViewingPatient(null);
+    setViewingProgramIndex(null);
+  };
+
   const handleDeleteProgram = (programId: number, programName: string) => {
     setProgramToDelete({ id: programId, name: programName });
     setShowDeleteProgramConfirm(true);
@@ -519,6 +544,12 @@ function App() {
             const updatedPatient = await patientResponse.json();
             setViewingPatient(updatedPatient);
           }
+        }
+
+        // If we were on the program page, navigate back to patient profile
+        if (currentPage === 'program') {
+          setViewingProgramIndex(null);
+          setCurrentPage('patients');
         }
 
         setNotification({ message: 'Program deleted successfully!', type: 'success' });
@@ -765,17 +796,6 @@ function App() {
           onBack={() => {
             setShowProgramConfigModal(false);
             setShowPatientModal(true);
-          }}
-        />
-      )}
-
-      {showProgramDetailsModal && viewingPatient && viewingProgramIndex !== null && (
-        <ProgramDetailsModal
-          program={viewingPatient.assignedPrograms[viewingProgramIndex]}
-          patientName={viewingPatient.name}
-          onClose={() => {
-            setShowProgramDetailsModal(false);
-            setViewingProgramIndex(null);
           }}
         />
       )}
@@ -1048,6 +1068,25 @@ function App() {
         <div className="flex-1 overflow-y-auto px-6 py-7">
           <EducationLibrary />
         </div>
+      ) : currentPage === 'program' && viewingPatient && viewingProgramIndex !== null ? (
+        <div className="flex-1 overflow-y-auto px-6 py-7">
+          <ProgramView
+            program={viewingPatient.assignedPrograms[viewingProgramIndex]}
+            patientName={viewingPatient.name}
+            onBack={() => {
+              setViewingProgramIndex(null);
+              setCurrentPage('patients');
+            }}
+            onEdit={() => handleEditProgram(viewingProgramIndex)}
+            onDelete={() => {
+              const prog = viewingPatient.assignedPrograms[viewingProgramIndex];
+              if (prog.config.id && prog.config.name) {
+                handleDeleteProgram(prog.config.id, prog.config.name);
+              }
+            }}
+            onDuplicate={() => handleDuplicateProgram(viewingProgramIndex)}
+          />
+        </div>
       ) : (
         <div className="flex-1 overflow-y-auto px-6 py-7">
           {viewingPatient ? (
@@ -1060,7 +1099,7 @@ function App() {
               }}
               onViewProgram={(programIndex) => {
                 setViewingProgramIndex(programIndex);
-                setShowProgramDetailsModal(true);
+                setCurrentPage('program');
               }}
               onEditProgram={handleEditProgram}
               onDeleteProgram={handleDeleteProgram}
