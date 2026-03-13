@@ -26,6 +26,7 @@ const os = require('os');
 const BUCKET_NAME = 'moveify-exercise-videos';
 const FRAME_TIME = '5'; // seconds into the video
 const QUALITY = '5'; // ffmpeg jpg quality (2-31, lower = better)
+const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
 
 async function main() {
   const storage = new Storage();
@@ -64,7 +65,7 @@ async function main() {
 
       // Extract frame with ffmpeg
       execSync(
-        `ffmpeg -y -ss ${FRAME_TIME} -i "${videoPath}" -frames:v 1 -q:v ${QUALITY} -vf "scale=320:-1" "${thumbPath}"`,
+        `"${FFMPEG}" -y -ss ${FRAME_TIME} -i "${videoPath}" -frames:v 1 -q:v ${QUALITY} -vf "scale=320:-1" "${thumbPath}"`,
         { stdio: 'pipe' }
       );
 
@@ -77,9 +78,7 @@ async function main() {
         },
       });
 
-      // Make it publicly readable
-      await bucket.file(thumbName).makePublic();
-
+      // Bucket uses uniform access — no per-object ACL needed
       console.log(`  OK ${thumbName}`);
       generated++;
     } catch (err) {
