@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { ArrowLeft, MoreVertical, Check, ChevronLeft, ChevronRight, Pause, Info, Play } from 'lucide-react';
+import { ArrowLeft, MoreVertical, ChevronLeft, ChevronRight, Pause, Info, Play } from 'lucide-react';
 import type { AssignedProgram, BlockStatusResponse, BlockWeekRow } from '../types/index.ts';
 import { formatDuration, getExerciseType } from '../utils/duration';
 import { exercises as defaultExercises } from '../data/exercises';
@@ -17,9 +17,7 @@ interface ProgramViewProps {
 }
 
 export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, onDuplicate }: ProgramViewProps) => {
-  const completedCount = program.exercises.filter(e => e.completed).length;
   const totalExercises = program.exercises.length;
-  const completionPercentage = totalExercises > 0 ? Math.round((completedCount / totalExercises) * 100) : 0;
 
   // Build name→videoUrl lookup from default exercises
   const videoUrlMap = useMemo(() => {
@@ -191,18 +189,6 @@ export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, on
             </p>
           </div>
         </div>
-        {/* Progress bar */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 bg-slate-200 rounded-full h-2">
-            <div
-              className="bg-primary-400 h-2 rounded-full transition-all"
-              style={{ width: `${completionPercentage}%` }}
-            />
-          </div>
-          <span className="text-sm text-slate-500 whitespace-nowrap">
-            {completedCount}/{totalExercises} completed ({completionPercentage}%)
-          </span>
-        </div>
       </div>
 
       {/* Block Periodization Section */}
@@ -349,11 +335,7 @@ export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, on
           {program.exercises.map((exercise, index) => (
             <div
               key={index}
-              className={`bg-white rounded-xl ring-1 p-4 flex gap-4 ${
-                exercise.completed
-                  ? 'ring-emerald-200 bg-emerald-50/50'
-                  : 'ring-slate-200'
-              }`}
+              className="bg-white rounded-xl ring-1 ring-slate-200 p-4 flex gap-4"
             >
               {/* Video thumbnail */}
               <div className="w-28 h-20 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 relative flex items-center justify-center">
@@ -369,15 +351,7 @@ export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, on
 
               {/* Exercise info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-semibold text-slate-800 truncate">{exercise.name}</h3>
-                  {exercise.completed && (
-                    <span className="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2 py-0.5 rounded flex items-center gap-1 flex-shrink-0">
-                      <Check size={12} />
-                      Done
-                    </span>
-                  )}
-                </div>
+                <h3 className="font-semibold text-slate-800 truncate mb-1">{exercise.name}</h3>
                 <p className="text-sm text-slate-600 mb-1">
                   <strong>{renderPrescription(exercise)}</strong>
                   {exercise.holdTime && ` · Hold ${exercise.holdTime}`}
