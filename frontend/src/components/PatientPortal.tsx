@@ -191,13 +191,13 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   const selectedDate = weekDates[selectedWeekDay];
   const selectedDateString = toLocalDateString(selectedDate);
 
-  // Helper: parse a program's start date
+  // Helper: parse a program's start date (avoids UTC shift by splitting manually)
   const getProgramStartDate = (program: typeof patient.assignedPrograms[0]): Date | null => {
     const startDateValue = program.config.startDate;
     if (!startDateValue) return null;
     if (typeof startDateValue === 'string' && startDateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      const parsed = new Date(startDateValue);
-      parsed.setHours(0, 0, 0, 0);
+      const [y, m, d] = startDateValue.split('-').map(Number);
+      const parsed = new Date(y, m - 1, d);
       return !isNaN(parsed.getTime()) ? parsed : null;
     }
     return null;
@@ -432,7 +432,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">
               <span className="hidden sm:inline">{dayNames[selectedWeekDay]}'s Exercises</span>
               <span className="sm:hidden">{dayNames[selectedWeekDay]}</span>
-              {selectedWeekDay === today && <span className="text-moveify-teal"> (Today)</span>}
+              {selectedWeekDay === today && weekOffset === 0 && <span className="text-moveify-teal"> (Today)</span>}
             </h2>
           </div>
 

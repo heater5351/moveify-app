@@ -369,6 +369,39 @@ router.get('/:patientId', requirePatientAccess, async (req, res) => {
   }
 });
 
+// Update patient details (clinician only)
+router.put('/:patientId', requireRole('clinician'), async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { name, dob, email, phone, address, condition } = req.body;
+
+    if (!name || !dob || !email) {
+      return res.status(400).json({ error: 'Name, date of birth, and email are required' });
+    }
+
+    const patient = await db.getOne(
+      `SELECT id FROM users WHERE id = $1 AND role = 'patient'`,
+      [patientId]
+    );
+
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    await db.query(
+      `UPDATE users SET name = $1, dob = $2, email = $3, phone = $4, address = $5, condition = $6 WHERE id = $7`,
+      [name, dob, email, phone || null, address || null, condition || null, patientId]
+    );
+
+    audit.log(req, 'patient_update', 'patient', parseInt(patientId), { fields: ['name', 'dob', 'email', 'phone', 'address', 'condition'] });
+
+    res.json({ message: 'Patient updated' });
+  } catch (error) {
+    console.error('Update patient error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Delete patient by ID (admin only)
 router.delete('/:patientId', requireRole('clinician'), requireAdmin, async (req, res) => {
   try {

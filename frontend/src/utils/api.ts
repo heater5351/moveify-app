@@ -151,7 +151,7 @@ export async function apiCall<T = unknown>(
  */
 export async function checkServerHealth(): Promise<boolean> {
   try {
-    const response = await fetch('http://localhost:3000/health', {
+    const response = await fetch(`${API_URL.replace(/\/api$/, '')}/health`, {
       method: 'GET',
       signal: AbortSignal.timeout(5000), // 5 second timeout
     });

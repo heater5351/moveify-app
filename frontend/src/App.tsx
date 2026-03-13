@@ -147,19 +147,6 @@ function App() {
       });
       const data = await response.json();
       if (response.ok) {
-        // DEBUG: Log first patient's first exercise to check duration/rest fields
-        const firstPatientWithProgram = data.patients?.find((p: Patient) => p.assignedPrograms?.length > 0);
-        if (firstPatientWithProgram) {
-          const firstEx = firstPatientWithProgram.assignedPrograms[0]?.exercises?.[0];
-          if (firstEx) {
-            console.log('[DEBUG] fetchPatients - sample exercise from API:', {
-              name: firstEx.name,
-              prescribedDuration: firstEx.prescribedDuration,
-              restDuration: firstEx.restDuration,
-              sets: firstEx.sets, reps: firstEx.reps
-            });
-          }
-        }
         setPatients(data.patients);
       }
     } catch (error) {
@@ -260,9 +247,6 @@ function App() {
   };
 
   const handleUpdateExercise = (index: number, field: 'sets' | 'reps' | 'weight' | 'duration' | 'rest' | 'instructions', value: number | string) => {
-    if (field === 'duration' || field === 'rest') {
-      console.log(`[DEBUG] handleUpdateExercise: index=${index}, field=${field}, value=${value}`);
-    }
     setProgramExercises(prev => prev.map((ex, i) => {
       if (i !== index) return ex;
       if (field === 'weight') return { ...ex, prescribedWeight: value as number };
@@ -341,16 +325,6 @@ function App() {
       // Check if we're editing or creating
       const isEditing = editingProgramId !== null;
 
-      // DEBUG: Log what we're sending
-      console.log('[DEBUG] programExercises before API call:', programExercises.map(ex => ({
-        name: ex.name,
-        sets: ex.sets,
-        reps: ex.reps,
-        prescribedDuration: ex.prescribedDuration,
-        restDuration: ex.restDuration,
-        prescribedWeight: ex.prescribedWeight,
-        instructions: ex.instructions
-      })));
 
       let response;
       if (isEditing) {
@@ -469,16 +443,6 @@ function App() {
     setEditingProgramId(program.config.id || null);
     setSelectedPatient(viewingPatient);
     setProgramName(program.config.name || '');
-    // DEBUG: Log exercises loaded for editing
-    console.log('[DEBUG] Loading exercises for edit:', program.exercises.map(ex => ({
-      name: ex.name,
-      sets: ex.sets,
-      reps: ex.reps,
-      prescribedDuration: ex.prescribedDuration,
-      restDuration: ex.restDuration,
-      prescribedWeight: ex.prescribedWeight,
-      instructions: ex.instructions
-    })));
     setProgramExercises(program.exercises);
     setProgramConfig({
       startDate: program.config.startDate,
@@ -629,35 +593,40 @@ function App() {
     });
   };
 
-  const handleSaveEditPatient = () => {
+  const handleSaveEditPatient = async () => {
     if (!editingPatient || !editingPatient.name || !editingPatient.dob || !editingPatient.email) {
       setNotification({ message: 'Please fill in required fields: Name, Date of Birth, and Email', type: 'error' });
       return;
     }
 
-    const dobDate = new Date(editingPatient.dob);
-    const today = new Date();
-    let age = today.getFullYear() - dobDate.getFullYear();
-    const monthDiff = today.getMonth() - dobDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dobDate.getDate())) {
-      age--;
+    try {
+      const response = await fetch(`${API_URL}/patients/${editingPatient.id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          name: editingPatient.name,
+          dob: editingPatient.dob,
+          email: editingPatient.email,
+          phone: editingPatient.phone || '',
+          address: editingPatient.address || '',
+          condition: editingPatient.condition || '',
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setNotification({ message: data.error || 'Failed to update patient', type: 'error' });
+        return;
+      }
+
+      await fetchPatients();
+
+      setShowEditPatientModal(false);
+      setEditingPatient(null);
+      setNotification({ message: 'Patient updated successfully!', type: 'success' });
+    } catch {
+      setNotification({ message: 'Connection error. Please try again.', type: 'error' });
     }
-
-    const updatedPatients = patients.map(p =>
-      p.id === editingPatient.id
-        ? { ...editingPatient, age: age }
-        : p
-    );
-
-    setPatients(updatedPatients);
-
-    if (viewingPatient && viewingPatient.id === editingPatient.id) {
-      setViewingPatient({ ...editingPatient, age: age });
-    }
-
-    setShowEditPatientModal(false);
-    setEditingPatient(null);
-    setNotification({ message: 'Patient updated successfully!', type: 'success' });
   };
 
   const handleDeletePatient = async () => {
@@ -742,16 +711,24 @@ function App() {
           });
 
           if (!response.ok) {
-            // Revert on error
-            updatedPrograms[programIndex].exercises[exerciseIndex].completed = exercise.completed;
-            setLoggedInPatient({ ...loggedInPatient, assignedPrograms: updatedPrograms });
-            console.error('Failed to update exercise completion');
+            // Revert on error — restore original exercise state immutably
+            const revertPrograms = [...updatedPrograms];
+            revertPrograms[programIndex] = {
+              ...revertPrograms[programIndex],
+              exercises: [...revertPrograms[programIndex].exercises]
+            };
+            revertPrograms[programIndex].exercises[exerciseIndex] = { ...exercise };
+            setLoggedInPatient(prev => prev ? { ...prev, assignedPrograms: revertPrograms } : prev);
           }
-        } catch (error) {
-          // Revert on error
-          updatedPrograms[programIndex].exercises[exerciseIndex].completed = exercise.completed;
-          setLoggedInPatient({ ...loggedInPatient, assignedPrograms: updatedPrograms });
-          console.error('Error updating exercise completion:', error);
+        } catch {
+          // Revert on error — restore original exercise state immutably
+          const revertPrograms = [...updatedPrograms];
+          revertPrograms[programIndex] = {
+            ...revertPrograms[programIndex],
+            exercises: [...revertPrograms[programIndex].exercises]
+          };
+          revertPrograms[programIndex].exercises[exerciseIndex] = { ...exercise };
+          setLoggedInPatient(prev => prev ? { ...prev, assignedPrograms: revertPrograms } : prev);
         }
       }
     }
