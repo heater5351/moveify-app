@@ -402,11 +402,23 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
     });
   };
 
+  // Determine if the user is actively searching/filtering
+  const hasActiveSearch = searchTerm.trim().length > 0;
+  const hasActiveFilters = Object.entries(filters).some(([key, v]) => key !== 'showFavoritesOnly' && v);
+  const isActivelyBrowsing = hasActiveSearch || hasActiveFilters;
+
   // Combine default and custom exercises
   const allExercises = [...defaultExercises, ...customExercises];
-  const filteredExercises = applyFilters(allExercises);
   const filteredCustom = applyFilters(customExercises);
   const filteredDefault = applyFilters(defaultExercises);
+
+  // When idle (no search/filters), show only favorites
+  const favoriteDefault = defaultExercises.filter(ex => favorites.has(`default-${ex.id}`));
+  const favoriteCustom = customExercises.filter(ex => favorites.has(`custom-${ex.id}`));
+
+  const displayedCustom = isActivelyBrowsing ? filteredCustom : favoriteCustom;
+  const displayedDefault = isActivelyBrowsing ? filteredDefault : favoriteDefault;
+  const displayedTotal = displayedCustom.length + displayedDefault.length;
 
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -562,12 +574,20 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
 
       {/* Scrollable Exercise Grid Container */}
       <div className="flex-1 min-h-0 overflow-y-auto pr-2">
+        {/* Browsing mode indicator */}
+        {!isActivelyBrowsing && (
+          <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
+            <Star size={14} className="text-yellow-400" fill="currentColor" />
+            <span>Showing favorites — search or filter to browse all {allExercises.length} exercises</span>
+          </div>
+        )}
+
         {/* Custom Exercises Section */}
-        {filteredCustom.length > 0 && (
+        {displayedCustom.length > 0 && (
           <div className="mb-8">
             <h3 className="text-lg font-semibold text-gray-700 mb-4">Your Custom Exercises</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-            {filteredCustom.map(exercise => {
+            {displayedCustom.map(exercise => {
                 return (
                   <div
                     key={exercise.id}
@@ -643,11 +663,13 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
 
       {/* Default Exercises Section */}
       <div>
-        {customExercises.length > 0 && (
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Default Exercise Library</h3>
+        {(displayedCustom.length > 0 || (!isActivelyBrowsing && displayedDefault.length > 0)) && (
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">
+            {isActivelyBrowsing ? 'Default Exercise Library' : 'Favorite Exercises'}
+          </h3>
         )}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-          {filteredDefault.map(exercise => {
+          {displayedDefault.map(exercise => {
               return (
                 <div
                   key={exercise.id}
@@ -709,9 +731,17 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
       </div>
 
       {/* No Results */}
-      {filteredExercises.length === 0 && (
+      {displayedTotal === 0 && !isLoading && (
         <div className="text-center py-12">
-          <p className="text-gray-500">No exercises found matching "{searchTerm}"</p>
+          {isActivelyBrowsing ? (
+            <p className="text-gray-500">No exercises found matching your search</p>
+          ) : (
+            <div>
+              <Star size={40} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500 mb-1">No favorite exercises yet</p>
+              <p className="text-gray-400 text-sm">Star exercises to add them here, or use the search bar to browse the full library</p>
+            </div>
+          )}
         </div>
       )}
       </div>
