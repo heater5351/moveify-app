@@ -479,6 +479,8 @@ function App() {
               rpeTarget: w.rpe_target ?? w.rpeTarget ?? null,
               weight: w.weight ?? null,
               notes: w.notes ?? null,
+              duration: w.duration ?? null,
+              restDuration: w.rest_duration ?? w.restDuration ?? null,
             }));
             setPendingBlockData({ duration, weeks });
           }
