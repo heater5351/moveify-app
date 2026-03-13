@@ -7,17 +7,18 @@ interface LazyVideoCardProps {
 }
 
 // Derives thumbnail URL from video URL: adds .jpg suffix
-function getThumbnailUrl(videoUrl: string): string {
+export function getThumbnailUrl(videoUrl: string): string {
   return `${videoUrl}.jpg`;
 }
 
 // Lazy video card: shows a static .jpg thumbnail instantly, loads video on hover.
+// Thumbnail stays visible until the video is actually playing — no white flash.
 export const LazyVideoCard = ({ src, className, autoPlay }: LazyVideoCardProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [videoReady, setVideoReady] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [thumbError, setThumbError] = useState(false);
 
   // Observe intersection for lazy thumbnail loading
@@ -32,31 +33,26 @@ export const LazyVideoCard = ({ src, className, autoPlay }: LazyVideoCardProps) 
     return () => observer.disconnect();
   }, []);
 
-  const handleVideoReady = useCallback(() => {
-    setVideoReady(true);
+  const handlePlaying = useCallback(() => {
+    setIsPlaying(true);
   }, []);
 
   const handleMouseEnter = useCallback(() => {
     setIsHovered(true);
-    if (autoPlay) return;
-    const video = videoRef.current;
-    if (video && videoReady) video.play().catch(() => {});
-  }, [autoPlay, videoReady]);
+  }, []);
 
   const handleMouseLeave = useCallback(() => {
     setIsHovered(false);
-    if (autoPlay) return;
+    setIsPlaying(false);
     const video = videoRef.current;
-    if (video) { video.pause(); video.currentTime = 0; }
+    if (video && !autoPlay) { video.pause(); video.currentTime = 0; }
   }, [autoPlay]);
 
-  // Auto-play once video is ready if hovered while loading
-  useEffect(() => {
-    if (isHovered && videoReady && !autoPlay) {
-      const video = videoRef.current;
-      if (video) video.play().catch(() => {});
-    }
-  }, [videoReady, isHovered, autoPlay]);
+  // Start playback once video can play and is hovered
+  const handleCanPlay = useCallback(() => {
+    const video = videoRef.current;
+    if (video && !autoPlay) video.play().catch(() => {});
+  }, [autoPlay]);
 
   const thumbnailUrl = getThumbnailUrl(src);
 
@@ -67,33 +63,36 @@ export const LazyVideoCard = ({ src, className, autoPlay }: LazyVideoCardProps) 
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Static thumbnail image — loads fast, shown until video plays */}
+      {/* Static thumbnail — stays visible until video is actually playing */}
       {isVisible && !thumbError && (
         <img
           src={thumbnailUrl}
           alt=""
-          className={`absolute inset-0 w-full h-full object-cover ${isHovered && videoReady ? 'opacity-0' : 'opacity-100'}`}
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ opacity: isPlaying ? 0 : 1, transition: 'opacity 100ms' }}
           loading="lazy"
           onError={() => setThumbError(true)}
         />
       )}
 
       {/* Fallback skeleton if no thumbnail */}
-      {(!isVisible || thumbError) && !videoReady && (
+      {(!isVisible || thumbError) && !isPlaying && (
         <div className="absolute inset-0 bg-slate-200 animate-pulse" />
       )}
 
-      {/* Video — only mounts on hover (or autoPlay) to avoid mass loading */}
+      {/* Video — only mounts on hover (or autoPlay), hidden until playing */}
       {(isHovered || autoPlay) && (
         <video
           ref={videoRef}
           src={`${src}#t=0.5`}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-150 ${videoReady ? 'opacity-100' : 'opacity-0'}`}
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ opacity: isPlaying ? 1 : 0, transition: 'opacity 100ms' }}
           muted
           loop
           playsInline
           preload="auto"
-          onCanPlay={handleVideoReady}
+          onCanPlay={handleCanPlay}
+          onPlaying={handlePlaying}
           autoPlay={autoPlay}
         />
       )}

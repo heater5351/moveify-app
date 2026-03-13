@@ -3,7 +3,7 @@ import { Search, Play, Plus, Trash2, X, Star, Filter } from 'lucide-react';
 import type { ProgramExercise, Exercise, ExerciseFilters } from '../types/index.ts';
 import { exercises as defaultExercises } from '../data/exercises';
 import { getExerciseType } from '../utils/duration';
-import { LazyVideoCard } from './LazyVideoCard';
+import { LazyVideoCard, getThumbnailUrl } from './LazyVideoCard';
 import { AddExerciseModal } from './modals/AddExerciseModal';
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
@@ -104,6 +104,7 @@ const ExerciseDetailModal = ({
                 muted
                 playsInline
                 preload="metadata"
+                poster={getThumbnailUrl(exercise.videoUrl)}
               />
             )}
           </div>

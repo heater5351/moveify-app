@@ -11,7 +11,7 @@ import { getAuthHeaders } from '../utils/api';
 import { toLocalDateString } from '../utils/date.ts';
 import { exercises as defaultExercises } from '../data/exercises';
 import { formatDuration, getExerciseType } from '../utils/duration';
-import { LazyVideoCard } from './LazyVideoCard';
+import { LazyVideoCard, getThumbnailUrl } from './LazyVideoCard';
 
 interface PatientPortalProps {
   patient: Patient;
@@ -627,6 +627,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
               muted
               autoPlay
               playsInline
+              poster={getThumbnailUrl(videoModal.url)}
             />
             {videoModal.description && (
               <div className="bg-white rounded-b-xl px-4 py-3">
