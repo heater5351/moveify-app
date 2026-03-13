@@ -556,7 +556,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
                       className="bg-gradient-to-br from-purple-500 to-purple-600 basis-2/3 flex items-center justify-center relative group/card"
                     >
                       {exercise.videoUrl && !exercise.videoUrl.includes('youtube.com') && (
-                        <LazyVideoCard src={exercise.videoUrl} loadStrategy="hover" />
+                        <LazyVideoCard src={exercise.videoUrl} />
                       )}
                       {/* Favorite Star */}
                       <button
@@ -638,7 +638,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
                     className="bg-white basis-2/3 flex items-center justify-center relative group/card"
                   >
                     {exercise.videoUrl && !exercise.videoUrl.includes('youtube.com') && (
-                      <LazyVideoCard src={exercise.videoUrl} loadStrategy="hover" />
+                      <LazyVideoCard src={exercise.videoUrl} />
                     )}
                     {/* Favorite Star */}
                     <button
