@@ -184,6 +184,35 @@ function App() {
     }
   }, [patients]);
 
+  // Auto-refresh patient data every 60s (patient portal only, pauses when tab hidden)
+  useEffect(() => {
+    if (!isLoggedIn || userRole !== 'patient' || !loggedInPatient) return;
+
+    const refreshPatientData = async () => {
+      if (document.hidden) return;
+      try {
+        const response = await fetch(`${API_URL}/patients/${loggedInPatient.id}`, {
+          headers: getAuthHeaders()
+        });
+        if (response.ok) {
+          const patientData = await response.json();
+          setLoggedInPatient(patientData);
+        }
+      } catch {
+        // Silent — next interval will retry
+      }
+    };
+
+    const intervalId = setInterval(refreshPatientData, 60000);
+    const handleVisibility = () => { if (!document.hidden) refreshPatientData(); };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isLoggedIn, userRole, loggedInPatient?.id]);
+
   // Sync viewingPatient when patients array updates (e.g., after program create/edit)
   useEffect(() => {
     if (viewingPatient) {
