@@ -281,7 +281,7 @@ async function evaluateProgression(programId) {
     if (advancedToWeek >= block.block_duration && !holdAction) {
       // Block complete
       await client.query(
-        `UPDATE block_schedules SET current_week = $1, status = 'completed', updated_at = NOW() WHERE id = $2`,
+        `UPDATE block_schedules SET current_week = $1, status = 'completed', updated_at = NOW(), last_evaluated_at = NOW() WHERE id = $2`,
         [block.block_duration, block.id]
       );
       await client.query(`
@@ -314,7 +314,7 @@ async function evaluateProgression(programId) {
     if (advancedToWeek > currentWeek) {
       // Advance to the new week
       await client.query(
-        `UPDATE block_schedules SET current_week = $1, updated_at = NOW() WHERE id = $2`,
+        `UPDATE block_schedules SET current_week = $1, updated_at = NOW(), last_evaluated_at = NOW() WHERE id = $2`,
         [advancedToWeek, block.id]
       );
 

@@ -124,6 +124,13 @@ router.put('/:id', async (req, res) => {
 
     await client.query('BEGIN');
 
+    const existing = await client.query('SELECT id FROM program_templates WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
     await client.query(
       `UPDATE program_templates SET name = $1, description = $2, updated_at = NOW() WHERE id = $3`,
       [name, description || null, id]

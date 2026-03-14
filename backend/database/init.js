@@ -607,6 +607,27 @@ async function initDatabase() {
       ON data_requests(status)
     `);
 
+    // block_schedules general index (partial index only covers active status)
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_block_schedules_program_id
+      ON block_schedules(program_id)
+    `);
+
+    // Fix education_modules.created_by FK to allow clinician deletion
+    await db.query(`
+      DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'education_modules_created_by_fkey'
+          AND table_name = 'education_modules'
+        ) THEN
+          ALTER TABLE education_modules DROP CONSTRAINT education_modules_created_by_fkey;
+          ALTER TABLE education_modules ADD CONSTRAINT education_modules_created_by_fkey
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
+        END IF;
+      END $$
+    `);
+
     console.log('✅ Database indexes created');
     console.log('✅ Database migrations complete');
 

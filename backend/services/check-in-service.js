@@ -132,12 +132,15 @@ async function getTodayCheckIn(patientId) {
  * Get check-in history for a patient
  */
 async function getCheckInHistory(patientId, days = 30) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
+
   const checkIns = await db.getAll(`
     SELECT * FROM daily_check_ins
-    WHERE patient_id = $1
+    WHERE patient_id = $1 AND check_in_date >= $2
     ORDER BY check_in_date DESC
-    LIMIT $2
-  `, [patientId, days]);
+  `, [patientId, cutoffStr]);
 
   return checkIns.map(checkIn => ({
     id: checkIn.id,

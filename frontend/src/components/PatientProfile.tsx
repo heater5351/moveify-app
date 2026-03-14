@@ -258,7 +258,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
 
                   return (
                     <div
-                      key={program.config.id}
+                      key={program.config.id ?? `program-${index}`}
                       className="ring-1 ring-slate-200 rounded-lg p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
                     >
                       <button

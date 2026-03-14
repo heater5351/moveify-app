@@ -58,6 +58,8 @@ export type ProgramExercise = Exercise & {
   completed: boolean;
   holdTime?: string;
   instructions?: string;
+  image?: string; // image URL from backend (alias for imageUrl in program context)
+  enablePeriodization?: boolean;
   completionData?: CompletionData | null;
   allCompletions?: { [date: string]: CompletionData }; // All completions by date (YYYY-MM-DD)
 }
@@ -65,7 +67,7 @@ export type ProgramExercise = Exercise & {
 export type ProgramConfig = {
   id?: number;
   name?: string;
-  startDate: 'today' | 'tomorrow' | 'nextweek' | 'custom';
+  startDate: 'today' | 'tomorrow' | 'nextweek' | 'custom' | string;
   customStartDate: string;
   frequency: string[];
   duration: '1week' | '2weeks' | '4weeks' | '6weeks' | 'ongoing' | 'custom' | 'completed';
@@ -128,9 +130,13 @@ export type Clinician = {
   name: string;
   email: string;
   is_admin: boolean;
+  isAdmin?: boolean;
   default_location_id: number | null;
+  defaultLocationId?: number | null;
   location_name: string | null;
+  locationName?: string | null;
   created_at: string;
+  createdAt?: string;
 }
 
 // Block-based periodization types

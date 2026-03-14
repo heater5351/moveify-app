@@ -45,12 +45,23 @@ function requirePatientAccess(req, res, next) {
 
 /**
  * Middleware: require admin flag on the authenticated clinician
+ * Checks the database for current is_admin status (not stale JWT claim)
  */
-function requireAdmin(req, res, next) {
-  if (!req.user || req.user.role !== 'clinician' || !req.user.is_admin) {
+async function requireAdmin(req, res, next) {
+  if (!req.user || req.user.role !== 'clinician') {
     return res.status(403).json({ error: 'Admin access required' });
   }
-  next();
+  try {
+    const db = require('../database/db');
+    const user = await db.getOne('SELECT is_admin FROM users WHERE id = $1', [req.user.id]);
+    if (!user || !user.is_admin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    req.user.is_admin = true;
+    next();
+  } catch (error) {
+    return res.status(500).json({ error: 'Server error' });
+  }
 }
 
 module.exports = {

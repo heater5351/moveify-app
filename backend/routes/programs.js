@@ -3,7 +3,7 @@ const express = require('express');
 const db = require('../database/db');
 const checkInService = require('../services/check-in-service');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { requirePatientAccess } = require('../middleware/ownership');
+const { requirePatientAccess, requireAdmin } = require('../middleware/ownership');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -64,7 +64,7 @@ router.get('/patient/:patientId', requirePatientAccess, async (req, res) => {
     );
 
     // Format frequency back to array
-    const frequency = program.frequency ? JSON.parse(program.frequency) : [];
+    const frequency = program.frequency ? (() => { try { return JSON.parse(program.frequency); } catch { return []; } })() : [];
 
     res.json({
       program: {
@@ -515,7 +515,7 @@ router.get('/analytics/patient/:patientId', requirePatientAccess, async (req, re
     let totalCompletedAll = 0;
 
     for (const program of programs) {
-      const frequency = program.frequency ? JSON.parse(program.frequency) : [];
+      const frequency = program.frequency ? (() => { try { return JSON.parse(program.frequency); } catch { return []; } })() : [];
       frequency.forEach(f => allFrequencies.add(f));
 
       const exercises = await db.getAll(
@@ -847,10 +847,15 @@ router.get('/analytics/patient/:patientId', requirePatientAccess, async (req, re
   }
 });
 
-// Delete program (clinician only)
-router.delete('/:programId', requireRole('clinician'), async (req, res) => {
+// Delete program (admin only — CASCADE deletes all exercise and completion data)
+router.delete('/:programId', requireRole('clinician'), requireAdmin, async (req, res) => {
   try {
     const { programId } = req.params;
+
+    const program = await db.getOne('SELECT id FROM programs WHERE id = $1', [programId]);
+    if (!program) {
+      return res.status(404).json({ error: 'Program not found' });
+    }
 
     await db.query('DELETE FROM programs WHERE id = $1', [programId]);
 

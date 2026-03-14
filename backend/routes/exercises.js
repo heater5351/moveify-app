@@ -77,7 +77,7 @@ router.post('/', async (req, res) => {
   try {
     const clinicianId = req.user.id;
     const {
-      name, category, duration, description, videoUrl,
+      name, category, duration, description, videoUrl, difficulty,
       jointArea, muscleGroup, movementType, equipment, position, exerciseType
     } = req.body;
 
@@ -93,12 +93,13 @@ router.post('/', async (req, res) => {
         clinician_id, name, category, difficulty, duration, description, video_url,
         joint_area, muscle_group, movement_type, equipment, position, exercise_type
       )
-      VALUES ($1, $2, $3, 'Beginner', $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $13, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `, [
       clinicianId, name, category, duration, description, videoUrl || null,
       jointArea || null, muscleGroup || null, movementType || null, equipment || null, position || null,
-      safeExerciseType
+      safeExerciseType,
+      difficulty || 'Beginner'
     ]);
 
     res.status(201).json(result.rows[0]);
@@ -188,11 +189,11 @@ router.post('/favorites', async (req, res) => {
   }
 });
 
-// Remove favorite (clinicianId from JWT)
+// Remove favorite (clinicianId from JWT) — uses query params for proxy compatibility
 router.delete('/favorites', async (req, res) => {
   try {
     const clinicianId = req.user.id;
-    const { exerciseId, exerciseType } = req.body;
+    const { exerciseId, exerciseType } = req.query.exerciseId ? req.query : req.body;
 
     if (!exerciseId || !exerciseType) {
       return res.status(400).json({ error: 'Missing required fields' });

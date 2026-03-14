@@ -39,18 +39,11 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
     setIsLoading(true);
 
     try {
-      // Add timeout for slow networks (20 seconds per attempt)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
-
       const response = await fetchWithRetry(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, rememberMe }),
-        signal: controller.signal
       });
-
-      clearTimeout(timeoutId);
 
       const data = await response.json();
 
@@ -143,7 +136,7 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleLoginSubmit()}
+              onKeyDown={(e) => e.key === 'Enter' && handleLoginSubmit()}
               placeholder="you@example.com"
               className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 transition-all text-slate-900 placeholder:text-slate-400 bg-white text-sm"
             />
@@ -157,7 +150,7 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleLoginSubmit()}
+              onKeyDown={(e) => e.key === 'Enter' && handleLoginSubmit()}
               placeholder="••••••••"
               className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 transition-all text-slate-900 placeholder:text-slate-400 bg-white text-sm"
             />

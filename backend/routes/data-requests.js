@@ -199,6 +199,8 @@ router.post('/:id/execute-deletion', requireAdmin, async (req, res) => {
       await client.query('BEGIN');
 
       // Delete health data (cascades handle most, but be explicit for clarity)
+      await client.query('DELETE FROM patient_education_modules WHERE patient_id = $1', [userId]);
+      await client.query('DELETE FROM clinician_flags WHERE patient_id = $1', [userId]);
       await client.query('DELETE FROM daily_check_ins WHERE patient_id = $1', [userId]);
       await client.query('DELETE FROM exercise_completions WHERE patient_id = $1', [userId]);
       await client.query(
