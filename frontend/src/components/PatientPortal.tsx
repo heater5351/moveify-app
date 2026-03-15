@@ -23,6 +23,9 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, 1 = next week, -1 = previous week
   const [activeView, setActiveView] = useState<'exercises' | 'progress' | 'education'>('exercises');
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [showInfoBanner, setShowInfoBanner] = useState(() => {
+    return localStorage.getItem('moveify_hide_completion_tip') !== 'true';
+  });
   const [selectedExercise, setSelectedExercise] = useState<{
     exercise: ProgramExercise;
     exerciseIndex: number;
@@ -338,6 +341,26 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
               <BlockProgressBanner key={program.config.id} programId={program.config.id} refreshKey={blockRefreshKey} />
             ) : null
           ))}
+
+          {/* Completion tip banner */}
+          {showInfoBanner && (
+            <div className="bg-primary-50 rounded-xl px-4 py-3 mb-4 sm:mb-6 flex items-start gap-3 ring-1 ring-primary-100">
+              <Info size={16} className="text-primary-500 mt-0.5 flex-shrink-0" />
+              <p className="text-xs sm:text-sm text-primary-700 flex-1">
+                Mark your exercises as complete so your clinician can track your progress and adjust your sets, reps, and weights over time.
+              </p>
+              <button
+                onClick={() => {
+                  setShowInfoBanner(false);
+                  localStorage.setItem('moveify_hide_completion_tip', 'true');
+                }}
+                className="text-primary-400 hover:text-primary-600 flex-shrink-0 p-0.5"
+                aria-label="Dismiss tip"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
           {/* Week View - Optimized for mobile with navigation */}
           <div className="bg-white rounded-xl shadow-md border border-gray-200 p-3 sm:p-6 mb-4 sm:mb-6">
