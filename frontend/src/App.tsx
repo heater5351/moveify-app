@@ -359,23 +359,12 @@ function App() {
           try {
             const targetProgramId = responseData.programId;
 
-            // For editing, exercises already have DB IDs; for new, fetch to get them
+            // Use exercise IDs from the response (new programs) or from existing exercises (editing)
             let exerciseIds: number[] = [];
-            if (isEditing) {
+            if (responseData.exerciseIds) {
+              exerciseIds = responseData.exerciseIds;
+            } else if (isEditing) {
               exerciseIds = programExercises.map(e => e.id).filter((id): id is number => id !== undefined);
-            }
-
-            if (!isEditing || exerciseIds.length === 0) {
-              // Fetch the newly created program to get exercise IDs
-              const progRes = await fetch(`${API_URL}/programs/patient/${selectedPatient.id}`, {
-                headers: getAuthHeaders()
-              });
-              if (progRes.ok) {
-                const progData = await progRes.json();
-                if (progData.program && progData.program.exercises) {
-                  exerciseIds = progData.program.exercises.map((e: { id: number }) => e.id);
-                }
-              }
             }
 
             if (exerciseIds.length > 0) {

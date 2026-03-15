@@ -56,10 +56,11 @@ export const BlockBuilderModal = ({
     if (initialWeeks.length > 0) {
       // Map DB exercise IDs to array indices
       const idToIdx: Record<number, number> = {};
+      const hasDbIds = programExercises.some(ex => ex.id);
       programExercises.forEach((ex, i) => { if (ex.id) idToIdx[ex.id] = i; });
       initialWeeks.forEach(w => {
-        // Try DB ID lookup first; only treat as array index if no DB IDs exist
-        const idx = idToIdx[w.programExerciseId] ?? (w.programExerciseId < programExercises.length ? w.programExerciseId : undefined);
+        // If exercises have DB IDs, use DB lookup only. Otherwise treat as array index (new program).
+        const idx = hasDbIds ? idToIdx[w.programExerciseId] : (w.programExerciseId < programExercises.length ? w.programExerciseId : undefined);
         if (idx !== undefined) {
           const key: CellKey = `${idx}-${w.weekNumber}`;
           initial[key] = {
@@ -286,7 +287,7 @@ export const BlockBuilderModal = ({
         const duration = parseInt(cell.duration) || null;
         const restDuration = parseInt(cell.rest) || null;
         weeks.push({
-          programExerciseId: idx,
+          programExerciseId: idx, // Array index — remapped to DB IDs by App.tsx on save
           weekNumber: week,
           sets,
           reps,

@@ -171,6 +171,13 @@ router.post('/patient/:patientId', requireRole('clinician'), async (req, res) =>
       ]);
     }
 
+    // Fetch the created exercise IDs in order (for block creation)
+    const createdExercises = await client.query(
+      'SELECT id FROM program_exercises WHERE program_id = $1 ORDER BY exercise_order ASC',
+      [programId]
+    );
+    const exerciseIds = createdExercises.rows.map(e => e.id);
+
     await client.query('COMMIT');
     client.release();
 
@@ -178,7 +185,8 @@ router.post('/patient/:patientId', requireRole('clinician'), async (req, res) =>
 
     res.json({
       message: 'Program assigned successfully',
-      programId: programId
+      programId: programId,
+      exerciseIds: exerciseIds
     });
   } catch (error) {
     await client.query('ROLLBACK');
@@ -304,14 +312,43 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
     }
 
     // Delete exercises that were removed from the program
+    // Note: exercise_block_weeks has ON DELETE CASCADE on program_exercise_id,
+    // so removing exercises will also remove their block week prescriptions
     if (updatedExerciseIds.size > 0) {
       const idsToKeep = Array.from(updatedExerciseIds);
       const placeholders = idsToKeep.map((_, i) => `$${i + 2}`).join(',');
+
+      // Check if any deleted exercises have block data and deactivate the block
+      const activeBlock = await client.query(
+        `SELECT bs.id FROM block_schedules bs WHERE bs.program_id = $1 AND bs.status = 'active'`,
+        [programId]
+      );
+      if (activeBlock.rows.length > 0) {
+        const deletedWithBlock = await client.query(
+          `SELECT pe.id FROM program_exercises pe
+           JOIN exercise_block_weeks ebw ON ebw.program_exercise_id = pe.id
+           WHERE pe.program_id = $1 AND pe.id NOT IN (${placeholders})`,
+          [programId, ...idsToKeep]
+        );
+        if (deletedWithBlock.rows.length > 0) {
+          // Deactivate the block since its data is being modified
+          await client.query(
+            `UPDATE block_schedules SET status = 'paused', updated_at = NOW() WHERE program_id = $1 AND status = 'active'`,
+            [programId]
+          );
+        }
+      }
+
       await client.query(
         `DELETE FROM program_exercises WHERE program_id = $1 AND id NOT IN (${placeholders})`,
         [programId, ...idsToKeep]
       );
     } else {
+      // All exercises removed — deactivate any active block
+      await client.query(
+        `UPDATE block_schedules SET status = 'paused', updated_at = NOW() WHERE program_id = $1 AND status = 'active'`,
+        [programId]
+      );
       await client.query('DELETE FROM program_exercises WHERE program_id = $1', [programId]);
     }
 
@@ -856,6 +893,13 @@ router.delete('/:programId', requireRole('clinician'), requireAdmin, async (req,
     if (!program) {
       return res.status(404).json({ error: 'Program not found' });
     }
+
+    // Auto-resolve any unresolved flags before deletion (so they aren't silently lost)
+    await db.query(
+      `UPDATE clinician_flags SET resolved = TRUE, resolved_at = NOW(), resolved_by = $1
+       WHERE program_id = $2 AND resolved = FALSE`,
+      [req.user.id, programId]
+    );
 
     await db.query('DELETE FROM programs WHERE id = $1', [programId]);
 

@@ -55,11 +55,10 @@ async function createBlock(programId, blockDuration, startDate, exerciseWeeks) {
       for (const cell of week1Cells) {
         await client.query(`
           UPDATE program_exercises
-          SET sets = $1, reps = $2, prescribed_weight = COALESCE($3, prescribed_weight),
-              prescribed_duration = COALESCE($4, prescribed_duration),
-              rest_duration = COALESCE($5, rest_duration)
+          SET sets = $1, reps = $2, prescribed_weight = $3,
+              prescribed_duration = $4, rest_duration = $5
           WHERE id = $6
-        `, [cell.sets, cell.reps, cell.weight || null, cell.duration || null, cell.restDuration || null, cell.programExerciseId]);
+        `, [cell.sets, cell.reps, cell.weight ?? null, cell.duration ?? null, cell.restDuration ?? null, cell.programExerciseId]);
       }
     }
 
@@ -245,26 +244,39 @@ async function evaluateProgression(programId) {
 
     // PAIN CHECK (highest priority) — hold at this week
     if (avgGeneralPain >= 6 || avgExercisePain >= 5) {
-      await db.query(`
-        INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date)
-        VALUES ($1, $2, 'pain_flare', $3, CURRENT_DATE)
-      `, [
-        programId, patientId,
-        `Pain flare detected in week ${week}: avg general pain ${avgGeneralPain.toFixed(1)}/10, avg exercise pain ${avgExercisePain.toFixed(1)}/10. Week held.`
-      ]);
+      // Only insert if no existing unresolved pain_flare flag for this program today
+      const existingFlag = await db.getOne(
+        `SELECT id FROM clinician_flags WHERE program_id = $1 AND patient_id = $2 AND flag_type = 'pain_flare' AND flag_date = CURRENT_DATE AND resolved = FALSE`,
+        [programId, patientId]
+      );
+      if (!existingFlag) {
+        await db.query(`
+          INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date)
+          VALUES ($1, $2, 'pain_flare', $3, CURRENT_DATE)
+        `, [
+          programId, patientId,
+          `Pain flare detected in week ${week}: avg general pain ${avgGeneralPain.toFixed(1)}/10, avg exercise pain ${avgExercisePain.toFixed(1)}/10. Week held.`
+        ]);
+      }
       holdAction = { action: 'hold_pain', heldAtWeek: week, avgGeneralPain, avgExercisePain };
       break;
     }
 
     // PERFORMANCE CHECK — hold at this week
     if (completionRate < 0.70) {
-      await db.query(`
-        INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date, resolved)
-        VALUES ($1, $2, 'performance_hold', $3, CURRENT_DATE, TRUE)
-      `, [
-        programId, patientId,
-        `Performance hold in week ${week}: completion rate ${Math.round(completionRate * 100)}% (threshold 70%). Week held.`
-      ]);
+      const existingPerfFlag = await db.getOne(
+        `SELECT id FROM clinician_flags WHERE program_id = $1 AND patient_id = $2 AND flag_type = 'performance_hold' AND flag_date = CURRENT_DATE`,
+        [programId, patientId]
+      );
+      if (!existingPerfFlag) {
+        await db.query(`
+          INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date, resolved)
+          VALUES ($1, $2, 'performance_hold', $3, CURRENT_DATE, TRUE)
+        `, [
+          programId, patientId,
+          `Performance hold in week ${week}: completion rate ${Math.round(completionRate * 100)}% (threshold 70%). Week held.`
+        ]);
+      }
       holdAction = { action: 'hold_performance', heldAtWeek: week, completionRate };
       break;
     }
@@ -284,13 +296,20 @@ async function evaluateProgression(programId) {
         `UPDATE block_schedules SET current_week = $1, status = 'completed', updated_at = NOW(), last_evaluated_at = NOW() WHERE id = $2`,
         [block.block_duration, block.id]
       );
-      await client.query(`
-        INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date)
-        VALUES ($1, $2, 'block_complete', $3, CURRENT_DATE)
-      `, [
-        programId, patientId,
-        `Block complete: patient has finished all ${block.block_duration} weeks. Please review and assign new block.`
-      ]);
+      // Only insert block_complete flag if not already flagged today
+      const existingComplete = await client.query(
+        `SELECT id FROM clinician_flags WHERE program_id = $1 AND patient_id = $2 AND flag_type = 'block_complete' AND flag_date = CURRENT_DATE`,
+        [programId, patientId]
+      );
+      if (existingComplete.rows.length === 0) {
+        await client.query(`
+          INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date)
+          VALUES ($1, $2, 'block_complete', $3, CURRENT_DATE)
+        `, [
+          programId, patientId,
+          `Block complete: patient has finished all ${block.block_duration} weeks. Please review and assign new block.`
+        ]);
+      }
 
       // Apply final week's prescription
       const finalCells = await db.getAll(`
@@ -301,8 +320,8 @@ async function evaluateProgression(programId) {
 
       for (const cell of finalCells) {
         await client.query(
-          `UPDATE program_exercises SET sets = $1, reps = $2, prescribed_weight = COALESCE($3, prescribed_weight),
-           prescribed_duration = COALESCE($4, prescribed_duration), rest_duration = COALESCE($5, rest_duration) WHERE id = $6`,
+          `UPDATE program_exercises SET sets = $1, reps = $2, prescribed_weight = $3,
+           prescribed_duration = $4, rest_duration = $5 WHERE id = $6`,
           [cell.sets, cell.reps, cell.weight, cell.duration, cell.rest_duration, cell.program_exercise_id]
         );
       }
@@ -325,10 +344,32 @@ async function evaluateProgression(programId) {
         WHERE block_schedule_id = $1 AND week_number = $2
       `, [block.id, advancedToWeek]);
 
+      // Check for exercises missing block data (added after block was created)
+      const programExerciseCount = await db.getOne(
+        'SELECT COUNT(*) as count FROM program_exercises WHERE program_id = $1',
+        [programId]
+      );
+      if (newCells.length < parseInt(programExerciseCount.count)) {
+        // Flag clinician about missing block data
+        const existingMismatch = await client.query(
+          `SELECT id FROM clinician_flags WHERE program_id = $1 AND flag_type = 'block_complete' AND flag_reason LIKE '%missing block data%' AND resolved = FALSE`,
+          [programId]
+        );
+        if (existingMismatch.rows.length === 0) {
+          await client.query(`
+            INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date)
+            VALUES ($1, $2, 'performance_hold', $3, CURRENT_DATE)
+          `, [
+            programId, patientId,
+            `Warning: ${parseInt(programExerciseCount.count) - newCells.length} exercise(s) missing block data for week ${advancedToWeek}. These exercises will keep their base prescription. Consider editing the block.`
+          ]);
+        }
+      }
+
       for (const cell of newCells) {
         await client.query(
-          `UPDATE program_exercises SET sets = $1, reps = $2, prescribed_weight = COALESCE($3, prescribed_weight),
-           prescribed_duration = COALESCE($4, prescribed_duration), rest_duration = COALESCE($5, rest_duration) WHERE id = $6`,
+          `UPDATE program_exercises SET sets = $1, reps = $2, prescribed_weight = $3,
+           prescribed_duration = $4, rest_duration = $5 WHERE id = $6`,
           [cell.sets, cell.reps, cell.weight, cell.duration, cell.rest_duration, cell.program_exercise_id]
         );
       }
@@ -387,8 +428,8 @@ async function manualOverride(programId, action) {
 
       for (const cell of cells) {
         await client.query(
-          `UPDATE program_exercises SET sets = $1, reps = $2, prescribed_weight = COALESCE($3, prescribed_weight),
-           prescribed_duration = COALESCE($4, prescribed_duration), rest_duration = COALESCE($5, rest_duration) WHERE id = $6`,
+          `UPDATE program_exercises SET sets = $1, reps = $2, prescribed_weight = $3,
+           prescribed_duration = $4, rest_duration = $5 WHERE id = $6`,
           [cell.sets, cell.reps, cell.weight, cell.duration, cell.rest_duration, cell.program_exercise_id]
         );
       }
@@ -408,25 +449,39 @@ async function manualOverride(programId, action) {
  * Override a single cell in the block.
  */
 async function overrideCell(blockScheduleId, programExerciseId, weekNumber, data, overriddenBy) {
-  await db.query(`
+  const result = await db.run(`
     UPDATE exercise_block_weeks
     SET sets = $1, reps = $2, rpe_target = $3, weight = $4, notes = $5,
         duration = $6, rest_duration = $7,
         overridden_by = $8, overridden_at = NOW()
     WHERE block_schedule_id = $9 AND program_exercise_id = $10 AND week_number = $11
   `, [
-    data.sets, data.reps, data.rpeTarget || null, data.weight || null, data.notes || null,
-    data.duration || null, data.restDuration || null,
+    data.sets, data.reps, data.rpeTarget ?? null, data.weight ?? null, data.notes ?? null,
+    data.duration ?? null, data.restDuration ?? null,
     overriddenBy || null,
     blockScheduleId, programExerciseId, weekNumber
   ]);
+
+  if (result.rowCount === 0) {
+    throw new Error('Block cell not found');
+  }
+
+  // If overriding the current week, also update program_exercises so patient sees it immediately
+  const block = await db.getOne('SELECT current_week FROM block_schedules WHERE id = $1', [blockScheduleId]);
+  if (block && block.current_week === weekNumber) {
+    await db.query(`
+      UPDATE program_exercises SET sets = $1, reps = $2, prescribed_weight = $3,
+             prescribed_duration = $4, rest_duration = $5
+      WHERE id = $6
+    `, [data.sets, data.reps, data.weight ?? null, data.duration ?? null, data.restDuration ?? null, programExerciseId]);
+  }
 }
 
 /**
  * Get unresolved flags for a clinician's patients.
  */
 async function getUnresolvedFlags() {
-  return db.getAll(`
+  const rows = await db.getAll(`
     SELECT cf.*, u.name as patient_name, p.name as program_name
     FROM clinician_flags cf
     JOIN users u ON cf.patient_id = u.id
@@ -434,6 +489,22 @@ async function getUnresolvedFlags() {
     WHERE cf.resolved = FALSE
     ORDER BY cf.created_at DESC
   `);
+
+  // Map snake_case to camelCase for frontend
+  return rows.map(f => ({
+    id: f.id,
+    programId: f.program_id,
+    patientId: f.patient_id,
+    flagType: f.flag_type,
+    flagReason: f.flag_reason,
+    flagDate: f.flag_date,
+    resolved: f.resolved,
+    resolvedAt: f.resolved_at,
+    resolvedBy: f.resolved_by,
+    createdAt: f.created_at,
+    patientName: f.patient_name,
+    programName: f.program_name
+  }));
 }
 
 /**
