@@ -323,7 +323,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
           </div>
         </div>
       ) : activeTab === 'analytics' ? (
-        <ProgressAnalytics patientId={patient.id} apiUrl={API_URL} />
+        <ProgressAnalytics patientId={patient.id} apiUrl={API_URL} assignedPrograms={patient.assignedPrograms} />
       ) : (
         <div>
           <div className="flex items-center justify-between mb-5">

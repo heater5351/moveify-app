@@ -59,6 +59,7 @@ interface ProgressAnalyticsProps {
   patientId: number;
   apiUrl: string;
   isPatientView?: boolean;
+  assignedPrograms?: import('../types/index.ts').AssignedProgram[];
 }
 
 interface OverviewData {
@@ -81,7 +82,7 @@ interface OverviewData {
 
 // ── Component ───────────────────────────────────────────────────────────
 
-export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: ProgressAnalyticsProps) => {
+export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false, assignedPrograms }: ProgressAnalyticsProps) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<7 | 14 | 30>(30);
@@ -316,7 +317,7 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false }: 
       </div>
 
       {subView === 'daily' ? (
-        <DailyActivityView patientId={patientId} />
+        <DailyActivityView patientId={patientId} assignedPrograms={assignedPrograms} />
       ) : (
       <>
 
