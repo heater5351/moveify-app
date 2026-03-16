@@ -218,9 +218,12 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onOpenProtocol
     }
   };
 
-  // Strip the program-exercises code block from display text
+  // Strip the program-exercises code block from display text (complete and in-progress)
   const stripCodeBlock = (text: string) => {
-    return text.replace(/```program-exercises[\s\S]*?```\n?/g, '').trim();
+    return text
+      .replace(/```program-exercises[\s\S]*?```\n?/g, '')
+      .replace(/```program-exercises[\s\S]*/g, '')
+      .trim();
   };
 
   const confidenceColor = (confidence: string) => {
