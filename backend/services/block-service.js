@@ -55,8 +55,10 @@ async function createBlock(programId, blockDuration, startDate, exerciseWeeks) {
       for (const cell of week1Cells) {
         await client.query(`
           UPDATE program_exercises
-          SET sets = $1, reps = $2, prescribed_weight = $3,
-              prescribed_duration = $4, rest_duration = $5
+          SET sets = $1, reps = $2,
+              prescribed_weight = COALESCE($3, prescribed_weight),
+              prescribed_duration = COALESCE($4, prescribed_duration),
+              rest_duration = COALESCE($5, rest_duration)
           WHERE id = $6
         `, [cell.sets, cell.reps, cell.weight ?? null, cell.duration ?? null, cell.restDuration ?? null, cell.programExerciseId]);
       }
@@ -368,8 +370,10 @@ async function evaluateProgression(programId) {
 
       for (const cell of newCells) {
         await client.query(
-          `UPDATE program_exercises SET sets = $1, reps = $2, prescribed_weight = $3,
-           prescribed_duration = $4, rest_duration = $5 WHERE id = $6`,
+          `UPDATE program_exercises SET sets = $1, reps = $2,
+           prescribed_weight = COALESCE($3, prescribed_weight),
+           prescribed_duration = COALESCE($4, prescribed_duration),
+           rest_duration = COALESCE($5, rest_duration) WHERE id = $6`,
           [cell.sets, cell.reps, cell.weight, cell.duration, cell.rest_duration, cell.program_exercise_id]
         );
       }
@@ -428,8 +432,10 @@ async function manualOverride(programId, action) {
 
       for (const cell of cells) {
         await client.query(
-          `UPDATE program_exercises SET sets = $1, reps = $2, prescribed_weight = $3,
-           prescribed_duration = $4, rest_duration = $5 WHERE id = $6`,
+          `UPDATE program_exercises SET sets = $1, reps = $2,
+           prescribed_weight = COALESCE($3, prescribed_weight),
+           prescribed_duration = COALESCE($4, prescribed_duration),
+           rest_duration = COALESCE($5, rest_duration) WHERE id = $6`,
           [cell.sets, cell.reps, cell.weight, cell.duration, cell.rest_duration, cell.program_exercise_id]
         );
       }
