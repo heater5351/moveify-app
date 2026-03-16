@@ -14,9 +14,10 @@ interface ProgramViewProps {
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
+  onRefresh?: () => void;
 }
 
-export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, onDuplicate }: ProgramViewProps) => {
+export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, onDuplicate, onRefresh }: ProgramViewProps) => {
   const totalExercises = program.exercises.length;
 
   // Build name→videoUrl lookup from default exercises
@@ -100,6 +101,7 @@ export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, on
         body: JSON.stringify({ action }),
       });
       await fetchBlockData();
+      onRefresh?.();
     } catch {
       // Silent
     } finally {

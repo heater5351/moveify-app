@@ -1125,6 +1125,7 @@ function App() {
               }
             }}
             onDuplicate={() => handleDuplicateProgram(viewingProgramIndex)}
+            onRefresh={fetchPatients}
           />
         </div>
       ) : (
