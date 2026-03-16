@@ -49,9 +49,11 @@ if (isProduction && !corsOrigin) {
   console.warn('WARNING: CORS_ORIGIN not set in production. CORS will reject all cross-origin requests.');
 }
 
-// Allow Capacitor WebView origins alongside the main frontend origin
+// Allow Capacitor WebView origins and custom domain alongside the main frontend origin
 const allowedOrigins = [
   corsOrigin,
+  'https://moveifyapp.com',
+  'https://www.moveifyapp.com',
   'https://localhost',      // Capacitor Android WebView
   'capacitor://localhost',  // Capacitor iOS (future-proofing)
 ].filter(Boolean);
