@@ -30,6 +30,8 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onOpenProtocol
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const streamBufferRef = useRef('');
+  const rafRef = useRef<number | null>(null);
 
   // Load usage on mount
   useEffect(() => {
@@ -76,17 +78,29 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onOpenProtocol
     const controller = new AbortController();
     abortRef.current = controller;
 
+    // Flush buffered stream text to state (once per frame)
+    const flushBuffer = () => {
+      rafRef.current = null;
+      const buffered = streamBufferRef.current;
+      if (!buffered) return;
+      streamBufferRef.current = '';
+      setMessages(prev => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last?.role === 'assistant') {
+          updated[updated.length - 1] = { ...last, content: last.content + buffered };
+        }
+        return updated;
+      });
+    };
+
     try {
       await streamAiChat(apiMessages, {
         onText: (text) => {
-          setMessages(prev => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last.role === 'assistant') {
-              updated[updated.length - 1] = { ...last, content: last.content + text };
-            }
-            return updated;
-          });
+          streamBufferRef.current += text;
+          if (!rafRef.current) {
+            rafRef.current = requestAnimationFrame(flushBuffer);
+          }
         },
         onExercises: (exercises) => {
           setMessages(prev => {
@@ -99,11 +113,16 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onOpenProtocol
           });
         },
         onDone: (usageData) => {
+          // Flush any remaining buffered text
+          if (rafRef.current) cancelAnimationFrame(rafRef.current);
+          const remaining = streamBufferRef.current;
+          streamBufferRef.current = '';
+          rafRef.current = null;
           setMessages(prev => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
-            if (last.role === 'assistant') {
-              updated[updated.length - 1] = { ...last, isStreaming: false };
+            if (last?.role === 'assistant') {
+              updated[updated.length - 1] = { ...last, content: last.content + remaining, isStreaming: false };
             }
             return updated;
           });
