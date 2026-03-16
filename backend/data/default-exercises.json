@@ -1,0 +1,994 @@
+[
+  {
+    "name": "Squat with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Back Squat with Barbell",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Barbell",
+    "position": "Standing"
+  },
+  {
+    "name": "Bulgarian Split Squat with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Deadlift with Barbell",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Hamstrings, Glutes, Lower Back",
+    "equipment": "Barbell",
+    "position": "Standing"
+  },
+  {
+    "name": "Romanian Deadlift with Barbell",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Hamstrings, Glutes",
+    "equipment": "Barbell",
+    "position": "Standing"
+  },
+  {
+    "name": "Single Leg Deadlift with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Hamstrings, Glutes",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Calf Raise with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Ankle",
+    "muscleGroup": "Calves",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Step Down with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Single Leg Squat with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Wall Sit with Bodyweight",
+    "exerciseType": "duration",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Forward Lunge with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Hip Hinge with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip",
+    "muscleGroup": "Hamstrings, Glutes, Lower Back",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Single Leg Calf Raise with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Ankle",
+    "muscleGroup": "Calves",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Sit To Stand with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Seated"
+  },
+  {
+    "name": "Split Squat with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Staggered Deadlift with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Hamstrings, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Staggered Sit To Stand with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Seated"
+  },
+  {
+    "name": "Alternating Split Squat Jumps with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee, Ankle",
+    "muscleGroup": "Quadriceps, Glutes, Calves",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Bent Over Row with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Lats, Rhomboids, Biceps",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Bicep Curl To Shoulder Press with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Elbow, Shoulder",
+    "muscleGroup": "Biceps, Deltoids, Triceps",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Calf Raise Hold with Bodyweight",
+    "exerciseType": "duration",
+    "jointArea": "Ankle",
+    "muscleGroup": "Calves",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Calf Raise with Support",
+    "exerciseType": "reps",
+    "jointArea": "Ankle",
+    "muscleGroup": "Calves",
+    "equipment": "Support",
+    "position": "Standing"
+  },
+  {
+    "name": "Chest Press with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Chest, Triceps, Deltoids",
+    "equipment": "Dumbbells",
+    "position": "Supine"
+  },
+  {
+    "name": "Child's Pose",
+    "exerciseType": "duration",
+    "jointArea": "Spine, Hip, Shoulder",
+    "muscleGroup": "Lower Back, Lats",
+    "equipment": "Bodyweight",
+    "position": "Kneeling"
+  },
+  {
+    "name": "Curtsy Lunge with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes, Adductors",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Drop Jump with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee, Ankle",
+    "muscleGroup": "Quadriceps, Glutes, Calves",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Hip Abduction On Step with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip",
+    "muscleGroup": "Glutes, Abductors",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Incline Chest Press with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Chest, Triceps, Deltoids",
+    "equipment": "Dumbbells",
+    "position": "Supine"
+  },
+  {
+    "name": "Kneeling Calf Raise with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Ankle",
+    "muscleGroup": "Calves",
+    "equipment": "Bodyweight",
+    "position": "Kneeling"
+  },
+  {
+    "name": "Lateral Step Down Tap with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Lateral Step Up with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes, Abductors",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Plank with Alternating Arm and Leg Lifts with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Spine, Hip, Shoulder",
+    "muscleGroup": "Core, Glutes, Deltoids",
+    "equipment": "Bodyweight",
+    "position": "Prone"
+  },
+  {
+    "name": "Romanian Deadlift with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Hamstrings, Glutes",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Running",
+    "exerciseType": "cardio",
+    "jointArea": "Hip, Knee, Ankle",
+    "muscleGroup": "Quadriceps, Hamstrings, Calves, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Side Plank with Bodyweight",
+    "exerciseType": "duration",
+    "jointArea": "Spine",
+    "muscleGroup": "Core, Obliques",
+    "equipment": "Bodyweight",
+    "position": "Side-lying"
+  },
+  {
+    "name": "Single Arm Bent Over Row with Dumbbell",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Lats, Rhomboids, Biceps",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Single Leg Calf Raise Hold with Bodyweight",
+    "exerciseType": "duration",
+    "jointArea": "Ankle",
+    "muscleGroup": "Calves",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Single Leg Calf Raise with Support",
+    "exerciseType": "reps",
+    "jointArea": "Ankle",
+    "muscleGroup": "Calves",
+    "equipment": "Support",
+    "position": "Standing"
+  },
+  {
+    "name": "Single Leg Deadlift with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Hamstrings, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Single Leg Deadlift with Dumbbell",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Hamstrings, Glutes",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Single Leg Sit To Stand with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Seated"
+  },
+  {
+    "name": "Single Leg Sit To Stand with Dumbbell",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Dumbbells",
+    "position": "Seated"
+  },
+  {
+    "name": "Single Leg Squat with Support",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Support",
+    "position": "Standing"
+  },
+  {
+    "name": "Sit To Stand with Dumbbell",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Dumbbells",
+    "position": "Seated"
+  },
+  {
+    "name": "Split Squat with Dumbbell",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Split Squat with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Squat with Dumbbell",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Staggered Sit To Stand with Dumbbell",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Dumbbells",
+    "position": "Seated"
+  },
+  {
+    "name": "Step Down Tap with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Step Up with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Step Up with Dumbbell",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Step Up with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Glutes",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Thread The Needle",
+    "exerciseType": "reps",
+    "jointArea": "Spine, Shoulder",
+    "muscleGroup": "Core, Upper Back",
+    "equipment": "Bodyweight",
+    "position": "Kneeling"
+  },
+  {
+    "name": "Walking",
+    "exerciseType": "cardio",
+    "jointArea": "Hip, Knee, Ankle",
+    "muscleGroup": "Quadriceps, Hamstrings, Calves, Glutes",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Kneeling Lat Pullover with Cable Bar",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Latissimus Dorsi, Core",
+    "equipment": "Cable",
+    "position": "Kneeling"
+  },
+  {
+    "name": "Kneeling Lat Pullover with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Latissimus Dorsi, Core",
+    "equipment": "Cable",
+    "position": "Kneeling"
+  },
+  {
+    "name": "Kneeling Single Arm High Row with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Latissimus Dorsi, Rhomboids, Biceps",
+    "equipment": "Cable",
+    "position": "Kneeling"
+  },
+  {
+    "name": "Kneeling Single Arm Low Row with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Latissimus Dorsi, Rhomboids, Biceps",
+    "equipment": "Cable",
+    "position": "Kneeling"
+  },
+  {
+    "name": "Kneeling Single Arm Mid Row with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Latissimus Dorsi, Rhomboids, Biceps",
+    "equipment": "Cable",
+    "position": "Kneeling"
+  },
+  {
+    "name": "Seated Face Pull with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Rear Deltoids, Rhomboids, Rotator Cuff",
+    "equipment": "Cable",
+    "position": "Seated"
+  },
+  {
+    "name": "Seated Mid Row with Cable Bar",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Latissimus Dorsi, Rhomboids, Biceps",
+    "equipment": "Cable",
+    "position": "Seated"
+  },
+  {
+    "name": "Seated Mid Row with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Latissimus Dorsi, Rhomboids, Biceps",
+    "equipment": "Cable",
+    "position": "Seated"
+  },
+  {
+    "name": "Seated Single Arm Row with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Latissimus Dorsi, Rhomboids, Biceps",
+    "equipment": "Cable",
+    "position": "Seated"
+  },
+  {
+    "name": "Single Arm Tricep Pushdown with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Triceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Split Stance Single Arm High Row with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Latissimus Dorsi, Rhomboids, Biceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Split Stance Single Arm Low Row with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Latissimus Dorsi, Rhomboids, Biceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Split Stance Single Arm Mid Row with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Latissimus Dorsi, Rhomboids, Biceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Face Pull and External Rotation with Cable Ropes",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Rear Deltoids, Rhomboids, Rotator Cuff",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Face Pull with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Rear Deltoids, Rhomboids, Rotator Cuff",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Lat Pullover with Cable Bar",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Latissimus Dorsi, Core",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Lat Pullover with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Latissimus Dorsi, Core",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Mid Row with Cable Bar",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Latissimus Dorsi, Rhomboids, Biceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Mid Row with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Latissimus Dorsi, Rhomboids, Biceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Single Arm Lat Pullover with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Latissimus Dorsi, Core",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Tricep Pushdown with Cable Bar",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Triceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Tricep Pushdown with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Triceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Single Arm Tricep Extension with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Triceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Single Arm Bicep Curl with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Biceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Reverse Single Arm Bicep Curl with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Biceps, Forearms",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Single Arm Lateral Raise with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Deltoids",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Single Arm Front Raise with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Deltoids",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Single Arm Shoulder Extension with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Latissimus Dorsi, Rear Deltoids",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Single Arm Shoulder Extension and Half Angel with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Latissimus Dorsi, Rear Deltoids, Rotator Cuff",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Single Arm Shoulder Extension and Full Angel with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Latissimus Dorsi, Rear Deltoids, Rotator Cuff",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Single Arm Shoulder External Rotation with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Rotator Cuff",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Single Arm Shoulder External Rotation 45 Abduction with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Rotator Cuff",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Single Arm Shoulder External Rotation 90 Abduction with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Rotator Cuff",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Single Arm Shoulder Internal Rotation with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Rotator Cuff",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Single Arm Shoulder Internal Rotation 45 Abduction with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Rotator Cuff",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Single Arm Shoulder Internal Rotation 90 Abduction with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Rotator Cuff",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Palloff Press with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Spine",
+    "muscleGroup": "Core, Obliques",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Seated Incline Press with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Chest, Triceps, Deltoids",
+    "equipment": "Cable",
+    "position": "Seated"
+  },
+  {
+    "name": "Seated Single Arm Press with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Chest, Triceps, Deltoids",
+    "equipment": "Cable",
+    "position": "Seated"
+  },
+  {
+    "name": "Staggered Single Arm Press with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Chest, Triceps, Deltoids",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Staggered Chest Fly with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Chest, Deltoids",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Seated Single Arm Bicep Curl with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Biceps",
+    "equipment": "Cable",
+    "position": "Seated"
+  },
+  {
+    "name": "Seated Reverse Single Arm Bicep Curl with Cable Handle",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Biceps, Forearms",
+    "equipment": "Cable",
+    "position": "Seated"
+  },
+  {
+    "name": "Standing Bicep Curl with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Biceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Single Arm Bicep Curl with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Biceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Overhead Tricep Extension with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Triceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Kneeling Overhead Tricep Extension with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Triceps",
+    "equipment": "Cable",
+    "position": "Kneeling"
+  },
+  {
+    "name": "Seated Bicep Curl with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Biceps",
+    "equipment": "Cable",
+    "position": "Seated"
+  },
+  {
+    "name": "Seated Single Arm Bicep Curl with Cable Rope",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Biceps",
+    "equipment": "Cable",
+    "position": "Seated"
+  },
+  {
+    "name": "Standing Bicep Curl with Cable Bar",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Biceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Reverse Bicep Curl with Cable Bar",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Biceps, Forearms",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Overhead Tricep Extension with Cable Bar",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Triceps",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Kneeling Overhead Tricep Extension with Cable Bar",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Triceps",
+    "equipment": "Cable",
+    "position": "Kneeling"
+  },
+  {
+    "name": "Standing Single Arm Lateral Raise with Cable Bar",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Deltoids",
+    "equipment": "Cable",
+    "position": "Standing"
+  },
+  {
+    "name": "Seated Bicep Curl with Cable Bar",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Biceps",
+    "equipment": "Cable",
+    "position": "Seated"
+  },
+  {
+    "name": "Seated Leg Extension with Machine",
+    "exerciseType": "reps",
+    "jointArea": "Knee",
+    "muscleGroup": "Quadriceps",
+    "equipment": "Machine",
+    "position": "Seated"
+  },
+  {
+    "name": "Seated Single Leg Leg Extension with Machine",
+    "exerciseType": "reps",
+    "jointArea": "Knee",
+    "muscleGroup": "Quadriceps",
+    "equipment": "Machine",
+    "position": "Seated"
+  },
+  {
+    "name": "Seated Bilateral Concentric Unilateral Eccentric Leg Extension with Machine",
+    "exerciseType": "reps",
+    "jointArea": "Knee",
+    "muscleGroup": "Quadriceps",
+    "equipment": "Machine",
+    "position": "Seated"
+  },
+  {
+    "name": "Seated Partial Bilateral Isometric Leg Extension with Machine",
+    "exerciseType": "reps",
+    "jointArea": "Knee",
+    "muscleGroup": "Quadriceps",
+    "equipment": "Machine",
+    "position": "Seated"
+  },
+  {
+    "name": "Seated Partial Unilateral Isometric Leg Extension with Machine",
+    "exerciseType": "reps",
+    "jointArea": "Knee",
+    "muscleGroup": "Quadriceps",
+    "equipment": "Machine",
+    "position": "Seated"
+  },
+  {
+    "name": "Seated Hamstring Curl with Machine",
+    "exerciseType": "reps",
+    "jointArea": "Knee",
+    "muscleGroup": "Hamstrings",
+    "equipment": "Machine",
+    "position": "Seated"
+  },
+  {
+    "name": "Seated Single Leg Hamstring Curl with Machine",
+    "exerciseType": "reps",
+    "jointArea": "Knee",
+    "muscleGroup": "Hamstrings",
+    "equipment": "Machine",
+    "position": "Seated"
+  },
+  {
+    "name": "Seated Bilateral Concentric Unilateral Eccentric Hamstring Curl with Machine",
+    "exerciseType": "reps",
+    "jointArea": "Knee",
+    "muscleGroup": "Hamstrings",
+    "equipment": "Machine",
+    "position": "Seated"
+  },
+  {
+    "name": "Lateral Shoulder Raise with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Deltoids",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Scaption with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Deltoids, Rotator Cuff",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Bicep Curl with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Biceps",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Hammer Curl with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Biceps, Forearms",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Cross Body Hammer Curl with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Elbow",
+    "muscleGroup": "Biceps, Forearms",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Shoulder Press with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Deltoids, Triceps",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Front Delt Raise with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Deltoids",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  }
+]

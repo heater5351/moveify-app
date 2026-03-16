@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Sparkles } from 'lucide-react';
 import { Routes, Route, useSearchParams, useNavigate } from 'react-router-dom';
 import type { Patient, ProgramExercise, ProgramConfig, UserRole, NewPatient, CompletionData, User, ExerciseWeekPrescription } from './types/index.ts';
 import { LoginPage } from './components/LoginPage';
@@ -29,6 +30,8 @@ import { PatientAccountPage } from './components/PatientAccountPage';
 import { PatientDataPage } from './components/PatientDataPage';
 import { PatientEditProfileModal } from './components/modals/PatientEditProfileModal';
 import { AdminPanel } from './components/AdminPanel';
+import { AiAssistantPanel } from './components/AiAssistantPanel';
+import { AiProtocolModal } from './components/modals/AiProtocolModal';
 import { API_URL } from './config';
 import { getAuthHeaders, setToken, clearAuth, setStoredUser, getToken } from './utils/api';
 import { toLocalDateString } from './utils/date.ts';
@@ -71,6 +74,8 @@ function App() {
   const [showProgramTemplateModal, setShowProgramTemplateModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const [showAiProtocolModal, setShowAiProtocolModal] = useState(false);
 
   // Form states
   const [newPatient, setNewPatient] = useState<NewPatient>({
@@ -1011,13 +1016,27 @@ function App() {
           </div>
 
           {userRole === 'clinician' && loggedInUser ? (
-            <AccountDropdown
-              user={loggedInUser}
-              onLogout={handleLogout}
-              onEditProfile={() => setShowEditProfileModal(true)}
-              onChangePassword={() => setShowChangePasswordModal(true)}
-              onNavigateAdmin={() => setCurrentPage('admin')}
-            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAiPanel(!showAiPanel)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  showAiPanel
+                    ? 'bg-primary-400 text-white'
+                    : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
+                }`}
+                title="AI Exercise Assistant"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span className="hidden md:inline">AI Assistant</span>
+              </button>
+              <AccountDropdown
+                user={loggedInUser}
+                onLogout={handleLogout}
+                onEditProfile={() => setShowEditProfileModal(true)}
+                onChangePassword={() => setShowChangePasswordModal(true)}
+                onNavigateAdmin={() => setCurrentPage('admin')}
+              />
+            </div>
           ) : loggedInPatient ? (
             <PatientAccountDropdown
               patient={loggedInPatient}
@@ -1134,6 +1153,25 @@ function App() {
             />
           )}
         </div>
+      )}
+
+      {/* AI Assistant Panel */}
+      {userRole === 'clinician' && (
+        <AiAssistantPanel
+          show={showAiPanel}
+          onClose={() => setShowAiPanel(false)}
+          onAddToProgram={handleAddToProgram}
+          onOpenProtocols={() => setShowAiProtocolModal(true)}
+        />
+      )}
+
+      {/* AI Protocol Modal */}
+      {userRole === 'clinician' && (
+        <AiProtocolModal
+          show={showAiProtocolModal}
+          onClose={() => setShowAiProtocolModal(false)}
+          isAdmin={loggedInUser?.isAdmin || false}
+        />
       )}
     </div>
   );

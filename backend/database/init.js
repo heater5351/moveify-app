@@ -613,6 +613,41 @@ async function initDatabase() {
       ON block_schedules(program_id)
     `);
 
+    // AI usage log (token tracking, rate limiting)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS ai_usage_log (
+        id SERIAL PRIMARY KEY,
+        clinician_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        input_tokens INTEGER NOT NULL,
+        output_tokens INTEGER NOT NULL,
+        model TEXT NOT NULL,
+        request_type TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_ai_usage_log_clinician_date
+      ON ai_usage_log(clinician_id, created_at)
+    `);
+
+    // Clinician protocols (injected into AI system prompt)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS clinician_protocols (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        content TEXT NOT NULL,
+        category TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        is_global BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_clinician_protocols_created_by
+      ON clinician_protocols(created_by)
+    `);
+
     // Fix education_modules.created_by FK to allow clinician deletion
     await db.query(`
       DO $$ BEGIN
