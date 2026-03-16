@@ -214,6 +214,7 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onOpenProtocol
       }));
     if (programExercises.length > 0) {
       onAddToProgram(programExercises);
+      onClose();
     }
   };
 
