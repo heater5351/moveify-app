@@ -253,7 +253,6 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
             {patient.assignedPrograms && patient.assignedPrograms.length > 0 ? (
               <div className="space-y-2.5">
                 {patient.assignedPrograms.map((program, index) => {
-                  const completedCount = program.exercises.filter(e => e.completed).length;
                   const totalExercises = program.exercises.length;
 
                   return (
@@ -267,7 +266,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
                       >
                         <h3 className="font-medium text-slate-800 text-sm">{program.config.name}</h3>
                         <p className="text-xs text-slate-500 mt-1">
-                          {totalExercises} exercises · {completedCount} completed today
+                          {totalExercises} exercises
                         </p>
                         <p className="text-xs text-primary-500 mt-0.5">
                           {program.config.frequency.join(', ')} · {program.config.duration}
