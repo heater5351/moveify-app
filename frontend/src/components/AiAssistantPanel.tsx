@@ -30,8 +30,10 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onOpenProtocol
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const streamBufferRef = useRef('');
-  const rafRef = useRef<number | null>(null);
+  const streamQueueRef = useRef('');
+  const displayedRef = useRef('');
+  const typewriterRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamDoneRef = useRef(false);
 
   // Load usage on mount
   useEffect(() => {
@@ -78,51 +80,72 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onOpenProtocol
     const controller = new AbortController();
     abortRef.current = controller;
 
-    // Flush buffered stream text to state (once per frame)
-    const flushBuffer = () => {
-      rafRef.current = null;
-      const buffered = streamBufferRef.current;
-      if (!buffered) return;
-      streamBufferRef.current = '';
-      setMessages(prev => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last?.role === 'assistant') {
-          updated[updated.length - 1] = { ...last, content: last.content + buffered };
+    // Typewriter: drains streamQueueRef char-by-char into displayed state
+    streamQueueRef.current = '';
+    displayedRef.current = '';
+    streamDoneRef.current = false;
+
+    const CHARS_PER_TICK = 3;
+    const TICK_MS = 16; // ~60fps
+
+    const startTypewriter = () => {
+      if (typewriterRef.current) return;
+      typewriterRef.current = setInterval(() => {
+        const queue = streamQueueRef.current;
+        if (queue.length === 0) {
+          if (streamDoneRef.current) {
+            clearInterval(typewriterRef.current!);
+            typewriterRef.current = null;
+          }
+          return;
         }
-        return updated;
-      });
+        // Drain multiple chars per tick to keep up with fast streams
+        const chunkSize = Math.min(CHARS_PER_TICK + Math.floor(queue.length / 20), queue.length);
+        const chunk = queue.slice(0, chunkSize);
+        streamQueueRef.current = queue.slice(chunkSize);
+        displayedRef.current += chunk;
+        const displayed = displayedRef.current;
+        setMessages(prev => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.role === 'assistant') {
+            updated[updated.length - 1] = { ...last, content: displayed };
+          }
+          return updated;
+        });
+      }, TICK_MS);
     };
 
     try {
       await streamAiChat(apiMessages, {
         onText: (text) => {
-          streamBufferRef.current += text;
-          if (!rafRef.current) {
-            rafRef.current = requestAnimationFrame(flushBuffer);
-          }
+          streamQueueRef.current += text;
+          startTypewriter();
         },
         onExercises: (exercises) => {
           setMessages(prev => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
-            if (last.role === 'assistant') {
+            if (last?.role === 'assistant') {
               updated[updated.length - 1] = { ...last, exercises };
             }
             return updated;
           });
         },
         onDone: (usageData) => {
-          // Flush any remaining buffered text
-          if (rafRef.current) cancelAnimationFrame(rafRef.current);
-          const remaining = streamBufferRef.current;
-          streamBufferRef.current = '';
-          rafRef.current = null;
+          streamDoneRef.current = true;
+          // Flush remaining queue immediately
+          if (typewriterRef.current) {
+            clearInterval(typewriterRef.current);
+            typewriterRef.current = null;
+          }
+          const fullContent = displayedRef.current + streamQueueRef.current;
+          streamQueueRef.current = '';
           setMessages(prev => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
             if (last?.role === 'assistant') {
-              updated[updated.length - 1] = { ...last, content: last.content + remaining, isStreaming: false };
+              updated[updated.length - 1] = { ...last, content: fullContent, isStreaming: false };
             }
             return updated;
           });
@@ -130,10 +153,13 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onOpenProtocol
           setIsStreaming(false);
         },
         onError: (errMsg) => {
+          if (typewriterRef.current) {
+            clearInterval(typewriterRef.current);
+            typewriterRef.current = null;
+          }
           setError(errMsg);
           setMessages(prev => {
             const updated = [...prev];
-            // Remove the empty assistant message
             if (updated[updated.length - 1]?.role === 'assistant' && !updated[updated.length - 1].content) {
               updated.pop();
             } else {
@@ -171,12 +197,19 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onOpenProtocol
 
   const handleStop = () => {
     abortRef.current?.abort();
+    if (typewriterRef.current) {
+      clearInterval(typewriterRef.current);
+      typewriterRef.current = null;
+    }
+    // Show whatever has been displayed so far
+    const fullContent = displayedRef.current + streamQueueRef.current;
+    streamQueueRef.current = '';
     setIsStreaming(false);
     setMessages(prev => {
       const updated = [...prev];
       const last = updated[updated.length - 1];
       if (last?.role === 'assistant') {
-        updated[updated.length - 1] = { ...last, isStreaming: false };
+        updated[updated.length - 1] = { ...last, content: fullContent || last.content, isStreaming: false };
       }
       return updated;
     });
