@@ -24,7 +24,12 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   const [activeView, setActiveView] = useState<'exercises' | 'progress' | 'education'>('exercises');
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showInfoBanner, setShowInfoBanner] = useState(() => {
-    return localStorage.getItem('moveify_hide_completion_tip') !== 'true';
+    const dismissCount = parseInt(localStorage.getItem('moveify_tip_dismiss_count') || '0', 10);
+    if (dismissCount >= 5) return false;
+    const lastDismissed = localStorage.getItem('moveify_tip_last_dismissed');
+    if (!lastDismissed) return true;
+    const daysSince = (Date.now() - parseInt(lastDismissed, 10)) / (1000 * 60 * 60 * 24);
+    return daysSince >= 7;
   });
   const [selectedExercise, setSelectedExercise] = useState<{
     exercise: ProgramExercise;
@@ -348,11 +353,14 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
               <Info size={16} className="text-primary-500 mt-0.5 flex-shrink-0" />
               <p className="text-xs sm:text-sm text-primary-700 flex-1">
                 Mark your exercises as complete so your clinician can track your progress and adjust your sets, reps, and weights over time.
+                <span className="block mt-1 text-primary-600 font-medium">P.S. You can speed this up by pressing "Completed as prescribed"</span>
               </p>
               <button
                 onClick={() => {
                   setShowInfoBanner(false);
-                  localStorage.setItem('moveify_hide_completion_tip', 'true');
+                  const count = parseInt(localStorage.getItem('moveify_tip_dismiss_count') || '0', 10) + 1;
+                  localStorage.setItem('moveify_tip_dismiss_count', String(count));
+                  localStorage.setItem('moveify_tip_last_dismissed', String(Date.now()));
                 }}
                 className="text-primary-400 hover:text-primary-600 flex-shrink-0 p-0.5"
                 aria-label="Dismiss tip"
