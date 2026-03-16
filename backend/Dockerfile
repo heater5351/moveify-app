@@ -13,6 +13,7 @@ COPY database/ ./database/
 COPY middleware/ ./middleware/
 COPY routes/ ./routes/
 COPY services/ ./services/
+COPY data/ ./data/
 
 EXPOSE 8080
 

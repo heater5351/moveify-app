@@ -17,6 +17,7 @@ const aiLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: { error: 'Too many AI requests. Please wait a moment.' }
 });
 router.use(aiLimiter);
