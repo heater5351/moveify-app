@@ -7,3 +7,9 @@
 html, body {
   overflow-x: hidden;
 }
+
+/* Safe area insets for Android notch/cutout devices */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}

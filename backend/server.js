@@ -49,8 +49,15 @@ if (isProduction && !corsOrigin) {
   console.warn('WARNING: CORS_ORIGIN not set in production. CORS will reject all cross-origin requests.');
 }
 
+// Allow Capacitor WebView origins alongside the main frontend origin
+const allowedOrigins = [
+  corsOrigin,
+  'https://localhost',      // Capacitor Android WebView
+  'capacitor://localhost',  // Capacitor iOS (future-proofing)
+].filter(Boolean);
+
 const corsOptions = {
-  origin: corsOrigin || false,
+  origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, useSearchParams, useNavigate } from 'react-router-dom';
 import type { Patient, ProgramExercise, ProgramConfig, UserRole, NewPatient, CompletionData, User, ExerciseWeekPrescription } from './types/index.ts';
 import { LoginPage } from './components/LoginPage';
@@ -32,6 +32,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { API_URL } from './config';
 import { getAuthHeaders, setToken, clearAuth, setStoredUser, getToken } from './utils/api';
 import { toLocalDateString } from './utils/date.ts';
+import { useCapacitorBackButton } from './hooks/useCapacitorBackButton';
 
 function App() {
   // Authentication state
@@ -91,6 +92,29 @@ function App() {
     customEndDate: '',
     trackRpe: true
   });
+
+  // Android back button handler (Capacitor)
+  const handleBackButton = useCallback(() => {
+    // Close any open modal first
+    if (viewingProgramIndex !== null) {
+      setViewingProgramIndex(null);
+      return true;
+    }
+    // Patient: navigate back to main portal from sub-pages
+    if (userRole === 'patient' && (currentPage === 'account' || currentPage === 'mydata')) {
+      setCurrentPage('exercises');
+      return true;
+    }
+    // Clinician: navigate back from patient profile to patients list
+    if (userRole === 'clinician' && currentPage === 'programs' && viewingPatient) {
+      setCurrentPage('patients');
+      setViewingPatient(null);
+      return true;
+    }
+    return false;
+  }, [viewingProgramIndex, userRole, currentPage, viewingPatient]);
+
+  useCapacitorBackButton(handleBackButton);
 
   // Session restoration on mount
   useEffect(() => {
