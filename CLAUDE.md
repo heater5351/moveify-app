@@ -42,11 +42,24 @@ Moveify is a clinical exercise prescription and patient management platform (sim
 
 ### Deployment
 
-- Frontend: **Vercel** (vite build → `dist/`)
+- Frontend: **Vercel** (vite build → `dist/`) — live at **https://www.moveifyapp.com**
 - Backend: **GCP Cloud Run** (Docker container) + **Cloud SQL PostgreSQL** (`australia-southeast1`)
 - Environment variable `VITE_API_URL` points frontend to backend (falls back to `localhost:3000`)
 - Cloud Run connects to Cloud SQL via Unix socket (`/cloudsql/{INSTANCE_CONNECTION_NAME}`)
 - `backend/Dockerfile` builds the container; `backend/database/db.js` switches between Cloud SQL socket and `DATABASE_URL` based on env vars
+- Domain: **moveifyapp.com** registered on Cloudflare, DNS pointing to Vercel (DNS only, no proxy)
+
+### Mobile App (Android)
+
+- **Capacitor 8** wraps the existing React SPA into a native Android app for Google Play
+- Android project lives at `frontend/android/`, app ID: `com.moveifyhealth.app`
+- Build: `cd frontend && npm run build:android` (builds SPA + syncs to Android project)
+- APK is built via Gradle: `cd frontend/android && JAVA_HOME="C:/Program Files/Android/Android Studio/jbr" ./gradlew assembleDebug`
+- The Android WebView loads local files; API calls go to the Cloud Run backend via `VITE_API_URL` baked in at build time (from `frontend/.env.production`)
+- CORS allows `https://localhost` and `capacitor://localhost` for WebView origins
+- `FRONTEND_URL` env var on Cloud Run controls where email links (invitations, password resets) point — currently `https://www.moveifyapp.com`
+- **When the app is on Google Play:** email links will open in the browser, not the app. Deep linking (Android App Links) is a future enhancement if needed
+- **When modifying email templates or links:** consider that patients may be using the website OR the Android app. Links should always use `FRONTEND_URL` and point to the web domain (works in both contexts)
 
 ## Project Structure
 
@@ -368,3 +381,9 @@ Moveify stores **sensitive health information** (patient demographics, condition
 gcloud run deploy moveify-backend --source backend/ --region australia-southeast1 --platform managed --allow-unauthenticated --add-cloudsql-instances moveify-app:australia-southeast1:moveify-db
 ```
 If `gcloud auth` has expired, run `gcloud auth login` first.
+
+**Android app changes:** After frontend changes that should be reflected in the Android app, rebuild:
+```
+cd frontend && npm run build:android
+```
+Then rebuild the APK/AAB via Android Studio or Gradle for testing/submission.
