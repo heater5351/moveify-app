@@ -67,7 +67,7 @@ function App() {
   const [editingProgramId, setEditingProgramId] = useState<number | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showBlockBuilderModal, setShowBlockBuilderModal] = useState(false);
-  const [pendingBlockData, setPendingBlockData] = useState<{ duration: number; weeks: ExerciseWeekPrescription[]; startingWeights?: Record<number, string>; rowTemplateIds?: Record<number, number | ''> } | null>(null);
+  const [pendingBlockData, setPendingBlockData] = useState<{ duration: number; weeks: ExerciseWeekPrescription[]; startingWeights?: Record<number, string>; rowTemplateIds?: Record<number, number | ''>; isModified?: boolean } | null>(null);
   const [showDeletePatientConfirm, setShowDeletePatientConfirm] = useState(false);
   const [showDeleteProgramConfirm, setShowDeleteProgramConfirm] = useState(false);
   const [programToDelete, setProgramToDelete] = useState<{ id: number; name: string } | null>(null);
@@ -383,33 +383,42 @@ function App() {
       if (response.ok) {
         const responseData = await response.json();
 
-        // If a block was configured, create/update it with the program's exercise IDs
-        if (pendingBlockData && responseData.programId) {
+        // If a block was configured or modified, create/update it with the program's exercise IDs
+        // Skip re-creation when editing if the block wasn't actually changed (just exercises updated)
+        if (pendingBlockData && responseData.programId && (!isEditing || pendingBlockData.isModified)) {
           try {
             const targetProgramId = responseData.programId;
 
-            // Use exercise IDs from the response (new programs) or from existing exercises (editing)
-            let exerciseIds: number[] = [];
-            if (responseData.exerciseIds) {
-              exerciseIds = responseData.exerciseIds;
-            } else if (isEditing) {
-              exerciseIds = programExercises.map(e => e.id).filter((id): id is number => id !== undefined);
-            }
-
-            if (exerciseIds.length > 0) {
-              const remappedWeeks = pendingBlockData.weeks.map(w => ({
-                ...w,
-                programExerciseId: exerciseIds[w.programExerciseId] ?? exerciseIds[0]
-              }));
+            if (isEditing) {
+              // When editing, block weeks already have correct programExerciseId values
+              // from the DB — send them as-is without remapping
               await fetch(`${API_URL}/blocks/${targetProgramId}`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify({
                   blockDuration: pendingBlockData.duration,
                   startDate: toLocalDateString(new Date()),
-                  exerciseWeeks: remappedWeeks
+                  exerciseWeeks: pendingBlockData.weeks
                 })
               });
+            } else {
+              // New program: remap index-based IDs to real DB IDs from response
+              const exerciseIds: number[] = responseData.exerciseIds || [];
+              if (exerciseIds.length > 0) {
+                const remappedWeeks = pendingBlockData.weeks.map(w => ({
+                  ...w,
+                  programExerciseId: exerciseIds[w.programExerciseId] ?? exerciseIds[0]
+                }));
+                await fetch(`${API_URL}/blocks/${targetProgramId}`, {
+                  method: 'POST',
+                  headers: getAuthHeaders(),
+                  body: JSON.stringify({
+                    blockDuration: pendingBlockData.duration,
+                    startDate: toLocalDateString(new Date()),
+                    exerciseWeeks: remappedWeeks
+                  })
+                });
+              }
             }
           } catch (blockError) {
             console.error('Failed to create block (program still saved):', blockError);
@@ -493,7 +502,7 @@ function App() {
               duration: w.duration ?? null,
               restDuration: w.rest_duration ?? w.restDuration ?? null,
             }));
-            setPendingBlockData({ duration, weeks });
+            setPendingBlockData({ duration, weeks, isModified: false });
           }
         })
         .catch(() => {});
@@ -876,7 +885,7 @@ function App() {
           initialRowTemplateIds={pendingBlockData?.rowTemplateIds}
           onClose={() => setShowBlockBuilderModal(false)}
           onSave={(blockDuration, exerciseWeeks, savedStartingWeights, savedRowTemplateIds) => {
-            setPendingBlockData({ duration: blockDuration, weeks: exerciseWeeks, startingWeights: savedStartingWeights, rowTemplateIds: savedRowTemplateIds });
+            setPendingBlockData({ duration: blockDuration, weeks: exerciseWeeks, startingWeights: savedStartingWeights, rowTemplateIds: savedRowTemplateIds, isModified: true });
             setShowBlockBuilderModal(false);
           }}
         />
