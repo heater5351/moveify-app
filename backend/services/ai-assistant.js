@@ -74,6 +74,37 @@ ${exerciseList}
   { "name": "Calf Raise Hold with Bodyweight", "sets": 3, "prescribedDuration": 30, "instructions": "Hold at top position" }
 ]
 \`\`\`
+
+## Periodization Blocks
+When the clinician asks for a periodized program, progressive overload, or a multi-week block, output a \`program-block\` fenced code block IN ADDITION to the \`program-exercises\` block. The \`program-exercises\` block defines the base exercises; the \`program-block\` defines weekly progressions.
+
+The \`program-block\` JSON object must have:
+- blockDuration (number): total weeks (4, 6, or 8)
+- weeks (array): one entry per exercise per week, each with:
+  - exerciseIndex (number): 0-based index into the program-exercises array
+  - weekNumber (number): 1-based week number
+  - sets (number)
+  - reps (number)
+  - weight (number or null, in kg)
+  - duration (number or null, in seconds — for duration/cardio exercises)
+  - restDuration (number or null, in seconds)
+  - rpeTarget (number or null, 1-10 scale)
+  - notes (string or null)
+
+Only output a \`program-block\` if periodization is requested or clearly implied (e.g., "progressive program", "6-week block", "build up over time"). Do NOT output a \`program-block\` for simple one-off program requests.
+
+### Periodization Block Example
+\`\`\`program-block
+{
+  "blockDuration": 4,
+  "weeks": [
+    { "exerciseIndex": 0, "weekNumber": 1, "sets": 3, "reps": 10, "weight": 20, "duration": null, "restDuration": 60, "rpeTarget": 6, "notes": null },
+    { "exerciseIndex": 0, "weekNumber": 2, "sets": 3, "reps": 10, "weight": 25, "duration": null, "restDuration": 60, "rpeTarget": 7, "notes": null },
+    { "exerciseIndex": 0, "weekNumber": 3, "sets": 4, "reps": 8, "weight": 30, "duration": null, "restDuration": 90, "rpeTarget": 7, "notes": null },
+    { "exerciseIndex": 0, "weekNumber": 4, "sets": 4, "reps": 8, "weight": 32.5, "duration": null, "restDuration": 90, "rpeTarget": 8, "notes": "Deload next week if RPE > 8" }
+  ]
+}
+\`\`\`
 ${protocolSection}
 
 ## Privacy
@@ -157,4 +188,44 @@ async function* streamChat(messages, exercises, protocols = []) {
   };
 }
 
-module.exports = { buildSystemPrompt, parseExerciseResponse, streamChat, getClient };
+/**
+ * Parse periodization block from AI response text
+ * @param {string} responseText - Full AI response
+ * @returns {{ blockDuration: number, weeks: Array } | null}
+ */
+function parseBlockResponse(responseText) {
+  const blockRegex = /```program-block\s*\n([\s\S]*?)```/;
+  const match = responseText.match(blockRegex);
+
+  if (!match) return null;
+
+  try {
+    const parsed = JSON.parse(match[1]);
+    if (!parsed.blockDuration || !Array.isArray(parsed.weeks)) return null;
+
+    // Validate and clean week entries
+    const weeks = parsed.weeks
+      .filter(w => typeof w.exerciseIndex === 'number' && typeof w.weekNumber === 'number')
+      .map(w => ({
+        exerciseIndex: w.exerciseIndex,
+        weekNumber: w.weekNumber,
+        sets: w.sets || 3,
+        reps: w.reps || 10,
+        weight: w.weight ?? null,
+        duration: w.duration ?? null,
+        restDuration: w.restDuration ?? null,
+        rpeTarget: w.rpeTarget ?? null,
+        notes: w.notes ?? null,
+      }));
+
+    return {
+      blockDuration: Math.min(Math.max(parsed.blockDuration, 1), 12),
+      weeks,
+    };
+  } catch (error) {
+    console.error('Failed to parse AI block response:', error.message);
+    return null;
+  }
+}
+
+module.exports = { buildSystemPrompt, parseExerciseResponse, parseBlockResponse, streamChat, getClient };

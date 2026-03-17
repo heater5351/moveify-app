@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Send, Sparkles, Plus, CheckCircle, AlertCircle, HelpCircle, BookOpen, Loader2, RotateCcw, Shield } from 'lucide-react';
-import type { ProgramExercise } from '../types/index.ts';
+import type { ProgramExercise, ExerciseWeekPrescription } from '../types/index.ts';
 import { streamAiChat, getAiUsage } from '../utils/ai';
-import type { AiMessage, AiExerciseMatch, AiUsage } from '../utils/ai';
+import type { AiMessage, AiExerciseMatch, AiUsage, AiBlockData } from '../utils/ai';
+import { formatDuration } from '../utils/duration';
 
 type AiAssistantPanelProps = {
   show: boolean;
   onClose: () => void;
   onAddToProgram: (exercises: ProgramExercise[]) => void;
+  onAddToProgramWithBlock: (exercises: ProgramExercise[], blockDuration: number, weeks: ExerciseWeekPrescription[]) => void;
   onOpenProtocols: () => void;
 };
 
@@ -15,12 +17,13 @@ type DisplayMessage = {
   role: 'user' | 'assistant';
   content: string;
   exercises?: AiExerciseMatch[];
+  block?: AiBlockData;
   isStreaming?: boolean;
 };
 
 const CONSENT_KEY = 'moveify_ai_consent';
 
-export function AiAssistantPanel({ show, onClose, onAddToProgram, onOpenProtocols }: AiAssistantPanelProps) {
+export function AiAssistantPanel({ show, onClose, onAddToProgram, onAddToProgramWithBlock, onOpenProtocols }: AiAssistantPanelProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -128,6 +131,16 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onOpenProtocol
             const last = updated[updated.length - 1];
             if (last?.role === 'assistant') {
               updated[updated.length - 1] = { ...last, exercises };
+            }
+            return updated;
+          });
+        },
+        onBlock: (block) => {
+          setMessages(prev => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last?.role === 'assistant') {
+              updated[updated.length - 1] = { ...last, block };
             }
             return updated;
           });
@@ -243,38 +256,67 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onOpenProtocol
     onAddToProgram([exercise]);
   };
 
-  const handleAddAll = (exercises: AiExerciseMatch[]) => {
-    const programExercises: ProgramExercise[] = exercises
-      .filter(e => e.matched)
-      .map(e => ({
-        id: 0,
-        name: e.matched!.name,
-        category: 'Musculoskeletal',
-        duration: '',
-        description: '',
-        exerciseType: (e.matched!.exerciseType as 'reps' | 'duration' | 'cardio') || 'reps',
-        equipment: e.matched!.equipment || undefined,
-        jointArea: e.matched!.jointArea || undefined,
-        muscleGroup: e.matched!.muscleGroup || undefined,
-        sets: e.suggested.sets || 3,
-        reps: e.suggested.reps || 10,
-        prescribedWeight: e.suggested.prescribedWeight,
-        prescribedDuration: e.suggested.prescribedDuration,
-        restDuration: e.suggested.restDuration,
-        instructions: e.suggested.instructions,
-        completed: false,
-      }));
-    if (programExercises.length > 0) {
-      onAddToProgram(programExercises);
-      onClose();
+  const handleAddAll = (exercises: AiExerciseMatch[], block?: AiBlockData) => {
+    // Build matched exercise list, keeping a map from original AI index to matched index
+    const matchedExercises: ProgramExercise[] = [];
+    const indexMap = new Map<number, number>(); // AI exerciseIndex -> programExercises index
+
+    exercises.forEach((e, aiIndex) => {
+      if (e.matched) {
+        indexMap.set(aiIndex, matchedExercises.length);
+        matchedExercises.push({
+          id: 0,
+          name: e.matched!.name,
+          category: 'Musculoskeletal',
+          duration: '',
+          description: '',
+          exerciseType: (e.matched!.exerciseType as 'reps' | 'duration' | 'cardio') || 'reps',
+          equipment: e.matched!.equipment || undefined,
+          jointArea: e.matched!.jointArea || undefined,
+          muscleGroup: e.matched!.muscleGroup || undefined,
+          sets: e.suggested.sets || 3,
+          reps: e.suggested.reps || 10,
+          prescribedWeight: e.suggested.prescribedWeight,
+          prescribedDuration: e.suggested.prescribedDuration,
+          restDuration: e.suggested.restDuration,
+          instructions: e.suggested.instructions,
+          completed: false,
+        });
+      }
+    });
+
+    if (matchedExercises.length === 0) return;
+
+    if (block && block.weeks.length > 0) {
+      // Convert AI block weeks to ExerciseWeekPrescription using index mapping
+      const weeks: ExerciseWeekPrescription[] = block.weeks
+        .filter(w => indexMap.has(w.exerciseIndex))
+        .map(w => ({
+          programExerciseId: indexMap.get(w.exerciseIndex)!,
+          weekNumber: w.weekNumber,
+          sets: w.sets,
+          reps: w.reps,
+          weight: w.weight,
+          duration: w.duration,
+          restDuration: w.restDuration,
+          rpeTarget: w.rpeTarget,
+          notes: w.notes,
+        }));
+
+      onAddToProgramWithBlock(matchedExercises, block.blockDuration, weeks);
+    } else {
+      onAddToProgram(matchedExercises);
     }
+    onClose();
   };
 
-  // Strip the program-exercises code block from display text (complete and in-progress)
+  // Strip the program-exercises and program-block code blocks from display text (complete and in-progress)
   const stripCodeBlock = (text: string) => {
     return text
       .replace(/```program-exercises[\s\S]*?```\n?/g, '')
       .replace(/```program-exercises[\s\S]*/g, '')
+      .replace(/```program-block[\s\S]*?```\n?/g, '')
+      .replace(/```program-block[\s\S]*/g, '')
       .trim();
   };
 
@@ -452,14 +494,71 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onOpenProtocol
                           </div>
                         ))}
 
+                        {/* Block preview */}
+                        {msg.block && msg.block.weeks.length > 0 && (
+                          <div className="bg-violet-50 border border-violet-200 rounded-lg p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-5 h-5 bg-violet-200 rounded flex items-center justify-center">
+                                <span className="text-violet-700 text-xs font-bold">B</span>
+                              </div>
+                              <span className="text-xs font-semibold text-violet-700">
+                                {msg.block.blockDuration}-Week Periodization Block
+                              </span>
+                            </div>
+                            <div className="overflow-x-auto -mx-1">
+                              <table className="w-full text-[10px]">
+                                <thead>
+                                  <tr className="border-b border-violet-200">
+                                    <th className="text-left py-1 px-1 font-semibold text-violet-600 min-w-[100px]">Exercise</th>
+                                    {Array.from({ length: msg.block.blockDuration }, (_, i) => (
+                                      <th key={i} className="text-center py-1 px-1 font-semibold text-violet-500 min-w-[50px]">Wk {i + 1}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(() => {
+                                    // Group weeks by exerciseIndex
+                                    const exerciseIndices = [...new Set(msg.block!.weeks.map(w => w.exerciseIndex))];
+                                    return exerciseIndices.map(exIdx => {
+                                      const exercise = msg.exercises?.[exIdx];
+                                      const exName = exercise?.matched?.name || exercise?.suggested.name || `Exercise ${exIdx + 1}`;
+                                      const exType = exercise?.matched?.exerciseType || 'reps';
+                                      return (
+                                        <tr key={exIdx} className="border-b border-violet-100">
+                                          <td className="py-1 px-1 font-medium text-violet-700 truncate max-w-[100px]">{exName}</td>
+                                          {Array.from({ length: msg.block!.blockDuration }, (_, i) => {
+                                            const week = msg.block!.weeks.find(w => w.exerciseIndex === exIdx && w.weekNumber === i + 1);
+                                            return (
+                                              <td key={i} className="text-center py-1 px-1 text-violet-600">
+                                                {week ? (
+                                                  <>
+                                                    {exType === 'cardio' || exType === 'duration'
+                                                      ? `${week.sets}x${week.duration ? formatDuration(week.duration) : week.reps}`
+                                                      : `${week.sets}x${week.reps}`}
+                                                    {week.weight ? <div className="text-[9px] text-violet-400">{week.weight}kg</div> : null}
+                                                  </>
+                                                ) : '--'}
+                                              </td>
+                                            );
+                                          })}
+                                        </tr>
+                                      );
+                                    });
+                                  })()}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Load All button */}
                         {msg.exercises.filter(e => e.matched).length > 1 && (
                           <button
-                            onClick={() => handleAddAll(msg.exercises!)}
+                            onClick={() => handleAddAll(msg.exercises!, msg.block)}
                             className="w-full py-2 px-3 bg-primary-400 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                           >
                             <Plus className="w-4 h-4" />
-                            Load All into Program Builder ({msg.exercises.filter(e => e.matched).length})
+                            {msg.block ? 'Load with Block into Program Builder' : 'Load All into Program Builder'} ({msg.exercises.filter(e => e.matched).length})
                           </button>
                         )}
                       </div>

@@ -29,6 +29,23 @@ export type AiExerciseMatch = {
   score: number;
 };
 
+export type AiBlockWeek = {
+  exerciseIndex: number;
+  weekNumber: number;
+  sets: number;
+  reps: number;
+  weight: number | null;
+  duration: number | null;
+  restDuration: number | null;
+  rpeTarget: number | null;
+  notes: string | null;
+};
+
+export type AiBlockData = {
+  blockDuration: number;
+  weeks: AiBlockWeek[];
+};
+
 export type AiUsage = {
   inputTokens: number;
   outputTokens: number;
@@ -39,6 +56,7 @@ export type AiUsage = {
 type StreamCallback = {
   onText: (text: string) => void;
   onExercises: (exercises: AiExerciseMatch[]) => void;
+  onBlock: (block: AiBlockData) => void;
   onDone: (usage: AiUsage) => void;
   onError: (error: string) => void;
 };
@@ -111,6 +129,9 @@ export async function streamAiChat(
               break;
             case 'exercises':
               callbacks.onExercises(parsed.exercises);
+              break;
+            case 'block':
+              callbacks.onBlock(parsed.block);
               break;
             case 'done':
               callbacks.onDone(parsed.usage);

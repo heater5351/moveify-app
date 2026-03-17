@@ -3,7 +3,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { streamChat, parseExerciseResponse } = require('../services/ai-assistant');
+const { streamChat, parseExerciseResponse, parseBlockResponse } = require('../services/ai-assistant');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -169,6 +169,15 @@ router.post('/chat', async (req, res) => {
                 confidence: e.confidence,
                 score: e.score,
               }))
+            })}\n\n`);
+          }
+
+          // Parse and send block data if present
+          const blockData = parseBlockResponse(fullResponse);
+          if (blockData) {
+            res.write(`data: ${JSON.stringify({
+              type: 'block',
+              block: blockData,
             })}\n\n`);
           }
 

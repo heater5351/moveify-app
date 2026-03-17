@@ -1171,6 +1171,10 @@ function App() {
           show={showAiPanel}
           onClose={() => setShowAiPanel(false)}
           onAddToProgram={handleAddToProgram}
+          onAddToProgramWithBlock={(exercises, blockDuration, weeks) => {
+            setProgramExercises(prev => [...prev, ...exercises]);
+            setPendingBlockData({ duration: blockDuration, weeks, isModified: true });
+          }}
           onOpenProtocols={() => setShowAiProtocolModal(true)}
         />
       )}
