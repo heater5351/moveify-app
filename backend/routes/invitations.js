@@ -137,10 +137,12 @@ router.post('/set-password', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
-    // Validate invitation first to check role
+    // Atomically claim the invitation token (prevents race condition with concurrent requests)
     const invitation = await db.getOne(`
-      SELECT * FROM invitation_tokens
+      UPDATE invitation_tokens
+      SET used = 1
       WHERE token = $1 AND used = 0 AND expires_at > NOW()
+      RETURNING *
     `, [token]);
 
     if (!invitation) {
@@ -149,6 +151,8 @@ router.post('/set-password', async (req, res) => {
 
     // Only require health data consent for patients
     if (invitation.role === 'patient' && healthDataConsent !== true) {
+      // Undo the claim so the patient can retry with consent
+      await db.query('UPDATE invitation_tokens SET used = 0 WHERE token = $1', [token]);
       return res.status(400).json({ error: 'You must consent to health data collection to create an account' });
     }
 
@@ -167,9 +171,6 @@ router.post('/set-password', async (req, res) => {
         UPDATE users SET password_hash = $1 WHERE email = $2 AND role = $3
       `, [passwordHash, invitation.email, invitation.role]);
     }
-
-    // Mark invitation as used
-    await db.query('UPDATE invitation_tokens SET used = 1 WHERE token = $1', [token]);
 
     // Get the user ID
     const user = await db.getOne('SELECT id FROM users WHERE email = $1', [invitation.email]);

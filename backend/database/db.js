@@ -4,7 +4,8 @@ const { Pool } = require('pg');
 // Build pool config: Cloud SQL Unix socket (GCP) or DATABASE_URL (local/other)
 function getPoolConfig() {
   const base = {
-    max: 5,
+    max: 20,
+    min: 2,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
     query_timeout: 15000,
@@ -32,13 +33,26 @@ function getPoolConfig() {
 
 const pool = new Pool(getPoolConfig());
 
-// Test connection on startup
-pool.on('connect', () => {
-  console.log('✅ PostgreSQL connected');
-});
+// Track consecutive connection failures for recovery
+let consecutiveErrors = 0;
+const MAX_CONSECUTIVE_ERRORS = 5;
 
 pool.on('error', (err) => {
-  console.error('❌ PostgreSQL pool error:', err);
+  consecutiveErrors++;
+  console.error(`❌ PostgreSQL pool error (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`, err.message);
+
+  if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+    console.error('❌ Too many consecutive DB errors — exiting for container restart');
+    process.exit(1);
+  }
+});
+
+// Reset error counter on successful connection
+pool.on('connect', () => {
+  if (consecutiveErrors > 0) {
+    console.log('✅ PostgreSQL connection recovered');
+  }
+  consecutiveErrors = 0;
 });
 
 // Helper function for single query

@@ -113,8 +113,14 @@ app.get('/', (req, res) => {
   res.json({ message: 'Moveify Backend is running!' });
 });
 
-// Health check route (used by Railway)
+// Track database readiness
+let dbReady = false;
+
+// Health check route
 app.get('/health', (req, res) => {
+  if (!dbReady) {
+    return res.status(503).json({ status: 'UNAVAILABLE', reason: 'Database not ready', timestamp: new Date().toISOString() });
+  }
   res.json({ status: 'OK', version: '2.1.0-duration', timestamp: new Date().toISOString() });
 });
 
@@ -171,6 +177,7 @@ async function startServer() {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       await initDatabase();
+      dbReady = true;
       console.log('Database initialized');
       break;
     } catch (error) {

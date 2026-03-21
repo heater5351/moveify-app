@@ -102,22 +102,20 @@ router.get('/patient/:patientId', requirePatientAccess, async (req, res) => {
 
 // Create new program for a patient (clinician only)
 router.post('/patient/:patientId', requireRole('clinician'), async (req, res) => {
+  const { patientId } = req.params;
+  const { exercises, config, name } = req.body;
+
+  if (!name || name.trim() === '') {
+    return res.status(400).json({ error: 'Program name is required' });
+  }
+
+  if (!exercises || exercises.length === 0) {
+    return res.status(400).json({ error: 'Exercises are required' });
+  }
+
   const client = await db.getClient();
 
   try {
-    const { patientId } = req.params;
-    const { exercises, config, name } = req.body;
-
-    if (!name || name.trim() === '') {
-      client.release();
-      return res.status(400).json({ error: 'Program name is required' });
-    }
-
-    if (!exercises || exercises.length === 0) {
-      client.release();
-      return res.status(400).json({ error: 'Exercises are required' });
-    }
-
     await client.query('BEGIN');
 
     const actualStartDate = getActualStartDate(config?.startDate, config?.customStartDate);
@@ -179,7 +177,6 @@ router.post('/patient/:patientId', requireRole('clinician'), async (req, res) =>
     const exerciseIds = createdExercises.rows.map(e => e.id);
 
     await client.query('COMMIT');
-    client.release();
 
     audit.log(req, 'program_create', 'program', programId, { patientId: parseInt(patientId), exerciseCount: exercises.length });
 
@@ -189,31 +186,30 @@ router.post('/patient/:patientId', requireRole('clinician'), async (req, res) =>
       exerciseIds: exerciseIds
     });
   } catch (error) {
-    await client.query('ROLLBACK');
-    client.release();
+    await client.query('ROLLBACK').catch(e => console.error('Rollback failed:', e));
     console.error('Create program error:', error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 });
 
 // Update existing program (clinician only)
 router.put('/:programId', requireRole('clinician'), async (req, res) => {
+  const { programId } = req.params;
+  const { exercises, config, name } = req.body;
+
+  if (!name || name.trim() === '') {
+    return res.status(400).json({ error: 'Program name is required' });
+  }
+
+  if (!exercises || exercises.length === 0) {
+    return res.status(400).json({ error: 'Exercises are required' });
+  }
+
   const client = await db.getClient();
 
   try {
-    const { programId } = req.params;
-    const { exercises, config, name } = req.body;
-
-    if (!name || name.trim() === '') {
-      client.release();
-      return res.status(400).json({ error: 'Program name is required' });
-    }
-
-    if (!exercises || exercises.length === 0) {
-      client.release();
-      return res.status(400).json({ error: 'Exercises are required' });
-    }
-
     await client.query('BEGIN');
 
     const actualStartDate = getActualStartDate(config?.startDate, config?.customStartDate);
@@ -353,7 +349,6 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
     }
 
     await client.query('COMMIT');
-    client.release();
 
     audit.log(req, 'program_update', 'program', parseInt(programId));
 
@@ -362,10 +357,11 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
       programId: programId
     });
   } catch (error) {
-    await client.query('ROLLBACK');
-    client.release();
+    await client.query('ROLLBACK').catch(e => console.error('Rollback failed:', e));
     console.error('Update program error:', error);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 });
 
