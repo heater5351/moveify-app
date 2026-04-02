@@ -18,6 +18,7 @@ const programTemplateRoutes = require('./routes/program-templates');
 const adminRoutes = require('./routes/admin');
 const dataRequestRoutes = require('./routes/data-requests');
 const aiRoutes = require('./routes/ai-assistant');
+const feedbackRoutes = require('./routes/feedback');
 
 // Import database init
 const { initDatabase } = require('./database/init');
@@ -107,6 +108,7 @@ app.use('/api/program-templates', programTemplateRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/data-requests', dataRequestRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // Test route
 app.get('/', (req, res) => {

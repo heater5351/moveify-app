@@ -8,8 +8,7 @@ html, body {
   overflow-x: hidden;
 }
 
-/* Safe area insets for Android notch/cutout devices */
-body {
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+/* Safe area insets for notch/cutout devices */
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 0px);
 }

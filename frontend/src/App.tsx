@@ -32,6 +32,7 @@ import { PatientEditProfileModal } from './components/modals/PatientEditProfileM
 import { AdminPanel } from './components/AdminPanel';
 import { AiAssistantPanel } from './components/AiAssistantPanel';
 import { AiProtocolModal } from './components/modals/AiProtocolModal';
+import { BugReportModal } from './components/modals/BugReportModal';
 import { API_URL } from './config';
 import { getAuthHeaders, setToken, clearAuth, setStoredUser, getToken } from './utils/api';
 import { toLocalDateString } from './utils/date.ts';
@@ -74,6 +75,7 @@ function App() {
   const [showProgramTemplateModal, setShowProgramTemplateModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showBugReportModal, setShowBugReportModal] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [showAiProtocolModal, setShowAiProtocolModal] = useState(false);
 
@@ -808,7 +810,7 @@ function App() {
   }
 
   return (
-    <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
+    <div className="h-dvh bg-slate-50 flex flex-col overflow-hidden">
       {/* Modals */}
       {showPatientModal && (
         <PatientSelectionModal
@@ -924,6 +926,15 @@ function App() {
         />
       )}
 
+      {/* Bug Report Modal */}
+      {showBugReportModal && (
+        <BugReportModal
+          onClose={() => setShowBugReportModal(false)}
+          onSuccess={() => setNotification({ message: 'Report submitted — thank you!', type: 'success' })}
+          currentPage={currentPage}
+        />
+      )}
+
       {/* Notification Modal */}
       {notification && (
         <NotificationModal
@@ -963,7 +974,7 @@ function App() {
       )}
 
       {/* Header & Navigation */}
-      <header className="bg-secondary-500 flex-shrink-0">
+      <header className="bg-secondary-500 flex-shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-6 flex items-center justify-between h-14">
           <div className="flex items-center">
             <img
@@ -1044,6 +1055,7 @@ function App() {
                 onEditProfile={() => setShowEditProfileModal(true)}
                 onChangePassword={() => setShowChangePasswordModal(true)}
                 onNavigateAdmin={() => setCurrentPage('admin')}
+                onReportBug={() => setShowBugReportModal(true)}
               />
             </div>
           ) : loggedInPatient ? (
@@ -1053,6 +1065,7 @@ function App() {
               onChangePassword={() => setShowChangePasswordModal(true)}
               onNavigateAccount={() => setCurrentPage('account')}
               onNavigateData={() => setCurrentPage('mydata')}
+              onReportBug={() => setShowBugReportModal(true)}
             />
           ) : null}
         </div>
@@ -1060,7 +1073,7 @@ function App() {
 
       {/* Main Content Area - Split layout for clinician */}
       {userRole === 'patient' && loggedInPatient && currentPage === 'account' ? (
-        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-8" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-8 safe-bottom" style={{ WebkitOverflowScrolling: 'touch' }}>
           <PatientAccountPage
             patient={loggedInPatient}
             onBack={() => setCurrentPage('exercises')}
@@ -1068,14 +1081,14 @@ function App() {
           />
         </div>
       ) : userRole === 'patient' && loggedInPatient && currentPage === 'mydata' ? (
-        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-8" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-8 safe-bottom" style={{ WebkitOverflowScrolling: 'touch' }}>
           <PatientDataPage
             onBack={() => setCurrentPage('exercises')}
             onNotification={(message, type) => setNotification({ message, type })}
           />
         </div>
       ) : userRole === 'patient' && loggedInPatient ? (
-        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-8" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-8 safe-bottom" style={{ WebkitOverflowScrolling: 'touch' }}>
           <PatientPortal
             patient={loggedInPatient}
             onToggleComplete={handleToggleExerciseComplete}

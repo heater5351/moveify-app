@@ -667,6 +667,21 @@ async function initDatabase() {
     console.log('✅ Database migrations complete');
 
     // Backfill: ensure first clinician is admin
+    // Bug reports table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS bug_reports (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        category TEXT NOT NULL CHECK(category IN ('bug', 'feature', 'other')),
+        description TEXT NOT NULL,
+        page TEXT,
+        status TEXT DEFAULT 'open' CHECK(status IN ('open', 'reviewed', 'resolved')),
+        admin_notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
     console.log('🔄 Checking admin backfill...');
     const adminCount = await db.getOne("SELECT COUNT(*) as count FROM users WHERE role = 'clinician' AND is_admin = TRUE");
     if (adminCount && parseInt(adminCount.count) === 0) {

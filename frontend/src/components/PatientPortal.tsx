@@ -5,7 +5,6 @@ import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
 import { ExerciseCompletionModal } from './modals/ExerciseCompletionModal';
 import DailyCheckInModal from './modals/DailyCheckInModal';
-import BlockProgressBanner from './BlockProgressBanner';
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
 import { toLocalDateString } from '../utils/date.ts';
@@ -340,13 +339,6 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
         <PatientEducationModules patientId={patient.id} isPatientView={true} />
       ) : (
         <>
-          {/* Block Progress Banners — show for all programs with blocks */}
-          {patient.assignedPrograms.map(program => (
-            program.config.id ? (
-              <BlockProgressBanner key={program.config.id} programId={program.config.id} refreshKey={blockRefreshKey} />
-            ) : null
-          ))}
-
           {/* Completion tip banner */}
           {showInfoBanner && (
             <div className="bg-primary-50 rounded-xl px-4 py-3 mb-4 sm:mb-6 flex items-start gap-3 ring-1 ring-primary-100">

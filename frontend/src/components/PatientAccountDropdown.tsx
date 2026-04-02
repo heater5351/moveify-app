@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { LogOut, ChevronDown, KeyRound, UserCircle, Database } from 'lucide-react';
+import { LogOut, ChevronDown, KeyRound, UserCircle, Database, Bug } from 'lucide-react';
 import type { Patient } from '../types/index';
 
 type PatientAccountDropdownProps = {
@@ -8,9 +8,10 @@ type PatientAccountDropdownProps = {
   onChangePassword: () => void;
   onNavigateAccount: () => void;
   onNavigateData: () => void;
+  onReportBug: () => void;
 };
 
-export const PatientAccountDropdown = ({ patient, onLogout, onChangePassword, onNavigateAccount, onNavigateData }: PatientAccountDropdownProps) => {
+export const PatientAccountDropdown = ({ patient, onLogout, onChangePassword, onNavigateAccount, onNavigateData, onReportBug }: PatientAccountDropdownProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -76,6 +77,13 @@ export const PatientAccountDropdown = ({ patient, onLogout, onChangePassword, on
             >
               <KeyRound size={15} className="text-slate-400" />
               Change Password
+            </button>
+            <button
+              onClick={() => { setIsOpen(false); onReportBug(); }}
+              className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              <Bug size={15} className="text-slate-400" />
+              Report an Issue
             </button>
           </div>
 

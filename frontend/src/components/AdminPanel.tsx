@@ -1,6 +1,21 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, MapPin, Plus, Pencil, Trash2, Shield, ShieldOff, Database, Download, AlertTriangle, Check, X } from 'lucide-react';
+import { UserPlus, MapPin, Plus, Pencil, Trash2, Shield, ShieldOff, Database, Download, AlertTriangle, Check, X, Bug } from 'lucide-react';
 import type { Clinician, Location, DataRequest } from '../types/index';
+
+type BugReport = {
+  id: number;
+  user_id: number;
+  category: 'bug' | 'feature' | 'other';
+  description: string;
+  page: string | null;
+  status: 'open' | 'reviewed' | 'resolved';
+  admin_notes: string | null;
+  reporter_name: string;
+  reporter_email: string;
+  reporter_role: string;
+  created_at: string;
+  updated_at: string;
+};
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
 import { InviteClinicianModal } from './modals/InviteClinicianModal';
@@ -12,7 +27,7 @@ type AdminPanelProps = {
 };
 
 export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) => {
-  const [activeTab, setActiveTab] = useState<'clinicians' | 'locations' | 'data-requests'>('clinicians');
+  const [activeTab, setActiveTab] = useState<'clinicians' | 'locations' | 'data-requests' | 'bug-reports'>('clinicians');
   const [clinicians, setClinicians] = useState<Clinician[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +42,9 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
   // Data requests
   const [dataRequests, setDataRequests] = useState<DataRequest[]>([]);
   const [confirmAction, setConfirmAction] = useState<{ type: 'approve-deletion' | 'execute-deletion'; id: number; name: string } | null>(null);
+
+  // Bug reports
+  const [bugReports, setBugReports] = useState<BugReport[]>([]);
 
   // Confirm modals
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'clinician' | 'location'; id: number; name: string } | null>(null);
@@ -67,8 +85,36 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
     }
   };
 
+  const fetchBugReports = async () => {
+    try {
+      const res = await fetch(`${API_URL}/feedback`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setBugReports(data);
+      }
+    } catch {
+      // Silently fail
+    }
+  };
+
+  const handleUpdateBugReport = async (id: number, status: string) => {
+    try {
+      const res = await fetch(`${API_URL}/feedback/${id}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        await fetchBugReports();
+        onNotification(`Report marked as ${status}`, 'success');
+      }
+    } catch {
+      onNotification('Failed to update report', 'error');
+    }
+  };
+
   useEffect(() => {
-    Promise.all([fetchClinicians(), fetchLocations(), fetchDataRequests()]).finally(() => setLoading(false));
+    Promise.all([fetchClinicians(), fetchLocations(), fetchDataRequests(), fetchBugReports()]).finally(() => setLoading(false));
   }, []);
 
   const handleToggleAdmin = async (clinicianId: number) => {
@@ -290,7 +336,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-semibold font-display text-secondary-500">Admin Panel</h1>
-        <p className="text-sm text-slate-500 mt-1">Manage clinicians, locations, and data requests</p>
+        <p className="text-sm text-slate-500 mt-1">Manage clinicians, locations, data requests, and bug reports</p>
       </div>
 
       {/* Tabs */}
@@ -327,6 +373,21 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
           {dataRequests.filter(r => r.status === 'pending' || r.status === 'approved').length > 0 && (
             <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
               {dataRequests.filter(r => r.status === 'pending' || r.status === 'approved').length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('bug-reports')}
+          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors relative ${
+            activeTab === 'bug-reports'
+              ? 'bg-white text-secondary-500 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Bug Reports
+          {bugReports.filter(r => r.status === 'open').length > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+              {bugReports.filter(r => r.status === 'open').length}
             </span>
           )}
         </button>
@@ -637,6 +698,81 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Bug Reports Tab */}
+      {activeTab === 'bug-reports' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-slate-500">
+              {bugReports.length} report{bugReports.length !== 1 ? 's' : ''}
+              {bugReports.filter(r => r.status === 'open').length > 0 && (
+                <span className="text-yellow-600 font-medium">
+                  {' '}({bugReports.filter(r => r.status === 'open').length} open)
+                </span>
+              )}
+            </p>
+          </div>
+
+          {bugReports.length === 0 ? (
+            <div className="bg-white rounded-xl ring-1 ring-slate-200 p-8 text-center">
+              <Bug size={32} className="text-slate-300 mx-auto mb-3" />
+              <p className="text-sm text-slate-500">No bug reports yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {bugReports.map(report => (
+                <div key={report.id} className="bg-white rounded-xl ring-1 ring-slate-200 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          report.category === 'bug' ? 'bg-red-50 text-red-600' :
+                          report.category === 'feature' ? 'bg-amber-50 text-amber-600' :
+                          'bg-blue-50 text-blue-600'
+                        }`}>
+                          {report.category === 'bug' ? 'Bug' : report.category === 'feature' ? 'Feature' : 'Other'}
+                        </span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          report.status === 'open' ? 'bg-yellow-50 text-yellow-600' :
+                          report.status === 'reviewed' ? 'bg-blue-50 text-blue-600' :
+                          'bg-green-50 text-green-600'
+                        }`}>
+                          {report.status}
+                        </span>
+                        <span className="text-[10px] text-slate-400 capitalize">{report.reporter_role}</span>
+                      </div>
+                      <p className="text-sm text-slate-800 mb-1.5">{report.description}</p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-400">
+                        <span>{report.reporter_name} ({report.reporter_email})</span>
+                        <span>{new Date(report.created_at).toLocaleDateString()}</span>
+                        {report.page && <span>Page: {report.page}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {report.status === 'open' && (
+                        <button
+                          onClick={() => handleUpdateBugReport(report.id, 'reviewed')}
+                          className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+                        >
+                          Review
+                        </button>
+                      )}
+                      {report.status !== 'resolved' && (
+                        <button
+                          onClick={() => handleUpdateBugReport(report.id, 'resolved')}
+                          className="px-2.5 py-1 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-md transition-colors"
+                        >
+                          Resolve
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
