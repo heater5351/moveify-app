@@ -557,7 +557,7 @@ router.get('/analytics/patient/:patientId', requirePatientAccess, async (req, re
       frequency.forEach(f => allFrequencies.add(f));
 
       const exercises = await db.getAll(
-        'SELECT id FROM program_exercises WHERE program_id = $1',
+        'SELECT id FROM program_exercises WHERE program_id = $1 AND (is_warmup IS NOT TRUE)',
         [program.id]
       );
       const exerciseIds = exercises.map(e => e.id);
