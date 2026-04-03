@@ -399,15 +399,23 @@ function App() {
             const targetProgramId = responseData.programId;
 
             if (isEditing) {
-              // When editing, block weeks already have correct programExerciseId values
-              // from the DB — send them as-is without remapping
+              // When block was modified during edit, programExerciseId values are array indices
+              // into the non-warmup exercises. Remap to real DB IDs.
+              const mainExercises = programExercises.filter(ex => !ex.isWarmup);
+              const needsRemap = pendingBlockData.isModified && mainExercises.some(ex => ex.id && ex.id > 0);
+              const remappedEditWeeks = needsRemap
+                ? pendingBlockData.weeks.map(w => ({
+                    ...w,
+                    programExerciseId: mainExercises[w.programExerciseId]?.id ?? w.programExerciseId
+                  }))
+                : pendingBlockData.weeks;
               await fetch(`${API_URL}/blocks/${targetProgramId}`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify({
                   blockDuration: pendingBlockData.duration,
                   startDate: toLocalDateString(new Date()),
-                  exerciseWeeks: pendingBlockData.weeks
+                  exerciseWeeks: remappedEditWeeks
                 })
               });
             } else {

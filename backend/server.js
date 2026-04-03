@@ -70,6 +70,13 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// Disable ETag caching on API responses — prevents stale 304s after data mutations
+app.set('etag', false);
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
+
 // Rate limiting — auth endpoints (brute force protection)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
