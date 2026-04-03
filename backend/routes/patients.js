@@ -318,7 +318,8 @@ router.get('/', requireRole('clinician'), async (req, res) => {
           notes: todayCompletion.notes
         } : null,
         allCompletions: allExCompletions,
-        enablePeriodization: ex.auto_adjust_enabled !== false
+        enablePeriodization: ex.auto_adjust_enabled !== false,
+        isWarmup: ex.is_warmup === true
       });
     });
 

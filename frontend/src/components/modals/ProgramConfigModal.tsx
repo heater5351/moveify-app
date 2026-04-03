@@ -6,9 +6,13 @@ interface ProgramConfigModalProps {
   onUpdate: (config: ProgramConfig) => void;
   onConfirm: () => void;
   onBack: () => void;
+  isEditing?: boolean;
 }
 
-export const ProgramConfigModal = ({ config, onUpdate, onConfirm, onBack }: ProgramConfigModalProps) => {
+export const ProgramConfigModal = ({ config, onUpdate, onConfirm, onBack, isEditing }: ProgramConfigModalProps) => {
+  // When editing, the startDate is an actual date string (e.g., "2026-03-15"), not a preset
+  const isExistingDate = config.startDate && /^\d{4}-\d{2}-\d{2}$/.test(config.startDate);
+
   const toggleFrequencyDay = (day: string) => {
     if (config.frequency.includes(day)) {
       onUpdate({
@@ -39,6 +43,12 @@ export const ProgramConfigModal = ({ config, onUpdate, onConfirm, onBack }: Prog
           {/* Start Date */}
           <div>
             <h4 className="text-sm font-semibold text-slate-700 mb-3">When do you want this program to start?</h4>
+            {isEditing && isExistingDate && (
+              <p className="text-sm text-slate-500 mb-3">
+                Currently starts: <span className="font-medium text-slate-700">{new Date(config.startDate + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                <span className="text-xs text-slate-400 ml-1">(leave unchanged or pick a new date below)</span>
+              </p>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {['today', 'tomorrow', 'nextweek', 'custom'].map(option => (
                 <button
