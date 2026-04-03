@@ -24,7 +24,7 @@ function getClient() {
  * @param {Array} protocols - Clinician protocols
  * @returns {string}
  */
-function buildSystemPrompt(exercises, protocols = []) {
+function buildSystemPrompt(exercises, protocols = [], programContext = null) {
   const exerciseList = exercises.map(e => {
     const parts = [e.name];
     if (e.exerciseType && e.exerciseType !== 'reps') parts.push(`(${e.exerciseType})`);
@@ -110,11 +110,40 @@ Only output a \`program-block\` if periodization is requested or clearly implied
 }
 \`\`\`
 ${protocolSection}
-
+${buildProgramContextSection(programContext)}
 ## Privacy
 - Patient identifying information has been automatically removed from messages
 - Never ask for patient names, DOBs, or contact details
 - Refer to the patient as "the patient" or "your patient"`;
+}
+
+function buildProgramContextSection(programContext) {
+  if (!programContext || !programContext.exercises || programContext.exercises.length === 0) return '';
+
+  const warmups = programContext.exercises.filter(e => e.isWarmup);
+  const mains = programContext.exercises.filter(e => !e.isWarmup);
+
+  let section = '\n## Current Program Builder State\nThe clinician currently has the following exercises loaded in their program builder. Use this context when they ask to modify, add to, or discuss the current program.\n';
+  if (programContext.programName) {
+    section += `\nProgram name: "${programContext.programName}"`;
+  }
+
+  if (warmups.length > 0) {
+    section += '\n\n**Warm Up:**\n' + warmups.map((e, i) =>
+      `${i + 1}. ${e.name} — ${e.sets}×${e.reps}${e.prescribedWeight ? ` @ ${e.prescribedWeight}kg` : ''}${e.prescribedDuration ? ` × ${e.prescribedDuration}s` : ''}${e.instructions ? ` (${e.instructions})` : ''}`
+    ).join('\n');
+  }
+
+  section += '\n\n**Main Exercises:**\n' + mains.map((e, i) =>
+    `${i + 1}. ${e.name} — ${e.sets}×${e.reps}${e.prescribedWeight ? ` @ ${e.prescribedWeight}kg` : ''}${e.prescribedDuration ? ` × ${e.prescribedDuration}s` : ''}${e.restDuration ? ` [rest ${e.restDuration}s]` : ''}${e.instructions ? ` (${e.instructions})` : ''}`
+  ).join('\n');
+
+  if (programContext.blockDuration) {
+    section += `\n\n**Periodization block:** ${programContext.blockDuration} weeks${programContext.blockCurrentWeek ? `, currently on week ${programContext.blockCurrentWeek}` : ''}`;
+  }
+
+  section += '\n\nWhen the clinician asks to modify the program, suggest changes relative to this existing program. You can suggest additions, removals, substitutions, or prescription changes.';
+  return section;
 }
 
 /**
@@ -154,9 +183,9 @@ function parseExerciseResponse(responseText, exercises) {
  * @param {Array} protocols - Clinician protocols
  * @returns {AsyncIterable} - Yields { type: 'text'|'done', text?, usage? }
  */
-async function* streamChat(messages, exercises, protocols = []) {
+async function* streamChat(messages, exercises, protocols = [], programContext = null) {
   const anthropic = getClient();
-  const systemPrompt = buildSystemPrompt(exercises, protocols);
+  const systemPrompt = buildSystemPrompt(exercises, protocols, programContext);
 
   // Strip PHI from all user messages
   const cleanedMessages = [];

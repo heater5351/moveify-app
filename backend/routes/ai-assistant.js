@@ -66,7 +66,7 @@ async function logUsage(clinicianId, inputTokens, outputTokens, model, requestTy
  */
 router.post('/chat', async (req, res) => {
   try {
-    const { messages } = req.body;
+    const { messages, programContext } = req.body;
     const clinicianId = req.user.id;
 
     // Validate messages
@@ -128,7 +128,7 @@ router.post('/chat', async (req, res) => {
     let fullResponse = '';
 
     try {
-      for await (const chunk of streamChat(messages, exercises, protocols)) {
+      for await (const chunk of streamChat(messages, exercises, protocols, programContext)) {
         if (chunk.type === 'text') {
           fullResponse += chunk.text;
           res.write(`data: ${JSON.stringify({ type: 'text', text: chunk.text })}\n\n`);

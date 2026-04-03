@@ -1197,6 +1197,20 @@ function App() {
             setPendingBlockData({ duration: blockDuration, weeks, isModified: true });
           }}
           onOpenProtocols={() => setShowAiProtocolModal(true)}
+          programContext={programExercises.length > 0 ? {
+            exercises: programExercises.map(ex => ({
+              name: ex.name,
+              sets: ex.sets,
+              reps: ex.reps,
+              prescribedWeight: ex.prescribedWeight,
+              prescribedDuration: ex.prescribedDuration,
+              restDuration: ex.restDuration,
+              instructions: ex.instructions,
+              isWarmup: ex.isWarmup,
+            })),
+            blockDuration: pendingBlockData?.duration,
+            programName: programName || undefined,
+          } : null}
         />
       )}
 

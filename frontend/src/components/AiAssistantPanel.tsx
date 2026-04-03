@@ -5,12 +5,20 @@ import { streamAiChat, getAiUsage } from '../utils/ai';
 import type { AiMessage, AiExerciseMatch, AiUsage, AiBlockData } from '../utils/ai';
 import { formatDuration } from '../utils/duration';
 
+type ProgramContext = {
+  exercises: { name: string; sets: number; reps: number; prescribedWeight?: number; prescribedDuration?: number; restDuration?: number; instructions?: string; isWarmup?: boolean }[];
+  blockDuration?: number;
+  blockCurrentWeek?: number;
+  programName?: string;
+} | null;
+
 type AiAssistantPanelProps = {
   show: boolean;
   onClose: () => void;
   onAddToProgram: (exercises: ProgramExercise[]) => void;
   onAddToProgramWithBlock: (exercises: ProgramExercise[], blockDuration: number, weeks: ExerciseWeekPrescription[]) => void;
   onOpenProtocols: () => void;
+  programContext?: ProgramContext;
 };
 
 type DisplayMessage = {
@@ -23,7 +31,7 @@ type DisplayMessage = {
 
 const CONSENT_KEY = 'moveify_ai_consent';
 
-export function AiAssistantPanel({ show, onClose, onAddToProgram, onAddToProgramWithBlock, onOpenProtocols }: AiAssistantPanelProps) {
+export function AiAssistantPanel({ show, onClose, onAddToProgram, onAddToProgramWithBlock, onOpenProtocols, programContext }: AiAssistantPanelProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -185,7 +193,7 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onAddToProgram
           });
           setIsStreaming(false);
         },
-      }, controller.signal);
+      }, controller.signal, programContext || undefined);
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
         setError('Failed to connect to AI assistant');

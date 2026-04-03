@@ -68,12 +68,18 @@ type StreamCallback = {
 export async function streamAiChat(
   messages: AiMessage[],
   callbacks: StreamCallback,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  programContext?: { exercises: { name: string; sets: number; reps: number; prescribedWeight?: number; prescribedDuration?: number; restDuration?: number; instructions?: string; isWarmup?: boolean }[]; blockDuration?: number; blockCurrentWeek?: number; programName?: string }
 ): Promise<void> {
   const token = getToken();
   if (!token) {
     callbacks.onError('Not authenticated');
     return;
+  }
+
+  const body: Record<string, unknown> = { messages };
+  if (programContext && programContext.exercises.length > 0) {
+    body.programContext = programContext;
   }
 
   const response = await fetch(`${API_URL}/ai/chat`, {
@@ -82,7 +88,7 @@ export async function streamAiChat(
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
     },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify(body),
     signal,
   });
 
