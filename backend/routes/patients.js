@@ -360,15 +360,6 @@ router.get('/', requireRole('clinician'), async (req, res) => {
       assignedPrograms: programsByPatient[patient.id] || []
     }));
 
-    // Debug: log exercise counts per program for patient 2
-    const p2 = formattedPatients.find(p => p.id === 2);
-    if (p2) {
-      p2.assignedPrograms.forEach(prog => {
-        const exNames = prog.exercises.map(e => `${e.name}(warmup=${e.isWarmup})`).join(', ');
-        console.log(`[DEBUG] Patient 2 program "${prog.config.name}": ${prog.exercises.length} exercises: ${exNames}`);
-      });
-    }
-
     audit.log(req, 'patients_list', 'patient', null, { count: formattedPatients.length });
 
     res.json({ patients: formattedPatients });

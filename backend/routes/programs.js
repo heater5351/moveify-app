@@ -287,12 +287,13 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
         ]);
         updatedExerciseIds.add(existingId);
       } else {
-        await client.query(`
+        const insertResult = await client.query(`
           INSERT INTO program_exercises (
             program_id, exercise_name, exercise_category, sets, reps, prescribed_weight,
             hold_time, instructions, image_url, exercise_order, auto_adjust_enabled,
             prescribed_duration, rest_duration, is_warmup
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          RETURNING id
         `, [
           programId,
           exercise.name,
@@ -309,6 +310,7 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
           rest,
           exercise.isWarmup || false
         ]);
+        updatedExerciseIds.add(insertResult.rows[0].id);
       }
     }
 
