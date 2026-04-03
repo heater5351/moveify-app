@@ -56,25 +56,20 @@ export const BlockBuilderModal = ({
   useEffect(() => {
     const initial: Record<CellKey, CellData> = {};
     if (initialWeeks.length > 0) {
-      // Map DB exercise IDs to array indices
+      // Map DB exercise IDs to filtered array indices
       const idToIdx: Record<number, number> = {};
       const hasDbIds = filteredExercises.some(ex => ex.id && ex.id > 0);
       filteredExercises.forEach((ex, i) => { if (ex.id && ex.id > 0) idToIdx[ex.id] = i; });
 
-      // Build index remap: original programExercises index -> filteredExercises index
-      // This handles warm-up exercises being filtered out
-      const originalToFiltered: Record<number, number> = {};
-      let filteredIdx = 0;
-      programExercises.forEach((ex, origIdx) => {
-        if (!ex.isWarmup) {
-          originalToFiltered[origIdx] = filteredIdx++;
-        }
-      });
+      // Check if initialWeeks use DB IDs or filtered array indices.
+      // DB IDs are large (> filteredExercises.length), filtered indices are small (0..N-1).
+      const maxId = Math.max(...initialWeeks.map(w => w.programExerciseId));
+      const usesDbIds = hasDbIds && maxId >= filteredExercises.length;
 
       initialWeeks.forEach(w => {
-        // If exercises have real DB IDs, use DB lookup. Otherwise remap array index accounting for warmup filter.
-        const idx = hasDbIds ? idToIdx[w.programExerciseId] : (originalToFiltered[w.programExerciseId] ?? undefined);
-        if (idx !== undefined) {
+        // If using DB IDs, remap to filtered index. Otherwise programExerciseId IS the filtered index already.
+        const idx = usesDbIds ? idToIdx[w.programExerciseId] : w.programExerciseId;
+        if (idx !== undefined && idx < filteredExercises.length) {
           const key: CellKey = `${idx}-${w.weekNumber}`;
           initial[key] = {
             sets: String(w.sets),
