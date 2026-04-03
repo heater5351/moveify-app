@@ -251,6 +251,7 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onAddToProgram
       prescribedDuration: match.suggested.prescribedDuration,
       restDuration: match.suggested.restDuration,
       instructions: match.suggested.instructions,
+      isWarmup: match.suggested.isWarmup || false,
       completed: false,
     };
     onAddToProgram([exercise]);
@@ -280,6 +281,7 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onAddToProgram
           prescribedDuration: e.suggested.prescribedDuration,
           restDuration: e.suggested.restDuration,
           instructions: e.suggested.instructions,
+          isWarmup: e.suggested.isWarmup || false,
           completed: false,
         });
       }

@@ -60,6 +60,7 @@ export type ProgramExercise = Exercise & {
   instructions?: string;
   image?: string; // image URL from backend (alias for imageUrl in program context)
   enablePeriodization?: boolean;
+  isWarmup?: boolean;
   completionData?: CompletionData | null;
   allCompletions?: { [date: string]: CompletionData }; // All completions by date (YYYY-MM-DD)
 }

@@ -17,6 +17,7 @@ export type AiExerciseMatch = {
     prescribedDuration?: number;
     restDuration?: number;
     instructions?: string;
+    isWarmup?: boolean;
   };
   matched: {
     name: string;

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Trash2, X, GripVertical, BarChart2, FolderOpen, Save } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Trash2, X, GripVertical, BarChart2, FolderOpen, Save, ChevronDown, ChevronUp, Flame } from 'lucide-react';
 import type { ProgramExercise, Patient } from '../types/index.ts';
 import { formatDuration, getExerciseType } from '../utils/duration.ts';
 import {
@@ -36,6 +36,7 @@ interface ProgramBuilderProps {
   onAddExercise?: (exercise: ProgramExercise) => void;
   onSaveAsTemplate?: () => void;
   onLoadTemplate?: () => void;
+  onToggleWarmup?: (index: number) => void;
 }
 
 interface SortableExerciseProps {
@@ -43,9 +44,10 @@ interface SortableExerciseProps {
   index: number;
   onRemove: (index: number) => void;
   onUpdate: (index: number, field: 'sets' | 'reps' | 'weight' | 'duration' | 'rest' | 'instructions', value: number | string) => void;
+  onToggleWarmup?: (index: number) => void;
 }
 
-const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerciseProps) => {
+const SortableExercise = ({ exercise, index, onRemove, onUpdate, onToggleWarmup }: SortableExerciseProps) => {
   const {
     attributes,
     listeners,
@@ -119,12 +121,23 @@ const SortableExercise = ({ exercise, index, onRemove, onUpdate }: SortableExerc
             )}
           </div>
         </div>
-        <button
-          onClick={() => onRemove(index)}
-          className="text-slate-400 hover:text-red-500 transition-colors flex-shrink-0 ml-2"
-        >
-          <Trash2 size={16} />
-        </button>
+        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+          {onToggleWarmup && (
+            <button
+              onClick={() => onToggleWarmup(index)}
+              className={`p-1 rounded transition-colors ${exercise.isWarmup ? 'text-amber-500 hover:text-amber-600' : 'text-slate-300 hover:text-amber-400'}`}
+              title={exercise.isWarmup ? 'Move to program' : 'Move to warm-up'}
+            >
+              <Flame size={14} />
+            </button>
+          )}
+          <button
+            onClick={() => onRemove(index)}
+            className="text-slate-400 hover:text-red-500 transition-colors"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-2 mb-2">
@@ -318,9 +331,11 @@ export const ProgramBuilder = ({
   hasBlock = false,
   onAddExercise,
   onSaveAsTemplate,
-  onLoadTemplate
+  onLoadTemplate,
+  onToggleWarmup
 }: ProgramBuilderProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [warmupCollapsed, setWarmupCollapsed] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -329,16 +344,34 @@ export const ProgramBuilder = ({
     })
   );
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  // Split exercises into warmup and main, preserving original indices
+  const warmupItems = useMemo(() =>
+    programExercises.map((ex, i) => ({ exercise: ex, originalIndex: i })).filter(e => e.exercise.isWarmup),
+    [programExercises]
+  );
+  const mainItems = useMemo(() =>
+    programExercises.map((ex, i) => ({ exercise: ex, originalIndex: i })).filter(e => !e.exercise.isWarmup),
+    [programExercises]
+  );
+
+  const handleSectionDragEnd = (section: 'warmup' | 'main') => (event: DragEndEvent) => {
     const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-    if (over && active.id !== over.id) {
-      const oldIndex = parseInt((active.id as string).split('-')[1]);
-      const newIndex = parseInt((over.id as string).split('-')[1]);
+    const items = section === 'warmup' ? warmupItems : mainItems;
+    const oldLocalIndex = items.findIndex(i => `exercise-${i.originalIndex}` === active.id);
+    const newLocalIndex = items.findIndex(i => `exercise-${i.originalIndex}` === over.id);
+    if (oldLocalIndex === -1 || newLocalIndex === -1) return;
 
-      const newOrder = arrayMove(programExercises, oldIndex, newIndex);
-      onReorderExercises(newOrder);
-    }
+    // Reorder within the section, then rebuild the full array
+    const reorderedSection = arrayMove(items, oldLocalIndex, newLocalIndex);
+    const otherSection = section === 'warmup' ? mainItems : warmupItems;
+
+    // Rebuild: warmup first, then main
+    const newWarmup = section === 'warmup' ? reorderedSection : otherSection;
+    const newMain = section === 'main' ? reorderedSection : otherSection;
+    const newOrder = [...newWarmup.map(i => i.exercise), ...newMain.map(i => i.exercise)];
+    onReorderExercises(newOrder);
   };
 
   return (
@@ -413,28 +446,66 @@ export const ProgramBuilder = ({
             <p className="text-slate-300 text-xs mt-1">Drag exercises here or click + to add</p>
           </div>
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={programExercises.map((_, index) => `exercise-${index}`)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-2.5">
-                {programExercises.map((exercise, index) => (
-                  <SortableExercise
-                    key={`exercise-${index}`}
-                    exercise={exercise}
-                    index={index}
-                    onRemove={onRemoveExercise}
-                    onUpdate={onUpdateExercise}
-                  />
-                ))}
+          <div className="space-y-4">
+            {/* Warm-up Section */}
+            {warmupItems.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setWarmupCollapsed(!warmupCollapsed)}
+                  className="flex items-center gap-1.5 mb-2 text-xs font-semibold text-amber-600 uppercase tracking-wider hover:text-amber-700 transition-colors"
+                >
+                  <Flame size={12} />
+                  Warm Up ({warmupItems.length})
+                  {warmupCollapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+                </button>
+                {!warmupCollapsed && (
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd('warmup')}>
+                    <SortableContext items={warmupItems.map(i => `exercise-${i.originalIndex}`)} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-2.5">
+                        {warmupItems.map(({ exercise, originalIndex }) => (
+                          <SortableExercise
+                            key={`exercise-${originalIndex}`}
+                            exercise={exercise}
+                            index={originalIndex}
+                            onRemove={onRemoveExercise}
+                            onUpdate={onUpdateExercise}
+                            onToggleWarmup={onToggleWarmup}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                )}
               </div>
-            </SortableContext>
-          </DndContext>
+            )}
+
+            {/* Main Program Section */}
+            {(warmupItems.length > 0 || mainItems.length > 0) && (
+              <div>
+                {warmupItems.length > 0 && (
+                  <div className="flex items-center gap-1.5 mb-2 text-xs font-semibold text-secondary-400 uppercase tracking-wider">
+                    Exercise Program ({mainItems.length})
+                  </div>
+                )}
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd('main')}>
+                  <SortableContext items={mainItems.map(i => `exercise-${i.originalIndex}`)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2.5">
+                      {mainItems.map(({ exercise, originalIndex }) => (
+                        <SortableExercise
+                          key={`exercise-${originalIndex}`}
+                          exercise={exercise}
+                          index={originalIndex}
+                          onRemove={onRemoveExercise}
+                          onUpdate={onUpdateExercise}
+                          onToggleWarmup={onToggleWarmup}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              </div>
+            )}
+          </div>
         )}
       </div>
 

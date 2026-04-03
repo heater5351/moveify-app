@@ -292,6 +292,12 @@ function App() {
     setProgramExercises(newOrder);
   };
 
+  const handleToggleWarmup = (index: number) => {
+    setProgramExercises(prev => prev.map((ex, i) =>
+      i === index ? { ...ex, isWarmup: !ex.isWarmup } : ex
+    ));
+  };
+
   const handleSaveAsTemplate = async () => {
     if (programExercises.length === 0) return;
 
@@ -310,6 +316,7 @@ function App() {
         hold_time: ex.holdTime || null,
         instructions: ex.instructions || null,
         image_url: null,
+        is_warmup: ex.isWarmup || false,
       }));
 
       const res = await fetch(`${API_URL}/program-templates`, {
@@ -1114,6 +1121,7 @@ function App() {
               onConfigureBlock={programExercises.length > 0 ? () => setShowBlockBuilderModal(true) : undefined}
               hasBlock={pendingBlockData !== null}
               onAddExercise={handleAddSingleExercise}
+              onToggleWarmup={handleToggleWarmup}
               onSaveAsTemplate={handleSaveAsTemplate}
               onLoadTemplate={() => setShowProgramTemplateModal(true)}
             />

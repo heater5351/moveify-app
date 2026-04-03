@@ -37,6 +37,8 @@ export const BlockBuilderModal = ({
   initialStartingWeights,
   initialRowTemplateIds
 }: BlockBuilderModalProps) => {
+  // Exclude warm-up exercises from periodization blocks
+  const filteredExercises = programExercises.filter(ex => !ex.isWarmup);
   const [blockDuration, setBlockDuration] = useState<4 | 6 | 8>(initialDuration);
   const [cells, setCells] = useState<Record<CellKey, CellData>>({});
   const [templates, setTemplates] = useState<PeriodizationTemplate[]>([]);
@@ -56,11 +58,11 @@ export const BlockBuilderModal = ({
     if (initialWeeks.length > 0) {
       // Map DB exercise IDs to array indices
       const idToIdx: Record<number, number> = {};
-      const hasDbIds = programExercises.some(ex => ex.id);
-      programExercises.forEach((ex, i) => { if (ex.id) idToIdx[ex.id] = i; });
+      const hasDbIds = filteredExercises.some(ex => ex.id);
+      filteredExercises.forEach((ex, i) => { if (ex.id) idToIdx[ex.id] = i; });
       initialWeeks.forEach(w => {
         // If exercises have DB IDs, use DB lookup only. Otherwise treat as array index (new program).
-        const idx = hasDbIds ? idToIdx[w.programExerciseId] : (w.programExerciseId < programExercises.length ? w.programExerciseId : undefined);
+        const idx = hasDbIds ? idToIdx[w.programExerciseId] : (w.programExerciseId < filteredExercises.length ? w.programExerciseId : undefined);
         if (idx !== undefined) {
           const key: CellKey = `${idx}-${w.weekNumber}`;
           initial[key] = {
@@ -75,7 +77,7 @@ export const BlockBuilderModal = ({
       });
     } else {
       // Pre-fill with exercise baseline sets/reps/duration/rest
-      programExercises.forEach((ex, idx) => {
+      filteredExercises.forEach((ex, idx) => {
         for (let week = 1; week <= blockDuration; week++) {
           const key: CellKey = `${idx}-${week}`;
           initial[key] = {
@@ -96,7 +98,7 @@ export const BlockBuilderModal = ({
       setStartingWeights(initialStartingWeights);
     } else {
       const initialWeightsMap: Record<number, string> = {};
-      programExercises.forEach((ex, idx) => {
+      filteredExercises.forEach((ex, idx) => {
         if (ex.prescribedWeight && ex.prescribedWeight > 0) {
           initialWeightsMap[idx] = String(ex.prescribedWeight);
         }
@@ -160,7 +162,7 @@ export const BlockBuilderModal = ({
     // Fill new weeks with defaults for existing exercises
     if (d > blockDuration) {
       const additions: Record<CellKey, CellData> = {};
-      programExercises.forEach((ex, idx) => {
+      filteredExercises.forEach((ex, idx) => {
         for (let week = blockDuration + 1; week <= d; week++) {
           const key: CellKey = `${idx}-${week}`;
           if (!cells[key]) {
@@ -263,7 +265,7 @@ export const BlockBuilderModal = ({
   // Apply template to ALL exercises
   const handleApplyToAll = async () => {
     if (!selectedTemplateId) return;
-    const allIndices = programExercises.map((_, i) => i);
+    const allIndices = filteredExercises.map((_, i) => i);
     await applyTemplateToRows(Number(selectedTemplateId), allIndices);
   };
 
@@ -275,7 +277,7 @@ export const BlockBuilderModal = ({
 
   const buildExerciseWeeks = (): ExerciseWeekPrescription[] => {
     const weeks: ExerciseWeekPrescription[] = [];
-    programExercises.forEach((ex, idx) => {
+    filteredExercises.forEach((ex, idx) => {
       const exType = getExerciseType(ex);
       const isDuration = exType === 'duration' || exType === 'cardio';
       for (let week = 1; week <= blockDuration; week++) {
@@ -413,7 +415,7 @@ export const BlockBuilderModal = ({
                 </tr>
               </thead>
               <tbody>
-                {programExercises.map((exercise, exIdx) => {
+                {filteredExercises.map((exercise, exIdx) => {
                   const exType = getExerciseType(exercise);
                   const isDuration = exType === 'duration' || exType === 'cardio';
                   return (
@@ -575,7 +577,7 @@ export const BlockBuilderModal = ({
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-200 flex justify-between items-center">
           <p className="text-xs text-slate-400">
-            {programExercises.length} exercise{programExercises.length !== 1 ? 's' : ''} x {blockDuration} weeks = {programExercises.length * blockDuration} cells
+            {filteredExercises.length} exercise{filteredExercises.length !== 1 ? 's' : ''} x {blockDuration} weeks = {filteredExercises.length * blockDuration} cells
           </p>
           <div className="flex gap-3">
             <button

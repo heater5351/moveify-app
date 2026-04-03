@@ -56,7 +56,7 @@ ${exerciseList}
 1. ONLY suggest exercises that exist in the library above. Never invent exercises.
 2. Use the EXACT exercise name from the library.
 3. When suggesting a program, output a fenced code block with the label \`program-exercises\` containing a JSON array.
-4. Each exercise object must have: name (string), sets (number), reps (number), and optionally: prescribedWeight (number, kg), prescribedDuration (number, seconds), restDuration (number, seconds), instructions (string).
+4. Each exercise object must have: name (string), sets (number), reps (number), and optionally: prescribedWeight (number, kg), prescribedDuration (number, seconds), restDuration (number, seconds), instructions (string), isWarmup (boolean, default false — set to true for warm-up exercises).
 5. For duration-type exercises, use prescribedDuration instead of reps.
 6. For cardio-type exercises, use prescribedDuration (in seconds) and sets=1.
 7. Default prescriptions if not specified: reps exercises = 3 sets x 10 reps, duration exercises = 3 sets x 30 seconds, cardio = 1 set x 1200 seconds (20 min).
@@ -70,10 +70,12 @@ ${exerciseList}
 ## Output Format Example
 \`\`\`program-exercises
 [
-  { "name": "Squat with Bodyweight", "sets": 3, "reps": 12, "instructions": "Focus on depth and knee tracking" },
+  { "name": "Squat with Bodyweight", "sets": 2, "reps": 10, "isWarmup": true, "instructions": "Light warm-up, focus on range of motion" },
+  { "name": "Squat with Barbell", "sets": 3, "reps": 12, "instructions": "Focus on depth and knee tracking" },
   { "name": "Calf Raise Hold with Bodyweight", "sets": 3, "prescribedDuration": 30, "instructions": "Hold at top position" }
 ]
 \`\`\`
+When suggesting a program, include warm-up exercises (isWarmup: true) before the main exercises if appropriate. Warm-up exercises are typically lighter, lower volume, and prepare the joints/muscles for the main program.
 
 ## Periodization Blocks
 When the clinician asks for a periodized program, progressive overload, or a multi-week block, output a \`program-block\` fenced code block IN ADDITION to the \`program-exercises\` block. The \`program-exercises\` block defines the base exercises; the \`program-block\` defines weekly progressions.
@@ -92,6 +94,8 @@ The \`program-block\` JSON object must have:
   - notes (string or null)
 
 Only output a \`program-block\` if periodization is requested or clearly implied (e.g., "progressive program", "6-week block", "build up over time"). Do NOT output a \`program-block\` for simple one-off program requests.
+
+**IMPORTANT:** Periodization blocks must NEVER include warm-up exercises. Only reference non-warm-up exercises by their exerciseIndex in the \`program-block\`. Warm-up exercises keep their base prescription and do not progress.
 
 ### Periodization Block Example
 \`\`\`program-block

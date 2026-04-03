@@ -90,7 +90,8 @@ router.get('/patient/:patientId', requirePatientAccess, async (req, res) => {
           instructions: ex.instructions,
           image: ex.image_url,
           completed: ex.completed === 1,
-          enablePeriodization: ex.auto_adjust_enabled === true
+          enablePeriodization: ex.auto_adjust_enabled === true,
+          isWarmup: ex.is_warmup === true
         }))
       }
     });
@@ -151,8 +152,8 @@ router.post('/patient/:patientId', requireRole('clinician'), async (req, res) =>
       await client.query(`
         INSERT INTO program_exercises (
           program_id, exercise_name, exercise_category, sets, reps, prescribed_weight,
-          hold_time, instructions, image_url, exercise_order, prescribed_duration, rest_duration
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          hold_time, instructions, image_url, exercise_order, prescribed_duration, rest_duration, is_warmup
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       `, [
         programId,
         exercise.name,
@@ -165,7 +166,8 @@ router.post('/patient/:patientId', requireRole('clinician'), async (req, res) =>
         exercise.image || '',
         index,
         duration,
-        rest
+        rest,
+        exercise.isWarmup || false
       ]);
     }
 
@@ -265,8 +267,9 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
           UPDATE program_exercises
           SET exercise_category = $1, sets = $2, reps = $3, prescribed_weight = $4,
               hold_time = $5, instructions = $6, image_url = $7, exercise_order = $8,
-              auto_adjust_enabled = $9, prescribed_duration = $10, rest_duration = $11
-          WHERE id = $12
+              auto_adjust_enabled = $9, prescribed_duration = $10, rest_duration = $11,
+              is_warmup = $12
+          WHERE id = $13
         `, [
           exercise.category || '',
           exercise.sets,
@@ -279,6 +282,7 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
           exercise.enablePeriodization !== undefined ? exercise.enablePeriodization : false,
           duration,
           rest,
+          exercise.isWarmup || false,
           existingId
         ]);
         updatedExerciseIds.add(existingId);
@@ -287,8 +291,8 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
           INSERT INTO program_exercises (
             program_id, exercise_name, exercise_category, sets, reps, prescribed_weight,
             hold_time, instructions, image_url, exercise_order, auto_adjust_enabled,
-            prescribed_duration, rest_duration
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            prescribed_duration, rest_duration, is_warmup
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         `, [
           programId,
           exercise.name,
@@ -302,7 +306,8 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
           index,
           exercise.enablePeriodization !== undefined ? exercise.enablePeriodization : false,
           duration,
-          rest
+          rest,
+          exercise.isWarmup || false
         ]);
       }
     }

@@ -22,6 +22,7 @@ type TemplateDetail = ProgramTemplate & {
     instructions: string | null;
     image_url: string | null;
     exercise_order: number;
+    is_warmup?: boolean;
   }[];
 };
 
@@ -105,6 +106,7 @@ export const ProgramTemplateModal = ({ onLoad, onClose }: ProgramTemplateModalPr
       holdTime: ex.hold_time || undefined,
       instructions: ex.instructions || undefined,
       completed: false,
+      isWarmup: ex.is_warmup || false,
     }));
 
     onLoad(exercises);

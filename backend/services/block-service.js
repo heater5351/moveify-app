@@ -347,8 +347,9 @@ async function evaluateProgression(programId) {
       `, [block.id, advancedToWeek]);
 
       // Check for exercises missing block data (added after block was created)
+      // Exclude warm-up exercises — they are intentionally not part of blocks
       const programExerciseCount = await db.getOne(
-        'SELECT COUNT(*) as count FROM program_exercises WHERE program_id = $1',
+        'SELECT COUNT(*) as count FROM program_exercises WHERE program_id = $1 AND (is_warmup IS NOT TRUE)',
         [programId]
       );
       if (newCells.length < parseInt(programExerciseCount.count)) {

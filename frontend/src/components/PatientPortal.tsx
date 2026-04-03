@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Play, Check, TrendingUp, Calendar as CalendarIcon, BookOpen, ChevronLeft, ChevronRight, X, Info } from 'lucide-react';
+import { Play, Check, TrendingUp, Calendar as CalendarIcon, BookOpen, ChevronLeft, ChevronRight, X, Info, Flame, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Patient, CompletionData, ProgramExercise, DailyCheckIn } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
@@ -38,6 +38,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   } | null>(null);
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [_hasCheckedInToday, setHasCheckedInToday] = useState(false);
+  const [warmupCollapsed, setWarmupCollapsed] = useState<Record<number, boolean>>({});
   const [blockRefreshKey, setBlockRefreshKey] = useState(0);
   const [blockInfoMap, setBlockInfoMap] = useState<Map<number, {
     hasBlock: boolean;
@@ -293,6 +294,88 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
     );
   };
 
+  const renderExerciseCard = (exercise: ProgramExercise & { originalIndex: number }, group: ProgramGroup) => (
+    <div
+      key={`${group.programIndex}-${exercise.originalIndex}`}
+      className={`bg-white rounded-xl sm:rounded-2xl shadow-md sm:shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all ${group.isCompleted ? 'opacity-75' : ''}`}
+    >
+      <div className="flex flex-col sm:flex-row">
+        <div
+          className="relative w-full sm:w-48 lg:w-52 h-40 sm:h-36 bg-gradient-to-br from-moveify-teal via-moveify-ocean to-moveify-navy flex items-center justify-center flex-shrink-0 cursor-pointer"
+          onClick={(e) => {
+            const url = getVideoUrl(exercise.name);
+            if (url) { e.stopPropagation(); setVideoModal({ url, name: exercise.name, description: getExerciseDescription(exercise.name) }); }
+          }}
+        >
+          {getVideoUrl(exercise.name) ? (
+            <LazyVideoCard src={getVideoUrl(exercise.name)!} className="absolute inset-0" />
+          ) : (
+            <div className="absolute inset-0 bg-black opacity-10"></div>
+          )}
+          <Play className="text-white relative z-10 drop-shadow-lg" size={48} />
+          {exercise.completed && (
+            <div className="absolute top-3 right-3 bg-green-500 text-white rounded-full p-1.5 sm:p-2 shadow-lg z-10">
+              <Check size={16} className="sm:w-5 sm:h-5" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 p-4 sm:p-5 lg:p-6">
+          <div className="flex items-start justify-between mb-3 sm:mb-4">
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{exercise.name}</h3>
+                {exercise.completed && <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-lg">Done</span>}
+                {group.isCompleted && <span className="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded-lg">Ended</span>}
+              </div>
+            </div>
+          </div>
+          {group.showPrescription ? (
+            <div className="mb-3 sm:mb-4">
+              <p className="text-sm sm:text-base text-gray-700 font-semibold">
+                {(() => {
+                  const exType = getExerciseType(exercise);
+                  if (exType === 'cardio') return exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : 'As prescribed';
+                  if (exType === 'duration') { const dur = exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : '—'; return `${exercise.sets} set${exercise.sets !== 1 ? 's' : ''} | ${dur}`; }
+                  return `${exercise.sets} set${exercise.sets !== 1 ? 's' : ''} | ${exercise.reps} rep${exercise.reps !== 1 ? 's' : ''}${(exercise.prescribedWeight || 0) > 0 ? ` | ${exercise.prescribedWeight} kg` : ''}`;
+                })()}
+              </p>
+              {(exercise.restDuration || 0) > 0 && <p className="text-xs text-slate-500 mt-0.5">Rest: {formatDuration(exercise.restDuration!)}</p>}
+            </div>
+          ) : (
+            <p className="text-sm sm:text-base text-gray-300 font-semibold mb-3 sm:mb-4">&mdash;</p>
+          )}
+          <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 mb-2">{exercise.description}</p>
+          {exercise.instructions && (
+            <div className="flex items-start gap-1.5 bg-primary-50 rounded-lg px-3 py-2 mb-3 sm:mb-4">
+              <Info size={14} className="text-primary-500 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-primary-700">{exercise.instructions}</p>
+            </div>
+          )}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            {!group.isCompleted && group.showPrescription && canComplete && (
+              <button
+                onClick={() => {
+                  const wd = getDatesForWeek(weekOffset);
+                  const sd = wd[selectedWeekDay];
+                  setSelectedExercise({ exercise, exerciseIndex: exercise.originalIndex, programIndex: group.programIndex, selectedDate: sd });
+                  setShowCompletionModal(true);
+                }}
+                className={`w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold transition-all shadow-md hover:shadow-lg text-sm sm:text-base ${exercise.completed
+                  ? 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700'
+                  : 'bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-blue-400'}`}
+              >
+                {exercise.completed ? 'Edit' : 'Mark Complete'}
+              </button>
+            )}
+            {!group.isCompleted && group.showPrescription && !canComplete && (
+              <p className="text-xs text-slate-400 italic">Available to complete on the day</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
       {/* Daily Check-In Modal */}
@@ -488,123 +571,48 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
                   )}
 
                   <div className="space-y-4 sm:space-y-5">
-                    {group.exercises.map((exercise) => (
-                      <div
-                        key={`${group.programIndex}-${exercise.originalIndex}`}
-                        className={`bg-white rounded-xl sm:rounded-2xl shadow-md sm:shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all ${group.isCompleted ? 'opacity-75' : ''}`}
-                      >
-                        {/* Mobile: Stacked layout, Desktop: Side-by-side */}
-                        <div className="flex flex-col sm:flex-row">
-                          {/* Video Thumbnail */}
-                          <div
-                            className="relative w-full sm:w-48 lg:w-52 h-40 sm:h-36 bg-gradient-to-br from-moveify-teal via-moveify-ocean to-moveify-navy flex items-center justify-center flex-shrink-0 cursor-pointer"
-                            onClick={(e) => {
-                              const url = getVideoUrl(exercise.name);
-                              if (url) { e.stopPropagation(); setVideoModal({ url, name: exercise.name, description: getExerciseDescription(exercise.name) }); }
-                            }}
-                          >
-                            {getVideoUrl(exercise.name) ? (
-                              <LazyVideoCard src={getVideoUrl(exercise.name)!} className="absolute inset-0" />
-                            ) : (
-                              <div className="absolute inset-0 bg-black opacity-10"></div>
-                            )}
-                            <Play className="text-white relative z-10 drop-shadow-lg" size={48} />
-                            {exercise.completed && (
-                              <div className="absolute top-3 right-3 bg-green-500 text-white rounded-full p-1.5 sm:p-2 shadow-lg z-10">
-                                <Check size={16} className="sm:w-5 sm:h-5" />
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Exercise Details */}
-                          <div className="flex-1 p-4 sm:p-5 lg:p-6">
-                            <div className="flex items-start justify-between mb-3 sm:mb-4">
-                              <div className="flex-1">
-                                <div className="flex flex-wrap items-center gap-2 mb-2">
-                                  <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{exercise.name}</h3>
-                                  {exercise.completed && (
-                                    <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-lg">
-                                      Done
-                                    </span>
-                                  )}
-                                  {group.isCompleted && (
-                                    <span className="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded-lg">
-                                      Ended
-                                    </span>
-                                  )}
+                    {/* Warm-up section (collapsible) */}
+                    {(() => {
+                      const warmups = group.exercises.filter(ex => ex.isWarmup);
+                      const mains = group.exercises.filter(ex => !ex.isWarmup);
+                      const hasWarmup = warmups.length > 0;
+                      const isCollapsed = warmupCollapsed[group.programIndex] ?? false;
+                      return (
+                        <>
+                          {hasWarmup && (
+                            <>
+                              <button
+                                onClick={() => setWarmupCollapsed(prev => ({ ...prev, [group.programIndex]: !isCollapsed }))}
+                                className="flex items-center gap-2 w-full text-left py-2"
+                              >
+                                <Flame size={16} className="text-amber-500" />
+                                <span className="text-sm font-semibold text-amber-700 uppercase tracking-wider">Warm Up</span>
+                                <span className="text-xs text-amber-500">({warmups.length})</span>
+                                <div className="flex-1 h-px bg-amber-200 ml-2" />
+                                {isCollapsed ? <ChevronDown size={16} className="text-amber-400" /> : <ChevronUp size={16} className="text-amber-400" />}
+                              </button>
+                              {!isCollapsed && warmups.map((exercise) => (
+                                <div key={`warmup-${group.programIndex}-${exercise.originalIndex}`}>
+                                  {renderExerciseCard(exercise, group)}
                                 </div>
-                              </div>
+                              ))}
+                            </>
+                          )}
+                          {hasWarmup && mains.length > 0 && (
+                            <div className="flex items-center gap-2 py-2">
+                              <span className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Exercise Program</span>
+                              <span className="text-xs text-slate-400">({mains.length})</span>
+                              <div className="flex-1 h-px bg-slate-200 ml-2" />
                             </div>
-
-                            {/* Prescribed Sets | Reps | Weight — blank for future block weeks */}
-                            {group.showPrescription ? (
-                              <div className="mb-3 sm:mb-4">
-                                <p className="text-sm sm:text-base text-gray-700 font-semibold">
-                                  {(() => {
-                                    const exType = getExerciseType(exercise);
-                                    if (exType === 'cardio') {
-                                      return exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : 'As prescribed';
-                                    }
-                                    if (exType === 'duration') {
-                                      const dur = exercise.prescribedDuration ? formatDuration(exercise.prescribedDuration) : '—';
-                                      return `${exercise.sets} set${exercise.sets !== 1 ? 's' : ''} | ${dur}`;
-                                    }
-                                    return `${exercise.sets} set${exercise.sets !== 1 ? 's' : ''} | ${exercise.reps} rep${exercise.reps !== 1 ? 's' : ''}${(exercise.prescribedWeight || 0) > 0 ? ` | ${exercise.prescribedWeight} kg` : ''}`;
-                                  })()}
-                                </p>
-                                {(exercise.restDuration || 0) > 0 && (
-                                  <p className="text-xs text-slate-500 mt-0.5">Rest: {formatDuration(exercise.restDuration!)}</p>
-                                )}
-                              </div>
-                            ) : (
-                              <p className="text-sm sm:text-base text-gray-300 font-semibold mb-3 sm:mb-4">
-                                &mdash;
-                              </p>
-                            )}
-
-                            <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 mb-2">
-                              {exercise.description}
-                            </p>
-
-                            {exercise.instructions && (
-                              <div className="flex items-start gap-1.5 bg-primary-50 rounded-lg px-3 py-2 mb-3 sm:mb-4">
-                                <Info size={14} className="text-primary-500 mt-0.5 flex-shrink-0" />
-                                <p className="text-xs text-primary-700">{exercise.instructions}</p>
-                              </div>
-                            )}
-
-                            {/* Buttons */}
-                            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                              {!group.isCompleted && group.showPrescription && canComplete && (
-                                <button
-                                  onClick={() => {
-                                    const weekDates = getDatesForWeek(weekOffset);
-                                    const selectedDate = weekDates[selectedWeekDay];
-
-                                    setSelectedExercise({
-                                      exercise,
-                                      exerciseIndex: exercise.originalIndex,
-                                      programIndex: group.programIndex,
-                                      selectedDate
-                                    });
-                                    setShowCompletionModal(true);
-                                  }}
-                                  className={`w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold transition-all shadow-md hover:shadow-lg text-sm sm:text-base ${exercise.completed
-                                    ? 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700'
-                                    : 'bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-blue-400'
-                                    }`}
-                                >
-                                  {exercise.completed ? 'Edit' : 'Mark Complete'}
-                                </button>
-                              )}
-                              {!group.isCompleted && group.showPrescription && !canComplete && (
-                                <p className="text-xs text-slate-400 italic">Available to complete on the day</p>
-                              )}
+                          )}
+                          {mains.map((exercise) => (
+                            <div key={`main-${group.programIndex}-${exercise.originalIndex}`}>
+                              {renderExerciseCard(exercise, group)}
                             </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                          ))}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}

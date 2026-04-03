@@ -584,6 +584,10 @@ async function initDatabase() {
     await db.query(`ALTER TABLE template_weeks ADD COLUMN IF NOT EXISTS duration INTEGER`);
     await db.query(`ALTER TABLE template_weeks ADD COLUMN IF NOT EXISTS rest_duration INTEGER`);
 
+    // Warm-up section flag
+    await db.query(`ALTER TABLE program_exercises ADD COLUMN IF NOT EXISTS is_warmup BOOLEAN DEFAULT FALSE`);
+    await db.query(`ALTER TABLE program_template_exercises ADD COLUMN IF NOT EXISTS is_warmup BOOLEAN DEFAULT FALSE`);
+
     // data_requests — patient data export/deletion requests (APP 12, APP 13)
     await db.query(`
       CREATE TABLE IF NOT EXISTS data_requests (
