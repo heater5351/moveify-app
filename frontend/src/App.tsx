@@ -399,14 +399,14 @@ function App() {
             const targetProgramId = responseData.programId;
 
             if (isEditing) {
-              // When block was modified during edit, programExerciseId values are array indices
-              // into the non-warmup exercises. Remap to real DB IDs.
-              const mainExercises = programExercises.filter(ex => !ex.isWarmup);
-              const needsRemap = pendingBlockData.isModified && mainExercises.some(ex => ex.id && ex.id > 0);
-              const remappedEditWeeks = needsRemap
+              // Backend now returns exerciseIds in exercise_order. Filter to non-warmup
+              // exercises to match block builder's filteredExercises indices.
+              const allExerciseIds: number[] = responseData.exerciseIds || [];
+              const nonWarmupIds = allExerciseIds.filter((_, i) => !programExercises[i]?.isWarmup);
+              const remappedEditWeeks = pendingBlockData.isModified
                 ? pendingBlockData.weeks.map(w => ({
                     ...w,
-                    programExerciseId: mainExercises[w.programExerciseId]?.id ?? w.programExerciseId
+                    programExerciseId: nonWarmupIds[w.programExerciseId] ?? w.programExerciseId
                   }))
                 : pendingBlockData.weeks;
               await fetch(`${API_URL}/blocks/${targetProgramId}`, {

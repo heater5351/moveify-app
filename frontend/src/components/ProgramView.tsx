@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { ArrowLeft, MoreVertical, ChevronLeft, ChevronRight, Pause, Info, Play } from 'lucide-react';
+import { ArrowLeft, MoreVertical, ChevronLeft, ChevronRight, Pause, Info, Play, Flame } from 'lucide-react';
 import type { AssignedProgram, BlockStatusResponse, BlockWeekRow } from '../types/index.ts';
 import { formatDuration, getExerciseType } from '../utils/duration';
 import { exercises as defaultExercises } from '../data/exercises';
@@ -18,8 +18,6 @@ interface ProgramViewProps {
 }
 
 export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, onDuplicate, onRefresh }: ProgramViewProps) => {
-  const totalExercises = program.exercises.length;
-
   // Build name→videoUrl lookup from default exercises
   const videoUrlMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -332,9 +330,11 @@ export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, on
 
       {/* Exercise List */}
       <div className="mb-8">
-        <h2 className="font-semibold text-slate-800 mb-4">Exercises ({totalExercises})</h2>
-        <div className="space-y-3">
-          {program.exercises.map((exercise, index) => (
+        {(() => {
+          const warmups = program.exercises.filter(ex => ex.isWarmup);
+          const mains = program.exercises.filter(ex => !ex.isWarmup);
+
+          const renderExerciseCard = (exercise: typeof program.exercises[0], index: number) => (
             <div
               key={index}
               className="bg-white rounded-xl ring-1 ring-slate-200 p-4 flex gap-4"
@@ -369,8 +369,33 @@ export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, on
                 )}
               </div>
             </div>
-          ))}
-        </div>
+          );
+
+          return (
+            <>
+              {warmups.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Flame size={18} className="text-orange-500" />
+                    <h2 className="font-semibold text-slate-800">Warm Up ({warmups.length})</h2>
+                  </div>
+                  <div className="space-y-3">
+                    {warmups.map((exercise, index) => renderExerciseCard(exercise, index))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <h2 className="font-semibold text-slate-800 mb-4">
+                  Exercise Program ({mains.length})
+                </h2>
+                <div className="space-y-3">
+                  {mains.map((exercise, index) => renderExerciseCard(exercise, index))}
+                </div>
+              </div>
+            </>
+          );
+        })()}
       </div>
     </div>
   );

@@ -355,13 +355,21 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
       await client.query('DELETE FROM program_exercises WHERE program_id = $1', [programId]);
     }
 
+    // Fetch final exercise IDs in order (needed for block remapping)
+    const finalExercises = await client.query(
+      'SELECT id FROM program_exercises WHERE program_id = $1 ORDER BY exercise_order ASC',
+      [programId]
+    );
+    const exerciseIds = finalExercises.rows.map(r => r.id);
+
     await client.query('COMMIT');
 
     audit.log(req, 'program_update', 'program', parseInt(programId));
 
     res.json({
       message: 'Program updated successfully',
-      programId: programId
+      programId: programId,
+      exerciseIds
     });
   } catch (error) {
     await client.query('ROLLBACK').catch(e => console.error('Rollback failed:', e));
