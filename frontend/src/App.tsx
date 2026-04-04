@@ -1204,6 +1204,9 @@ function App() {
             setProgramExercises(prev => [...prev, ...exercises]);
             setPendingBlockData({ duration: blockDuration, weeks, isModified: true });
           }}
+          onApplyBlockOnly={(blockDuration, weeks) => {
+            setPendingBlockData({ duration: blockDuration, weeks, isModified: true });
+          }}
           onOpenProtocols={() => setShowAiProtocolModal(true)}
           programContext={programExercises.length > 0 ? {
             exercises: programExercises.map(ex => ({

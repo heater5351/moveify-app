@@ -17,6 +17,7 @@ type AiAssistantPanelProps = {
   onClose: () => void;
   onAddToProgram: (exercises: ProgramExercise[]) => void;
   onAddToProgramWithBlock: (exercises: ProgramExercise[], blockDuration: number, weeks: ExerciseWeekPrescription[]) => void;
+  onApplyBlockOnly: (blockDuration: number, weeks: ExerciseWeekPrescription[]) => void;
   onOpenProtocols: () => void;
   programContext?: ProgramContext;
 };
@@ -31,7 +32,7 @@ type DisplayMessage = {
 
 const CONSENT_KEY = 'moveify_ai_consent';
 
-export function AiAssistantPanel({ show, onClose, onAddToProgram, onAddToProgramWithBlock, onOpenProtocols, programContext }: AiAssistantPanelProps) {
+export function AiAssistantPanel({ show, onClose, onAddToProgram, onAddToProgramWithBlock, onApplyBlockOnly, onOpenProtocols, programContext }: AiAssistantPanelProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -320,6 +321,24 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onAddToProgram
     onClose();
   };
 
+  const handleApplyBlockOnly = (block: AiBlockData) => {
+    if (!block || block.weeks.length === 0) return;
+    // Block-only mode: exerciseIndex maps directly to non-warmup exercise indices in the current program
+    const weeks: ExerciseWeekPrescription[] = block.weeks.map(w => ({
+      programExerciseId: w.exerciseIndex,
+      weekNumber: w.weekNumber,
+      sets: w.sets,
+      reps: w.reps,
+      weight: w.weight,
+      duration: w.duration,
+      restDuration: w.restDuration,
+      rpeTarget: w.rpeTarget,
+      notes: w.notes,
+    }));
+    onApplyBlockOnly(block.blockDuration, weeks);
+    onClose();
+  };
+
   // Strip the program-exercises and program-block code blocks from display text (complete and in-progress)
   const stripCodeBlock = (text: string) => {
     return text
@@ -429,10 +448,10 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onAddToProgram
                     "Generate a knee rehab program for post-ACL, week 6-8"
                   </button>
                   <button
-                    onClick={() => setInput('Build a lower limb strengthening program with dumbbells, 3x per week')}
+                    onClick={() => setInput('Suggest a good hamstring exercise with dumbbells')}
                     className="block w-full text-left px-3 py-2 bg-slate-50 hover:bg-primary-50 rounded-lg transition-colors"
                   >
-                    "Lower limb strengthening with dumbbells, 3x per week"
+                    "Suggest a good hamstring exercise with dumbbells"
                   </button>
                   <button
                     onClick={() => setInput('Shoulder rehabilitation program for rotator cuff tendinopathy, early stage')}
@@ -481,11 +500,12 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onAddToProgram
                                     AI suggested: "{ex.suggested.name}"
                                   </p>
                                 )}
-                                <div className="flex items-center gap-2 text-xs opacity-75">
+                                <div className="flex items-center gap-2 text-xs opacity-75 flex-wrap">
                                   {ex.suggested.sets && <span>{ex.suggested.sets} sets</span>}
                                   {ex.suggested.reps && <span>&times; {ex.suggested.reps} reps</span>}
-                                  {ex.suggested.prescribedDuration && <span>&times; {ex.suggested.prescribedDuration}s</span>}
+                                  {ex.suggested.prescribedDuration && <span>&times; {formatDuration(ex.suggested.prescribedDuration)}</span>}
                                   {ex.suggested.prescribedWeight && <span>@ {ex.suggested.prescribedWeight}kg</span>}
+                                  {ex.suggested.restDuration && <span className="text-violet-500">Rest {formatDuration(ex.suggested.restDuration)}</span>}
                                 </div>
                                 {ex.suggested.instructions && (
                                   <p className="text-xs opacity-75 mt-1 italic">{ex.suggested.instructions}</p>
@@ -546,6 +566,7 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onAddToProgram
                                                       ? `${week.sets}x${week.duration ? formatDuration(week.duration) : week.reps}`
                                                       : `${week.sets}x${week.reps}`}
                                                     {week.weight ? <div className="text-[9px] text-violet-400">{week.weight}kg</div> : null}
+                                                    {week.restDuration ? <div className="text-[9px] text-violet-400">Rest {formatDuration(week.restDuration)}</div> : null}
                                                   </>
                                                 ) : '--'}
                                               </td>
@@ -571,6 +592,79 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onAddToProgram
                             {msg.block ? 'Load with Block into Program Builder' : 'Load All into Program Builder'} ({msg.exercises.filter(e => e.matched).length})
                           </button>
                         )}
+                        {/* Apply Block Only button — when AI generated a block for existing exercises */}
+                        {msg.block && msg.block.weeks.length > 0 && programContext && programContext.exercises.length > 0 && (
+                          <button
+                            onClick={() => handleApplyBlockOnly(msg.block!)}
+                            className="w-full py-2 px-3 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                          >
+                            Apply Block to Current Program ({msg.block.blockDuration} weeks)
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Block-only response (no exercises, just a block for current program) */}
+                    {(!msg.exercises || msg.exercises.length === 0) && msg.block && msg.block.weeks.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="bg-violet-50 border border-violet-200 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-5 h-5 bg-violet-200 rounded flex items-center justify-center">
+                              <span className="text-violet-700 text-xs font-bold">B</span>
+                            </div>
+                            <span className="text-xs font-semibold text-violet-700">
+                              {msg.block.blockDuration}-Week Periodization Block
+                            </span>
+                          </div>
+                          <div className="overflow-x-auto -mx-1">
+                            <table className="w-full text-[10px]">
+                              <thead>
+                                <tr className="border-b border-violet-200">
+                                  <th className="text-left py-1 px-1 font-semibold text-violet-600 min-w-[100px]">Exercise</th>
+                                  {Array.from({ length: msg.block.blockDuration }, (_, i) => (
+                                    <th key={i} className="text-center py-1 px-1 font-semibold text-violet-500 min-w-[50px]">Wk {i + 1}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(() => {
+                                  const exerciseIndices = [...new Set(msg.block!.weeks.map(w => w.exerciseIndex))];
+                                  const nonWarmup = programContext?.exercises.filter(e => !e.isWarmup) || [];
+                                  return exerciseIndices.map(exIdx => {
+                                    const exName = nonWarmup[exIdx]?.name || `Exercise ${exIdx + 1}`;
+                                    return (
+                                      <tr key={exIdx} className="border-b border-violet-100">
+                                        <td className="py-1 px-1 font-medium text-violet-700 truncate max-w-[100px]">{exName}</td>
+                                        {Array.from({ length: msg.block!.blockDuration }, (_, i) => {
+                                          const week = msg.block!.weeks.find(w => w.exerciseIndex === exIdx && w.weekNumber === i + 1);
+                                          return (
+                                            <td key={i} className="text-center py-1 px-1 text-violet-600">
+                                              {week ? (
+                                                <>
+                                                  {week.duration ? `${week.sets}x${formatDuration(week.duration)}` : `${week.sets}x${week.reps}`}
+                                                  {week.weight ? <div className="text-[9px] text-violet-400">{week.weight}kg</div> : null}
+                                                  {week.restDuration ? <div className="text-[9px] text-violet-400">Rest {formatDuration(week.restDuration)}</div> : null}
+                                                </>
+                                              ) : '--'}
+                                            </td>
+                                          );
+                                        })}
+                                      </tr>
+                                    );
+                                  });
+                                })()}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                        {programContext && programContext.exercises.length > 0 && (
+                          <button
+                            onClick={() => handleApplyBlockOnly(msg.block!)}
+                            className="w-full py-2 px-3 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                          >
+                            Apply Block to Current Program ({msg.block.blockDuration} weeks)
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -589,6 +683,7 @@ export function AiAssistantPanel({ show, onClose, onAddToProgram, onAddToProgram
 
           {/* Input area */}
           <div className="border-t border-slate-200 p-3">
+            <p className="text-[10px] text-slate-400 mb-2">Do not include patient names, dates of birth, or contact details.</p>
             <div className="flex gap-2">
               <textarea
                 ref={inputRef}

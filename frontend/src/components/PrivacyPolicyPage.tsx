@@ -14,7 +14,7 @@ export const PrivacyPolicyPage = () => {
           <h1 className="text-2xl font-semibold font-display text-secondary-500 tracking-tight">
             Privacy Policy
           </h1>
-          <p className="text-sm text-slate-500 mt-2">Last updated: 3 March 2026</p>
+          <p className="text-sm text-slate-500 mt-2">Last updated: 4 April 2026</p>
         </div>
 
         {/* Policy Content */}
@@ -104,14 +104,18 @@ export const PrivacyPolicyPage = () => {
               <li><strong>Google Cloud Platform (Cloud SQL):</strong> database hosting in the Sydney, Australia region (<code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">australia-southeast1</code>). All health data is stored here.</li>
               <li><strong>Vercel:</strong> hosts the static frontend application (HTML, CSS, JavaScript). No health data is stored on or transmitted through Vercel.</li>
               <li><strong>Gmail API:</strong> used to send transactional emails (account invitations, password resets). Only email addresses are processed — no health data is included in emails.</li>
+              <li><strong>Anthropic (Claude API):</strong> powers the optional AI Exercise Assistant feature available to clinicians. When a clinician uses this feature, de-identified clinical descriptions (such as injury type or rehabilitation stage) may be transmitted to Anthropic's API to generate exercise program suggestions. Before transmission, an automated process removes patient names, dates of birth, contact details, and other identifying information. Anthropic does not use API data to train its models, and data is deleted from their systems within 7 days. Anthropic's Data Processing Addendum (incorporated into their Commercial Terms of Service) governs this processing. This feature is only available to clinicians — patient data is never sent to Anthropic directly.</li>
             </ul>
           </section>
 
           {/* 8. Cross-border disclosure */}
           <section>
             <h2 className="text-base font-semibold font-display text-secondary-500 mb-2">8. Cross-border disclosure</h2>
-            <p className="text-sm text-slate-600 leading-relaxed">
+            <p className="text-sm text-slate-600 leading-relaxed mb-3">
               In accordance with APP 8, your health data is stored exclusively in Australia (Google Cloud Platform, Sydney region). The static frontend application is hosted on Vercel, which operates infrastructure in the United States, but no personal or health data is stored on or transmitted through Vercel servers. Transactional emails are processed by Google's Gmail API — only email addresses are included in these communications, never health data.
+            </p>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              The AI Exercise Assistant feature (available to clinicians only) transmits de-identified clinical descriptions to Anthropic's API, which is operated from the United States. Before any transmission, automated processing removes patient names, dates of birth, phone numbers, email addresses, and other identifying information. The information sent to Anthropic is limited to clinical context such as injury type and rehabilitation stage, and cannot reasonably identify any individual. Anthropic operates under a Data Processing Addendum that includes Standard Contractual Clauses for cross-border data transfers. Anthropic does not use this data for model training, and it is deleted within 7 days.
             </p>
           </section>
 

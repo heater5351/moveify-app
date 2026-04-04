@@ -4,14 +4,21 @@
 
 const db = require('../database/db');
 
+const MONTHS = 'January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+
 // Regex patterns for common PHI
 const PATTERNS = {
   // Australian phone numbers: 04xx xxx xxx, (0x) xxxx xxxx, +61 x xxxx xxxx
   phone: /(?:\+61\s?\d|\(0\d\)\s?\d{4}\s?\d{4}|0[2-478]\s?\d{4}\s?\d{4}|04\d{2}\s?\d{3}\s?\d{3})/g,
   // Email addresses
   email: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
-  // Dates that look like DOBs: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
-  dob: /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})\b/g,
+  // Dates: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+  dobNumeric: /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})\b/g,
+  // Written dates: "3 March 1990", "3rd March 1990", "March 3, 1990", "March 3rd 1990"
+  dobWritten: new RegExp(
+    `\\b(?:\\d{1,2}(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:${MONTHS})(?:[,.]?\\s+\\d{4})?|(?:${MONTHS})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:[,.]?\\s+\\d{4})?)\\b`,
+    'gi'
+  ),
   // Medicare numbers: 10 or 11 digits with optional spaces
   medicare: /\b\d{4}\s?\d{5}\s?\d{1,2}\b/g,
   // Street addresses (basic pattern: number + street name + street type)
@@ -63,7 +70,8 @@ function stripPhi(message, patientNames = []) {
     const placeholder = {
       phone: '[PHONE]',
       email: '[EMAIL]',
-      dob: '[DOB]',
+      dobNumeric: '[DOB]',
+      dobWritten: '[DOB]',
       medicare: '[MEDICARE]',
       address: '[ADDRESS]',
     }[type] || '[REDACTED]';

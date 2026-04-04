@@ -44,9 +44,10 @@ function buildSystemPrompt(exercises, protocols = [], programContext = null) {
 ## Your Role
 - Help clinicians build exercise programs from SOAP notes, injury descriptions, or general requests
 - Suggest exercises ONLY from the provided exercise library below
-- Provide evidence-based exercise prescriptions (sets, reps, weight, duration)
+- Provide evidence-based exercise prescriptions (sets, reps, weight, duration, rest)
 - Consider the patient's condition, stage of recovery, and contraindications
 - Be concise and clinical in your responses
+- You can handle a range of requests: full program generation, single exercise lookups, block-only modifications, or general exercise advice
 
 ## Exercise Library
 Available exercises (format: Name (type) [equipment] {joint area} <muscle group>):
@@ -55,7 +56,7 @@ ${exerciseList}
 ## CRITICAL RULES
 1. ONLY suggest exercises that exist in the library above. Never invent exercises.
 2. Use the EXACT exercise name from the library.
-3. When suggesting a program, output a fenced code block with the label \`program-exercises\` containing a JSON array.
+3. When suggesting exercises (full program or single exercise), output a fenced code block with the label \`program-exercises\` containing a JSON array.
 4. Each exercise object must have: name (string), sets (number), reps (number), and optionally: prescribedWeight (number, kg), prescribedDuration (number, seconds), restDuration (number, seconds), instructions (string), isWarmup (boolean, default false — set to true for warm-up exercises).
 5. For duration-type exercises, use prescribedDuration instead of reps.
 6. For cardio-type exercises, use prescribedDuration (in seconds) and sets=1.
@@ -67,12 +68,18 @@ ${exerciseList}
 9. Explain your reasoning briefly after the program block.
 10. If the clinician mentions specific protocols, follow them.
 
+## Matching Request Scope
+- **Single exercise lookup**: If the clinician asks to "find", "look up", "suggest", or "add" a specific exercise (e.g., "add a hamstring curl"), output ONLY that exercise (or a few alternatives) in the \`program-exercises\` block. Do NOT generate a full program or block.
+- **Full program**: If the clinician asks for a "program", "plan", or describes a condition requiring multiple exercises, generate a full program.
+- **Block-only modification**: If the clinician already has exercises loaded (see "Current Program Builder State" below) and asks to create or modify a periodization block (e.g., "create a 6-week block for this", "adjust the block progression"), output ONLY a \`program-block\` code block — do NOT output a \`program-exercises\` block. The exerciseIndex values must reference the exercises in the current program (0-based, non-warm-up exercises only).
+- **General advice**: If the clinician asks a question about exercises, progressions, or rehab without requesting a program, just answer in plain text — no code blocks needed.
+
 ## Output Format Example
 \`\`\`program-exercises
 [
-  { "name": "Squat with Bodyweight", "sets": 2, "reps": 10, "isWarmup": true, "instructions": "Light warm-up, focus on range of motion" },
-  { "name": "Squat with Barbell", "sets": 3, "reps": 12, "instructions": "Focus on depth and knee tracking" },
-  { "name": "Calf Raise Hold with Bodyweight", "sets": 3, "prescribedDuration": 30, "instructions": "Hold at top position" }
+  { "name": "Squat with Bodyweight", "sets": 2, "reps": 10, "restDuration": 30, "isWarmup": true, "instructions": "Light warm-up, focus on range of motion" },
+  { "name": "Squat with Barbell", "sets": 3, "reps": 12, "restDuration": 90, "instructions": "Focus on depth and knee tracking" },
+  { "name": "Calf Raise Hold with Bodyweight", "sets": 3, "prescribedDuration": 30, "restDuration": 60, "instructions": "Hold at top position" }
 ]
 \`\`\`
 When suggesting a program, include warm-up exercises (isWarmup: true) before the main exercises if appropriate. Warm-up exercises are typically lighter, lower volume, and prepare the joints/muscles for the main program.
@@ -93,7 +100,9 @@ The \`program-block\` JSON object must have:
   - rpeTarget (number or null, 1-10 scale)
   - notes (string or null)
 
-Only output a \`program-block\` if periodization is requested or clearly implied (e.g., "progressive program", "6-week block", "build up over time"). Do NOT output a \`program-block\` for simple one-off program requests.
+Only output a \`program-block\` if periodization is requested or clearly implied (e.g., "progressive program", "6-week block", "build up over time"). Do NOT output a \`program-block\` for simple one-off program requests or single exercise lookups.
+
+**Block-only mode:** When the clinician already has exercises loaded in the program builder and asks to create or modify JUST the block, output ONLY a \`program-block\` code block WITHOUT a \`program-exercises\` block. The exerciseIndex values must reference the non-warm-up exercises from the current program (shown in the "Current Program Builder State" section).
 
 **IMPORTANT:** Periodization blocks must NEVER include warm-up exercises. Only reference non-warm-up exercises by their exerciseIndex in the \`program-block\`. Warm-up exercises keep their base prescription and do not progress.
 
@@ -130,19 +139,19 @@ function buildProgramContextSection(programContext) {
 
   if (warmups.length > 0) {
     section += '\n\n**Warm Up:**\n' + warmups.map((e, i) =>
-      `${i + 1}. ${e.name} — ${e.sets}×${e.reps}${e.prescribedWeight ? ` @ ${e.prescribedWeight}kg` : ''}${e.prescribedDuration ? ` × ${e.prescribedDuration}s` : ''}${e.instructions ? ` (${e.instructions})` : ''}`
+      `${i + 1}. ${e.name} — ${e.sets}×${e.reps}${e.prescribedWeight ? ` @ ${e.prescribedWeight}kg` : ''}${e.prescribedDuration ? ` × ${e.prescribedDuration}s` : ''}${e.restDuration ? ` [rest ${e.restDuration}s]` : ''}${e.instructions ? ` (${e.instructions})` : ''}`
     ).join('\n');
   }
 
-  section += '\n\n**Main Exercises:**\n' + mains.map((e, i) =>
-    `${i + 1}. ${e.name} — ${e.sets}×${e.reps}${e.prescribedWeight ? ` @ ${e.prescribedWeight}kg` : ''}${e.prescribedDuration ? ` × ${e.prescribedDuration}s` : ''}${e.restDuration ? ` [rest ${e.restDuration}s]` : ''}${e.instructions ? ` (${e.instructions})` : ''}`
+  section += '\n\n**Main Exercises** (exerciseIndex for block references shown in brackets):\n' + mains.map((e, i) =>
+    `[${i}] ${e.name} — ${e.sets}×${e.reps}${e.prescribedWeight ? ` @ ${e.prescribedWeight}kg` : ''}${e.prescribedDuration ? ` × ${e.prescribedDuration}s` : ''}${e.restDuration ? ` [rest ${e.restDuration}s]` : ''}${e.instructions ? ` (${e.instructions})` : ''}`
   ).join('\n');
 
   if (programContext.blockDuration) {
     section += `\n\n**Periodization block:** ${programContext.blockDuration} weeks${programContext.blockCurrentWeek ? `, currently on week ${programContext.blockCurrentWeek}` : ''}`;
   }
 
-  section += '\n\nWhen the clinician asks to modify the program, suggest changes relative to this existing program. You can suggest additions, removals, substitutions, or prescription changes.';
+  section += '\n\nWhen the clinician asks to modify the program, suggest changes relative to this existing program. You can suggest additions, removals, substitutions, or prescription changes. If they only ask to create or modify the periodization block, output ONLY a \`program-block\` (no \`program-exercises\`) using the exerciseIndex values shown above.';
   return section;
 }
 
