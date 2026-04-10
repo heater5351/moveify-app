@@ -698,6 +698,138 @@ async function initDatabase() {
       }
     }
 
+    // ===== SCRIBE TABLES =====
+    console.log('🔄 Initializing Scribe tables...');
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS scribe_sessions (
+        id SERIAL PRIMARY KEY,
+        clinician_id INTEGER NOT NULL REFERENCES users(id),
+        patient_id INTEGER NOT NULL REFERENCES users(id),
+        patient_name_enc TEXT NOT NULL,
+        session_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        ended_at TIMESTAMPTZ,
+        status TEXT NOT NULL DEFAULT 'recording'
+          CHECK(status IN ('recording','transcribing','generating','review','completed','discarded')),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_scribe_sessions_clinician ON scribe_sessions(clinician_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_scribe_sessions_patient ON scribe_sessions(patient_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_scribe_sessions_date ON scribe_sessions(session_date)`);
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS transcripts (
+        id SERIAL PRIMARY KEY,
+        session_id INTEGER NOT NULL REFERENCES scribe_sessions(id) ON DELETE CASCADE,
+        content_enc TEXT NOT NULL,
+        word_count INTEGER,
+        duration_secs INTEGER,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_transcripts_session ON transcripts(session_id)`);
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS soap_templates (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        discipline TEXT NOT NULL,
+        system_prompt TEXT NOT NULL,
+        is_default BOOLEAN DEFAULT FALSE,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS soap_notes (
+        id SERIAL PRIMARY KEY,
+        session_id INTEGER NOT NULL REFERENCES scribe_sessions(id) ON DELETE CASCADE,
+        subjective_enc TEXT,
+        version INTEGER NOT NULL DEFAULT 1,
+        generated_by TEXT NOT NULL DEFAULT 'llm' CHECK(generated_by IN ('llm','manual')),
+        llm_model TEXT,
+        template_id INTEGER REFERENCES soap_templates(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_soap_notes_session ON soap_notes(session_id)`);
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS soap_note_versions (
+        id SERIAL PRIMARY KEY,
+        soap_note_id INTEGER NOT NULL REFERENCES soap_notes(id) ON DELETE CASCADE,
+        version INTEGER NOT NULL,
+        subjective_enc TEXT,
+        edited_by INTEGER NOT NULL REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS clinician_preferences (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        system_prompt_enc TEXT NOT NULL,
+        discipline TEXT NOT NULL DEFAULT 'exercise_physiology',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id)
+      )
+    `);
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS prompt_versions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        system_prompt_enc TEXT NOT NULL,
+        discipline TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_prompt_versions_user ON prompt_versions(user_id)`);
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS patient_summaries (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER NOT NULL REFERENCES users(id),
+        summary_enc TEXT NOT NULL,
+        session_count INTEGER NOT NULL DEFAULT 1,
+        last_session_id INTEGER REFERENCES scribe_sessions(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(patient_id)
+      )
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_patient_summaries_patient ON patient_summaries(patient_id)`);
+
+    // Seed default SOAP template (exercise physiology)
+    await db.query(`
+      INSERT INTO soap_templates (name, discipline, system_prompt, is_default)
+      SELECT 'Exercise Physiology — Standard', 'exercise_physiology', $1, true
+      WHERE NOT EXISTS (SELECT 1 FROM soap_templates WHERE is_default = true)
+    `, [`You are an experienced clinical exercise physiologist scribe. Given a transcript of a patient consultation, generate a structured SOAP note following Australian allied health clinical standards.
+
+Subjective
+- Patient's reported symptoms, history of present condition, pain descriptions, functional limitations, goals, and relevant psychosocial factors.
+
+Objective
+- Clinical findings mentioned: range of motion, strength assessments, functional tests, movement quality observations, vitals if mentioned, any outcome measures discussed.
+
+Assessment
+- Clinical reasoning, working diagnosis/impression, progress since last session, contributing factors, prognosis.
+
+Plan
+- Treatment provided today, exercise prescription changes, home exercise program updates, follow-up schedule, referrals, patient education provided.
+
+Use bullet points within each section. Be concise but thorough. Do not fabricate information not present in the transcript.`]);
+
+    console.log('✅ Scribe tables initialized');
+
     console.log('✅ Database tables initialized');
   } catch (error) {
     console.error('❌ Database initialization error:', error);

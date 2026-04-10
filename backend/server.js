@@ -1,5 +1,6 @@
 // Moveify Backend Server
 const express = require('express');
+const expressWs = require('express-ws');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -20,10 +21,19 @@ const dataRequestRoutes = require('./routes/data-requests');
 const aiRoutes = require('./routes/ai-assistant');
 const feedbackRoutes = require('./routes/feedback');
 
+// Scribe routes
+const scribeSessionRoutes = require('./routes/scribe-sessions');
+const scribeSoapNoteRoutes = require('./routes/scribe-soap-notes');
+const scribePreferencesRoutes = require('./routes/scribe-preferences');
+const scribeHandoutRoutes = require('./routes/scribe-handout');
+const { registerScribeTranscriptionWs } = require('./routes/scribe-transcription');
+
 // Import database init
 const { initDatabase } = require('./database/init');
 
 const app = express();
+// express-ws must be initialised before any route files are imported
+expressWs(app);
 const PORT = process.env.PORT || 3000;
 
 // Security headers with strict CSP
@@ -117,6 +127,13 @@ app.use('/api/data-requests', dataRequestRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/feedback', feedbackRoutes);
 
+// Scribe routes — clinician-only, all under /api/scribe/
+app.use('/api/scribe/sessions', scribeSessionRoutes);
+app.use('/api/scribe/sessions', scribeSoapNoteRoutes);
+app.use('/api/scribe/sessions', scribeHandoutRoutes);
+app.use('/api/scribe/preferences', scribePreferencesRoutes);
+registerScribeTranscriptionWs(app);
+
 // Test route
 app.get('/', (req, res) => {
   res.json({ message: 'Moveify Backend is running!' });
@@ -169,6 +186,11 @@ process.on('SIGTERM', () => {
     });
   }
 });
+
+// Validate scribe encryption key at startup
+if (!process.env.SCRIBE_ENCRYPTION_KEY || process.env.SCRIBE_ENCRYPTION_KEY.length !== 64) {
+  console.warn('WARNING: SCRIBE_ENCRYPTION_KEY not set or invalid — Scribe PHI encryption will fail at runtime');
+}
 
 // Initialize database and start server
 async function startServer() {
