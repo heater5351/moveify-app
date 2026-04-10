@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown } from 'lucide-react';
+import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown, FileText } from 'lucide-react';
+import ScribeHistoryPage from './scribe/ScribeHistoryPage';
+import ProgressNotePage from './scribe/ProgressNotePage';
 import type { Patient, ClinicianFlag, BlockStatusResponse } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
@@ -18,7 +20,8 @@ interface PatientProfileProps {
 }
 
 export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram }: PatientProfileProps) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'education'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'education' | 'notes'>('overview');
+  const [noteCtx, setNoteCtx] = useState<{ sessionId?: number } | null>(null);
   const [showAssignEducationModal, setShowAssignEducationModal] = useState(false);
   const [educationModulesRefreshKey, setEducationModulesRefreshKey] = useState(0);
   const [flags, setFlags] = useState<ClinicianFlag[]>([]);
@@ -143,6 +146,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
             { id: 'overview', label: 'Overview', icon: <User size={15} /> },
             { id: 'analytics', label: 'Progress Analytics', icon: <TrendingUp size={15} /> },
             { id: 'education', label: 'Education', icon: <BookOpen size={15} /> },
+            { id: 'notes', label: 'Progress Notes', icon: <FileText size={15} /> },
           ].map(({ id, label, icon }) => (
             <button
               key={id}
@@ -323,6 +327,36 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
         </div>
       ) : activeTab === 'analytics' ? (
         <ProgressAnalytics patientId={patient.id} apiUrl={API_URL} assignedPrograms={patient.assignedPrograms} />
+      ) : activeTab === 'notes' ? (
+        noteCtx !== null ? (
+          <ProgressNotePage
+            patientId={patient.id}
+            patientName={patient.name}
+            existingSessionId={noteCtx.sessionId}
+            onBack={() => setNoteCtx(null)}
+          />
+        ) : (
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-sm font-semibold text-slate-700">Progress Notes</h2>
+              <button
+                onClick={() => setNoteCtx({})}
+                className="bg-primary-400 hover:bg-primary-500 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-1.5 text-sm transition-colors shadow-sm"
+              >
+                <FileText size={15} />
+                New Progress Note
+              </button>
+            </div>
+            <ScribeHistoryPage
+              patientId={patient.id}
+              onViewSession={(sessionId, _name, _pid, _at, status, hasNote) => {
+                if ((status === 'recording' && hasNote) || status === 'completed') {
+                  setNoteCtx({ sessionId });
+                }
+              }}
+            />
+          </div>
+        )
       ) : (
         <div>
           <div className="flex items-center justify-between mb-5">

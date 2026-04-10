@@ -31,6 +31,7 @@ import { PatientDataPage } from './components/PatientDataPage';
 import { PatientEditProfileModal } from './components/modals/PatientEditProfileModal';
 import { AdminPanel } from './components/AdminPanel';
 import { AiAssistantPanel } from './components/AiAssistantPanel';
+import ScribePage from './components/scribe/ScribePage';
 import { AiProtocolModal } from './components/modals/AiProtocolModal';
 import { BugReportModal } from './components/modals/BugReportModal';
 import { API_URL } from './config';
@@ -1034,6 +1035,16 @@ function App() {
                 >
                   Education
                 </button>
+                <button
+                  onClick={() => { setCurrentPage('scribe'); setViewingPatient(null); }}
+                  className={`px-5 text-sm font-medium border-b-2 transition-colors ${
+                    currentPage === 'scribe'
+                      ? 'border-moveify-teal text-white'
+                      : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/20'
+                  }`}
+                >
+                  Scribe Notes
+                </button>
                 {loggedInUser?.isAdmin && (
                   <button
                     onClick={() => setCurrentPage('admin')}
@@ -1134,6 +1145,10 @@ function App() {
               onLoadTemplate={() => setShowProgramTemplateModal(true)}
             />
           </div>
+        </div>
+      ) : currentPage === 'scribe' ? (
+        <div className="flex-1 overflow-y-auto px-6 py-7">
+          <ScribePage />
         </div>
       ) : currentPage === 'admin' && loggedInUser?.isAdmin ? (
         <div className="flex-1 overflow-y-auto px-6 py-7">

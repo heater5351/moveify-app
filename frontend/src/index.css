@@ -1,14 +1,71 @@
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@theme {
+  --font-display: 'Sora', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+
+  /* Primary (teal) */
+  --color-primary-50: #e6f7f7;
+  --color-primary-100: #b3e7e6;
+  --color-primary-200: #80d7d5;
+  --color-primary-300: #4dc7c4;
+  --color-primary-400: #46c1c0;
+  --color-primary-500: #3aa9a8;
+  --color-primary-600: #2e8786;
+  --color-primary-700: #226564;
+  --color-primary-800: #164342;
+  --color-primary-900: #0a2120;
+
+  /* Secondary (navy) */
+  --color-secondary-50: #e8eaed;
+  --color-secondary-100: #b8bec6;
+  --color-secondary-200: #88929f;
+  --color-secondary-300: #586678;
+  --color-secondary-400: #283a51;
+  --color-secondary-500: #132232;
+  --color-secondary-600: #0f1b28;
+  --color-secondary-700: #0b141e;
+  --color-secondary-800: #070d14;
+  --color-secondary-900: #03060a;
+
+  /* Moveify brand aliases */
+  --color-moveify-teal: #46c1c0;
+  --color-moveify-teal-light: #5ed4d3;
+  --color-moveify-teal-dark: #3aa9a8;
+  --color-moveify-navy: #132232;
+  --color-moveify-navy-light: #1f3548;
+  --color-moveify-ocean: #045e62;
+  --color-moveify-ocean-light: #056f74;
+
+  /* Animations */
+  --animate-slide-in-right: slide-in-right 0.25s ease-out;
+  --animate-suggestion-enter: slideInFromBottom 0.25s ease-out;
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes slideInFromBottom {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 html, body {
   overflow-x: hidden;
 }
 
 /* Safe area insets for notch/cutout devices */
-.safe-bottom {
-  padding-bottom: max(env(safe-area-inset-bottom), 0px);
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
+
+/* Custom scrollbar (subtle) */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }

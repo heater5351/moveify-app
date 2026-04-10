@@ -313,3 +313,25 @@ export type BlockWeekRow = {
   duration?: number | null;
   restDuration?: number | null;
 }
+
+// Scribe types
+export type Suggestion = {
+  text: string;
+  phase: 'subjective' | 'objective' | 'planning';
+  refs: { title: string; url: string }[];
+}
+
+export type PromptVersion = {
+  id: number;
+  discipline: string;
+  createdAt: string;
+  systemPrompt?: string;
+}
+
+export type SoapTemplate = {
+  id: number;
+  name: string;
+  discipline: string;
+  systemPrompt: string;
+  isDefault: boolean;
+}
