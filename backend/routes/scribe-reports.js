@@ -34,11 +34,11 @@ router.post('/sessions/:id/report/generate', async (req, res) => {
     if (sessionResult.rows[0].clinician_id !== req.user.id) return res.status(403).json({ error: 'Access denied' });
 
     const noteResult = await db.query(
-      'SELECT content_enc FROM soap_notes WHERE session_id = $1 ORDER BY created_at DESC LIMIT 1',
+      'SELECT subjective_enc FROM soap_notes WHERE session_id = $1 ORDER BY created_at DESC LIMIT 1',
       [req.params.id]
     );
     if (noteResult.rows.length === 0) return res.status(404).json({ error: 'No saved note for this session' });
-    const noteContent = decrypt(noteResult.rows[0].content_enc);
+    const noteContent = decrypt(noteResult.rows[0].subjective_enc);
 
     const templateResult = await db.query(
       'SELECT system_prompt FROM report_templates WHERE type = $1 AND is_default = true LIMIT 1',
