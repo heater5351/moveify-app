@@ -108,7 +108,7 @@ router.get('/history', async (req, res) => {
       [...params, limit, offset]
     );
     const countResult = await db.query(
-      `SELECT COUNT(*) FROM scribe_sessions ${where.replace('s.', '')}`,
+      `SELECT COUNT(*) FROM scribe_sessions ${where.replace(/s\./g, '')}`,
       params
     );
     res.json({

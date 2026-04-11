@@ -55,6 +55,12 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
         }
       })
       .catch(() => {});
+    apiFetch(`/sessions/${existingSessionId}/soap-note`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.content) setNoteContent(data.content);
+      })
+      .catch(() => {});
   }, [existingSessionId]);
 
   function assignSpeaker(speakerNum: number | null) {
