@@ -64,6 +64,14 @@ async function createBlock(programId, blockDuration, startDate, exerciseWeeks) {
       }
     }
 
+    // Auto-resolve any unresolved block_complete flags for this program
+    await client.query(
+      `UPDATE clinician_flags
+       SET resolved = TRUE, resolved_at = NOW()
+       WHERE program_id = $1 AND flag_type = 'block_complete' AND resolved = FALSE`,
+      [programId]
+    );
+
     await client.query('COMMIT');
     return { blockScheduleId, programId, blockDuration, startDate };
   } catch (err) {
