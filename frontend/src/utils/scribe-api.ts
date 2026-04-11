@@ -51,3 +51,25 @@ export async function generateHandout(
     clearTimeout(timer);
   }
 }
+
+export async function generateReport(
+  sessionId: number,
+  type: 'cdmp'
+): Promise<{ sections: { executiveSummary: string; objectiveAssessment: string; goals: string }; model: string }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 45_000);
+  try {
+    const res = await apiFetch(`/sessions/${sessionId}/report/generate`, {
+      method: 'POST',
+      body: JSON.stringify({ type }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { error?: string }).error || 'Report generation failed');
+    }
+    return res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}

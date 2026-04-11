@@ -26,6 +26,7 @@ const scribeSessionRoutes = require('./routes/scribe-sessions');
 const scribeSoapNoteRoutes = require('./routes/scribe-soap-notes');
 const scribePreferencesRoutes = require('./routes/scribe-preferences');
 const scribeHandoutRoutes = require('./routes/scribe-handout');
+const scribeReportRoutes = require('./routes/scribe-reports');
 const { registerScribeTranscriptionWs } = require('./routes/scribe-transcription');
 
 // Import database init
@@ -131,6 +132,7 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/scribe/sessions', scribeSessionRoutes);
 app.use('/api/scribe/sessions', scribeSoapNoteRoutes);
 app.use('/api/scribe/sessions', scribeHandoutRoutes);
+app.use('/api/scribe', scribeReportRoutes);
 app.use('/api/scribe/preferences', scribePreferencesRoutes);
 registerScribeTranscriptionWs(app);
 

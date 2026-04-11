@@ -335,3 +335,16 @@ export type SoapTemplate = {
   systemPrompt: string;
   isDefault: boolean;
 }
+
+export type HandoutSections = {
+  found: string;
+  focus: string;
+  pathway: string;
+  clinicalContext?: string;
+}
+
+export type ReportSections = {
+  executiveSummary: string;
+  objectiveAssessment: string;
+  goals: string;
+}

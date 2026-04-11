@@ -828,6 +828,36 @@ Plan
 
 Use bullet points within each section. Be concise but thorough. Do not fabricate information not present in the transcript.`]);
 
+    // Report templates
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS report_templates (
+        id SERIAL PRIMARY KEY,
+        type TEXT NOT NULL CHECK(type IN ('cdmp')),
+        name TEXT NOT NULL,
+        system_prompt TEXT NOT NULL,
+        is_default BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await db.query(`
+      INSERT INTO report_templates (type, name, system_prompt, is_default)
+      SELECT 'cdmp', 'CDMP GP Report', $1, true
+      WHERE NOT EXISTS (SELECT 1 FROM report_templates WHERE type = 'cdmp' AND is_default = true)
+    `, [`You are an Accredited Exercise Physiologist writing a formal clinical report to a referring GP.
+Given a SOAP note from a patient consultation, extract and write exactly three sections.
+
+EXECUTIVE SUMMARY
+A concise 2-3 sentence narrative describing the patient's presentation, referred conditions, and what was completed at this consultation. Professional clinical tone.
+
+OBJECTIVE ASSESSMENT
+Key objective findings from the consultation: measurements, functional tests, ROM, strength assessments, or any clinical data mentioned. Use bullet points. Include only findings explicitly in the note.
+
+GOALS
+3-5 SMART goals agreed upon or implied during the consultation. Use bullet points. Ground these in the note content.
+
+Output exactly the three headings (EXECUTIVE SUMMARY, OBJECTIVE ASSESSMENT, GOALS) followed by their content. No markdown formatting.`]);
+
     console.log('✅ Scribe tables initialized');
 
     console.log('✅ Database tables initialized');

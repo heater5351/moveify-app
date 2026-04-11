@@ -107,4 +107,29 @@ async function generateHandout(transcript, patientFirstName, assessmentDate) {
   return { sections: { ...sections, clinicalContext: clinicalContext || undefined }, model: MODEL_ID };
 }
 
-module.exports = { generateSoapNote, generateHandout };
+async function generateReport(soapNoteContent, systemPrompt) {
+  if (!soapNoteContent || soapNoteContent.trim().length < 20) {
+    throw new Error('SOAP note too short to generate a report');
+  }
+  const userMessage = `The following is a SOAP note from a patient consultation. Generate the three report sections as instructed.\n\nSOAP Note:\n${soapNoteContent}`;
+  const command = new ConverseCommand({
+    modelId: MODEL_ID,
+    messages: [{ role: 'user', content: [{ text: userMessage }] }],
+    system: [{ text: systemPrompt }],
+    inferenceConfig: { maxTokens: 1500 },
+  });
+  const response = await client.send(command);
+  const raw = response.output.message.content[0].text;
+  const cleaned = raw.replace(/\*\*/g, '');
+  const summaryMatch = cleaned.match(/EXECUTIVE SUMMARY\s*\n([\s\S]*?)(?=OBJECTIVE ASSESSMENT|$)/i);
+  const objectiveMatch = cleaned.match(/OBJECTIVE ASSESSMENT\s*\n([\s\S]*?)(?=GOALS|$)/i);
+  const goalsMatch = cleaned.match(/GOALS\s*\n([\s\S]*?)$/i);
+  return {
+    executiveSummary: summaryMatch ? summaryMatch[1].trim() : '',
+    objectiveAssessment: objectiveMatch ? objectiveMatch[1].trim() : '',
+    goals: goalsMatch ? goalsMatch[1].trim() : '',
+    model: MODEL_ID,
+  };
+}
+
+module.exports = { generateSoapNote, generateHandout, generateReport };

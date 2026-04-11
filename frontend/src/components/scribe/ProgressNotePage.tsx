@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ArrowLeft, Mic, Square, Pause, Play, Clock, ArrowRightLeft, Sparkles, Save } from 'lucide-react';
+import { ArrowLeft, Mic, Square, Pause, Play, Clock, ArrowRightLeft, Sparkles, Save, FileText, Check, Loader2 } from 'lucide-react';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
-import { apiFetch } from '../../utils/scribe-api';
+import { apiFetch, generateHandout, generateReport } from '../../utils/scribe-api';
+import type { HandoutSections, ReportSections } from '../../types';
+import HandoutPreview from './HandoutPreview';
+import ReportPreview from './ReportPreview';
 
 interface ProgressNotePageProps {
   patientId: number;
@@ -31,6 +34,13 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
   const [recordingDone, setRecordingDone] = useState(false);
   const [fullTranscript, setFullTranscript] = useState('');
   const [prevTranscript, setPrevTranscript] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [generatingHandout, setGeneratingHandout] = useState(false);
+  const [handoutSections, setHandoutSections] = useState<HandoutSections | null>(null);
+  const [handoutError, setHandoutError] = useState('');
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportSections, setReportSections] = useState<ReportSections | null>(null);
+  const [reportError, setReportError] = useState('');
 
   const linesRef = useRef<TranscriptLine[]>([]);
   const firstSpeakerRef = useRef<number | null>(null);
@@ -220,10 +230,44 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
         body: JSON.stringify({ content: noteContent }),
       });
       await apiFetch(`/sessions/${sid}/complete`, { method: 'POST' });
-      onBack();
+      setSaved(true);
     } catch {
       setSaveError('Failed to save. Please try again.');
       setSaving(false);
+    }
+  }
+
+  async function handleGenerateHandout() {
+    const transcript = buildLabelledNow();
+    if (!transcript.trim()) return;
+    const sid = await ensureSession();
+    if (!sid) return;
+    setGeneratingHandout(true);
+    setHandoutError('');
+    try {
+      const firstName = patientName.split(' ')[0];
+      const date = new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+      const result = await generateHandout(sid, transcript, firstName, date);
+      setHandoutSections(result.sections);
+    } catch (err) {
+      setHandoutError(err instanceof Error ? err.message : 'Handout generation failed');
+    } finally {
+      setGeneratingHandout(false);
+    }
+  }
+
+  async function handleGenerateReport() {
+    const sid = sessionId;
+    if (!sid) return;
+    setGeneratingReport(true);
+    setReportError('');
+    try {
+      const result = await generateReport(sid, 'cdmp');
+      setReportSections(result.sections);
+    } catch (err) {
+      setReportError(err instanceof Error ? err.message : 'Report generation failed');
+    } finally {
+      setGeneratingReport(false);
     }
   }
 
@@ -233,6 +277,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
   });
 
   return (
+    <>
     <div className="max-w-4xl mx-auto flex flex-col" style={{ height: 'calc(100vh - 4rem)' }}>
 
       {/* Header */}
@@ -246,17 +291,38 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
             <p className="text-xs text-gray-500">{today}</p>
           </div>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving || !noteContent.trim()}
-          className="flex items-center gap-2 bg-primary-400 hover:bg-primary-500 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-semibold transition active:scale-[0.98] shrink-0"
-        >
-          <Save className="w-4 h-4" />
-          {saving ? 'Saving…' : 'Save as Final'}
-        </button>
+        {!saved && (
+          <button
+            onClick={handleSave}
+            disabled={saving || !noteContent.trim()}
+            className="flex items-center gap-2 bg-primary-400 hover:bg-primary-500 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-semibold transition active:scale-[0.98] shrink-0"
+          >
+            <Save className="w-4 h-4" />
+            {saving ? 'Saving…' : 'Save as Final'}
+          </button>
+        )}
       </div>
 
       {saveError && <p className="text-xs text-red-500 mb-2 shrink-0">{saveError}</p>}
+
+      {saved && (
+        <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 mb-2 shrink-0">
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-green-700"><Check className="w-4 h-4" /> Note saved.</span>
+          <button
+            onClick={handleGenerateReport}
+            disabled={generatingReport}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-semibold text-white transition active:scale-[0.98]"
+            style={{ background: '#46c1c0' }}
+          >
+            {generatingReport ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+            Generate CDMP Report
+          </button>
+          {reportError && <span className="text-xs text-red-500">{reportError}</span>}
+          <button onClick={onBack} className="ml-auto text-sm font-semibold text-gray-500 hover:text-secondary-700 transition">
+            Done →
+          </button>
+        </div>
+      )}
 
       {/* Note editor */}
       <div className="flex flex-col flex-1 min-h-0 border-b border-gray-200 pb-3">
@@ -316,6 +382,14 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
               >
                 {generating ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Sparkles className="w-4 h-4" />}
                 {generating ? 'Generating…' : 'Generate Note'}
+              </button>
+              <button
+                onClick={handleGenerateHandout}
+                disabled={generatingHandout}
+                className="flex items-center gap-1.5 border-2 border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 px-3 py-1.5 rounded-lg text-sm font-semibold transition active:scale-95"
+              >
+                {generatingHandout ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                Patient Handout
               </button>
               <button onClick={handleStartRecording} className="flex items-center gap-1.5 border-2 border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm font-semibold transition active:scale-95">
                 <Mic className="w-3.5 h-3.5" /> Record Again
@@ -408,6 +482,29 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
           )}
         </div>
       </div>
+
+      {handoutError && <p className="text-xs text-red-500 mt-1 shrink-0">{handoutError}</p>}
     </div>
+
+    {handoutSections && (
+      <HandoutPreview
+        sections={handoutSections}
+        patientFirstName={patientName.split(' ')[0]}
+        assessmentDate={today}
+        onClose={() => setHandoutSections(null)}
+        onRegenerate={handleGenerateHandout}
+      />
+    )}
+    {reportSections && (
+      <ReportPreview
+        type="cdmp"
+        sections={reportSections}
+        patientName={patientName}
+        sessionDate={today}
+        onClose={() => setReportSections(null)}
+        onRegenerate={handleGenerateReport}
+      />
+    )}
+    </>
   );
 }

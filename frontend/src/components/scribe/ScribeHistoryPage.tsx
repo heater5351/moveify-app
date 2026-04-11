@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Clock, FileText, CheckCircle, XCircle, Loader2, Copy, Check, ChevronDown, ChevronUp, Brain, Mic, Trash2 } from 'lucide-react';
-import { apiFetch, deleteSession } from '../../utils/scribe-api';
+import { apiFetch, deleteSession, generateReport } from '../../utils/scribe-api';
+import type { ReportSections } from '../../types';
+import ReportPreview from './ReportPreview';
 
 interface HistorySession {
   id: number;
@@ -34,6 +36,8 @@ export default function ScribeHistoryPage({ onViewSession, patientId }: ScribeHi
   const [transcriptLoading, setTranscriptLoading] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [reportLoading, setReportLoading] = useState<number | null>(null);
+  const [activeReport, setActiveReport] = useState<{ sections: ReportSections; session: HistorySession } | null>(null);
   const limit = 20;
 
   useEffect(() => { loadSessions(); }, [offset]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -129,6 +133,18 @@ export default function ScribeHistoryPage({ onViewSession, patientId }: ScribeHi
     }
   }
 
+  async function handleGenerateReport(session: HistorySession) {
+    setReportLoading(session.id);
+    try {
+      const result = await generateReport(session.id, 'cdmp');
+      setActiveReport({ sections: result.sections, session });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Report generation failed');
+    } finally {
+      setReportLoading(null);
+    }
+  }
+
   async function toggleSummary(patientId: number) {
     if (summaryOpen === patientId) { setSummaryOpen(null); return; }
     setSummaryOpen(patientId);
@@ -187,6 +203,7 @@ export default function ScribeHistoryPage({ onViewSession, patientId }: ScribeHi
   const currentPage = Math.floor(offset / limit) + 1;
 
   return (
+    <>
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-4 sm:mb-6">
         <div>
@@ -245,9 +262,19 @@ export default function ScribeHistoryPage({ onViewSession, patientId }: ScribeHi
                     </>
                   )}
                   {session.status === 'completed' && session.hasNote && (
-                    <button onClick={() => onViewSession(session.id, session.patientName, session.patientId ?? 0, session.startedAt, session.status, session.hasNote)} className="px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition active:scale-[0.98]">
-                      Open
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handleGenerateReport(session)}
+                        disabled={reportLoading === session.id}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-lg transition disabled:opacity-50 active:scale-[0.98]"
+                      >
+                        {reportLoading === session.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                        CDMP Report
+                      </button>
+                      <button onClick={() => onViewSession(session.id, session.patientName, session.patientId ?? 0, session.startedAt, session.status, session.hasNote)} className="px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition active:scale-[0.98]">
+                        Open
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -320,5 +347,17 @@ export default function ScribeHistoryPage({ onViewSession, patientId }: ScribeHi
         </div>
       )}
     </div>
+
+    {activeReport && (
+      <ReportPreview
+        type="cdmp"
+        sections={activeReport.sections}
+        patientName={activeReport.session.patientName}
+        sessionDate={activeReport.session.sessionDate}
+        onClose={() => setActiveReport(null)}
+        onRegenerate={() => handleGenerateReport(activeReport.session)}
+      />
+    )}
+    </>
   );
 }
