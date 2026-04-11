@@ -347,4 +347,5 @@ export type ReportSections = {
   executiveSummary: string;
   objectiveAssessment: string;
   goals: string;
+  managementPlan: string;
 }

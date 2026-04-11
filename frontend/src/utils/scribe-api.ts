@@ -55,7 +55,7 @@ export async function generateHandout(
 export async function generateReport(
   sessionId: number,
   type: 'cdmp'
-): Promise<{ sections: { executiveSummary: string; objectiveAssessment: string; goals: string }; model: string }> {
+): Promise<{ sections: { executiveSummary: string; objectiveAssessment: string; goals: string; managementPlan: string }; model: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 45_000);
   try {

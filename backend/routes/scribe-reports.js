@@ -52,7 +52,7 @@ router.post('/sessions/:id/report/generate', async (req, res) => {
     const wordCount = noteContent.split(/\s+/).length;
     audit.log(req, 'report_generated', 'scribe_session', parseInt(req.params.id), { type, wordCount, model: result.model });
 
-    res.json({ sections: { executiveSummary: result.executiveSummary, objectiveAssessment: result.objectiveAssessment, goals: result.goals }, model: result.model });
+    res.json({ sections: { executiveSummary: result.executiveSummary, objectiveAssessment: result.objectiveAssessment, goals: result.goals, managementPlan: result.managementPlan }, model: result.model });
   } catch (err) {
     console.error('Generate report error:', err.message);
     res.status(500).json({ error: 'Failed to generate report' });

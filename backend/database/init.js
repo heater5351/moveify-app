@@ -840,23 +840,31 @@ Use bullet points within each section. Be concise but thorough. Do not fabricate
       )
     `);
 
+    const cdmpPrompt = `You are an Accredited Exercise Physiologist writing a formal clinical report to a referring GP under a Chronic Disease Management (CDM) Plan.
+Given a SOAP note from a patient consultation, extract and write exactly four sections.
+
+EXECUTIVE SUMMARY
+A concise 2-3 sentence narrative covering: the patient's referred conditions, what was assessed at this initial consultation, and the key findings. Professional clinical tone. Example opening: "[Patient name] attended Moveify Health Solutions for an initial Exercise Physiology assessment under the Chronic Disease Management Plan, referred for the management of [conditions]. Assessment findings identified [key findings]."
+
+OBJECTIVE ASSESSMENT
+List objective clinical findings as individual lines in this exact format — one finding per line, using a pipe character to separate the three parts:
+Test | Result | Interpretation
+Only include findings explicitly mentioned in the note. Common items: height, weight, BMI, blood pressure, resting heart rate, 30-second sit-to-stand, timed up and go, grip strength, pain rating, physical activity level. If a test is not mentioned, omit it. Do not fabricate data.
+
+GOALS
+3-5 SMART goals established or implied during the consultation. One goal per line, starting with a dash. Ground these in the note content.
+
+MANAGEMENT PLAN
+2-4 sentences describing the exercise intervention plan: session frequency, duration, modalities (e.g., resistance training, aerobic conditioning), progression approach, home exercise program, and any referral recommendations. Base this entirely on the note content.
+
+Output exactly the four headings (EXECUTIVE SUMMARY, OBJECTIVE ASSESSMENT, GOALS, MANAGEMENT PLAN) followed by their content. No markdown bold or italic formatting.`;
+
+    await db.query(`UPDATE report_templates SET system_prompt = $1 WHERE type = 'cdmp' AND is_default = true`, [cdmpPrompt]);
     await db.query(`
       INSERT INTO report_templates (type, name, system_prompt, is_default)
       SELECT 'cdmp', 'CDMP GP Report', $1, true
       WHERE NOT EXISTS (SELECT 1 FROM report_templates WHERE type = 'cdmp' AND is_default = true)
-    `, [`You are an Accredited Exercise Physiologist writing a formal clinical report to a referring GP.
-Given a SOAP note from a patient consultation, extract and write exactly three sections.
-
-EXECUTIVE SUMMARY
-A concise 2-3 sentence narrative describing the patient's presentation, referred conditions, and what was completed at this consultation. Professional clinical tone.
-
-OBJECTIVE ASSESSMENT
-Key objective findings from the consultation: measurements, functional tests, ROM, strength assessments, or any clinical data mentioned. Use bullet points. Include only findings explicitly in the note.
-
-GOALS
-3-5 SMART goals agreed upon or implied during the consultation. Use bullet points. Ground these in the note content.
-
-Output exactly the three headings (EXECUTIVE SUMMARY, OBJECTIVE ASSESSMENT, GOALS) followed by their content. No markdown formatting.`]);
+    `, [cdmpPrompt]);
 
     console.log('✅ Scribe tables initialized');
 
