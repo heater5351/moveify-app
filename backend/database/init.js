@@ -870,6 +870,7 @@ Output exactly the four headings (EXECUTIVE SUMMARY, OBJECTIVE ASSESSMENT, GOALS
 
     // One-time cleanup: clear all scribe sessions encrypted with pre-rotation key (2026-04-12)
     // Cannot decrypt with new key — demo data only, safe to remove unconditionally
+    await db.query(`UPDATE patient_summaries SET last_session_id = NULL WHERE last_session_id IS NOT NULL`);
     await db.query(`DELETE FROM scribe_sessions`);
     console.log('🔄 Cleared all legacy scribe sessions (key rotation cleanup)');
 
