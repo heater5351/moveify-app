@@ -167,7 +167,6 @@ app.use((err, req, res, next) => {
 process.on('uncaughtException', (err) => {
   console.error('UNCAUGHT EXCEPTION! Shutting down...');
   console.error('Error:', err.name, err.message);
-  console.error('Stack:', err.stack);
   setTimeout(() => process.exit(1), 1000);
 });
 
