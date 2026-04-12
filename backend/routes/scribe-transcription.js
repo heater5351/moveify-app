@@ -10,6 +10,7 @@ const db = require('../database/db');
 const { createLiveTranscription } = require('../services/scribe-transcribe');
 const { getPatientSummary } = require('../services/scribe-summary');
 const { generateSuggestion } = require('../services/scribe-suggestions');
+const { encrypt } = require('../services/scribe-encryption');
 const audit = require('../services/audit');
 
 const SEGMENTS_PER_SUGGESTION = 10;
@@ -53,6 +54,24 @@ function registerScribeTranscriptionWs(app) {
     let lastSuggestionAt = 0;
     let segmentsAtLastSuggestion = 0;
     let suggestionInFlight = false;
+    let lastAutoSavedCount = 0;
+
+    // Auto-save transcript to DB every 30s so recordings survive disconnects
+    const autoSaveInterval = sessionId ? setInterval(async () => {
+      if (finalSegments.length === lastAutoSavedCount) return;
+      try {
+        const text = finalSegments.join(' ');
+        await db.query(
+          `INSERT INTO transcripts (session_id, content_enc, word_count)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (session_id) DO UPDATE SET content_enc = $2, word_count = $3`,
+          [sessionId, encrypt(text), text.split(/\s+/).length]
+        );
+        lastAutoSavedCount = finalSegments.length;
+      } catch (err) {
+        console.error('Transcript auto-save error:', err.message);
+      }
+    }, 30_000) : null;
 
     // Suggestion interval — fires on segment count or time threshold
     const silenceCheckInterval = setInterval(async () => {
@@ -129,6 +148,7 @@ function registerScribeTranscriptionWs(app) {
 
     function cleanup() {
       clearInterval(silenceCheckInterval);
+      if (autoSaveInterval) clearInterval(autoSaveInterval);
       transcribe.close();
     }
 
