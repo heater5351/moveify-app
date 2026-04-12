@@ -33,6 +33,9 @@ const { registerScribeTranscriptionWs } = require('./routes/scribe-transcription
 const { initDatabase } = require('./database/init');
 
 const app = express();
+// Trust Cloud Run's load balancer (one proxy hop) — required for
+// express-rate-limit to correctly identify client IPs via X-Forwarded-For
+app.set('trust proxy', 1);
 // express-ws must be initialised before any route files are imported
 expressWs(app);
 const PORT = process.env.PORT || 3000;

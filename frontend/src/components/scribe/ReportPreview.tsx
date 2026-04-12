@@ -11,13 +11,11 @@ interface ReportPreviewProps {
   onRegenerate: () => void;
 }
 
-// Exact colours extracted from GP_Report_Template.docx
+// Exact colours from GP_Report_Template.docx
 const NAVY   = '#132232';
-const NAVY2  = '#1C2E3D';  // table headers / patient label cells
 const TEAL   = '#46C1C0';
-const LIGHT  = '#F0FAFA';  // alternating rows (even)
-const LIGHT2 = '#FAFEFE';  // alternating rows (odd)
-const XLIGHT = '#EBF8F8';  // signature box
+const LABEL  = '#D0EEEE'; // patient details label cells
+const ROW_BG = '#E8F7F7'; // objective assessment rows
 
 function cleanText(text: string): string {
   return text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/^#+\s*/gm, '').trim();
@@ -46,30 +44,30 @@ export default function ReportPreview({
     if (planRef.current)    planRef.current.innerText    = cleanText(sections.managementPlan);
   }, [sections]);
 
-  // Inject print CSS — visibility trick + page break support
   useEffect(() => {
     const style = document.createElement('style');
     style.id = 'report-print-css';
     style.textContent = `
-      @page { size: A4; margin: 15mm 18mm; }
+      @page { size: A4 portrait; margin: 15mm 18mm; }
       @media print {
         html, body { overflow: visible !important; height: auto !important; }
         body * { visibility: hidden !important; }
         #report-print-root, #report-print-root * { visibility: visible !important; }
         #report-print-root {
-          position: fixed !important;
-          top: 0 !important; left: 0 !important;
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
           width: 100% !important;
           height: auto !important;
           overflow: visible !important;
           background: white !important;
+          padding: 0 !important;
         }
         [data-no-print] { display: none !important; }
         [contenteditable] { outline: none !important; border: none !important; border-bottom: none !important; }
-        .report-page-break { page-break-after: always !important; }
-        .report-section { break-inside: avoid; }
-        img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .rpt-page-break { page-break-after: always !important; }
+        .rpt-avoid-break { break-inside: avoid; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       }
     `;
     document.head.appendChild(style);
@@ -80,79 +78,76 @@ export default function ReportPreview({
     const bd = backdropRef.current;
     if (!bd) { window.print(); return; }
 
-    // Temporarily remove overflow/fixed so browser can render full height
-    const savedStyle = bd.style.cssText;
-    bd.style.cssText = 'position:static;overflow:visible;background:transparent;height:auto;padding:0;display:block;';
+    // Temporarily remove overflow/fixed so content flows across pages
+    const savedCss = bd.style.cssText;
+    bd.style.cssText = 'position:static;overflow:visible;height:auto;background:transparent;padding:8px 0;display:block;';
     document.body.style.overflow = 'visible';
 
-    window.print();
-
-    const restore = () => {
-      bd.style.cssText = savedStyle;
-      document.body.style.overflow = '';
-    };
-    window.addEventListener('afterprint', restore, { once: true });
-    // Fallback in case afterprint doesn't fire
-    setTimeout(restore, 2000);
+    // Double rAF ensures browser repaints with new layout before print dialog opens
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.print();
+      const restore = () => {
+        bd.style.cssText = savedCss;
+        document.body.style.overflow = '';
+      };
+      window.addEventListener('afterprint', restore, { once: true });
+      setTimeout(restore, 3000); // fallback
+    }));
   }
 
   const objectiveRows = parseObjectiveRows(sections.objectiveAssessment);
 
-  const bodyTd: React.CSSProperties = {
-    fontFamily: "'DM Sans', Arial, sans-serif",
-    fontSize: '0.82rem',
+  const font: React.CSSProperties = { fontFamily: "'DM Sans', Arial, sans-serif" };
+
+  const bodyText: React.CSSProperties = {
+    ...font,
+    fontSize: '0.84rem',
     color: NAVY,
-    lineHeight: '1.6',
-    padding: '6px 10px',
+    lineHeight: '1.65',
   };
 
-  const editableBlock: React.CSSProperties = {
-    ...bodyTd,
-    padding: '8px 10px',
+  const editable: React.CSSProperties = {
+    ...bodyText,
     whiteSpace: 'pre-wrap',
-    minHeight: '60px',
+    minHeight: '56px',
+    padding: '8px 10px',
     outline: 'none',
   };
 
-  const editableInline: React.CSSProperties = {
+  const editableField: React.CSSProperties = {
+    ...bodyText,
     display: 'inline-block',
-    fontFamily: "'DM Sans', Arial, sans-serif",
-    fontSize: '0.82rem',
-    color: NAVY,
-    borderBottom: `1px dashed #94a3b8`,
-    minWidth: '140px',
+    borderBottom: '1px dashed #94a3b8',
+    minWidth: '160px',
     outline: 'none',
     padding: '1px 4px',
   };
 
-  const sectionHeadingTd: React.CSSProperties = {
+  const sectionHeading: React.CSSProperties = {
+    ...font,
     background: NAVY,
     color: 'white',
-    fontFamily: "'DM Sans', Arial, sans-serif",
     fontWeight: 700,
-    fontSize: '0.78rem',
-    letterSpacing: '0.1em',
+    fontSize: '0.8rem',
+    letterSpacing: '0.09em',
     textTransform: 'uppercase',
-    padding: '6px 10px',
+    padding: '7px 12px',
+    marginBottom: '0',
   };
 
-  // Letterhead table — logo LEFT (64%), title RIGHT (36% navy)
-  const Letterhead = () => (
-    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0' }}>
+  // Header: logo left (38%), title right (62%), both white
+  const Header = () => (
+    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '10px' }}>
       <tbody>
         <tr>
-          <td style={{ width: '64%', background: 'white', padding: '8px 10px 8px 0', verticalAlign: 'middle' }}>
-            <img
-              src="/assets/cdmp-logo.png"
-              alt="Moveify Health Solutions"
-              style={{ height: '52px', objectFit: 'contain', display: 'block' }}
-            />
+          <td style={{ width: '38%', padding: '6px 12px 6px 0', verticalAlign: 'middle' }}>
+            <img src="/assets/gp-report-logo.png" alt="Moveify Health Solutions" style={{ height: '45mm', maxHeight: '45mm', objectFit: 'contain', display: 'block' }} />
           </td>
-          <td style={{ width: '36%', background: NAVY, padding: '10px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
-            <div style={{ color: 'white', fontFamily: "'DM Sans', Arial, sans-serif", fontWeight: 800, fontSize: '0.82rem', letterSpacing: '0.06em', lineHeight: '1.4' }}>
+          <td style={{ width: '62%', padding: '6px 0 6px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
+            <div style={{ ...font, fontWeight: 800, fontSize: '1rem', color: NAVY, letterSpacing: '0.05em' }}>
               INITIAL CONSULTATION REPORT
             </div>
-            <div style={{ color: TEAL, fontFamily: "'DM Sans', Arial, sans-serif", fontWeight: 500, fontSize: '0.72rem', letterSpacing: '0.04em', marginTop: '2px' }}>
+            <div style={{ ...font, fontSize: '0.78rem', color: '#555555', marginTop: '3px' }}>
               Exercise Physiology &nbsp;·&nbsp; Allied Health
             </div>
           </td>
@@ -161,27 +156,11 @@ export default function ReportPreview({
     </table>
   );
 
-  // Teal divider bar
-  const TealBar = () => (
-    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '14px' }}>
-      <tbody><tr><td style={{ background: TEAL, height: '5px', padding: 0 }} /></tr></tbody>
-    </table>
-  );
-
-  // Footer bar
-  const FooterBar = () => (
-    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
-      <tbody>
-        <tr>
-          <td style={{ background: NAVY, color: 'white', fontFamily: "'DM Sans', Arial, sans-serif", fontSize: '0.7rem', padding: '7px 12px', textAlign: 'center', letterSpacing: '0.02em' }}>
-            Moveify Health Solutions &nbsp;·&nbsp; Exercise Physiology &nbsp;·&nbsp; Allied Health<br />
-            <span style={{ fontSize: '0.66rem', opacity: 0.85 }}>
-              Ryan Heath &nbsp;|&nbsp; AEP &nbsp;|&nbsp; ryan@moveifyhealth.com &nbsp;|&nbsp; ABN: 52 263 141 529
-            </span>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+  const Footer = () => (
+    <div style={{ ...font, fontSize: '0.7rem', color: '#666666', textAlign: 'center', marginTop: '24px', paddingTop: '6px', borderTop: '1px solid #e5e7eb' }}>
+      Moveify Health Solutions &nbsp;·&nbsp; Exercise Physiology &nbsp;·&nbsp; Allied Health &nbsp;&nbsp;|&nbsp;&nbsp;
+      Ryan Heath &nbsp;·&nbsp; AEP &nbsp;·&nbsp; 0435 524 991 &nbsp;·&nbsp; ryan@moveifyhealth.com &nbsp;·&nbsp; ABN: 52 263 141 529
+    </div>
   );
 
   return (
@@ -191,21 +170,14 @@ export default function ReportPreview({
     >
       <div className="w-full max-w-[210mm]">
 
-        {/* Toolbar — hidden on print */}
-        <div
-          data-no-print
-          className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 rounded-t-xl sticky top-4 z-10 shadow-sm"
-        >
+        {/* Toolbar */}
+        <div data-no-print className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 rounded-t-xl sticky top-4 z-10 shadow-sm">
           <h2 className="font-display font-bold text-secondary-700 text-base">CDMP Report Preview</h2>
           <div className="flex items-center gap-2">
             <button onClick={onRegenerate} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition">
               <RefreshCw className="w-3.5 h-3.5" /> Regenerate
             </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg text-white font-semibold transition"
-              style={{ background: TEAL }}
-            >
+            <button onClick={handlePrint} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg text-white font-semibold transition" style={{ background: TEAL }}>
               <Printer className="w-3.5 h-3.5" /> Print / Save PDF
             </button>
             <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition">
@@ -214,87 +186,61 @@ export default function ReportPreview({
           </div>
         </div>
 
-        {/* ─────────── PRINTABLE CONTENT ─────────── */}
-        <div id="report-print-root" className="bg-white" style={{ fontFamily: "'DM Sans', Arial, sans-serif" }}>
+        {/* ─────── PRINTABLE CONTENT ─────── */}
+        <div id="report-print-root" className="bg-white" style={font}>
 
           {/* ══ PAGE 1: Cover Letter ══ */}
-          <div className="report-page-break" style={{ padding: '18mm 0 10mm' }}>
-            <Letterhead />
-            <TealBar />
+          <div className="rpt-page-break" style={{ padding: '14mm 16mm 10mm' }}>
+            <Header />
 
-            {/* GP address block */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '18px' }}>
-              <tbody>
-                <tr>
-                  <td style={{ ...bodyTd, padding: '4px 0', lineHeight: '2' }}>
-                    <div>Dr&nbsp;<span contentEditable suppressContentEditableWarning style={editableInline}>Doctor Name</span></div>
-                    <div><span contentEditable suppressContentEditableWarning style={{ ...editableInline, minWidth: '200px' }}>Practice Name</span></div>
-                    <div><span contentEditable suppressContentEditableWarning style={{ ...editableInline, minWidth: '260px' }}>Address</span></div>
-                    <div style={{ marginTop: '4px' }}>{sessionDate}</div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            {/* GP address */}
+            <div style={{ ...bodyText, lineHeight: '1.9', marginBottom: '18px' }}>
+              <div>Dr&nbsp;<span contentEditable suppressContentEditableWarning style={editableField}>Doctor Name</span></div>
+              <div><span contentEditable suppressContentEditableWarning style={{ ...editableField, minWidth: '220px' }}>Practice Name</span></div>
+              <div><span contentEditable suppressContentEditableWarning style={{ ...editableField, minWidth: '280px' }}>Address</span></div>
+              <div style={{ marginTop: '6px' }}>{sessionDate}</div>
+            </div>
 
-            {/* Salutation */}
-            <p style={{ ...bodyTd, padding: '0 0 10px', margin: 0 }}>
-              Dear Dr <span contentEditable suppressContentEditableWarning style={{ ...editableInline, minWidth: '100px' }}>Surname</span>,
+            <p style={{ ...bodyText, marginBottom: '12px' }}>
+              Dear Dr <span contentEditable suppressContentEditableWarning style={{ ...editableField, minWidth: '110px' }}>Surname</span>,
             </p>
 
-            {/* Cover paragraphs */}
-            <p style={{ ...bodyTd, padding: '0 0 10px', margin: 0 }}>
-              Thank you sincerely for referring <strong>{patientName}</strong> to Moveify Health Solutions for Exercise Physiology services under the Chronic Disease Management (CDM) Plan. Please find below the report and recommendations following their Initial Consultation on {sessionDate}.
-            </p>
-            <p style={{ ...bodyTd, padding: '0 0 30px', margin: 0 }}>
-              Should you have any questions or queries, please do not hesitate to contact me.
+            <p style={{ ...bodyText, marginBottom: '12px' }}>
+              Thank you sincerely for referring <strong>{patientName}</strong> to Moveify Health Solutions for Exercise Physiology services under the GPMP/CDM Plan. Please find below the report and recommendations following their Initial Consultation on {sessionDate}.
             </p>
 
-            {/* Closing */}
-            <p style={{ ...bodyTd, padding: '0 0 6px', margin: 0 }}>Yours sincerely,</p>
-            <p style={{ ...bodyTd, padding: '0 0 4px', margin: 0 }}><strong>Ryan Heath</strong></p>
-            <p style={{ ...bodyTd, padding: '0 0 2px', margin: 0 }}>AEP &nbsp;|&nbsp; Exercise Physiologist</p>
-            <p style={{ ...bodyTd, padding: '0 0 2px', margin: 0 }}>Moveify Health Solutions</p>
-            <p style={{ ...bodyTd, padding: '0 0 16px', margin: 0 }}>ryan@moveifyhealth.com</p>
+            <p style={{ ...bodyText, marginBottom: '36px' }}>
+              Should you have any questions or queries, please do not hesitate to contact me on 0435 524 991 or ryan@moveifyhealth.com
+            </p>
 
-            {/* Signature box */}
-            <table style={{ width: '50%', borderCollapse: 'collapse', marginBottom: '0' }}>
-              <tbody>
-                <tr>
-                  <td style={{ background: XLIGHT, padding: '16px 14px', color: '#64748b', fontFamily: "'DM Sans', Arial, sans-serif", fontSize: '0.75rem', textAlign: 'center', minHeight: '60px' }}>
-                    [ Clinician Signature ]
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <p style={{ ...bodyText, marginBottom: '4px' }}>Yours sincerely,</p>
+            <p style={{ ...bodyText, marginBottom: '2px' }}><strong>Ryan Heath</strong></p>
+            <p style={{ ...bodyText, marginBottom: '2px' }}>Accredited Exercise Physiologist</p>
+            <p style={{ ...bodyText }}>BclinExPhys (Hons)</p>
 
-            <FooterBar />
+            <Footer />
           </div>
 
           {/* ══ PAGE 2: Clinical Report ══ */}
-          <div style={{ padding: '18mm 0 10mm' }}>
-            <Letterhead />
-            <TealBar />
+          <div style={{ padding: '14mm 16mm 10mm' }}>
+            <Header />
 
-            {/* PATIENT DETAILS heading */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0' }}>
-              <tbody><tr><td style={sectionHeadingTd}>PATIENT DETAILS</td></tr></tbody>
-            </table>
-
-            {/* Patient details 4-column grid */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12px' }}>
+            {/* PATIENT DETAILS */}
+            <div style={sectionHeading}>PATIENT DETAILS</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '14px' }}>
               <tbody>
                 {([
                   ['Patient Name', patientName, 'Date of Birth', ''],
-                  ['Referring GP', '', 'Practice', ''],
-                  ['Referral Date', '', 'CDM Sessions', ''],
+                  ['Referring GP', '',           'Practice',      ''],
+                  ['Referral Date', '',           'CDM Sessions',  ''],
                 ] as [string, string, string, string][]).map(([l1, v1, l2, v2], i) => (
                   <tr key={i}>
-                    <td style={{ width: '14.3%', background: NAVY2, color: 'white', fontFamily: "'DM Sans', Arial, sans-serif", fontWeight: 700, fontSize: '0.76rem', padding: '6px 10px' }}>{l1}</td>
-                    <td style={{ width: '35.7%', background: i % 2 === 0 ? LIGHT : LIGHT2, ...bodyTd }}>
+                    <td style={{ background: LABEL, color: NAVY, ...font, fontWeight: 700, fontSize: '0.76rem', padding: '6px 10px', width: '18%' }}>{l1}</td>
+                    <td style={{ background: 'white', ...bodyText, padding: '6px 10px', width: '32%' }}>
                       <span contentEditable suppressContentEditableWarning style={{ outline: 'none', display: 'block', minHeight: '16px' }}>{v1}</span>
                     </td>
-                    <td style={{ width: '14.3%', background: NAVY2, color: 'white', fontFamily: "'DM Sans', Arial, sans-serif", fontWeight: 700, fontSize: '0.76rem', padding: '6px 10px' }}>{l2}</td>
-                    <td style={{ width: '35.7%', background: i % 2 === 0 ? LIGHT : LIGHT2, ...bodyTd }}>
+                    <td style={{ background: LABEL, color: NAVY, ...font, fontWeight: 700, fontSize: '0.76rem', padding: '6px 10px', width: '18%' }}>{l2}</td>
+                    <td style={{ background: 'white', ...bodyText, padding: '6px 10px', width: '32%' }}>
                       <span contentEditable suppressContentEditableWarning style={{ outline: 'none', display: 'block', minHeight: '16px' }}>{v2}</span>
                     </td>
                   </tr>
@@ -303,37 +249,33 @@ export default function ReportPreview({
             </table>
 
             {/* EXECUTIVE SUMMARY */}
-            <div className="report-section">
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody><tr><td style={sectionHeadingTd}>EXECUTIVE SUMMARY</td></tr></tbody>
-              </table>
-              <div ref={summaryRef} contentEditable suppressContentEditableWarning style={{ ...editableBlock, marginBottom: '8px' }} />
+            <div className="rpt-avoid-break">
+              <div style={sectionHeading}>EXECUTIVE SUMMARY</div>
+              <div ref={summaryRef} contentEditable suppressContentEditableWarning style={editable} />
             </div>
 
             {/* OBJECTIVE ASSESSMENT */}
-            <div className="report-section">
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody><tr><td style={sectionHeadingTd}>OBJECTIVE ASSESSMENT</td></tr></tbody>
-              </table>
+            <div className="rpt-avoid-break">
+              <div style={sectionHeading}>OBJECTIVE ASSESSMENT</div>
               {objectiveRows.length > 0 ? (
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '8px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0' }}>
                   <thead>
                     <tr>
-                      {['Test', 'Result', 'Interpretation'].map(h => (
-                        <th key={h} style={{ background: NAVY2, color: 'white', fontFamily: "'DM Sans', Arial, sans-serif", fontWeight: 700, fontSize: '0.76rem', padding: '7px 10px', textAlign: 'left' }}>{h}</th>
-                      ))}
+                      <th style={{ background: TEAL, color: 'white', ...font, fontWeight: 700, fontSize: '0.76rem', padding: '7px 10px', textAlign: 'left', width: '26%' }}>Test</th>
+                      <th style={{ background: TEAL, color: 'white', ...font, fontWeight: 700, fontSize: '0.76rem', padding: '7px 10px', textAlign: 'left', width: '18%' }}>Result</th>
+                      <th style={{ background: TEAL, color: 'white', ...font, fontWeight: 700, fontSize: '0.76rem', padding: '7px 10px', textAlign: 'left' }}>Interpretation</th>
                     </tr>
                   </thead>
                   <tbody>
                     {objectiveRows.map((row, i) => (
-                      <tr key={i} style={{ background: i % 2 === 0 ? 'white' : LIGHT }}>
-                        <td style={{ ...bodyTd, fontWeight: 600, width: '28%' }}>
+                      <tr key={i} style={{ background: ROW_BG }}>
+                        <td style={{ ...bodyText, padding: '6px 10px', fontWeight: 600 }}>
                           <span contentEditable suppressContentEditableWarning style={{ outline: 'none' }}>{row.test}</span>
                         </td>
-                        <td style={{ ...bodyTd, width: '18%' }}>
+                        <td style={{ ...bodyText, padding: '6px 10px' }}>
                           <span contentEditable suppressContentEditableWarning style={{ outline: 'none' }}>{row.result}</span>
                         </td>
-                        <td style={bodyTd}>
+                        <td style={{ ...bodyText, padding: '6px 10px' }}>
                           <span contentEditable suppressContentEditableWarning style={{ outline: 'none' }}>{row.interpretation}</span>
                         </td>
                       </tr>
@@ -341,29 +283,25 @@ export default function ReportPreview({
                   </tbody>
                 </table>
               ) : (
-                <div contentEditable suppressContentEditableWarning style={{ ...editableBlock, marginBottom: '8px' }}>
+                <div contentEditable suppressContentEditableWarning style={editable}>
                   {cleanText(sections.objectiveAssessment)}
                 </div>
               )}
             </div>
 
             {/* GOALS */}
-            <div className="report-section">
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody><tr><td style={sectionHeadingTd}>GOALS</td></tr></tbody>
-              </table>
-              <div ref={goalsRef} contentEditable suppressContentEditableWarning style={{ ...editableBlock, marginBottom: '8px' }} />
+            <div className="rpt-avoid-break">
+              <div style={sectionHeading}>GOALS</div>
+              <div ref={goalsRef} contentEditable suppressContentEditableWarning style={editable} />
             </div>
 
-            {/* MANAGEMENT PLAN */}
-            <div className="report-section">
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody><tr><td style={sectionHeadingTd}>MANAGEMENT PLAN</td></tr></tbody>
-              </table>
-              <div ref={planRef} contentEditable suppressContentEditableWarning style={{ ...editableBlock, marginBottom: '8px' }} />
+            {/* PLAN */}
+            <div className="rpt-avoid-break">
+              <div style={sectionHeading}>PLAN</div>
+              <div ref={planRef} contentEditable suppressContentEditableWarning style={editable} />
             </div>
 
-            <FooterBar />
+            <Footer />
           </div>
 
         </div>{/* end report-print-root */}

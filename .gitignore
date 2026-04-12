@@ -23,3 +23,5 @@ ngrok.yml
 
 # Old files
 *.tsx.bak
+
+.vercel
