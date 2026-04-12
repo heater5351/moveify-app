@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Sparkles } from 'lucide-react';
 import { Routes, Route, useSearchParams, useNavigate } from 'react-router-dom';
 import type { Patient, ProgramExercise, ProgramConfig, UserRole, NewPatient, CompletionData, User, ExerciseWeekPrescription } from './types/index.ts';
@@ -32,6 +32,8 @@ import { PatientEditProfileModal } from './components/modals/PatientEditProfileM
 import { AdminPanel } from './components/AdminPanel';
 import { AiAssistantPanel } from './components/AiAssistantPanel';
 import ScribePage from './components/scribe/ScribePage';
+import ProgressNotePage from './components/scribe/ProgressNotePage';
+import FloatingRecordingIndicator from './components/scribe/FloatingRecordingIndicator';
 import { AiProtocolModal } from './components/modals/AiProtocolModal';
 import { BugReportModal } from './components/modals/BugReportModal';
 import { API_URL } from './config';
@@ -52,6 +54,30 @@ function App() {
   const [viewingPatient, setViewingPatient] = useState<Patient | null>(null);
   const [scribeEverOpened, setScribeEverOpened] = useState(false);
   const [scribeRecordingActive, setScribeRecordingActive] = useState(false);
+
+  // Persistent progress note — survives tab navigation
+  const [activeNote, setActiveNote] = useState<{ patientId: number; patientName: string; sessionId?: number } | null>(null);
+  const [noteFullscreen, setNoteFullscreen] = useState(false);
+  const [noteRecordingActive, setNoteRecordingActive] = useState(false);
+  const [noteElapsedSecs, setNoteElapsedSecs] = useState(0);
+  const noteTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Open a persistent note (survives tab navigation)
+  const handleOpenNote = useCallback((patientId: number, patientName: string, sessionId?: number) => {
+    setActiveNote({ patientId, patientName, sessionId });
+    setNoteFullscreen(true);
+    setNoteElapsedSecs(0);
+  }, []);
+
+  // Drive the floating indicator timer off noteRecordingActive
+  useEffect(() => {
+    if (noteRecordingActive) {
+      noteTimerRef.current = setInterval(() => setNoteElapsedSecs(s => s + 1), 1000);
+    } else {
+      if (noteTimerRef.current) clearInterval(noteTimerRef.current);
+    }
+    return () => { if (noteTimerRef.current) clearInterval(noteTimerRef.current); };
+  }, [noteRecordingActive]);
 
   // Patient management
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -1110,8 +1136,40 @@ function App() {
         >
           <ScribePage
             onRecordingActiveChange={setScribeRecordingActive}
+            onOpenNote={handleOpenNote}
+            activeNoteSessionId={activeNote?.sessionId ?? null}
           />
         </div>
+      )}
+
+      {/* Persistent ProgressNotePage — stays mounted across ALL tab navigation */}
+      {activeNote && userRole === 'clinician' && (
+        <div
+          className="flex-1 overflow-y-auto px-6 py-7"
+          style={{ display: noteFullscreen ? 'block' : 'none' }}
+        >
+          <ProgressNotePage
+            patientId={activeNote.patientId}
+            patientName={activeNote.patientName}
+            existingSessionId={activeNote.sessionId}
+            onRecordingActiveChange={setNoteRecordingActive}
+            onBack={() => setNoteFullscreen(false)}
+          />
+        </div>
+      )}
+
+      {/* Floating recording indicator — shown when note is recording but minimised */}
+      {noteRecordingActive && !noteFullscreen && activeNote && (
+        <FloatingRecordingIndicator
+          patientName={activeNote.patientName}
+          elapsedSecs={noteElapsedSecs}
+          onReturn={() => setNoteFullscreen(true)}
+          onStop={() => {
+            // User stops from float — just hide, ProgressNotePage handles cleanup
+            setNoteRecordingActive(false);
+            setNoteFullscreen(true);
+          }}
+        />
       )}
 
       {/* Main Content Area - Split layout for clinician */}
@@ -1213,6 +1271,8 @@ function App() {
               onEditProgram={handleEditProgram}
               onDeleteProgram={handleDeleteProgram}
               onAddProgram={handleAddProgram}
+              onOpenNote={handleOpenNote}
+              activeNoteSessionId={activeNote?.sessionId ?? null}
             />
           ) : (
             <PatientsPage

@@ -17,9 +17,10 @@ interface HistorySession {
 interface ScribeHistoryPageProps {
   onViewSession: (sessionId: number, patientName: string, patientId: number, startedAt: string, status: string, hasNote: boolean) => void;
   patientId?: number;
+  activeNoteSessionId?: number | null;
 }
 
-export default function ScribeHistoryPage({ onViewSession, patientId }: ScribeHistoryPageProps) {
+export default function ScribeHistoryPage({ onViewSession, patientId, activeNoteSessionId }: ScribeHistoryPageProps) {
   const [sessions, setSessions] = useState<HistorySession[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -219,12 +220,22 @@ export default function ScribeHistoryPage({ onViewSession, patientId }: ScribeHi
         </div>
       ) : (
         <div className="space-y-3">
-          {sessions.map(session => (
-            <div key={session.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {sessions.map(session => {
+            const isActiveRecording = activeNoteSessionId != null && session.id === activeNoteSessionId;
+            return (
+            <div key={session.id} className={`bg-white rounded-xl border overflow-hidden ${isActiveRecording ? 'border-red-300 ring-1 ring-red-200' : 'border-gray-200'}`}>
               <div className="px-4 sm:px-5 py-3 sm:py-4">
                 <div className="flex items-start sm:items-center justify-between gap-2 mb-2 sm:mb-0">
                   <div className="min-w-0">
-                    <h3 className="text-sm font-semibold text-secondary-700 truncate">{session.patientName}</h3>
+                    <div className="flex items-center gap-2">
+                      {isActiveRecording && (
+                        <span className="relative flex-shrink-0 inline-flex w-2.5 h-2.5">
+                          <span className="absolute inline-flex w-2.5 h-2.5 rounded-full bg-red-400 opacity-75 animate-ping" />
+                          <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-red-500" />
+                        </span>
+                      )}
+                      <h3 className="text-sm font-semibold text-secondary-700 truncate">{session.patientName}</h3>
+                    </div>
                     <p className="text-xs text-gray-500">{formatDate(session.sessionDate)} at {formatTime(session.startedAt)}</p>
                   </div>
                   <div className="shrink-0">{statusBadge(session.status)}</div>
@@ -250,11 +261,9 @@ export default function ScribeHistoryPage({ onViewSession, patientId }: ScribeHi
                   </button>
                   {session.status === 'recording' && (
                     <>
-                      {session.hasNote && (
-                        <button onClick={() => onViewSession(session.id, session.patientName, session.patientId ?? 0, session.startedAt, session.status, session.hasNote)} className="px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition active:scale-[0.98]">
-                          Continue
-                        </button>
-                      )}
+                      <button onClick={() => onViewSession(session.id, session.patientName, session.patientId ?? 0, session.startedAt, session.status, session.hasNote)} className={`px-3 py-1.5 text-xs font-medium rounded-lg transition active:scale-[0.98] ${isActiveRecording ? 'text-red-600 bg-red-50 hover:bg-red-100' : 'text-primary-600 bg-primary-50 hover:bg-primary-100'}`}>
+                        {isActiveRecording ? 'Return to Recording' : 'Continue'}
+                      </button>
                       <button onClick={() => handleDeleteSession(session.id)} disabled={deleting === session.id} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition disabled:opacity-50 active:scale-[0.98]">
                         {deleting === session.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                         Delete Draft
@@ -335,7 +344,8 @@ export default function ScribeHistoryPage({ onViewSession, patientId }: ScribeHi
                 </div>
               )}
             </div>
-          ))}
+          );
+          })}
         </div>
       )}
 

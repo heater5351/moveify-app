@@ -15,9 +15,13 @@ interface NoteContext {
 
 interface ScribePageProps {
   onRecordingActiveChange?: (active: boolean) => void;
+  /** When provided, note opening is delegated to App.tsx (persistent across tabs). */
+  onOpenNote?: (patientId: number, patientName: string, sessionId?: number) => void;
+  /** Highlight the currently-recording session in the history list. */
+  activeNoteSessionId?: number | null;
 }
 
-export default function ScribePage({ onRecordingActiveChange }: ScribePageProps) {
+export default function ScribePage({ onRecordingActiveChange, onOpenNote, activeNoteSessionId }: ScribePageProps) {
   const [view, setView] = useState<ScribeView>('history');
   const [noteCtx, setNoteCtx] = useState<NoteContext | null>(null);
   const [isRecordingActive, setIsRecordingActive] = useState(false);
@@ -28,8 +32,14 @@ export default function ScribePage({ onRecordingActiveChange }: ScribePageProps)
   }, [onRecordingActiveChange]);
 
   function openNewNote(patientId: number, patientName: string, sessionId?: number, initialNote?: string) {
-    setNoteCtx({ patientId, patientName, sessionId, initialNote });
-    setView('new-note');
+    if (onOpenNote) {
+      // Delegate to App.tsx so note persists across tab navigation
+      onOpenNote(patientId, patientName, sessionId);
+    } else {
+      // Fallback: internal note (no cross-tab persistence)
+      setNoteCtx({ patientId, patientName, sessionId, initialNote });
+      setView('new-note');
+    }
   }
 
   function handleViewSession(sessionId: number, patientName: string, patientId: number, _startedAt: string, status: string, _hasNote: boolean) {
@@ -41,8 +51,8 @@ export default function ScribePage({ onRecordingActiveChange }: ScribePageProps)
   return (
     <div className="max-w-4xl mx-auto">
 
-      {/* ProgressNotePage — always mounted once opened, hidden with CSS when not active */}
-      {noteCtx && (
+      {/* ProgressNotePage — only used in fallback (no onOpenNote) mode */}
+      {!onOpenNote && noteCtx && (
         <div style={{ display: view === 'new-note' ? 'block' : 'none' }}>
           <ProgressNotePage
             patientId={noteCtx.patientId}
@@ -55,7 +65,7 @@ export default function ScribePage({ onRecordingActiveChange }: ScribePageProps)
         </div>
       )}
 
-      {/* History / Settings tabs — hidden when note is open */}
+      {/* History / Settings tabs */}
       <div style={{ display: view !== 'new-note' ? 'block' : 'none' }}>
         {/* Tab navigation */}
         <div className="flex items-center gap-1 mb-6 border-b border-gray-200">
@@ -76,8 +86,8 @@ export default function ScribePage({ onRecordingActiveChange }: ScribePageProps)
             <Settings className="w-4 h-4" /> Settings
           </button>
 
-          {/* Recording in progress — return to note */}
-          {isRecordingActive && noteCtx && (
+          {/* Recording in progress (fallback mode only) — return to note */}
+          {!onOpenNote && isRecordingActive && noteCtx && (
             <button
               onClick={() => setView('new-note')}
               className="flex items-center gap-1.5 ml-4 px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg text-xs font-semibold text-red-600 animate-pulse"
@@ -100,7 +110,12 @@ export default function ScribePage({ onRecordingActiveChange }: ScribePageProps)
           </div>
         </div>
 
-        {view === 'history' && <ScribeHistoryPage onViewSession={handleViewSession} />}
+        {view === 'history' && (
+          <ScribeHistoryPage
+            onViewSession={handleViewSession}
+            activeNoteSessionId={activeNoteSessionId}
+          />
+        )}
         {view === 'settings' && <ScribeSettingsPage />}
       </div>
     </div>

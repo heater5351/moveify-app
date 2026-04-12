@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown, FileText } from 'lucide-react';
 import ScribeHistoryPage from './scribe/ScribeHistoryPage';
-import ProgressNotePage from './scribe/ProgressNotePage';
 import type { Patient, ClinicianFlag, BlockStatusResponse } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
@@ -17,12 +16,12 @@ interface PatientProfileProps {
   onEditProgram: (programIndex: number) => void;
   onDeleteProgram: (programId: number, programName: string) => void;
   onAddProgram: () => void;
+  onOpenNote: (patientId: number, patientName: string, sessionId?: number) => void;
+  activeNoteSessionId?: number | null;
 }
 
-export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram }: PatientProfileProps) => {
+export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram, onOpenNote, activeNoteSessionId }: PatientProfileProps) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'education' | 'notes'>('overview');
-  const [noteCtx, setNoteCtx] = useState<{ sessionId?: number } | null>(null);
-  const [isViewingNote, setIsViewingNote] = useState(false);
   const [showAssignEducationModal, setShowAssignEducationModal] = useState(false);
   const [educationModulesRefreshKey, setEducationModulesRefreshKey] = useState(0);
   const [flags, setFlags] = useState<ClinicianFlag[]>([]);
@@ -98,21 +97,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
   };
 
   return (
-    <div>
-      {/* ProgressNotePage: stays mounted once opened — CSS hidden when going back
-          so recording/transcript persist while browsing patient profile */}
-      {noteCtx !== null && (
-        <div style={{ display: isViewingNote ? 'block' : 'none' }}>
-          <ProgressNotePage
-            patientId={patient.id}
-            patientName={patient.name}
-            existingSessionId={noteCtx.sessionId}
-            onBack={() => { setIsViewingNote(false); setActiveTab('notes'); }}
-          />
-        </div>
-      )}
-
-    <div style={{ display: isViewingNote ? 'none' : 'block' }} className="space-y-5">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
@@ -347,7 +332,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-sm font-semibold text-slate-700">Progress Notes</h2>
               <button
-                onClick={() => { setNoteCtx({}); setIsViewingNote(true); }}
+                onClick={() => onOpenNote(patient.id, patient.name)}
                 className="bg-primary-400 hover:bg-primary-500 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-1.5 text-sm transition-colors shadow-sm"
               >
                 <FileText size={15} />
@@ -356,10 +341,10 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
             </div>
             <ScribeHistoryPage
               patientId={patient.id}
+              activeNoteSessionId={activeNoteSessionId}
               onViewSession={(sessionId, _name, _pid, _at, status, _hasNote) => {
                 if (status === 'recording' || status === 'completed') {
-                  setNoteCtx({ sessionId });
-                  setIsViewingNote(true);
+                  onOpenNote(patient.id, patient.name, sessionId);
                 }
               }}
             />
@@ -393,7 +378,6 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
           )}
         </div>
       )}
-    </div>
     </div>
   );
 };
