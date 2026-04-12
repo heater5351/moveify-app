@@ -12,6 +12,7 @@ interface ProgressNotePageProps {
   onBack: () => void;
   existingSessionId?: number;
   initialNote?: string;
+  onRecordingActiveChange?: (active: boolean) => void;
 }
 
 interface TranscriptLine {
@@ -19,7 +20,7 @@ interface TranscriptLine {
   speaker: number | null;
 }
 
-export default function ProgressNotePage({ patientId, patientName, onBack, existingSessionId, initialNote }: ProgressNotePageProps) {
+export default function ProgressNotePage({ patientId, patientName, onBack, existingSessionId, initialNote, onRecordingActiveChange }: ProgressNotePageProps) {
   const [sessionId, setSessionId] = useState<number | null>(existingSessionId ?? null);
   const [noteContent, setNoteContent] = useState(initialNote ?? '');
   const [elapsedSecs, setElapsedSecs] = useState(0);
@@ -147,6 +148,11 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isRecording, isPaused]);
 
+  // Notify parent when recording becomes active or inactive
+  useEffect(() => {
+    onRecordingActiveChange?.(isRecording && !isPaused);
+  }, [isRecording, isPaused, onRecordingActiveChange]);
+
   function formatTime(secs: number) {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
@@ -174,6 +180,19 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
     firstSpeakerRef.current = null;
     setSpeakerMap({});
     start();
+  }
+
+  async function handlePause() {
+    pause();
+    // Save transcript draft to DB so it's preserved if the user navigates away
+    const sid = sessionIdRef.current;
+    if (!sid || linesRef.current.length === 0) return;
+    try {
+      await apiFetch(`/sessions/${sid}/transcript`, {
+        method: 'POST',
+        body: JSON.stringify({ transcript: buildLabelledNow() }),
+      });
+    } catch { /* fire and forget */ }
   }
 
   function buildLabelledNow(): string {
@@ -363,7 +382,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
                   <Play className="w-4 h-4" /> Resume
                 </button>
               ) : (
-                <button onClick={pause} className="flex items-center gap-1.5 border-2 border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm font-semibold transition active:scale-95">
+                <button onClick={handlePause} className="flex items-center gap-1.5 border-2 border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm font-semibold transition active:scale-95">
                   <Pause className="w-4 h-4" /> Pause
                 </button>
               )}

@@ -81,6 +81,27 @@ router.get('/:sessionId/soap-note', async (req, res) => {
   }
 });
 
+// POST /api/scribe/sessions/:sessionId/transcript — save draft transcript without generating note
+router.post('/:sessionId/transcript', async (req, res) => {
+  try {
+    const { transcript } = req.body;
+    if (!transcript) return res.status(400).json({ error: 'Transcript required' });
+    const session = await verifySession(req.params.sessionId, req.user.id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    const wordCount = transcript.split(/\s+/).length;
+    await db.query(
+      `INSERT INTO transcripts (session_id, content_enc, word_count)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (session_id) DO UPDATE SET content_enc = $2, word_count = $3`,
+      [req.params.sessionId, encrypt(transcript), wordCount]
+    );
+    res.json({ saved: true });
+  } catch (err) {
+    console.error('Save transcript error:', err.message);
+    res.status(500).json({ error: 'Failed to save transcript' });
+  }
+});
+
 // POST /api/scribe/sessions/:sessionId/soap-note/generate
 router.post('/:sessionId/soap-note/generate', async (req, res) => {
   try {

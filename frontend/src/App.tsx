@@ -50,6 +50,8 @@ function App() {
   // Navigation state
   const [currentPage, setCurrentPage] = useState('exercises');
   const [viewingPatient, setViewingPatient] = useState<Patient | null>(null);
+  const [scribeEverOpened, setScribeEverOpened] = useState(false);
+  const [scribeRecordingActive, setScribeRecordingActive] = useState(false);
 
   // Patient management
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -1036,14 +1038,17 @@ function App() {
                   Education
                 </button>
                 <button
-                  onClick={() => { setCurrentPage('scribe'); setViewingPatient(null); }}
-                  className={`px-5 text-sm font-medium border-b-2 transition-colors ${
+                  onClick={() => { setCurrentPage('scribe'); setScribeEverOpened(true); setViewingPatient(null); }}
+                  className={`relative px-5 text-sm font-medium border-b-2 transition-colors ${
                     currentPage === 'scribe'
                       ? 'border-moveify-teal text-white'
                       : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/20'
                   }`}
                 >
                   Scribe Notes
+                  {scribeRecordingActive && currentPage !== 'scribe' && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                  )}
                 </button>
                 {loggedInUser?.isAdmin && (
                   <button
@@ -1097,6 +1102,18 @@ function App() {
         </div>
       </header>
 
+      {/* ScribePage — kept mounted once opened so recording persists across tab switches */}
+      {scribeEverOpened && userRole === 'clinician' && (
+        <div
+          className="flex-1 overflow-y-auto px-6 py-7"
+          style={{ display: currentPage === 'scribe' ? 'block' : 'none' }}
+        >
+          <ScribePage
+            onRecordingActiveChange={setScribeRecordingActive}
+          />
+        </div>
+      )}
+
       {/* Main Content Area - Split layout for clinician */}
       {userRole === 'patient' && loggedInPatient && currentPage === 'account' ? (
         <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-8 safe-bottom" style={{ WebkitOverflowScrolling: 'touch' }}>
@@ -1145,10 +1162,6 @@ function App() {
               onLoadTemplate={() => setShowProgramTemplateModal(true)}
             />
           </div>
-        </div>
-      ) : currentPage === 'scribe' ? (
-        <div className="flex-1 overflow-y-auto px-6 py-7">
-          <ScribePage />
         </div>
       ) : currentPage === 'admin' && loggedInUser?.isAdmin ? (
         <div className="flex-1 overflow-y-auto px-6 py-7">
