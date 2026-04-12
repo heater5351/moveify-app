@@ -61,20 +61,25 @@ function App() {
   const [noteRecordingActive, setNoteRecordingActive] = useState(false);
   const [noteElapsedSecs, setNoteElapsedSecs] = useState(0);
   const noteTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Session ID reported back from ProgressNotePage once recording begins
+  const [activeRecordingSessionId, setActiveRecordingSessionId] = useState<number | null>(null);
 
   // Open a persistent note (survives tab navigation)
   const handleOpenNote = useCallback((patientId: number, patientName: string, sessionId?: number) => {
     setActiveNote({ patientId, patientName, sessionId });
     setNoteFullscreen(true);
     setNoteElapsedSecs(0);
+    // Restore session ID highlight if reopening an existing session
+    if (sessionId) setActiveRecordingSessionId(sessionId);
   }, []);
 
-  // Drive the floating indicator timer off noteRecordingActive
+  // Drive the floating indicator timer off noteRecordingActive; clear session highlight when stopped
   useEffect(() => {
     if (noteRecordingActive) {
       noteTimerRef.current = setInterval(() => setNoteElapsedSecs(s => s + 1), 1000);
     } else {
       if (noteTimerRef.current) clearInterval(noteTimerRef.current);
+      setActiveRecordingSessionId(null);
     }
     return () => { if (noteTimerRef.current) clearInterval(noteTimerRef.current); };
   }, [noteRecordingActive]);
@@ -1137,7 +1142,7 @@ function App() {
           <ScribePage
             onRecordingActiveChange={setScribeRecordingActive}
             onOpenNote={handleOpenNote}
-            activeNoteSessionId={activeNote?.sessionId ?? null}
+            activeNoteSessionId={activeRecordingSessionId}
           />
         </div>
       )}
@@ -1162,6 +1167,7 @@ function App() {
               patientName={activeNote.patientName}
               existingSessionId={activeNote.sessionId}
               onRecordingActiveChange={setNoteRecordingActive}
+              onSessionIdChange={setActiveRecordingSessionId}
               onBack={() => setNoteFullscreen(false)}
             />
           </div>
@@ -1282,7 +1288,7 @@ function App() {
               onDeleteProgram={handleDeleteProgram}
               onAddProgram={handleAddProgram}
               onOpenNote={handleOpenNote}
-              activeNoteSessionId={activeNote?.sessionId ?? null}
+              activeNoteSessionId={activeRecordingSessionId}
             />
           ) : (
             <PatientsPage

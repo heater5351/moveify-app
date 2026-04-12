@@ -13,6 +13,7 @@ interface ProgressNotePageProps {
   existingSessionId?: number;
   initialNote?: string;
   onRecordingActiveChange?: (active: boolean) => void;
+  onSessionIdChange?: (sessionId: number) => void;
 }
 
 interface TranscriptLine {
@@ -20,7 +21,7 @@ interface TranscriptLine {
   speaker: number | null;
 }
 
-export default function ProgressNotePage({ patientId, patientName, onBack, existingSessionId, initialNote, onRecordingActiveChange }: ProgressNotePageProps) {
+export default function ProgressNotePage({ patientId, patientName, onBack, existingSessionId, initialNote, onRecordingActiveChange, onSessionIdChange }: ProgressNotePageProps) {
   const [sessionId, setSessionId] = useState<number | null>(existingSessionId ?? null);
   const [noteContent, setNoteContent] = useState(initialNote ?? '');
   const [elapsedSecs, setElapsedSecs] = useState(0);
@@ -103,6 +104,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
       const data = await res.json();
       sessionIdRef.current = data.id;
       setSessionId(data.id);
+      onSessionIdChange?.(data.id);
       return data.id;
     } catch {
       return null;
