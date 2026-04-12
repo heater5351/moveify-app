@@ -22,6 +22,7 @@ interface PatientProfileProps {
 export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram }: PatientProfileProps) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'education' | 'notes'>('overview');
   const [noteCtx, setNoteCtx] = useState<{ sessionId?: number } | null>(null);
+  const [isViewingNote, setIsViewingNote] = useState(false);
   const [showAssignEducationModal, setShowAssignEducationModal] = useState(false);
   const [educationModulesRefreshKey, setEducationModulesRefreshKey] = useState(0);
   const [flags, setFlags] = useState<ClinicianFlag[]>([]);
@@ -95,6 +96,19 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
       // Silently ignore
     }
   };
+
+  // ProgressNotePage rendered outside tab/conditional tree so it stays mounted
+  // and recording persists when switching tabs or clicking back to history
+  if (isViewingNote && noteCtx !== null) {
+    return (
+      <ProgressNotePage
+        patientId={patient.id}
+        patientName={patient.name}
+        existingSessionId={noteCtx.sessionId}
+        onBack={() => { setIsViewingNote(false); setActiveTab('notes'); }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -328,19 +342,11 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
       ) : activeTab === 'analytics' ? (
         <ProgressAnalytics patientId={patient.id} apiUrl={API_URL} assignedPrograms={patient.assignedPrograms} />
       ) : activeTab === 'notes' ? (
-        noteCtx !== null ? (
-          <ProgressNotePage
-            patientId={patient.id}
-            patientName={patient.name}
-            existingSessionId={noteCtx.sessionId}
-            onBack={() => setNoteCtx(null)}
-          />
-        ) : (
           <div>
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-sm font-semibold text-slate-700">Progress Notes</h2>
               <button
-                onClick={() => setNoteCtx({})}
+                onClick={() => { setNoteCtx({}); setIsViewingNote(true); }}
                 className="bg-primary-400 hover:bg-primary-500 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-1.5 text-sm transition-colors shadow-sm"
               >
                 <FileText size={15} />
@@ -352,11 +358,11 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
               onViewSession={(sessionId, _name, _pid, _at, status, hasNote) => {
                 if ((status === 'recording' && hasNote) || status === 'completed') {
                   setNoteCtx({ sessionId });
+                  setIsViewingNote(true);
                 }
               }}
             />
           </div>
-        )
       ) : (
         <div>
           <div className="flex items-center justify-between mb-5">

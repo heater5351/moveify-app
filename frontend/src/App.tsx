@@ -1174,6 +1174,8 @@ function App() {
         <div className="flex-1 overflow-y-auto px-6 py-7">
           <EducationLibrary />
         </div>
+      ) : currentPage === 'scribe' ? (
+        null
       ) : currentPage === 'program' && viewingPatient && viewingProgramIndex !== null ? (
         <div className="flex-1 overflow-y-auto px-6 py-7">
           <ProgramView
