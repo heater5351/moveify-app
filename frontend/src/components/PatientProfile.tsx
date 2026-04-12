@@ -97,21 +97,22 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
     }
   };
 
-  // ProgressNotePage rendered outside tab/conditional tree so it stays mounted
-  // and recording persists when switching tabs or clicking back to history
-  if (isViewingNote && noteCtx !== null) {
-    return (
-      <ProgressNotePage
-        patientId={patient.id}
-        patientName={patient.name}
-        existingSessionId={noteCtx.sessionId}
-        onBack={() => { setIsViewingNote(false); setActiveTab('notes'); }}
-      />
-    );
-  }
-
   return (
-    <div className="space-y-5">
+    <div>
+      {/* ProgressNotePage: stays mounted once opened — CSS hidden when going back
+          so recording/transcript persist while browsing patient profile */}
+      {noteCtx !== null && (
+        <div style={{ display: isViewingNote ? 'block' : 'none' }}>
+          <ProgressNotePage
+            patientId={patient.id}
+            patientName={patient.name}
+            existingSessionId={noteCtx.sessionId}
+            onBack={() => { setIsViewingNote(false); setActiveTab('notes'); }}
+          />
+        </div>
+      )}
+
+    <div style={{ display: isViewingNote ? 'none' : 'block' }} className="space-y-5">
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
@@ -355,8 +356,8 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
             </div>
             <ScribeHistoryPage
               patientId={patient.id}
-              onViewSession={(sessionId, _name, _pid, _at, status, hasNote) => {
-                if ((status === 'recording' && hasNote) || status === 'completed') {
+              onViewSession={(sessionId, _name, _pid, _at, status, _hasNote) => {
+                if (status === 'recording' || status === 'completed') {
                   setNoteCtx({ sessionId });
                   setIsViewingNote(true);
                 }
@@ -392,6 +393,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
           )}
         </div>
       )}
+    </div>
     </div>
   );
 };

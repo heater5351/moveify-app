@@ -32,10 +32,8 @@ export default function ScribePage({ onRecordingActiveChange }: ScribePageProps)
     setView('new-note');
   }
 
-  function handleViewSession(sessionId: number, patientName: string, patientId: number, _startedAt: string, status: string, hasNote: boolean) {
-    if (status === 'recording' && hasNote) {
-      openNewNote(patientId, patientName, sessionId);
-    } else if (status === 'completed' && hasNote) {
+  function handleViewSession(sessionId: number, patientName: string, patientId: number, _startedAt: string, status: string, _hasNote: boolean) {
+    if (status === 'recording' || status === 'completed') {
       openNewNote(patientId, patientName, sessionId);
     }
   }
