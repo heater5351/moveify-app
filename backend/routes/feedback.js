@@ -13,7 +13,7 @@ router.use(authenticate);
 const feedbackLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
-  keyGenerator: (req) => `feedback-${req.user?.id || req.ip}`,
+  keyGenerator: (req) => `feedback-${req.user.id}`,
   message: { error: 'Too many reports. Please try again later.' }
 });
 

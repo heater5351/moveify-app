@@ -14,7 +14,7 @@ router.use(authenticate);
 const dataRequestLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
-  keyGenerator: (req) => `data-req-${req.user?.id || req.ip}`,
+  keyGenerator: (req) => `data-req-${req.user.id}`,
   message: { error: 'Too many data requests. Please try again later.' }
 });
 
