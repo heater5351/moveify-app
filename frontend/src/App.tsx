@@ -1142,19 +1142,29 @@ function App() {
         </div>
       )}
 
-      {/* Persistent ProgressNotePage — stays mounted across ALL tab navigation */}
+      {/* Persistent ProgressNotePage — overlays full screen so flex layout is unaffected */}
       {activeNote && userRole === 'clinician' && (
         <div
-          className="flex-1 overflow-y-auto px-6 py-7"
-          style={{ display: noteFullscreen ? 'block' : 'none' }}
+          style={{
+            display: noteFullscreen ? 'flex' : 'none',
+            position: 'fixed',
+            inset: 0,
+            zIndex: 40,
+            background: 'rgb(248 250 252)', // bg-slate-50
+            flexDirection: 'column',
+            overflow: 'hidden',
+            paddingTop: 'env(safe-area-inset-top)',
+          }}
         >
-          <ProgressNotePage
-            patientId={activeNote.patientId}
-            patientName={activeNote.patientName}
-            existingSessionId={activeNote.sessionId}
-            onRecordingActiveChange={setNoteRecordingActive}
-            onBack={() => setNoteFullscreen(false)}
-          />
+          <div className="flex-1 overflow-y-auto px-6 py-7">
+            <ProgressNotePage
+              patientId={activeNote.patientId}
+              patientName={activeNote.patientName}
+              existingSessionId={activeNote.sessionId}
+              onRecordingActiveChange={setNoteRecordingActive}
+              onBack={() => setNoteFullscreen(false)}
+            />
+          </div>
         </div>
       )}
 
