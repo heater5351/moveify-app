@@ -1,0 +1,46 @@
+# Log files — may contain PHI (patient IDs, request paths, error traces)
+**/*.log
+**/logs/
+backend/backend_test.log
+
+# Test files that connect to production database
+backend/test-*.js
+backend/test-*.html
+
+# Secrets and credentials — never send to Anthropic API
+.env
+.env.*
+**/env-vars.yaml
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.jks
+**/*.keystore
+**/*.secrets
+
+# GCP credentials
+~/.config/gcloud/
+**/application_default_credentials.json
+**/service-account*.json
+**/serviceaccount*.json
+**/gcloud-service-key.json
+
+# Claude internal files
+.claude/
+**/.claude/
+
+# Lock files with potential embedded tokens
+**/*.lock
+
+# Android signing
+frontend/android/**/*.jks
+frontend/android/**/*.keystore
+frontend/android/local.properties
+
+# Node modules
+node_modules/
+**/node_modules/
+
+# Build output
+frontend/dist/
