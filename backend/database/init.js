@@ -868,6 +868,11 @@ Output exactly the four headings (EXECUTIVE SUMMARY, OBJECTIVE ASSESSMENT, GOALS
 
     console.log('✅ Scribe tables initialized');
 
+    // One-time cleanup: clear scribe data encrypted with pre-rotation key (2026-04-12)
+    // All rows predate the key rotation and cannot be decrypted — safe to remove (demo data only)
+    await db.query(`DELETE FROM scribe_sessions WHERE created_at < '2026-04-13 00:00:00+00'`);
+    console.log('🔄 Cleared legacy scribe sessions from before key rotation');
+
     console.log('✅ Database tables initialized');
   } catch (error) {
     console.error('❌ Database initialization error:', error);
