@@ -94,7 +94,10 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
   }
 
   async function ensureSession(): Promise<number | null> {
-    if (sessionIdRef.current) return sessionIdRef.current;
+    if (sessionIdRef.current) {
+      onSessionIdChange?.(sessionIdRef.current);
+      return sessionIdRef.current;
+    }
     try {
       const res = await apiFetch('/sessions', {
         method: 'POST',

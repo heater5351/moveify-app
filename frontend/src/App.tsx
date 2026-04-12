@@ -69,8 +69,8 @@ function App() {
     setActiveNote({ patientId, patientName, sessionId });
     setNoteFullscreen(true);
     setNoteElapsedSecs(0);
-    // Restore session ID highlight if reopening an existing session
-    if (sessionId) setActiveRecordingSessionId(sessionId);
+    // Don't pre-set activeRecordingSessionId here — ProgressNotePage fires
+    // onSessionIdChange only when recording actually starts via ensureSession.
   }, []);
 
   // Drive the floating indicator timer off noteRecordingActive; clear session highlight when stopped
