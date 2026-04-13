@@ -990,5 +990,117 @@
     "muscleGroup": "Deltoids",
     "equipment": "Dumbbells",
     "position": "Standing"
+  },
+  {
+    "name": "Standing Shoulder CARS with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Deltoids, Rotator Cuff",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Standing Hip CARS with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip",
+    "muscleGroup": "Glutes, Hip Flexors",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Bow and Arrow Twist with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Spine",
+    "muscleGroup": "Obliques, Rhomboids",
+    "equipment": "Bodyweight",
+    "position": "Side-lying"
+  },
+  {
+    "name": "Bow and Arrow with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Spine, Shoulder",
+    "muscleGroup": "Rhomboids, Obliques",
+    "equipment": "Bodyweight",
+    "position": "Side-lying"
+  },
+  {
+    "name": "Touch and Go Deadlift with Barbell",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee, Spine",
+    "muscleGroup": "Hamstrings, Glutes, Lower Back",
+    "equipment": "Barbell",
+    "position": "Standing"
+  },
+  {
+    "name": "Supported Curtsy Lunge with Dumbbell",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Glutes, Quadriceps",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Supported Curtsy Lunge with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Glutes, Quadriceps",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Prone External Rotation and Abduction with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Rotator Cuff, Deltoids",
+    "equipment": "Bodyweight",
+    "position": "Prone"
+  },
+  {
+    "name": "Elevated Single Leg Calf Raise with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Ankle",
+    "muscleGroup": "Calves",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Elevated Calf Raise with Bodyweight",
+    "exerciseType": "reps",
+    "jointArea": "Ankle",
+    "muscleGroup": "Calves",
+    "equipment": "Bodyweight",
+    "position": "Standing"
+  },
+  {
+    "name": "Elevated Single Leg Calf Raise with Dumbbell",
+    "exerciseType": "reps",
+    "jointArea": "Ankle",
+    "muscleGroup": "Calves",
+    "equipment": "Dumbbells",
+    "position": "Standing"
+  },
+  {
+    "name": "Landmine Press with Barbell",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder, Elbow",
+    "muscleGroup": "Deltoids, Triceps, Chest",
+    "equipment": "Barbell",
+    "position": "Standing"
+  },
+  {
+    "name": "Cycling with Machine",
+    "exerciseType": "cardio",
+    "jointArea": "Hip, Knee",
+    "muscleGroup": "Quadriceps, Hamstrings, Glutes, Calves",
+    "equipment": "Machine",
+    "position": "Seated"
+  },
+  {
+    "name": "Standing Alternating Front Delt Raise with Dumbbells",
+    "exerciseType": "reps",
+    "jointArea": "Shoulder",
+    "muscleGroup": "Deltoids",
+    "equipment": "Dumbbells",
+    "position": "Standing"
   }
 ]
