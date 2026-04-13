@@ -1873,6 +1873,19 @@ export const exercises: Exercise[] = [
     position: 'Standing'
   },
   {
+    id: 206,
+    name: 'Prone External Rotation and Abduction with Bodyweight',
+    category: 'Musculoskeletal',
+    duration: '3 sets x 12 reps each side',
+    description: 'Lie face down on a bench or mat with one arm hanging off the side, thumb pointing down. Keeping your elbow straight, rotate your arm outward and lift it away from your body in a diagonal arc — combining external rotation with abduction. Lower with control. This targets the posterior rotator cuff and is commonly used in shoulder rehabilitation.',
+    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Prone%20External%20Rotation%20and%20Abduction%20with%20Bodyweight',
+    jointArea: 'Shoulder',
+    muscleGroup: 'Rotator Cuff, Deltoids',
+    movementType: 'External Rotation, Abduction',
+    equipment: 'Bodyweight',
+    position: 'Prone'
+  },
+  {
     id: 192,
     name: 'Standing Front Delt Raise with Dumbbells',
     category: 'Musculoskeletal',
