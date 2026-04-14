@@ -156,6 +156,11 @@ router.post('/:sessionId/soap-note/generate', async (req, res) => {
     });
   } catch (err) {
     console.error('Generate SOAP note error:', err.message);
+    // Reset status so the session remains actionable as a draft
+    await db.query(
+      "UPDATE scribe_sessions SET status = 'recording', updated_at = NOW() WHERE id = $1",
+      [req.params.sessionId]
+    ).catch(() => {});
     res.status(500).json({ error: 'Failed to generate SOAP note' });
   }
 });

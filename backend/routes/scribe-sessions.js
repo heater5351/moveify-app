@@ -8,11 +8,11 @@ const audit = require('../services/audit');
 const router = express.Router();
 router.use(authenticate, requireRole('clinician'));
 
-// Verify patient belongs to this clinician via junction table
-async function verifyPatientAccess(clinicianId, patientId) {
+// Verify patient exists — all clinicians have shared access to all patients
+async function verifyPatientAccess(_clinicianId, patientId) {
   const result = await db.query(
-    'SELECT 1 FROM clinician_patients WHERE clinician_id = $1 AND patient_id = $2',
-    [clinicianId, patientId]
+    'SELECT 1 FROM users WHERE id = $1 AND role = $2',
+    [patientId, 'patient']
   );
   return result.rows.length > 0;
 }
