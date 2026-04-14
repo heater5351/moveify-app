@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ArrowLeft, Mic, Square, Pause, Play, Clock, ArrowRightLeft, Sparkles, Save, FileText, Check, Loader2 } from 'lucide-react';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
-import { apiFetch, generateHandout, generateReport } from '../../utils/scribe-api';
-import type { HandoutSections, ReportSections } from '../../types';
+import { apiFetch, generateHandout } from '../../utils/scribe-api';
+import type { HandoutSections } from '../../types';
 import HandoutPreview from './HandoutPreview';
-import ReportPreview from './ReportPreview';
 
 interface ProgressNotePageProps {
   patientId: number;
@@ -42,9 +41,6 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
   const [generatingHandout, setGeneratingHandout] = useState(false);
   const [handoutSections, setHandoutSections] = useState<HandoutSections | null>(null);
   const [handoutError, setHandoutError] = useState('');
-  const [generatingReport, setGeneratingReport] = useState(false);
-  const [reportSections, setReportSections] = useState<ReportSections | null>(null);
-  const [reportError, setReportError] = useState('');
 
   const linesRef = useRef<TranscriptLine[]>([]);
   const firstSpeakerRef = useRef<number | null>(null);
@@ -283,20 +279,6 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
     }
   }
 
-  async function handleGenerateReport() {
-    const sid = sessionId;
-    if (!sid) return;
-    setGeneratingReport(true);
-    setReportError('');
-    try {
-      const result = await generateReport(sid, 'cdmp');
-      setReportSections(result.sections);
-    } catch (err) {
-      setReportError(err instanceof Error ? err.message : 'Report generation failed');
-    } finally {
-      setGeneratingReport(false);
-    }
-  }
 
   const hasSpeakers = Object.keys(speakerMap).length >= 1;
   const today = new Date().toLocaleDateString('en-AU', {
@@ -510,16 +492,6 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
         assessmentDate={today}
         onClose={() => setHandoutSections(null)}
         onRegenerate={handleGenerateHandout}
-      />
-    )}
-    {reportSections && (
-      <ReportPreview
-        type="cdmp"
-        sections={reportSections}
-        patientName={patientName}
-        sessionDate={today}
-        onClose={() => setReportSections(null)}
-        onRegenerate={handleGenerateReport}
       />
     )}
     </>
