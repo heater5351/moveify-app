@@ -14,6 +14,8 @@ interface ProgressNotePageProps {
   initialNote?: string;
   onRecordingActiveChange?: (active: boolean) => void;
   onSessionIdChange?: (sessionId: number) => void;
+  /** Called after the note is successfully saved as final. */
+  onNoteComplete?: () => void;
 }
 
 interface TranscriptLine {
@@ -21,7 +23,7 @@ interface TranscriptLine {
   speaker: number | null;
 }
 
-export default function ProgressNotePage({ patientId, patientName, onBack, existingSessionId, initialNote, onRecordingActiveChange, onSessionIdChange }: ProgressNotePageProps) {
+export default function ProgressNotePage({ patientId, patientName, onBack, existingSessionId, initialNote, onRecordingActiveChange, onSessionIdChange, onNoteComplete }: ProgressNotePageProps) {
   const [sessionId, setSessionId] = useState<number | null>(existingSessionId ?? null);
   const [noteContent, setNoteContent] = useState(initialNote ?? '');
   const [elapsedSecs, setElapsedSecs] = useState(0);
@@ -95,7 +97,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
 
   async function ensureSession(): Promise<number | null> {
     if (sessionIdRef.current) {
-      onSessionIdChange?.(sessionIdRef.current);
+      // Existing session — don't fire onSessionIdChange (that's only for new recording sessions)
       return sessionIdRef.current;
     }
     try {
@@ -255,6 +257,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
       });
       await apiFetch(`/sessions/${sid}/complete`, { method: 'POST' });
       setSaved(true);
+      onNoteComplete?.();
     } catch {
       setSaveError('Failed to save. Please try again.');
       setSaving(false);
@@ -332,17 +335,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
       {saved && (
         <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 mb-2 shrink-0">
           <span className="flex items-center gap-1.5 text-sm font-semibold text-green-700"><Check className="w-4 h-4" /> Note saved.</span>
-          <button
-            onClick={handleGenerateReport}
-            disabled={generatingReport}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-semibold text-white transition active:scale-[0.98]"
-            style={{ background: '#46c1c0' }}
-          >
-            {generatingReport ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
-            Generate CDMP Report
-          </button>
-          {reportError && <span className="text-xs text-red-500">{reportError}</span>}
-          <button onClick={onBack} className="ml-auto text-sm font-semibold text-gray-500 hover:text-secondary-700 transition">
+          <button onClick={onNoteComplete ?? onBack} className="ml-auto text-sm font-semibold text-gray-500 hover:text-secondary-700 transition">
             Done →
           </button>
         </div>

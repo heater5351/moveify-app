@@ -63,6 +63,17 @@ function App() {
   const noteTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Session ID reported back from ProgressNotePage once recording begins
   const [activeRecordingSessionId, setActiveRecordingSessionId] = useState<number | null>(null);
+  // Incremented when a note is saved as final — causes PatientProfile to refresh its notes list
+  const [notesRefreshKey, setNotesRefreshKey] = useState(0);
+
+  // Called by ProgressNotePage when a note is saved as final
+  const handleNoteComplete = useCallback(() => {
+    setActiveNote(null);
+    setNoteFullscreen(false);
+    setNoteRecordingActive(false);
+    setActiveRecordingSessionId(null);
+    setNotesRefreshKey(k => k + 1);
+  }, []);
 
   // Open a persistent note (survives tab navigation)
   const handleOpenNote = useCallback((patientId: number, patientName: string, sessionId?: number) => {
@@ -1169,6 +1180,7 @@ function App() {
               onRecordingActiveChange={setNoteRecordingActive}
               onSessionIdChange={setActiveRecordingSessionId}
               onBack={() => setNoteFullscreen(false)}
+              onNoteComplete={handleNoteComplete}
             />
           </div>
         </div>
@@ -1289,6 +1301,7 @@ function App() {
               onAddProgram={handleAddProgram}
               onOpenNote={handleOpenNote}
               activeNoteSessionId={activeRecordingSessionId}
+              notesRefreshKey={notesRefreshKey}
             />
           ) : (
             <PatientsPage

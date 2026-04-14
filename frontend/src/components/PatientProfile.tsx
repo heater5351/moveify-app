@@ -18,9 +18,10 @@ interface PatientProfileProps {
   onAddProgram: () => void;
   onOpenNote: (patientId: number, patientName: string, sessionId?: number) => void;
   activeNoteSessionId?: number | null;
+  notesRefreshKey?: number;
 }
 
-export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram, onOpenNote, activeNoteSessionId }: PatientProfileProps) => {
+export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram, onOpenNote, activeNoteSessionId, notesRefreshKey }: PatientProfileProps) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'education' | 'notes'>('overview');
   const [showAssignEducationModal, setShowAssignEducationModal] = useState(false);
   const [educationModulesRefreshKey, setEducationModulesRefreshKey] = useState(0);
@@ -340,6 +341,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
               </button>
             </div>
             <ScribeHistoryPage
+              key={notesRefreshKey}
               patientId={patient.id}
               activeNoteSessionId={activeNoteSessionId}
               onViewSession={(sessionId, _name, _pid, _at, status, _hasNote) => {
