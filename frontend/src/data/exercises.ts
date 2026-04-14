@@ -1891,7 +1891,7 @@ export const exercises: Exercise[] = [
     category: 'Musculoskeletal',
     duration: '3 sets x 12 reps',
     description: 'Stand with a dumbbell in each hand in front of your thighs, palms facing your body. Raise both arms straight in front of you to shoulder height. Lower with control. Keep a slight bend in your elbows and avoid swinging.',
-    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Standing%20Front%20Delt%20Raise%20With%20Dumbbells',
+    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Standing%20Front%20Delt%20Raise%20with%20Dumbbells',
     jointArea: 'Shoulder',
     muscleGroup: 'Deltoids',
     movementType: 'Flexion',
