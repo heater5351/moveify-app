@@ -369,7 +369,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
       )}
 
       {/* Note editor */}
-      <div className={`flex flex-col min-h-0 pb-3 ${isLocked ? 'flex-1' : 'border-b border-gray-200'}`} style={isLocked ? { flex: 1 } : {}}>
+      <div className={`flex flex-col flex-1 min-h-0 pb-3 ${isLocked ? '' : 'border-b border-gray-200'}`}>
         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5 shrink-0">
           Progress Note
           {!sessionId && <span className="ml-2 text-gray-300 font-normal normal-case">Draft</span>}
