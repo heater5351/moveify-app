@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react';
-import { FileText, Clock, Settings, Mic } from 'lucide-react';
+import { FileText, Clock, Settings, Mic, ClipboardList } from 'lucide-react';
 import ProgressNotePage from './ProgressNotePage';
 import ScribeHistoryPage from './ScribeHistoryPage';
 import ScribeSettingsPage from './ScribeSettingsPage';
+import ScribeReportsPage from './ScribeReportsPage';
 
-type ScribeView = 'history' | 'new-note' | 'settings';
+type ScribeView = 'history' | 'new-note' | 'settings' | 'reports';
 
 interface NoteContext {
   patientId: number;
@@ -78,6 +79,14 @@ export default function ScribePage({ onRecordingActiveChange, onOpenNote, active
             <Clock className="w-4 h-4" /> History
           </button>
           <button
+            onClick={() => setView('reports')}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition -mb-px ${
+              view === 'reports' ? 'border-primary-400 text-primary-600' : 'border-transparent text-gray-500 hover:text-secondary-700'
+            }`}
+          >
+            <ClipboardList className="w-4 h-4" /> Reports
+          </button>
+          <button
             onClick={() => setView('settings')}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition -mb-px ${
               view === 'settings' ? 'border-primary-400 text-primary-600' : 'border-transparent text-gray-500 hover:text-secondary-700'
@@ -116,6 +125,7 @@ export default function ScribePage({ onRecordingActiveChange, onOpenNote, active
             activeNoteSessionId={activeNoteSessionId}
           />
         )}
+        {view === 'reports' && <ScribeReportsPage />}
         {view === 'settings' && <ScribeSettingsPage />}
       </div>
     </div>
