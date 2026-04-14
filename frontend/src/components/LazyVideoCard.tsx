@@ -9,7 +9,7 @@ interface LazyVideoCardProps {
 // Derives thumbnail URL from video URL: adds .jpg suffix
 // Bump version param when thumbnails are regenerated to bust browser cache
 export function getThumbnailUrl(videoUrl: string): string {
-  return `${videoUrl}.jpg?v=3`;
+  return `${videoUrl}.jpg?v=5`;
 }
 
 // Lazy video card: shows a static .jpg thumbnail instantly, loads video on hover.

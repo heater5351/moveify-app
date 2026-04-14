@@ -67,10 +67,12 @@ async function main() {
       await file.download({ destination: videoPath });
 
       // Extract frame with ffmpeg
-      // zscale chain converts from iPhone HLG/Dolby Vision HDR to standard BT.709 SDR
-      // so thumbnails render with correct colours in browsers
+      // zscale chain converts from iPhone HLG/Dolby Vision HDR to standard BT.709 SDR.
+      // npl=1000 matches iPhone HLG peak luminance (~1000 nits via USB/original file).
+      // Videos downloaded via Google Drive are already SDR and don't need this chain,
+      // but it's harmless — SDR content at npl=1000 tone-maps cleanly.
       execSync(
-        `"${FFMPEG}" -y -ss ${FRAME_TIME} -i "${videoPath}" -frames:v 1 -q:v ${QUALITY} -vf "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable,zscale=t=bt709:m=bt709:r=tv,scale=640:-1,format=yuv420p" -update 1 "${thumbPath}"`,
+        `"${FFMPEG}" -y -ss ${FRAME_TIME} -i "${videoPath}" -frames:v 1 -q:v ${QUALITY} -vf "zscale=t=linear:npl=1000,format=gbrpf32le,zscale=p=bt709,tonemap=hable,zscale=t=bt709:m=bt709:r=tv,scale=640:-1,format=yuv420p" -update 1 "${thumbPath}"`,
         { stdio: 'pipe' }
       );
 
