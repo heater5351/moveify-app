@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Clock, FileText, CheckCircle, XCircle, Loader2, Copy, Check, ChevronDown, ChevronUp, Brain, Mic, Trash2 } from 'lucide-react';
-import { apiFetch, deleteSession, generateReport } from '../../utils/scribe-api';
-import type { ReportSections } from '../../types';
-import ReportPreview from './ReportPreview';
+import { Clock, FileText, CheckCircle, XCircle, Loader2, Copy, Check, ChevronDown, ChevronUp, Mic, Trash2 } from 'lucide-react';
+import { apiFetch, deleteSession } from '../../utils/scribe-api';
 
 interface HistorySession {
   id: number;
@@ -29,16 +27,11 @@ export default function ScribeHistoryPage({ onViewSession, patientId, activeNote
   const [noteContent, setNoteContent] = useState<Record<number, string>>({});
   const [noteLoading, setNoteLoading] = useState<number | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
-  const [summaryOpen, setSummaryOpen] = useState<number | null>(null);
-  const [summaryContent, setSummaryContent] = useState<Record<number, string>>({});
-  const [summaryLoading, setSummaryLoading] = useState<number | null>(null);
   const [expandedTranscript, setExpandedTranscript] = useState<number | null>(null);
   const [transcriptContent, setTranscriptContent] = useState<Record<number, string>>({});
   const [transcriptLoading, setTranscriptLoading] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [reportLoading, setReportLoading] = useState<number | null>(null);
-  const [activeReport, setActiveReport] = useState<{ sections: ReportSections; session: HistorySession } | null>(null);
   const limit = 20;
 
   useEffect(() => { loadSessions(); }, [offset]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -134,38 +127,6 @@ export default function ScribeHistoryPage({ onViewSession, patientId, activeNote
     }
   }
 
-  async function handleGenerateReport(session: HistorySession) {
-    setReportLoading(session.id);
-    try {
-      const result = await generateReport(session.id, 'cdmp');
-      setActiveReport({ sections: result.sections, session });
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Report generation failed');
-    } finally {
-      setReportLoading(null);
-    }
-  }
-
-  async function toggleSummary(patientId: number) {
-    if (summaryOpen === patientId) { setSummaryOpen(null); return; }
-    setSummaryOpen(patientId);
-    if (summaryContent[patientId]) return;
-    setSummaryLoading(patientId);
-    try {
-      const res = await apiFetch(`/sessions/patient/${patientId}/summary`);
-      if (res.ok) {
-        const data = await res.json();
-        setSummaryContent(prev => ({ ...prev, [patientId]: data.summary }));
-      } else {
-        setSummaryContent(prev => ({ ...prev, [patientId]: 'No summary yet — complete a session to generate one.' }));
-      }
-    } catch {
-      setSummaryContent(prev => ({ ...prev, [patientId]: 'Failed to load summary.' }));
-    } finally {
-      setSummaryLoading(null);
-    }
-  }
-
   function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   }
@@ -242,11 +203,6 @@ export default function ScribeHistoryPage({ onViewSession, patientId, activeNote
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 mt-2">
-                  {session.patientId && session.status === 'completed' && (
-                    <button onClick={() => toggleSummary(session.patientId!)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition active:scale-[0.98]">
-                      <Brain className="w-3.5 h-3.5" /> Summary
-                    </button>
-                  )}
                   {session.hasNote && (
                     <button onClick={() => toggleNote(session.id)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition active:scale-[0.98]">
                       <FileText className="w-3.5 h-3.5" />
@@ -271,19 +227,9 @@ export default function ScribeHistoryPage({ onViewSession, patientId, activeNote
                     </>
                   )}
                   {session.status === 'completed' && session.hasNote && (
-                    <>
-                      <button
-                        onClick={() => handleGenerateReport(session)}
-                        disabled={reportLoading === session.id}
-                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-lg transition disabled:opacity-50 active:scale-[0.98]"
-                      >
-                        {reportLoading === session.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
-                        CDMP Report
-                      </button>
-                      <button onClick={() => onViewSession(session.id, session.patientName, session.patientId ?? 0, session.startedAt, session.status, session.hasNote)} className="px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition active:scale-[0.98]">
-                        Open
-                      </button>
-                    </>
+                    <button onClick={() => onViewSession(session.id, session.patientName, session.patientId ?? 0, session.startedAt, session.status, session.hasNote)} className="px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition active:scale-[0.98]">
+                      Open
+                    </button>
                   )}
                 </div>
               </div>
@@ -328,21 +274,6 @@ export default function ScribeHistoryPage({ onViewSession, patientId, activeNote
                 </div>
               )}
 
-              {session.patientId && summaryOpen === session.patientId && (
-                <div className="border-t border-purple-100 px-4 sm:px-5 py-3 sm:py-4 bg-purple-50/50">
-                  {summaryLoading === session.patientId ? (
-                    <div className="flex items-center justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-purple-400" /></div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Brain className="w-4 h-4 text-purple-500" />
-                        <span className="text-xs font-semibold text-purple-700">Rolling Patient Summary</span>
-                      </div>
-                      <pre className="text-sm text-secondary-700 whitespace-pre-wrap leading-relaxed">{summaryContent[session.patientId]}</pre>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
           );
           })}
@@ -358,16 +289,6 @@ export default function ScribeHistoryPage({ onViewSession, patientId, activeNote
       )}
     </div>
 
-    {activeReport && (
-      <ReportPreview
-        type="cdmp"
-        sections={activeReport.sections}
-        patientName={activeReport.session.patientName}
-        sessionDate={activeReport.session.sessionDate}
-        onClose={() => setActiveReport(null)}
-        onRegenerate={() => handleGenerateReport(activeReport.session)}
-      />
-    )}
     </>
   );
 }

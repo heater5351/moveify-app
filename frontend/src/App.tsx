@@ -65,6 +65,8 @@ function App() {
   const [activeRecordingSessionId, setActiveRecordingSessionId] = useState<number | null>(null);
   // Incremented when a note is saved as final — causes PatientProfile to refresh its notes list
   const [notesRefreshKey, setNotesRefreshKey] = useState(0);
+  // Incremented on every handleOpenNote call — forces ProgressNotePage to remount fresh
+  const [noteKey, setNoteKey] = useState(0);
 
   // Called by ProgressNotePage when a note is saved as final
   const handleNoteComplete = useCallback(() => {
@@ -80,6 +82,7 @@ function App() {
     setActiveNote({ patientId, patientName, sessionId });
     setNoteFullscreen(true);
     setNoteElapsedSecs(0);
+    setNoteKey(k => k + 1); // force ProgressNotePage to remount fresh for every new open
     // Don't pre-set activeRecordingSessionId here — ProgressNotePage fires
     // onSessionIdChange only when recording actually starts via ensureSession.
   }, []);
@@ -1174,6 +1177,7 @@ function App() {
         >
           <div className="flex-1 overflow-y-auto px-6 py-7">
             <ProgressNotePage
+              key={noteKey}
               patientId={activeNote.patientId}
               patientName={activeNote.patientName}
               existingSessionId={activeNote.sessionId}

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ArrowLeft, Mic, Square, Pause, Play, Clock, ArrowRightLeft, Sparkles, Save, FileText, Check, Loader2 } from 'lucide-react';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
-import { apiFetch, generateHandout } from '../../utils/scribe-api';
+import { apiFetch, generateHandout, revertSessionToDraft } from '../../utils/scribe-api';
 import type { HandoutSections } from '../../types';
 import HandoutPreview from './HandoutPreview';
 
@@ -41,6 +41,9 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
   const [generatingHandout, setGeneratingHandout] = useState(false);
   const [handoutSections, setHandoutSections] = useState<HandoutSections | null>(null);
   const [handoutError, setHandoutError] = useState('');
+  const [sessionStatus, setSessionStatus] = useState<string | null>(null);
+  const [completedAt, setCompletedAt] = useState<string | null>(null);
+  const [reverting, setReverting] = useState(false);
 
   const linesRef = useRef<TranscriptLine[]>([]);
   const firstSpeakerRef = useRef<number | null>(null);
@@ -56,6 +59,15 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
 
   useEffect(() => {
     if (!existingSessionId) return;
+    apiFetch(`/sessions/${existingSessionId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data) {
+          setSessionStatus(data.status);
+          setCompletedAt(data.endedAt ?? null);
+        }
+      })
+      .catch(() => {});
     apiFetch(`/sessions/${existingSessionId}/transcript`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
@@ -280,6 +292,25 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
   }
 
 
+  const isLocked = sessionStatus === 'completed';
+  const canRevert = isLocked && completedAt !== null &&
+    (Date.now() - new Date(completedAt).getTime()) < 48 * 60 * 60 * 1000;
+
+  async function handleRevertToDraft() {
+    if (!sessionIdRef.current) return;
+    setReverting(true);
+    setSaveError('');
+    try {
+      await revertSessionToDraft(sessionIdRef.current);
+      setSessionStatus('recording');
+      setCompletedAt(null);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to revert to draft');
+    } finally {
+      setReverting(false);
+    }
+  }
+
   const hasSpeakers = Object.keys(speakerMap).length >= 1;
   const today = new Date().toLocaleDateString('en-AU', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
@@ -300,7 +331,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
             <p className="text-xs text-gray-500">{today}</p>
           </div>
         </div>
-        {!saved && (
+        {!saved && !isLocked && (
           <button
             onClick={handleSave}
             disabled={saving || !noteContent.trim()}
@@ -309,6 +340,19 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
             <Save className="w-4 h-4" />
             {saving ? 'Saving…' : 'Save as Final'}
           </button>
+        )}
+        {isLocked && canRevert && (
+          <button
+            onClick={handleRevertToDraft}
+            disabled={reverting}
+            className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-semibold transition active:scale-[0.98] shrink-0"
+          >
+            {reverting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowLeft className="w-4 h-4" />}
+            {reverting ? 'Reverting…' : 'Revert to Draft'}
+          </button>
+        )}
+        {isLocked && !canRevert && (
+          <span className="text-xs text-slate-400 font-medium shrink-0">Note locked</span>
         )}
       </div>
 
@@ -332,9 +376,10 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
         <textarea
           ref={noteRef}
           value={noteContent}
-          onChange={e => setNoteContent(e.target.value)}
+          onChange={e => !isLocked && setNoteContent(e.target.value)}
+          readOnly={isLocked}
           placeholder="Write your note here, or record below and generate…"
-          className="flex-1 w-full border border-gray-200 rounded-xl p-4 text-sm text-secondary-700 leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-primary-300"
+          className={`flex-1 w-full border rounded-xl p-4 text-sm text-secondary-700 leading-relaxed resize-none focus:outline-none ${isLocked ? 'border-gray-100 bg-gray-50 cursor-default' : 'border-gray-200 focus:ring-2 focus:ring-primary-300'}`}
           style={{ minHeight: 0 }}
         />
         {generating && (
