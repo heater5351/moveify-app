@@ -1186,7 +1186,7 @@ function App() {
               existingSessionId={activeNote.sessionId}
               onRecordingActiveChange={setNoteRecordingActive}
               onSessionIdChange={setActiveRecordingSessionId}
-              onBack={() => { setNoteFullscreen(false); setScribeHistoryKey(k => k + 1); }}
+              onBack={() => { setNoteFullscreen(false); setScribeHistoryKey(k => k + 1); setNotesRefreshKey(k => k + 1); }}
               onNoteComplete={handleNoteComplete}
             />
           </div>
