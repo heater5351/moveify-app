@@ -117,7 +117,6 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
       const data = await res.json();
       sessionIdRef.current = data.id;
       setSessionId(data.id);
-      onSessionIdChange?.(data.id);
       return data.id;
     } catch {
       return null;
@@ -184,7 +183,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
     });
   }
 
-  function handleStartRecording() {
+  async function handleStartRecording() {
     setRecordingDone(false);
     setLines([]);
     linesRef.current = [];
@@ -194,7 +193,9 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
     setGenerateError('');
     firstSpeakerRef.current = null;
     setSpeakerMap({});
+    const sid = await ensureSession();
     start();
+    if (sid) onSessionIdChange?.(sid);
   }
 
   async function handlePause() {
