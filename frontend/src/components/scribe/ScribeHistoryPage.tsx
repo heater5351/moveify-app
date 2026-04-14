@@ -16,9 +16,10 @@ interface ScribeHistoryPageProps {
   onViewSession: (sessionId: number, patientName: string, patientId: number, startedAt: string, status: string, hasNote: boolean) => void;
   patientId?: number;
   activeNoteSessionId?: number | null;
+  refreshKey?: number;
 }
 
-export default function ScribeHistoryPage({ onViewSession, patientId, activeNoteSessionId }: ScribeHistoryPageProps) {
+export default function ScribeHistoryPage({ onViewSession, patientId, activeNoteSessionId, refreshKey }: ScribeHistoryPageProps) {
   const [sessions, setSessions] = useState<HistorySession[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -34,7 +35,7 @@ export default function ScribeHistoryPage({ onViewSession, patientId, activeNote
   const [loadError, setLoadError] = useState<string | null>(null);
   const limit = 20;
 
-  useEffect(() => { loadSessions(); }, [offset]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadSessions(); }, [offset, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadSessions() {
     setLoading(true);

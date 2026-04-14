@@ -20,9 +20,11 @@ interface ScribePageProps {
   onOpenNote?: (patientId: number, patientName: string, sessionId?: number) => void;
   /** Highlight the currently-recording session in the history list. */
   activeNoteSessionId?: number | null;
+  /** Increment to force ScribeHistoryPage to reload (e.g. after closing a note). */
+  historyRefreshKey?: number;
 }
 
-export default function ScribePage({ onRecordingActiveChange, onOpenNote, activeNoteSessionId }: ScribePageProps) {
+export default function ScribePage({ onRecordingActiveChange, onOpenNote, activeNoteSessionId, historyRefreshKey }: ScribePageProps) {
   const [view, setView] = useState<ScribeView>('history');
   const [noteCtx, setNoteCtx] = useState<NoteContext | null>(null);
   const [isRecordingActive, setIsRecordingActive] = useState(false);
@@ -123,6 +125,7 @@ export default function ScribePage({ onRecordingActiveChange, onOpenNote, active
           <ScribeHistoryPage
             onViewSession={handleViewSession}
             activeNoteSessionId={activeNoteSessionId}
+            refreshKey={historyRefreshKey}
           />
         )}
         {view === 'reports' && <ScribeReportsPage />}

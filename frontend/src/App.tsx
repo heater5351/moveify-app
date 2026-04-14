@@ -67,6 +67,8 @@ function App() {
   const [notesRefreshKey, setNotesRefreshKey] = useState(0);
   // Incremented on every handleOpenNote call — forces ProgressNotePage to remount fresh
   const [noteKey, setNoteKey] = useState(0);
+  // Incremented when a note is closed — causes ScribeHistoryPage to reload
+  const [scribeHistoryKey, setScribeHistoryKey] = useState(0);
 
   // Called by ProgressNotePage when a note is saved as final
   const handleNoteComplete = useCallback(() => {
@@ -1157,6 +1159,7 @@ function App() {
             onRecordingActiveChange={setScribeRecordingActive}
             onOpenNote={handleOpenNote}
             activeNoteSessionId={activeRecordingSessionId}
+            historyRefreshKey={scribeHistoryKey}
           />
         </div>
       )}
@@ -1183,7 +1186,7 @@ function App() {
               existingSessionId={activeNote.sessionId}
               onRecordingActiveChange={setNoteRecordingActive}
               onSessionIdChange={setActiveRecordingSessionId}
-              onBack={() => setNoteFullscreen(false)}
+              onBack={() => { setNoteFullscreen(false); setScribeHistoryKey(k => k + 1); }}
               onNoteComplete={handleNoteComplete}
             />
           </div>
