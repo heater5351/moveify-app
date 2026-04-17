@@ -472,10 +472,9 @@ function App() {
               // New program: remap index-based IDs to real DB IDs from response
               const exerciseIds: number[] = responseData.exerciseIds || [];
               if (exerciseIds.length > 0) {
-                const remappedWeeks = pendingBlockData.weeks.map(w => ({
-                  ...w,
-                  programExerciseId: exerciseIds[w.programExerciseId] ?? exerciseIds[0]
-                }));
+                const remappedWeeks = pendingBlockData.weeks
+                  .filter(w => exerciseIds[w.programExerciseId] !== undefined)
+                  .map(w => ({ ...w, programExerciseId: exerciseIds[w.programExerciseId] as number }));
                 await fetch(`${API_URL}/blocks/${targetProgramId}`, {
                   method: 'POST',
                   headers: getAuthHeaders(),

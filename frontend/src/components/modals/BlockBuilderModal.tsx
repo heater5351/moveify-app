@@ -165,6 +165,7 @@ export const BlockBuilderModal = ({
     setBlockDuration(d);
     setSelectedTemplateId('');
     setRowTemplateIds({});
+    setAppliedWeightData({});
     // Fill new weeks with defaults for existing exercises
     if (d > blockDuration) {
       const additions: Record<CellKey, CellData> = {};

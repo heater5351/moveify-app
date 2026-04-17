@@ -197,6 +197,7 @@ async function evaluateProgression(programId) {
   // Walk through each week from currentWeek to expectedWeek, checking metrics
   let advancedToWeek = currentWeek;
   let holdAction = null;
+  let pendingFlagInsert = null; // deferred into the transaction so it rolls back with the week update
 
   for (let week = currentWeek; week < expectedWeek; week++) {
     // Compute this week's calendar date range
@@ -260,13 +261,10 @@ async function evaluateProgression(programId) {
         [programId, patientId]
       );
       if (!existingFlag) {
-        await db.query(`
-          INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date)
-          VALUES ($1, $2, 'pain_flare', $3, CURRENT_DATE)
-        `, [
-          programId, patientId,
-          `Pain flare detected in week ${week}: avg general pain ${avgGeneralPain.toFixed(1)}/10, avg exercise pain ${avgExercisePain.toFixed(1)}/10. Week held.`
-        ]);
+        pendingFlagInsert = {
+          type: 'pain_flare',
+          reason: `Pain flare detected in week ${week}: avg general pain ${avgGeneralPain.toFixed(1)}/10, avg exercise pain ${avgExercisePain.toFixed(1)}/10. Week held.`
+        };
       }
       holdAction = { action: 'hold_pain', heldAtWeek: week, avgGeneralPain, avgExercisePain };
       break;
@@ -275,17 +273,14 @@ async function evaluateProgression(programId) {
     // PERFORMANCE CHECK — hold at this week
     if (completionRate < 0.70) {
       const existingPerfFlag = await db.getOne(
-        `SELECT id FROM clinician_flags WHERE program_id = $1 AND patient_id = $2 AND flag_type = 'performance_hold' AND flag_date = CURRENT_DATE`,
+        `SELECT id FROM clinician_flags WHERE program_id = $1 AND patient_id = $2 AND flag_type = 'performance_hold' AND flag_date = CURRENT_DATE AND resolved = FALSE`,
         [programId, patientId]
       );
       if (!existingPerfFlag) {
-        await db.query(`
-          INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date, resolved)
-          VALUES ($1, $2, 'performance_hold', $3, CURRENT_DATE, TRUE)
-        `, [
-          programId, patientId,
-          `Performance hold in week ${week}: completion rate ${Math.round(completionRate * 100)}% (threshold 70%). Week held.`
-        ]);
+        pendingFlagInsert = {
+          type: 'performance_hold',
+          reason: `Performance hold in week ${week}: completion rate ${Math.round(completionRate * 100)}% (threshold 70%). Week held.`
+        };
       }
       holdAction = { action: 'hold_performance', heldAtWeek: week, completionRate };
       break;
@@ -363,8 +358,8 @@ async function evaluateProgression(programId) {
       if (newCells.length < parseInt(programExerciseCount.count)) {
         // Flag clinician about missing block data
         const existingMismatch = await client.query(
-          `SELECT id FROM clinician_flags WHERE program_id = $1 AND flag_type = 'block_complete' AND flag_reason LIKE '%missing block data%' AND resolved = FALSE`,
-          [programId]
+          `SELECT id FROM clinician_flags WHERE program_id = $1 AND patient_id = $2 AND flag_type = 'performance_hold' AND flag_reason LIKE '%missing block data%' AND resolved = FALSE`,
+          [programId, patientId]
         );
         if (existingMismatch.rows.length === 0) {
           await client.query(`
@@ -386,6 +381,14 @@ async function evaluateProgression(programId) {
           [cell.sets, cell.reps, cell.weight, cell.duration, cell.rest_duration, cell.program_exercise_id]
         );
       }
+    }
+
+    // Commit any deferred flag insert atomically with the week update
+    if (pendingFlagInsert) {
+      await client.query(`
+        INSERT INTO clinician_flags (program_id, patient_id, flag_type, flag_reason, flag_date)
+        VALUES ($1, $2, $3, $4, CURRENT_DATE)
+      `, [programId, patientId, pendingFlagInsert.type, pendingFlagInsert.reason]);
     }
 
     await client.query('COMMIT');
