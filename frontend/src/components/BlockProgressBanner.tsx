@@ -78,13 +78,13 @@ export default function BlockProgressBanner({ programId, refreshKey }: Props) {
           <TrendingUp size={20} />
           <h3 className="font-semibold text-lg">Periodization Block</h3>
         </div>
-        <div className="text-sm font-medium bg-white bg-opacity-20 px-3 py-1 rounded-full">
+        <div className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full">
           Week {currentWeek} / {blockDuration}
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="w-full bg-white bg-opacity-20 rounded-full h-2 mb-2">
+      <div className="w-full bg-white/20 rounded-full h-2 mb-2">
         <div
           className="bg-white h-2 rounded-full transition-all duration-500"
           style={{ width: `${progress}%` }}
