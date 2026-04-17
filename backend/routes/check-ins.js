@@ -59,7 +59,11 @@ router.post('/', requireRole('patient'), async (req, res) => {
 router.get('/today/:patientId', requireSelf('patientId'), async (req, res) => {
   try {
     const { patientId } = req.params;
-    const checkIn = await checkInService.getTodayCheckIn(parseInt(patientId));
+    // Accept client's local date to avoid UTC/AEST mismatch on Cloud Run
+    const clientDate = typeof req.query.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
+      ? req.query.date
+      : null;
+    const checkIn = await checkInService.getTodayCheckIn(parseInt(patientId), clientDate);
 
     if (!checkIn) {
       return res.status(404).json({ error: 'No check-in for today' });

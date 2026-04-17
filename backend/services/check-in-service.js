@@ -100,11 +100,18 @@ async function submitCheckIn(checkInData) {
 }
 
 /**
- * Get today's check-in for a patient
+ * Get today's check-in for a patient.
+ * clientDate: optional YYYY-MM-DD string from the client's local timezone.
+ * Falls back to server UTC date if not provided.
  */
-async function getTodayCheckIn(patientId) {
-  const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+async function getTodayCheckIn(patientId, clientDate = null) {
+  let today;
+  if (clientDate) {
+    today = clientDate; // already validated as YYYY-MM-DD by the route
+  } else {
+    const now = new Date();
+    today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }
 
   const checkIn = await db.getOne(`
     SELECT * FROM daily_check_ins

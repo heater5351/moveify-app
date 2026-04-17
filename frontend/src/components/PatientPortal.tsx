@@ -70,7 +70,8 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
   useEffect(() => {
     const checkTodayCheckIn = async () => {
       try {
-        const response = await fetch(`${API_URL}/check-ins/today/${patient.id}`, {
+        const localDate = toLocalDateString(new Date());
+        const response = await fetch(`${API_URL}/check-ins/today/${patient.id}?date=${localDate}`, {
           headers: getAuthHeaders()
         });
         if (response.ok) {
