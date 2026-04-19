@@ -62,7 +62,7 @@ Rules:
 - Write in plain, warm language suitable for adults aged 45–75
 - Never use clinical jargon without an immediate plain-language explanation
 - Never include diagnoses, pathology results, or sensitive medical information unless explicitly appropriate for the patient
-- Never use asterisks (*) anywhere in the output
+- Never use asterisks (*), emojis, or markdown formatting anywhere in the output
 - Do not include pricing, Medicare information, or next steps — those are added separately
 - Output only the two sections in plain text, using the exact headings: WHAT WE FOUND / WHAT WE'LL FOCUS ON
 - Do not include any preamble, explanation, or text outside the two sections`;
@@ -72,10 +72,11 @@ const CLINICAL_CONTEXT_SYSTEM_PROMPT = `You are a clinical exercise physiologist
 Your task is to extract objective, measured clinical findings and present them in a table for the patient handout.
 
 Rules:
-- ONLY include findings that have an actual measured value from the assessment (e.g. degrees, seconds, kg, reps, a graded score). Do not include subjective reports or observations that lack a numeric or graded result.
-- The Result column must contain only the patient's actual measured value (e.g. "45°", "4/5", "45 sec", "120/80 mmHg"). Never put normative data or comparisons in the Result column.
-- The Interpretation column should be short (one sentence max). Include a normative comparison here where relevant (e.g. "Below norm of 50–60° — suggests lumbar restriction").
-- Never use asterisks (*) anywhere in the output.
+- ONLY include findings that have an actual numeric or graded measurement (e.g. "45°", "4/5", "45 sec", "120/80 mmHg", "Grade 2"). Never include a finding if the only evidence is a subjective patient report or a qualitative clinician observation with no number or grade.
+- The Result column must contain only the patient's actual measured value. Never put normative data, comparisons, or descriptive text in the Result column.
+- The Interpretation column should be one short sentence. Include a normative comparison here if relevant (e.g. "Below norm of 50–60° — suggests lumbar restriction").
+- Never wrap test names in square brackets. Write the test name as plain text only (e.g. "ROM Forward Bending", not "[ROM Forward Bending]").
+- Never use asterisks (*), emojis, or markdown formatting anywhere in the output.
 
 Output format — one finding per line, pipe-separated, no header row:
 Test Name | Measured Value | Interpretation
@@ -111,7 +112,11 @@ async function generateHandout(transcript, patientFirstName, assessmentDate) {
       inferenceConfig: { maxTokens: 800 },
     });
     const ctxRes = await client.send(ctxCmd);
-    clinicalContext = ctxRes.output.message.content[0].text.trim();
+    // Strip asterisks and square brackets that the model may still produce
+    clinicalContext = ctxRes.output.message.content[0].text
+      .replace(/\*+/g, '')
+      .replace(/\[|\]/g, '')
+      .trim();
   } catch (err) {
     console.error('Clinical context generation failed:', err.message);
   }

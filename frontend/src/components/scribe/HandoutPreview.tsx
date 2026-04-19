@@ -13,17 +13,31 @@ interface HandoutPreviewProps {
 const TEAL = '#46c1c0';
 const NAVY = '#132232';
 
+// Strip markdown formatting, emojis, and common AI-generated decoration
+function sanitise(s: string): string {
+  return s
+    .replace(/\*+/g, '')
+    .replace(/\[|\]/g, '')                              // remove square brackets
+    .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')             // emoji block 1
+    .replace(/[\u{2600}-\u{27BF}]/gu, '')               // emoji/symbol block 2
+    .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')             // emoji block 3
+    .trim();
+}
+
 function cleanText(text: string): string {
-  return text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/^[-•]\s*/gm, '').replace(/\n\s*\n/g, '\n').trim();
+  return sanitise(text)
+    .replace(/^[-•·]\s*/gm, '')
+    .replace(/\n\s*\n/g, '\n')
+    .trim();
 }
 
 function formatClinicalContext(raw: string): React.ReactNode {
   const lines = raw.split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
   const findings = lines.map(line => {
-    const clean = line.replace(/^[-•*]\s*/, '').replace(/\*/g, '').trim();
+    const clean = sanitise(line.replace(/^[-•*]\s*/, ''));
 
     // Primary format: pipe-separated  Test | Value | Interpretation
-    const pipes = clean.split('|').map(p => p.trim());
+    const pipes = clean.split('|').map(p => sanitise(p));
     if (pipes.length >= 3 && pipes[0] && pipes[1]) {
       return { test: pipes[0], value: pipes[1], interpretation: pipes[2] };
     }
@@ -34,7 +48,7 @@ function formatClinicalContext(raw: string): React.ReactNode {
     if (match) {
       const rawValue = match[2].trim();
       const value = rawValue.split(/\s+vs\s+/i)[0].trim();
-      return { test: match[1].trim(), value, interpretation: match[3].trim() };
+      return { test: sanitise(match[1]), value: sanitise(value), interpretation: sanitise(match[3]) };
     }
 
     return null;
@@ -71,73 +85,68 @@ export default function HandoutPreview({
   onClose,
   onRegenerate,
 }: HandoutPreviewProps) {
-  const backdropRef = useRef<HTMLDivElement>(null);
-  const foundRef   = useRef<HTMLDivElement>(null);
-  const focusRef   = useRef<HTMLDivElement>(null);
+  const foundRef = useRef<HTMLDivElement>(null);
+  const focusRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (foundRef.current) foundRef.current.innerText = cleanText(sections.found);
     if (focusRef.current) focusRef.current.innerText = cleanText(sections.focus);
   }, [sections]);
 
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.id = 'handout-print-css';
-    style.textContent = `
-      @page { size: A4; margin: 12mm; }
-      @media print {
-        html, body { overflow: visible !important; height: auto !important; margin: 0 !important; padding: 0 !important; }
-        body * { visibility: hidden !important; }
-        #handout-modal-backdrop {
-          position: static !important;
-          overflow: visible !important;
-          height: auto !important;
-          background: transparent !important;
-          display: block !important;
-          padding: 0 !important;
-          margin: 0 !important;
-          flex-direction: column !important;
-          align-items: stretch !important;
-          justify-content: flex-start !important;
-        }
-        #handout-print-root, #handout-print-root * { visibility: visible !important; }
-        #handout-print-root {
-          position: static !important;
-          width: 100% !important;
-          max-width: none !important;
-          height: auto !important;
-          overflow: visible !important;
-          background: white !important;
-          box-shadow: none !important;
-          border-radius: 0 !important;
-          padding: 0 !important;
-          margin: 0 !important;
-        }
-        [data-no-print] { display: none !important; }
-        [contenteditable] { outline: none !important; border: none !important; background: white !important; }
-        .print-break-inside { break-inside: avoid; }
-        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-      }
-    `;
-    document.head.appendChild(style);
-    return () => { document.getElementById('handout-print-css')?.remove(); };
-  }, []);
-
+  // Opens a fresh browser window containing only the handout HTML, then prints it.
+  // This sidesteps all modal overflow/fixed-positioning constraints that prevent
+  // multi-page printing when using window.print() on the current page.
   function handlePrint() {
-    const bd = backdropRef.current;
-    if (!bd) { window.print(); return; }
-    const savedCss = bd.style.cssText;
-    bd.style.cssText = 'position:static;overflow:visible;height:auto;background:transparent;padding:0;margin:0;display:block;';
-    document.body.style.overflow = 'visible';
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      window.print();
-      const restore = () => {
-        bd.style.cssText = savedCss;
-        document.body.style.overflow = '';
-      };
-      window.addEventListener('afterprint', restore, { once: true });
-      setTimeout(restore, 3000);
-    }));
+    const root = document.getElementById('handout-print-root');
+    if (!root) return;
+
+    // Deep-clone, strip UI-only elements, fix image paths, remove contenteditable
+    const clone = root.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('[data-no-print]').forEach(el => el.remove());
+    clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+    clone.querySelectorAll('img').forEach(img => {
+      const attr = img.getAttribute('src') || '';
+      if (attr.startsWith('/')) img.setAttribute('src', `${window.location.origin}${attr}`);
+    });
+    // Remove modal chrome from the outer wrapper
+    clone.style.cssText = 'width:100%;max-width:none;border-radius:0;box-shadow:none;background:white;';
+
+    const printWin = window.open('', '_blank', 'width=900,height=1200');
+    if (!printWin) {
+      alert('Please allow pop-ups for this site to print the handout.');
+      return;
+    }
+
+    printWin.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Patient Handout</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    @page { size: A4; margin: 12mm; }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    html, body { margin: 0; padding: 0; background: white; font-family: 'DM Sans', Arial, sans-serif; }
+    table { border-collapse: collapse; }
+    .print-break-inside { break-inside: avoid; }
+  </style>
+</head>
+<body>${clone.outerHTML}</body>
+</html>`);
+    printWin.document.close();
+
+    // Give fonts/images ~700ms to load before opening print dialog
+    setTimeout(() => {
+      printWin.focus();
+      printWin.print();
+      printWin.addEventListener('afterprint', () => printWin.close(), { once: true });
+      setTimeout(() => { if (!printWin.closed) printWin.close(); }, 5000);
+    }, 700);
   }
 
   // Shared styles
@@ -180,11 +189,7 @@ export default function HandoutPreview({
   };
 
   return (
-    <div
-      ref={backdropRef}
-      id="handout-modal-backdrop"
-      className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center overflow-y-auto py-4 px-2"
-    >
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center overflow-y-auto py-4 px-2">
       <div id="handout-print-root" className="bg-white w-full max-w-[210mm] rounded-xl shadow-2xl">
 
         {/* Toolbar */}
