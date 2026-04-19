@@ -339,7 +339,6 @@ export type SoapTemplate = {
 export type HandoutSections = {
   found: string;
   focus: string;
-  pathway: string;
   clinicalContext?: string;
 }
 

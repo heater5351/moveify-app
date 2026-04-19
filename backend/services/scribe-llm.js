@@ -41,55 +41,66 @@ async function generateSoapNote(transcript, systemPrompt) {
 
 const HANDOUT_SYSTEM_PROMPT = `You are a clinical documentation assistant for Moveify Health Solutions, an Accredited Exercise Physiology practice in Williamstown, South Australia.
 
-Your task is to generate the patient-facing sections of an assessment handout (Sections 1, 2, and 3 only) from a session transcript provided by the Exercise Physiologist. The transcript is a raw, unstructured record of a clinical conversation — approximately the first 45 minutes of a 60-minute Gateway Assessment. The session is not yet complete when you receive this input, so focus on what has been discussed and assessed so far.
+Your task is to generate the patient-facing sections of an assessment handout (Sections 1 and 2 only) from a session transcript provided by the Exercise Physiologist. The transcript is a raw, unstructured record of a clinical conversation — approximately the first 45 minutes of a 60-minute Gateway Assessment.
+
+Section 1 — WHAT WE FOUND
+Summarise the key assessment findings in plain language. Use 4–6 bullet points covering:
+- The patient's main presenting concerns and how long they have been present
+- Relevant history or contributing factors mentioned in the session
+- Key physical findings from the assessment (movement, strength, endurance, function)
+- How these findings relate to the patient's daily life, work, or goals
+- Any lifestyle or health factors discussed that are relevant to exercise
+
+Section 2 — WHAT WE'LL FOCUS ON
+Outline the treatment priorities that follow from the findings. Use 3–5 bullet points covering:
+- The primary movement, strength, or endurance goals for the program
+- Any specific exercises, activities, or habits that will be targeted
+- How the program will address the key findings from Section 1
+- Any lifestyle, pain management, or self-management strategies discussed
 
 Rules:
-- Write in plain, warm, non-clinical language suitable for adults aged 45–75
+- Write in plain, warm language suitable for adults aged 45–75
 - Never use clinical jargon without an immediate plain-language explanation
-- Never include diagnoses, pathology results, or sensitive medical information that the clinician has not explicitly flagged as appropriate for the patient to see
-- Sections 1 and 2 use bullet points (2–4 for Section 1, 2–3 for Section 2)
-- Section 3 is 1–2 sentences recommending a tier and briefly explaining why
-- The recommended tier must be one of: Foundation, Progress, or Performance
+- Never include diagnoses, pathology results, or sensitive medical information unless explicitly appropriate for the patient
+- Never use asterisks (*) anywhere in the output
 - Do not include pricing, Medicare information, or next steps — those are added separately
-- Output only the three sections in plain text, using the exact headings: WHAT WE FOUND / WHAT WE'LL FOCUS ON / RECOMMENDED PATHWAY
-- Do not include any preamble, explanation, or text outside the three sections`;
+- Output only the two sections in plain text, using the exact headings: WHAT WE FOUND / WHAT WE'LL FOCUS ON
+- Do not include any preamble, explanation, or text outside the two sections`;
 
 const CLINICAL_CONTEXT_SYSTEM_PROMPT = `You are a clinical exercise physiologist analyzing assessment data from a patient transcript.
 
-Your task is to extract objective clinical findings and provide context by comparing them to normative values or clinical thresholds.
+Your task is to extract objective, measured clinical findings and present them in a table for the patient handout.
 
-For each finding mentioned in the transcript:
-1. Identify the measure
-2. Extract the patient's value
-3. Compare to age-adjusted norms or clinical thresholds
-4. Briefly interpret the clinical meaning
+Rules:
+- ONLY include findings that have an actual measured value from the assessment (e.g. degrees, seconds, kg, reps, a graded score). Do not include subjective reports or observations that lack a numeric or graded result.
+- The Result column must contain only the patient's actual measured value (e.g. "45°", "4/5", "45 sec", "120/80 mmHg"). Never put normative data or comparisons in the Result column.
+- The Interpretation column should be short (one sentence max). Include a normative comparison here where relevant (e.g. "Below norm of 50–60° — suggests lumbar restriction").
+- Never use asterisks (*) anywhere in the output.
 
-Output format — one finding per line:
-- [Test name]: [patient value] vs [norm/threshold] — [brief interpretation]
+Output format — one finding per line, pipe-separated, no header row:
+Test Name | Measured Value | Interpretation
 
-Only include findings actually present in the transcript. Do not fabricate data.`;
+Only include findings actually present in the transcript. Do not fabricate data. If no objective measurements are present, output nothing.`;
 
 async function generateHandout(transcript, patientFirstName, assessmentDate) {
   if (!transcript || transcript.trim().length < 10) {
     throw new Error('Transcript too short to generate a handout');
   }
-  const userMessage = `The following is a transcript of a Gateway Assessment session. Generate Sections 1, 2, and 3 of the patient assessment handout.\n\nTranscript:\n${transcript}\n\nPatient first name: ${patientFirstName}\nAssessment date: ${assessmentDate}`;
+  const userMessage = `The following is a transcript of a Gateway Assessment session. Generate Sections 1 and 2 of the patient assessment handout.\n\nTranscript:\n${transcript}\n\nPatient first name: ${patientFirstName}\nAssessment date: ${assessmentDate}`;
   const command = new ConverseCommand({
     modelId: MODEL_ID,
     messages: [{ role: 'user', content: [{ text: userMessage }] }],
     system: [{ text: HANDOUT_SYSTEM_PROMPT }],
-    inferenceConfig: { maxTokens: 1500 },
+    inferenceConfig: { maxTokens: 2000 },
   });
   const response = await client.send(command);
   const raw = response.output.message.content[0].text;
-  const cleaned = raw.replace(/\*\*/g, '');
-  const foundMatch = cleaned.match(/WHAT WE FOUND\s*\n([\s\S]*?)(?=WHAT WE(?:'|')LL FOCUS ON|RECOMMENDED PATHWAY|$)/i);
-  const focusMatch = cleaned.match(/WHAT WE(?:'|')LL FOCUS ON\s*\n([\s\S]*?)(?=RECOMMENDED PATHWAY|$)/i);
-  const pathwayMatch = cleaned.match(/RECOMMENDED PATHWAY\s*\n([\s\S]*?)$/i);
+  const cleaned = raw.replace(/\*\*/g, '').replace(/\*/g, '');
+  const foundMatch = cleaned.match(/WHAT WE FOUND\s*\n([\s\S]*?)(?=WHAT WE(?:'|')LL FOCUS ON|$)/i);
+  const focusMatch = cleaned.match(/WHAT WE(?:'|')LL FOCUS ON\s*\n([\s\S]*?)$/i);
   const sections = {
     found: foundMatch ? foundMatch[1].trim() : '',
     focus: focusMatch ? focusMatch[1].trim() : '',
-    pathway: pathwayMatch ? pathwayMatch[1].trim() : '',
   };
   let clinicalContext = '';
   try {
