@@ -54,8 +54,8 @@ export const ExerciseCompletionModal = ({
   const [rpeRating, setRpeRating] = useState<number | undefined>(
     existingCompletion?.rpeRating
   );
-  const [painLevel, setPainLevel] = useState<number | undefined>(
-    existingCompletion?.painLevel
+  const [painLevel, setPainLevel] = useState<number>(
+    existingCompletion?.painLevel ?? 0
   );
   const [notes, setNotes] = useState<string>(existingCompletion?.notes || '');
 
@@ -364,20 +364,19 @@ export const ExerciseCompletionModal = ({
                     Pain <span className="text-gray-400">(0 none — 10 worst)</span>
                   </label>
                   <span className={`text-lg font-bold ${
-                    painLevel === undefined ? 'text-gray-400' :
                     painLevel === 0 ? 'text-green-600' :
                     painLevel <= 3 ? 'text-yellow-600' :
                     painLevel <= 6 ? 'text-orange-600' :
                     'text-red-600'
                   }`}>
-                    {painLevel !== undefined ? painLevel : '-'}
+                    {painLevel}
                   </span>
                 </div>
                 <input
                   type="range"
                   min="0"
                   max="10"
-                  value={painLevel !== undefined ? painLevel : 0}
+                  value={painLevel}
                   onChange={(e) => setPainLevel(parseInt(e.target.value))}
                   className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-red-600"
                 />
