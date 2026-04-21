@@ -24,7 +24,7 @@ router.get('/report-templates', async (req, res) => {
 // POST /api/scribe/sessions/:id/report/generate
 router.post('/sessions/:id/report/generate', async (req, res) => {
   try {
-    const { type = 'cdmp' } = req.body;
+    const { type = 'cdmp', patientName, sessionDate } = req.body;
 
     const sessionResult = await db.query(
       'SELECT id, clinician_id FROM scribe_sessions WHERE id = $1',
@@ -47,7 +47,7 @@ router.post('/sessions/:id/report/generate', async (req, res) => {
     if (templateResult.rows.length === 0) return res.status(404).json({ error: 'Report template not found' });
     const systemPrompt = templateResult.rows[0].system_prompt;
 
-    const result = await generateReport(noteContent, systemPrompt);
+    const result = await generateReport(noteContent, systemPrompt, patientName, sessionDate);
 
     const wordCount = noteContent.split(/\s+/).length;
     audit.log(req, 'report_generated', 'scribe_session', parseInt(req.params.id), { type, wordCount, model: result.model });

@@ -54,14 +54,16 @@ export async function generateHandout(
 
 export async function generateReport(
   sessionId: number,
-  type: 'cdmp'
+  type: 'cdmp',
+  patientName?: string,
+  sessionDate?: string,
 ): Promise<{ sections: { executiveSummary: string; objectiveAssessment: string; goals: string; managementPlan: string }; model: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 45_000);
   try {
     const res = await apiFetch(`/sessions/${sessionId}/report/generate`, {
       method: 'POST',
-      body: JSON.stringify({ type }),
+      body: JSON.stringify({ type, patientName, sessionDate }),
       signal: controller.signal,
     });
     if (!res.ok) {

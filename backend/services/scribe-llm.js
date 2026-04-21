@@ -125,11 +125,13 @@ async function generateHandout(transcript, patientFirstName, assessmentDate) {
   return { sections: { ...sections, clinicalContext: clinicalContext || undefined }, model: MODEL_ID };
 }
 
-async function generateReport(soapNoteContent, systemPrompt) {
+async function generateReport(soapNoteContent, systemPrompt, patientName, sessionDate) {
   if (!soapNoteContent || soapNoteContent.trim().length < 20) {
     throw new Error('SOAP note too short to generate a report');
   }
-  const userMessage = `The following is a SOAP note from a patient consultation. Generate the three report sections as instructed.\n\nSOAP Note:\n${soapNoteContent}`;
+  const nameContext = patientName ? `Patient full name: ${patientName}\n` : '';
+  const dateContext = sessionDate ? `Session date: ${sessionDate}\n` : '';
+  const userMessage = `${nameContext}${dateContext}\nSOAP Note:\n${soapNoteContent}\n\nGenerate the four report sections. Use the patient name and session date provided above — do not infer these from the note.`;
   const command = new ConverseCommand({
     modelId: MODEL_ID,
     messages: [{ role: 'user', content: [{ text: userMessage }] }],

@@ -81,7 +81,12 @@ export default function ScribeReportsPage() {
     setGenError('');
     try {
       if (selectedTemplate === 'cdmp') {
-        const result = await generateReport(selectedSession.id, 'cdmp');
+        const result = await generateReport(
+          selectedSession.id,
+          'cdmp',
+          selectedSession.patientName,
+          new Date(selectedSession.sessionDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }),
+        );
         setActiveReport({ sections: result.sections, session: selectedSession });
       } else {
         const transcriptRes = await apiFetch(`/sessions/${selectedSession.id}/transcript`);
