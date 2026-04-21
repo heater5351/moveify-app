@@ -141,8 +141,8 @@ async function generateReport(soapNoteContent, systemPrompt) {
   const cleaned = raw.replace(/\*\*/g, '');
   const summaryMatch = cleaned.match(/EXECUTIVE SUMMARY\s*\n([\s\S]*?)(?=OBJECTIVE ASSESSMENT|$)/i);
   const objectiveMatch = cleaned.match(/OBJECTIVE ASSESSMENT\s*\n([\s\S]*?)(?=GOALS|$)/i);
-  const goalsMatch = cleaned.match(/GOALS\s*\n([\s\S]*?)(?=MANAGEMENT PLAN|$)/i);
-  const planMatch = cleaned.match(/MANAGEMENT PLAN\s*\n([\s\S]*?)$/i);
+  const goalsMatch = cleaned.match(/GOALS\s*\n([\s\S]*?)(?=RECOMMENDATIONS?|MANAGEMENT PLAN|$)/i);
+  const planMatch = cleaned.match(/(?:RECOMMENDATIONS?|MANAGEMENT PLAN)\s*\n([\s\S]*?)$/i);
   return {
     executiveSummary: summaryMatch ? summaryMatch[1].trim() : '',
     objectiveAssessment: objectiveMatch ? objectiveMatch[1].trim() : '',
