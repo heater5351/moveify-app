@@ -14,6 +14,7 @@ COPY middleware/ ./middleware/
 COPY routes/ ./routes/
 COPY services/ ./services/
 COPY data/ ./data/
+COPY assets/ ./assets/
 
 EXPOSE 8080
 
