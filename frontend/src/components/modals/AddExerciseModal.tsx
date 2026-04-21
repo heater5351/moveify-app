@@ -53,7 +53,8 @@ const EQUIPMENT_OPTIONS = [
   'Foam Roller',
   'Stability Ball',
   'Cable',
-  'Support'
+  'Support',
+  'Wobble Cushion'
 ];
 
 const POSITION_OPTIONS = [
