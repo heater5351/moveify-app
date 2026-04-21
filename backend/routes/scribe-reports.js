@@ -3,6 +3,7 @@ const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { decrypt } = require('../services/scribe-encryption');
 const { generateReport } = require('../services/scribe-llm');
+const { generateGPReportDocx } = require('../services/scribe-docx');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -56,6 +57,28 @@ router.post('/sessions/:id/report/generate', async (req, res) => {
   } catch (err) {
     console.error('Generate report error:', err.message);
     res.status(500).json({ error: 'Failed to generate report' });
+  }
+});
+
+// POST /api/scribe/sessions/:id/report/docx — generate DOCX from edited report content
+router.post('/sessions/:id/report/docx', async (req, res) => {
+  try {
+    const sessionResult = await db.query(
+      'SELECT id, clinician_id FROM scribe_sessions WHERE id = $1', [req.params.id]
+    );
+    if (sessionResult.rows.length === 0) return res.status(404).json({ error: 'Session not found' });
+    if (sessionResult.rows[0].clinician_id !== req.user.id) return res.status(403).json({ error: 'Access denied' });
+
+    const buffer = await generateGPReportDocx(req.body);
+    const safeName = (req.body.patientName || 'Patient').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'Content-Disposition': `attachment; filename="GP_Report_${safeName}.docx"`,
+    });
+    res.send(buffer);
+  } catch (err) {
+    console.error('Generate DOCX error:', err.message);
+    res.status(500).json({ error: 'Failed to generate DOCX' });
   }
 });
 

@@ -230,7 +230,8 @@ export default function ScribeReportsPage() {
           type="cdmp"
           sections={activeReport.sections}
           patientName={activeReport.session.patientName}
-          sessionDate={activeReport.session.sessionDate}
+          sessionDate={new Date(activeReport.session.sessionDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
+          sessionId={activeReport.session.id}
           onClose={() => setActiveReport(null)}
           onRegenerate={handleGenerate}
         />
