@@ -29,6 +29,12 @@ const QUALITY = '2'; // ffmpeg jpg quality (2-31, lower = better)
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
 const FORCE = process.argv.includes('--force'); // Regenerate all thumbnails
 
+// --only "Name One" "Name Two" ... — limit to specific video names (implies --force for those)
+const onlyIdx = process.argv.indexOf('--only');
+const ONLY_NAMES = onlyIdx !== -1
+  ? process.argv.slice(onlyIdx + 1).filter(a => !a.startsWith('--'))
+  : null;
+
 async function main() {
   const storage = new Storage();
   const bucket = storage.bucket(BUCKET_NAME);
@@ -37,8 +43,15 @@ async function main() {
   const [files] = await bucket.getFiles();
 
   // Filter to video files (no extension = videos, skip .jpg files)
-  const videos = files.filter(f => !f.name.endsWith('.jpg') && !f.name.endsWith('.png') && !f.name.includes('/'));
-  console.log(`Found ${videos.length} videos in gs://${BUCKET_NAME}/`);
+  let videos = files.filter(f => !f.name.endsWith('.jpg') && !f.name.endsWith('.png') && !f.name.includes('/'));
+
+  if (ONLY_NAMES) {
+    const nameSet = new Set(ONLY_NAMES);
+    videos = videos.filter(f => nameSet.has(f.name));
+    console.log(`Targeting ${videos.length} of ${files.length} videos (--only filter)`);
+  } else {
+    console.log(`Found ${videos.length} videos in gs://${BUCKET_NAME}/`);
+  }
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'moveify-thumbs-'));
   let generated = 0;
@@ -48,8 +61,8 @@ async function main() {
   for (const file of videos) {
     const thumbName = `${file.name}.jpg`;
 
-    // Check if thumbnail already exists (skip unless --force)
-    if (!FORCE) {
+    // Check if thumbnail already exists (skip unless --force or --only)
+    if (!FORCE && !ONLY_NAMES) {
       const [exists] = await bucket.file(thumbName).exists();
       if (exists) {
         console.log(`  SKIP ${file.name} (thumbnail exists)`);
@@ -68,11 +81,12 @@ async function main() {
 
       // Extract frame with ffmpeg
       // zscale chain converts from iPhone HLG/Dolby Vision HDR to standard BT.709 SDR.
-      // npl=1000 matches iPhone HLG peak luminance (~1000 nits via USB/original file).
+      // npl=500 (nominal peak luminance): lower value = less dynamic range compression = brighter output.
+      // reinhard tonemapper: simpler and brighter than hable for typical indoor exercise scenes.
       // Videos downloaded via Google Drive are already SDR and don't need this chain,
-      // but it's harmless — SDR content at npl=1000 tone-maps cleanly.
+      // but it's harmless — SDR content tone-maps cleanly.
       execSync(
-        `"${FFMPEG}" -y -ss ${FRAME_TIME} -i "${videoPath}" -frames:v 1 -q:v ${QUALITY} -vf "zscale=t=linear:npl=1000,format=gbrpf32le,zscale=p=bt709,tonemap=hable,zscale=t=bt709:m=bt709:r=tv,scale=640:-1,format=yuv420p" -update 1 "${thumbPath}"`,
+        `"${FFMPEG}" -y -ss ${FRAME_TIME} -i "${videoPath}" -frames:v 1 -q:v ${QUALITY} -vf "zscale=t=linear:npl=500,format=gbrpf32le,zscale=p=bt709,tonemap=reinhard,zscale=t=bt709:m=bt709:r=tv,scale=640:-1,format=yuv420p" -update 1 "${thumbPath}"`,
         { stdio: 'pipe' }
       );
 
