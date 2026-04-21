@@ -94,6 +94,7 @@ export type Patient = {
   phone: string;
   address: string;
   dateAdded: string;
+  pendingSetup?: boolean;
   assignedPrograms: AssignedProgram[];
 }
 

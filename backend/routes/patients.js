@@ -199,6 +199,7 @@ async function formatPatientWithPrograms(patient) {
     phone: patient.phone || '',
     address: patient.address || '',
     dateAdded: patient.created_at,
+    pendingSetup: patient.pending_setup === true,
     assignedPrograms: assignedPrograms
   };
 }
@@ -211,7 +212,8 @@ router.get('/', requireRole('clinician'), async (req, res) => {
 
     // 1. All patients
     const patients = await db.getAll(`
-      SELECT id, email, role, name, dob, phone, address, condition, created_at
+      SELECT id, email, role, name, dob, phone, address, condition, created_at,
+             (password_hash IS NULL) AS pending_setup
       FROM users
       WHERE role = 'patient'
       ORDER BY created_at DESC

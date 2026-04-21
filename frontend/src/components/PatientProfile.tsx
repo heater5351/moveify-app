@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown, FileText } from 'lucide-react';
+import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown, FileText, Mail } from 'lucide-react';
 import ScribeHistoryPage from './scribe/ScribeHistoryPage';
 import type { Patient, ClinicianFlag, BlockStatusResponse } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
@@ -28,6 +28,8 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
   const [flags, setFlags] = useState<ClinicianFlag[]>([]);
   const [showFlags, setShowFlags] = useState(false);
   const [blockMap, setBlockMap] = useState<Record<number, BlockStatusResponse>>({});
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Fetch unresolved flags for this patient's programs
   useEffect(() => {
@@ -85,6 +87,35 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
     fetchBlocks();
   }, [patient.assignedPrograms]);
 
+  const handleResendInvitation = async () => {
+    setResending(true);
+    setResendMsg(null);
+    try {
+      const res = await fetch(`${API_URL}/invitations/generate`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: patient.email,
+          name: patient.name,
+          dob: patient.dob,
+          phone: patient.phone,
+          address: patient.address,
+          condition: patient.condition,
+        }),
+      });
+      if (res.ok) {
+        setResendMsg({ type: 'success', text: 'Invitation resent successfully.' });
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setResendMsg({ type: 'error', text: (err as { error?: string }).error || 'Failed to resend invitation.' });
+      }
+    } catch {
+      setResendMsg({ type: 'error', text: 'Network error. Please try again.' });
+    } finally {
+      setResending(false);
+    }
+  };
+
   const handleResolveFlag = async (flagId: number) => {
     try {
       await fetch(`${API_URL}/blocks/flags/${flagId}/resolve`, {
@@ -106,13 +137,32 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
         >
           ← Patients
         </button>
-        <button
-          onClick={onEdit}
-          className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-sm transition-colors shadow-sm"
-        >
-          <Edit size={15} />
-          Edit Profile
-        </button>
+        <div className="flex items-center gap-2">
+          {patient.pendingSetup && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleResendInvitation}
+                disabled={resending}
+                className="bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 disabled:opacity-50 px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-sm transition-colors shadow-sm"
+              >
+                <Mail size={15} />
+                {resending ? 'Sending…' : 'Resend Invitation'}
+              </button>
+              {resendMsg && (
+                <span className={`text-xs font-medium ${resendMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+                  {resendMsg.text}
+                </span>
+              )}
+            </div>
+          )}
+          <button
+            onClick={onEdit}
+            className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-sm transition-colors shadow-sm"
+          >
+            <Edit size={15} />
+            Edit Profile
+          </button>
+        </div>
       </div>
 
       {/* Patient header card */}
