@@ -360,7 +360,27 @@ export default function HandoutPreview({
               Note: If you decide to commit to a treatment block within 7 days of your casual sessions, the fees paid are credited toward your block price.
             </div>
 
-            <hr style={dividerStyle} />
+            {/* Part 2 page break — always starts a new page when printed */}
+            <div style={{ breakBefore: 'page', pageBreakBefore: 'always' }}>
+              {/* On-screen only: Part 2 label */}
+              <div
+                data-no-print
+                style={{
+                  background: '#f1f5f9',
+                  border: `1px dashed ${TEAL}`,
+                  borderRadius: '6px',
+                  padding: '6px 12px',
+                  marginBottom: '14px',
+                  color: TEAL,
+                  fontWeight: 700,
+                  fontSize: '0.74rem',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  textAlign: 'center',
+                }}
+              >
+                Part 2 — Pricing &amp; Next Steps (starts on a new page when printed)
+              </div>
 
             {/* Section 4 — Medicare & Health Fund */}
             <div style={{ ...headingStyle, marginBottom: '8px' }}>Section 4 — Medicare and Health Fund Offsets</div>
@@ -391,6 +411,8 @@ export default function HandoutPreview({
               Moveify Health Solutions · ryan@moveifyhealth.com · 0435 524 991<br />
               ABN 52 263 141 529 · 4 George St, Williamstown SA
             </div>
+
+            </div>{/* end Part 2 wrapper */}
 
           </div>
         </div>
