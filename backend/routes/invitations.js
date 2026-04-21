@@ -36,8 +36,8 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
     // Generate unique token
     const token = crypto.randomBytes(32).toString('hex');
 
-    // Set expiration (7 days from now)
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    // Set expiration (14 days from now)
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
     // Use transaction to ensure token + user are created atomically
     const client = await db.getClient();
