@@ -359,6 +359,7 @@ router.get('/', requireRole('clinician'), async (req, res) => {
       phone: patient.phone || '',
       address: patient.address || '',
       dateAdded: patient.created_at,
+      pendingSetup: patient.pending_setup === true,
       assignedPrograms: programsByPatient[patient.id] || []
     }));
 
@@ -377,7 +378,8 @@ router.get('/:patientId', requirePatientAccess, async (req, res) => {
     const { patientId } = req.params;
 
     const patient = await db.getOne(`
-      SELECT id, email, role, name, dob, phone, address, condition, created_at
+      SELECT id, email, role, name, dob, phone, address, condition, created_at,
+             (password_hash IS NULL) AS pending_setup
       FROM users
       WHERE id = $1 AND role = 'patient'
     `, [patientId]);
