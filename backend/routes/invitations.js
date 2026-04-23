@@ -26,8 +26,8 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
     }
 
     // Check if user already exists
-    const existingUser = await db.getOne('SELECT * FROM users WHERE email = $1', [email]);
-    if (existingUser) {
+    const existingUser = await db.getOne('SELECT id, password_hash FROM users WHERE email = $1', [email]);
+    if (existingUser && existingUser.password_hash !== null) {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
@@ -54,14 +54,18 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
         VALUES ($1, $2, 'patient', $3, $4, $5, $6, $7, $8, $9)
       `, [token, email, name, dob, phone, address, condition, expiresAt, clinicianId]);
 
-      // Create user immediately with null password (they'll set it when accepting invitation)
-      const userResult = await client.query(`
-        INSERT INTO users (email, password_hash, role, name, dob, phone, address, condition)
-        VALUES ($1, NULL, 'patient', $2, $3, $4, $5, $6)
-        RETURNING id
-      `, [email, name, dob, phone, address, condition]);
-
-      patientId = userResult.rows[0].id;
+      if (existingUser) {
+        // Resend: user row already exists with no password — just reuse it
+        patientId = existingUser.id;
+      } else {
+        // New invite: create user with null password
+        const userResult = await client.query(`
+          INSERT INTO users (email, password_hash, role, name, dob, phone, address, condition)
+          VALUES ($1, NULL, 'patient', $2, $3, $4, $5, $6)
+          RETURNING id
+        `, [email, name, dob, phone, address, condition]);
+        patientId = userResult.rows[0].id;
+      }
 
       await client.query('COMMIT');
     } catch (txError) {
