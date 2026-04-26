@@ -2426,16 +2426,17 @@ export const exercises: Exercise[] = [
   },
   {
     id: 246,
-    name: 'Seated Hip Abduction With Theraband',
+    name: 'Seated Isometric Hip Abduction With Theraband',
     category: 'Musculoskeletal',
-    duration: '3 sets x 15 reps',
-    description: 'Sit upright on a chair with a resistance band looped around both thighs just above the knees. Keeping your feet flat on the floor, push both knees outward against the band as far as comfortable. Hold briefly at the outer range, then slowly return to the start position.',
-    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Seated%20Hip%20Abduction%20With%20Theraband',
+    duration: '3 sets x 30s',
+    description: 'Sit upright on a chair with a resistance band looped around both thighs just above the knees. Push both knees outward against the band and hold the isometric contraction for the prescribed duration. Keep your feet flat on the floor and maintain an upright posture throughout.',
+    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Seated%20Isometric%20Hip%20Abduction%20With%20Theraband',
     jointArea: 'Hip',
     muscleGroup: 'Glutes',
-    movementType: 'Abduction',
+    movementType: 'Isometric',
     equipment: 'Resistance Band',
-    position: 'Seated'
+    position: 'Seated',
+    exerciseType: 'duration'
   },
   {
     id: 247,
