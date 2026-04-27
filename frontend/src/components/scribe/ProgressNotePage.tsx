@@ -162,10 +162,10 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isRecording, isPaused]);
 
-  // Notify parent when recording becomes active or inactive
+  // Notify parent when a recording session is open (true while recording or paused, false only on stop)
   useEffect(() => {
-    onRecordingActiveChange?.(isRecording && !isPaused);
-  }, [isRecording, isPaused, onRecordingActiveChange]);
+    onRecordingActiveChange?.(isRecording);
+  }, [isRecording, onRecordingActiveChange]);
 
   function formatTime(secs: number) {
     const m = Math.floor(secs / 60);
