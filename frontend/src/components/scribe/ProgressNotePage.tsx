@@ -245,7 +245,13 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
       });
       if (!res.ok) throw new Error('Generation failed');
       const data = await res.json();
-      setNoteContent(prev => prev.trim() ? `${prev}\n\n---\n\n${data.content}` : data.content);
+      const combined = noteContent.trim() ? `${noteContent}\n\n---\n\n${data.content}` : data.content;
+      setNoteContent(combined);
+      // Persist the combined note so re-entering the session shows the full content
+      apiFetch(`/sessions/${sid}/soap-note`, {
+        method: 'POST',
+        body: JSON.stringify({ content: combined }),
+      }).catch(() => {});
       setTimeout(() => {
         if (noteRef.current) {
           noteRef.current.focus();
@@ -330,7 +336,15 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
       {/* Header */}
       <div className="flex items-center justify-between py-3 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <button onClick={onBack} className="p-1 -ml-1 text-gray-400 hover:text-secondary-700 transition shrink-0">
+          <button onClick={() => {
+            if (noteContent.trim() && sessionIdRef.current && !isLocked) {
+              apiFetch(`/sessions/${sessionIdRef.current}/soap-note`, {
+                method: 'POST',
+                body: JSON.stringify({ content: noteContent }),
+              }).catch(() => {});
+            }
+            onBack();
+          }} className="p-1 -ml-1 text-gray-400 hover:text-secondary-700 transition shrink-0">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="min-w-0">
