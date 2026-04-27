@@ -184,6 +184,12 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
   }
 
   async function handleStartRecording() {
+    // Preserve any completed transcript before wiping for the new recording
+    const completed = buildLabelledNow();
+    if (completed) {
+      prevTranscriptRef.current = completed;
+      setPrevTranscript(completed);
+    }
     setRecordingDone(false);
     setLines([]);
     linesRef.current = [];
