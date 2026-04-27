@@ -81,13 +81,18 @@ function App() {
 
   // Open a persistent note (survives tab navigation)
   const handleOpenNote = useCallback((patientId: number, patientName: string, sessionId?: number) => {
+    // Returning to the same session that's already recording — just show it, don't remount
+    if (sessionId != null && activeRecordingSessionId === sessionId) {
+      setNoteFullscreen(true);
+      return;
+    }
     setActiveNote({ patientId, patientName, sessionId });
     setNoteFullscreen(true);
     setNoteElapsedSecs(0);
     setNoteKey(k => k + 1); // force ProgressNotePage to remount fresh for every new open
     // Don't pre-set activeRecordingSessionId here — ProgressNotePage fires
     // onSessionIdChange only when recording actually starts via ensureSession.
-  }, []);
+  }, [activeRecordingSessionId]);
 
   // Drive the floating indicator timer off noteRecordingActive; clear session highlight when stopped
   useEffect(() => {
@@ -1185,7 +1190,7 @@ function App() {
               existingSessionId={activeNote.sessionId}
               onRecordingActiveChange={setNoteRecordingActive}
               onSessionIdChange={setActiveRecordingSessionId}
-              onBack={() => { setNoteFullscreen(false); setNoteRecordingActive(false); setActiveRecordingSessionId(null); setScribeHistoryKey(k => k + 1); setNotesRefreshKey(k => k + 1); }}
+              onBack={() => { setNoteFullscreen(false); setScribeHistoryKey(k => k + 1); setNotesRefreshKey(k => k + 1); }}
               onNoteComplete={handleNoteComplete}
             />
           </div>
