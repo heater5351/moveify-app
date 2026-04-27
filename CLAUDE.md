@@ -370,13 +370,36 @@ Moveify stores **sensitive health information** (patient demographics, condition
 
 ## Workflow
 
-**⚠ CRITICAL: After EVERY change, you MUST commit AND `git push` in the same step. No exceptions. Do NOT wait for the user to tell you to push.**
+### Branches
+
+- **`dev`** — active development branch. Push here for staging. Vercel auto-deploys a preview URL; backend targets `moveify-backend-staging` + `moveify_staging` DB.
+- **`main`** — production. Only merge `dev → main` when ready to release.
+
+**⚠ Default push target is `dev`. Never push directly to `main` unless explicitly asked.**
+
+### Daily workflow (dev branch)
 
 1. Use `/commit-commands:commit` to create the commit
-2. **Immediately** run `git push` — the commit skill does NOT push for you
-3. Frontend auto-deploys via Vercel on push. Never leave commits unpushed.
+2. **Immediately** run `git push origin dev`
+3. Vercel preview auto-deploys. Never leave commits unpushed.
 
-**Backend changes:** If you modified any file in `backend/`, redeploy to Cloud Run immediately after pushing:
+**Backend changes on dev:** redeploy staging:
+```
+gcloud run deploy moveify-backend-staging --source backend/ --region australia-southeast1 --platform managed --allow-unauthenticated --add-cloudsql-instances moveify-app:australia-southeast1:moveify-db
+```
+
+### Merging dev → main (production release)
+
+Before merging, verify:
+1. **DB migrations** — if the change adds/alters schema, run the migration on production Cloud SQL *before* deploying the backend
+2. **New env vars** — add any new env vars to the production Cloud Run service *before* deploying
+3. **Breaking API changes** — redeploy production backend *before* merging (frontend deploys instantly on merge)
+
+Then:
+```
+git checkout main && git merge dev && git push origin main
+```
+Then redeploy production backend if `backend/` changed:
 ```
 gcloud run deploy moveify-backend --source backend/ --region australia-southeast1 --platform managed --allow-unauthenticated --add-cloudsql-instances moveify-app:australia-southeast1:moveify-db
 ```
