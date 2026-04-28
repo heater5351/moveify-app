@@ -39,6 +39,7 @@ export async function generateHandout(
   try {
     const res = await apiFetch(`/sessions/${sessionId}/handout/generate`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ transcript, patientFirstName, assessmentDate }),
       signal: controller.signal,
     });
@@ -84,6 +85,7 @@ export async function generateReport(
   try {
     const res = await apiFetch(`/sessions/${sessionId}/report/generate`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, patientName, sessionDate }),
       signal: controller.signal,
     });

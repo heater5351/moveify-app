@@ -44,6 +44,7 @@ async function generateGPReportDocx(data) {
     delimiters: { start: '{{', end: '}}' },
     paragraphLoop: true,
     linebreaks: true,
+    nullGetter() { return ''; },
   });
 
   const oa_rows = parseOaRows(data.objectiveAssessment);
@@ -87,15 +88,18 @@ async function generateGPReportDocx(data) {
 
   try {
     doc.render(context);
+    console.log('[scribe-docx] render succeeded');
   } catch (err) {
     console.error('[scribe-docx] docxtemplater render error:', err.message);
     if (err.properties && err.properties.errors) {
-      err.properties.errors.forEach(e => console.error('  tag error:', e.properties));
+      err.properties.errors.forEach(e => console.error('  tag error:', JSON.stringify(e.properties)));
     }
     throw err;
   }
 
-  return doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+  const buf = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+  console.log('[scribe-docx] buffer size:', buf.length);
+  return buf;
 }
 
 module.exports = { generateGPReportDocx };
