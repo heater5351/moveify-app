@@ -41,11 +41,15 @@ async function generateGPReportDocx(data) {
   const content = fs.readFileSync(TEMPLATE_PATH, 'binary');
   const zip = new PizZip(content);
 
-  // Word's spell/grammar checker inserts <w:proofErr> elements between XML runs,
-  // which breaks docxtemplater's ability to stitch {{ placeholder }} tags that
-  // span multiple runs. Strip them before rendering.
+  // Pre-process document XML:
+  // 1. Strip <w:proofErr> elements that Word inserts between runs and break tag stitching.
+  // 2. Normalise {{ tag }} → {{tag}} — Word preserves leading/trailing spaces inside
+  //    the braces which docxtemplater does not trim before context lookup.
   const docXmlRaw = zip.files['word/document.xml'].asText();
-  const docXmlClean = docXmlRaw.replace(/<w:proofErr[^>]*\/>/g, '');
+  const docXmlClean = docXmlRaw
+    .replace(/<w:proofErr[^>]*\/>/g, '')
+    .replace(/\{\{\s+/g, '{{')
+    .replace(/\s+\}\}/g, '}}');
   zip.file('word/document.xml', docXmlClean);
 
   const doc = new Docxtemplater(zip, {
