@@ -40,6 +40,14 @@ async function generateGPReportDocx(data) {
 
   const content = fs.readFileSync(TEMPLATE_PATH, 'binary');
   const zip = new PizZip(content);
+
+  // Word's spell/grammar checker inserts <w:proofErr> elements between XML runs,
+  // which breaks docxtemplater's ability to stitch {{ placeholder }} tags that
+  // span multiple runs. Strip them before rendering.
+  const docXmlRaw = zip.files['word/document.xml'].asText();
+  const docXmlClean = docXmlRaw.replace(/<w:proofErr[^>]*\/>/g, '');
+  zip.file('word/document.xml', docXmlClean);
+
   const doc = new Docxtemplater(zip, {
     delimiters: { start: '{{', end: '}}' },
     paragraphLoop: true,
@@ -79,7 +87,12 @@ async function generateGPReportDocx(data) {
     // AI-generated sections
     executive_summary: data.executiveSummary || '',
     oa_rows,
-    ...parseGoals(data.goals || ''),
+    ...(() => {
+      const g = parseGoals(data.goals || '');
+      // Provide both underscore (goal_1) and plain (goal1) forms since
+      // Word may save variable names either way depending on spell-check
+      return { ...g, goal1: g.goal_1, goal2: g.goal_2, goal3: g.goal_3 };
+    })(),
     management_plan:   data.recommendations || '',
   };
 
