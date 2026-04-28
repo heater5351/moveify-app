@@ -227,10 +227,16 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
     if (!blockInfo?.hasBlock || !blockInfo.startDate || !blockInfo.currentWeek || blockInfo.status !== 'active') {
       return true;
     }
-    const blockStart = new Date(blockInfo.startDate);
-    blockStart.setHours(0, 0, 0, 0);
+    // Today and past dates: always show — program_exercises holds the live (held) prescription,
+    // so the calendar-week gate would incorrectly hide it whenever the block is held at an earlier week.
     const viewDate = new Date(selectedDate);
     viewDate.setHours(0, 0, 0, 0);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    if (viewDate <= todayStart) return true;
+    // Future dates: hide if their calendar block week hasn't been reached yet.
+    const blockStart = new Date(blockInfo.startDate);
+    blockStart.setHours(0, 0, 0, 0);
     const daysSinceBlockStart = (viewDate.getTime() - blockStart.getTime()) / (1000 * 60 * 60 * 24);
     if (daysSinceBlockStart < 0) return true;
     const viewingBlockWeek = Math.floor(daysSinceBlockStart / 7) + 1;
