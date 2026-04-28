@@ -32,6 +32,12 @@ function parseGoals(text) {
 }
 
 async function generateGPReportDocx(data) {
+  console.log('[scribe-docx] incoming keys:', Object.keys(data));
+  console.log('[scribe-docx] patientName:', data.patientName);
+  console.log('[scribe-docx] executiveSummary length:', (data.executiveSummary || '').length);
+  console.log('[scribe-docx] objectiveAssessment sample:', (data.objectiveAssessment || '').slice(0, 80));
+  console.log('[scribe-docx] goals length:', (data.goals || '').length);
+
   const content = fs.readFileSync(TEMPLATE_PATH, 'binary');
   const zip = new PizZip(content);
   const doc = new Docxtemplater(zip, {
@@ -39,6 +45,9 @@ async function generateGPReportDocx(data) {
     paragraphLoop: true,
     linebreaks: true,
   });
+
+  const oa_rows = parseOaRows(data.objectiveAssessment);
+  console.log('[scribe-docx] oa_rows count:', oa_rows.length);
 
   const context = {
     // Clinician — hardcoded (single clinician)
@@ -68,12 +77,24 @@ async function generateGPReportDocx(data) {
     cdm_sessions:  data.cdmSessions  || '',
     // AI-generated sections
     executive_summary: data.executiveSummary || '',
-    oa_rows:           parseOaRows(data.objectiveAssessment),
+    oa_rows,
     ...parseGoals(data.goals || ''),
     management_plan:   data.recommendations || '',
   };
 
-  doc.render(context);
+  console.log('[scribe-docx] context patient_full_name:', context.patient_full_name);
+  console.log('[scribe-docx] context executive_summary length:', context.executive_summary.length);
+
+  try {
+    doc.render(context);
+  } catch (err) {
+    console.error('[scribe-docx] docxtemplater render error:', err.message);
+    if (err.properties && err.properties.errors) {
+      err.properties.errors.forEach(e => console.error('  tag error:', e.properties));
+    }
+    throw err;
+  }
+
   return doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
 }
 
