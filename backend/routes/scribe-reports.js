@@ -48,12 +48,26 @@ router.post('/sessions/:id/report/generate', async (req, res) => {
     if (templateResult.rows.length === 0) return res.status(404).json({ error: 'Report template not found' });
     const systemPrompt = templateResult.rows[0].system_prompt;
 
-    const result = await generateReport(noteContent, systemPrompt, patientName, sessionDate);
+    // patientName and sessionDate are substituted locally after the API returns —
+    // they are never sent to AWS.
+    const result = await generateReport(noteContent, systemPrompt);
+
+    const substitute = (text) => (text || '')
+      .replace(/\[PATIENT_NAME\]/g, patientName || '')
+      .replace(/\[SESSION_DATE\]/g, sessionDate || '');
 
     const wordCount = noteContent.split(/\s+/).length;
     audit.log(req, 'report_generated', 'scribe_session', parseInt(req.params.id), { type, wordCount, model: result.model });
 
-    res.json({ sections: { executiveSummary: result.executiveSummary, objectiveAssessment: result.objectiveAssessment, goals: result.goals, managementPlan: result.managementPlan }, model: result.model });
+    res.json({
+      sections: {
+        executiveSummary:    substitute(result.executiveSummary),
+        objectiveAssessment: substitute(result.objectiveAssessment),
+        goals:               substitute(result.goals),
+        managementPlan:      substitute(result.managementPlan),
+      },
+      model: result.model,
+    });
   } catch (err) {
     console.error('Generate report error:', err.message);
     res.status(500).json({ error: 'Failed to generate report' });

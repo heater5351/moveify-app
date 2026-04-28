@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FileText, Users, Loader2, Search, ChevronRight } from 'lucide-react';
-import { apiFetch, generateReport, generateHandout } from '../../utils/scribe-api';
-import type { ReportSections, HandoutSections } from '../../types';
-import ReportPreview from './ReportPreview';
+import { apiFetch, generateReport, generateHandout, downloadReportDocx } from '../../utils/scribe-api';
+import type { HandoutSections } from '../../types';
 import HandoutPreview from './HandoutPreview';
 
 type TemplateType = 'cdmp' | 'handout';
@@ -46,7 +45,6 @@ export default function ScribeReportsPage() {
   const [selectedSession, setSelectedSession] = useState<SessionItem | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState('');
-  const [activeReport, setActiveReport] = useState<{ sections: ReportSections; session: SessionItem } | null>(null);
   const [activeHandout, setActiveHandout] = useState<{ sections: HandoutSections; session: SessionItem } | null>(null);
 
   useEffect(() => { loadSessions(); }, []);
@@ -81,13 +79,16 @@ export default function ScribeReportsPage() {
     setGenError('');
     try {
       if (selectedTemplate === 'cdmp') {
-        const result = await generateReport(
-          selectedSession.id,
-          'cdmp',
-          selectedSession.patientName,
-          new Date(selectedSession.sessionDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }),
-        );
-        setActiveReport({ sections: result.sections, session: selectedSession });
+        const sessionDate = new Date(selectedSession.sessionDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+        const result = await generateReport(selectedSession.id, 'cdmp', selectedSession.patientName, sessionDate);
+        await downloadReportDocx(selectedSession.id, {
+          patientName:         selectedSession.patientName,
+          sessionDate,
+          executiveSummary:    result.sections.executiveSummary    || '',
+          objectiveAssessment: result.sections.objectiveAssessment || '',
+          goals:               result.sections.goals               || '',
+          recommendations:     result.sections.managementPlan      || '',
+        });
       } else {
         const transcriptRes = await apiFetch(`/sessions/${selectedSession.id}/transcript`);
         if (!transcriptRes.ok) throw new Error('Could not load transcript for this session');
@@ -224,18 +225,6 @@ export default function ScribeReportsPage() {
           </div>
         )}
       </div>
-
-      {activeReport && (
-        <ReportPreview
-          type="cdmp"
-          sections={activeReport.sections}
-          patientName={activeReport.session.patientName}
-          sessionDate={new Date(activeReport.session.sessionDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
-          sessionId={activeReport.session.id}
-          onClose={() => setActiveReport(null)}
-          onRegenerate={handleGenerate}
-        />
-      )}
 
       {activeHandout && (
         <HandoutPreview

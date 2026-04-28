@@ -42,6 +42,7 @@ export default function ReportPreview({ sections, patientName, sessionDate, sess
   const practiceNameRef  = useRef<HTMLSpanElement>(null);
   const addressRef       = useRef<HTMLSpanElement>(null);
   const townPostcodeRef  = useRef<HTMLSpanElement>(null);
+  const practiceEmailRef = useRef<HTMLSpanElement>(null);
   const sessionDateRef   = useRef<HTMLSpanElement>(null);
 
   // Patient details refs
@@ -49,6 +50,10 @@ export default function ReportPreview({ sections, patientName, sessionDate, sess
   const dobRef          = useRef<HTMLSpanElement>(null);
   const medicareNoRef   = useRef<HTMLSpanElement>(null);
   const referralDateRef = useRef<HTMLSpanElement>(null);
+  const cdmSessionsRef  = useRef<HTMLSpanElement>(null);
+
+  // Pronoun for template substitution
+  const [patientPronoun, setPatientPronoun] = useState<'his' | 'her' | 'their'>('their');
 
   // Objective rows in state so edits are captured
   const [objRows, setObjRows] = useState(() => parseObjectiveRows(sections.objectiveAssessment));
@@ -77,15 +82,18 @@ export default function ReportPreview({ sections, patientName, sessionDate, sess
         practiceName:  practiceNameRef.current?.innerText  || '',
         address:       addressRef.current?.innerText       || '',
         townPostcode:  townPostcodeRef.current?.innerText  || '',
+        practiceEmail: practiceEmailRef.current?.innerText || '',
         sessionDate:   sessionDateRef.current?.innerText   || sessionDate,
         // Patient details
         patientName,
+        patientPronoun,
         referringGP:  referringGPRef.current?.innerText  || '',
         dob:          dobRef.current?.innerText          || '',
         medicareNo:   medicareNoRef.current?.innerText   || '',
         referralDate: referralDateRef.current?.innerText || '',
+        cdmSessions:  cdmSessionsRef.current?.innerText || '',
         // AI sections
-        executiveSummary:  summaryRef.current?.innerText || '',
+        executiveSummary:    summaryRef.current?.innerText || '',
         objectiveAssessment: objRows.map(r => `${r.test} | ${r.result} | ${r.interpretation}`).join('\n'),
         goals:           goalsRef.current?.innerText || '',
         recommendations: planRef.current?.innerText  || '',
@@ -162,6 +170,7 @@ export default function ReportPreview({ sections, patientName, sessionDate, sess
               <div><span ref={practiceNameRef} contentEditable suppressContentEditableWarning style={{ ...inlineField, minWidth: '220px' }}>Practice Name</span></div>
               <div><span ref={addressRef} contentEditable suppressContentEditableWarning style={{ ...inlineField, minWidth: '200px' }}>Address</span></div>
               <div><span ref={townPostcodeRef} contentEditable suppressContentEditableWarning style={{ ...inlineField, minWidth: '160px' }}>Town Postcode</span></div>
+              <div><span ref={practiceEmailRef} contentEditable suppressContentEditableWarning style={{ ...inlineField, minWidth: '200px' }}>practice@email.com.au</span></div>
             </div>
             <div style={{ ...body, marginBottom: '18px' }}><span ref={sessionDateRef} contentEditable suppressContentEditableWarning style={{ ...inlineField, minWidth: '120px' }}>{sessionDate}</span></div>
             <p style={{ ...body, fontWeight: 700, marginBottom: '14px' }}>Dear Dr <span ref={doctorSurnameRef} contentEditable suppressContentEditableWarning style={{ ...inlineField, minWidth: '110px', fontWeight: 400 }}>Surname</span>,</p>
@@ -185,11 +194,23 @@ export default function ReportPreview({ sections, patientName, sessionDate, sess
                     <td style={{ background: LABEL, fontWeight: 700, fontSize: '0.78rem', padding: '8px 12px', width: '35%', borderRight: '1px solid #b0bec5', ...font, color: NAVY }}>Patient Name</td>
                     <td style={{ background: 'white', padding: '8px 12px', ...body }}><span contentEditable suppressContentEditableWarning style={{ outline: 'none', display: 'block' }}>{patientName}</span></td>
                   </tr>
+                  <tr style={{ borderBottom: '1px solid #b0bec5' }}>
+                    <td style={{ background: LABEL, fontWeight: 700, fontSize: '0.78rem', padding: '8px 12px', width: '35%', borderRight: '1px solid #b0bec5', ...font, color: NAVY }}>Pronoun</td>
+                    <td style={{ background: 'white', padding: '6px 12px', ...body }}>
+                      <select value={patientPronoun} onChange={e => setPatientPronoun(e.target.value as 'his' | 'her' | 'their')}
+                        style={{ font: 'inherit', fontSize: '0.84rem', border: '1px solid #d1d5db', borderRadius: '4px', padding: '2px 6px', color: NAVY, background: 'white' }}>
+                        <option value="his">his</option>
+                        <option value="her">her</option>
+                        <option value="their">their</option>
+                      </select>
+                    </td>
+                  </tr>
                   {[
                     ['Referring GP',  referringGPRef,  ''],
                     ['Date of Birth', dobRef,          ''],
                     ['Medicare No',   medicareNoRef,   ''],
                     ['Referral Date', referralDateRef, ''],
+                    ['CDM Sessions',  cdmSessionsRef,  ''],
                   ].map(([label, ref, val]) => (
                     <tr key={label as string} style={{ borderBottom: '1px solid #b0bec5' }}>
                       <td style={{ background: LABEL, fontWeight: 700, fontSize: '0.78rem', padding: '8px 12px', borderRight: '1px solid #b0bec5', ...font, color: NAVY }}>{label as string}</td>

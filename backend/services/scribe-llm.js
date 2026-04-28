@@ -89,7 +89,9 @@ async function generateHandout(transcript, patientFirstName, assessmentDate) {
   if (!transcript || transcript.trim().length < 10) {
     throw new Error('Transcript too short to generate a handout');
   }
-  const userMessage = `The following is a transcript of a Gateway Assessment session. Generate Sections 1 and 2 of the patient assessment handout.\n\nTranscript:\n${transcript}\n\nPatient first name: ${patientFirstName}\nAssessment date: ${assessmentDate}`;
+  // patientFirstName is intentionally not sent — the system prompt uses "you"/"your" only.
+  // assessmentDate is administrative metadata, not needed for content generation.
+  const userMessage = `The following is a transcript of a Gateway Assessment session. Generate Sections 1 and 2 of the patient assessment handout.\n\nTranscript:\n${transcript}`;
   const command = new ConverseCommand({
     modelId: MODEL_ID,
     messages: [{ role: 'user', content: [{ text: userMessage }] }],
@@ -125,13 +127,13 @@ async function generateHandout(transcript, patientFirstName, assessmentDate) {
   return { sections: { ...sections, clinicalContext: clinicalContext || undefined }, model: MODEL_ID };
 }
 
-async function generateReport(soapNoteContent, systemPrompt, patientName, sessionDate) {
+async function generateReport(soapNoteContent, systemPrompt) {
   if (!soapNoteContent || soapNoteContent.trim().length < 20) {
     throw new Error('SOAP note too short to generate a report');
   }
-  const nameContext = patientName ? `Patient full name: ${patientName}\n` : '';
-  const dateContext = sessionDate ? `Session date: ${sessionDate}\n` : '';
-  const userMessage = `${nameContext}${dateContext}\nSOAP Note:\n${soapNoteContent}\n\nGenerate the four report sections. Use the patient name and session date provided above — do not infer these from the note.`;
+  // Patient name and session date are not sent to AWS — they are substituted by the
+  // caller after the API returns, keeping identifying information off the wire.
+  const userMessage = `SOAP Note:\n${soapNoteContent}\n\nGenerate the four report sections. Where the patient name is needed write the literal placeholder: [PATIENT_NAME]. Where the session date is needed write: [SESSION_DATE].`;
   const command = new ConverseCommand({
     modelId: MODEL_ID,
     messages: [{ role: 'user', content: [{ text: userMessage }] }],
