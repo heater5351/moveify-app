@@ -32,11 +32,8 @@ function parseGoals(text) {
 }
 
 async function generateGPReportDocx(data) {
-  console.log('[scribe-docx] incoming keys:', Object.keys(data));
-  console.log('[scribe-docx] patientName:', data.patientName);
-  console.log('[scribe-docx] executiveSummary length:', (data.executiveSummary || '').length);
-  console.log('[scribe-docx] objectiveAssessment sample:', (data.objectiveAssessment || '').slice(0, 80));
-  console.log('[scribe-docx] goals length:', (data.goals || '').length);
+  console.log('[scribe-docx] generating report — fields present:', Object.keys(data).join(', '));
+  console.log('[scribe-docx] section lengths — summary:', (data.executiveSummary || '').length, 'goals:', (data.goals || '').length);
 
   const content = fs.readFileSync(TEMPLATE_PATH, 'binary');
   const zip = new PizZip(content);
@@ -60,7 +57,6 @@ async function generateGPReportDocx(data) {
   });
 
   const oa_rows = parseOaRows(data.objectiveAssessment);
-  console.log('[scribe-docx] oa_rows count:', oa_rows.length);
 
   const context = {
     // Clinician — hardcoded (single clinician)
@@ -100,8 +96,7 @@ async function generateGPReportDocx(data) {
     management_plan:   data.recommendations || '',
   };
 
-  console.log('[scribe-docx] context patient_full_name:', context.patient_full_name);
-  console.log('[scribe-docx] context executive_summary length:', context.executive_summary.length);
+  console.log('[scribe-docx] oa_rows:', oa_rows.length, '— rendering template');
 
   try {
     doc.render(context);
