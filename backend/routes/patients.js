@@ -55,8 +55,7 @@ async function formatPatientWithPrograms(patient) {
       email: patient.email,
       dob: patient.dob || '',
       age: calculateAge(patient.dob),
-      condition: patient.condition || '',
-      phone: patient.phone || '',
+            phone: patient.phone || '',
       address: patient.address || '',
       dateAdded: patient.created_at,
       clinikoPatientId: patient.cliniko_patient_id || null,
@@ -197,8 +196,7 @@ async function formatPatientWithPrograms(patient) {
     email: patient.email,
     dob: patient.dob || '',
     age: calculateAge(patient.dob),
-    condition: patient.condition || '',
-    phone: patient.phone || '',
+        phone: patient.phone || '',
     address: patient.address || '',
     dateAdded: patient.created_at,
     pendingSetup: patient.pending_setup === true,
@@ -216,7 +214,7 @@ router.get('/', requireRole('clinician'), async (req, res) => {
 
     // 1. All patients
     const patients = await db.getAll(`
-      SELECT id, email, role, name, dob, phone, address, condition, created_at,
+      SELECT id, email, role, name, dob, phone, address, created_at,
              cliniko_patient_id, cliniko_synced_at,
              (password_hash IS NULL) AS pending_setup
       FROM users
@@ -360,8 +358,7 @@ router.get('/', requireRole('clinician'), async (req, res) => {
       email: patient.email,
       dob: patient.dob || '',
       age: calculateAge(patient.dob),
-      condition: patient.condition || '',
-      phone: patient.phone || '',
+            phone: patient.phone || '',
       address: patient.address || '',
       dateAdded: patient.created_at,
       pendingSetup: patient.pending_setup === true,
@@ -385,7 +382,7 @@ router.get('/:patientId', requirePatientAccess, async (req, res) => {
     const { patientId } = req.params;
 
     const patient = await db.getOne(`
-      SELECT id, email, role, name, dob, phone, address, condition, created_at,
+      SELECT id, email, role, name, dob, phone, address, created_at,
              cliniko_patient_id, cliniko_synced_at,
              (password_hash IS NULL) AS pending_setup
       FROM users
@@ -411,7 +408,7 @@ router.get('/:patientId', requirePatientAccess, async (req, res) => {
 router.put('/:patientId', requireRole('clinician'), async (req, res) => {
   try {
     const { patientId } = req.params;
-    const { name, dob, email, phone, address, condition } = req.body;
+    const { name, dob, email, phone, address } = req.body;
 
     if (!name || !dob || !email) {
       return res.status(400).json({ error: 'Name, date of birth, and email are required' });
@@ -427,11 +424,11 @@ router.put('/:patientId', requireRole('clinician'), async (req, res) => {
     }
 
     await db.query(
-      `UPDATE users SET name = $1, dob = $2, email = $3, phone = $4, address = $5, condition = $6 WHERE id = $7`,
-      [name, dob, email, phone || null, address || null, condition || null, patientId]
+      `UPDATE users SET name = $1, dob = $2, email = $3, phone = $4, address = $5 WHERE id = $6`,
+      [name, dob, email, phone || null, address || null, patientId]
     );
 
-    audit.log(req, 'patient_update', 'patient', parseInt(patientId), { fields: ['name', 'dob', 'email', 'phone', 'address', 'condition'] });
+    audit.log(req, 'patient_update', 'patient', parseInt(patientId), { fields: ['name', 'dob', 'email', 'phone', 'address'] });
 
     res.json({ message: 'Patient updated' });
   } catch (error) {

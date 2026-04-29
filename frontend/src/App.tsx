@@ -138,7 +138,6 @@ function App() {
   const [newPatient, setNewPatient] = useState<NewPatient>({
     name: '',
     dob: '',
-    condition: '',
     email: '',
     phone: '',
     address: ''
@@ -707,7 +706,6 @@ function App() {
           email: editingPatient.email,
           phone: editingPatient.phone || '',
           address: editingPatient.address || '',
-          condition: editingPatient.condition || '',
         }),
       });
 
@@ -916,7 +914,6 @@ function App() {
             setNewPatient({
               name: '',
               dob: '',
-              condition: '',
               email: '',
               phone: '',
               address: ''

@@ -78,7 +78,6 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
               email: user.email,
               dob: user.dob || '',
               age: user.dob ? (() => { const d = new Date(user.dob), t = new Date(), a = t.getFullYear() - d.getFullYear(), m = t.getMonth() - d.getMonth(); return (m < 0 || (m === 0 && t.getDate() < d.getDate())) ? a - 1 : a; })() : 0,
-              condition: user.condition || '',
               phone: user.phone || '',
               address: user.address || '',
               dateAdded: user.created_at,

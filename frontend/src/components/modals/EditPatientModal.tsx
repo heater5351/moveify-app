@@ -110,17 +110,6 @@ export const EditPatientModal = ({ patient, onUpdate, onSave, onDelete, onClose 
             )}
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1.5">
-              Condition
-            </label>
-            <input
-              type="text"
-              value={patient.condition}
-              onChange={(e) => onUpdate({ ...patient, condition: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 outline-none"
-            />
-          </div>
 
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1.5">

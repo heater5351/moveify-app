@@ -127,7 +127,6 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
         dob: newPatient.dob,
         phone: newPatient.phone,
         address: newPatient.address,
-        condition: newPatient.condition,
       };
       if (selectedClinikoId) body.clinikoPatientId = selectedClinikoId;
 
@@ -301,16 +300,6 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
               {dobError && <p className="text-red-500 text-sm mt-1">{dobError}</p>}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Condition</label>
-              <input
-                type="text"
-                value={newPatient.condition}
-                onChange={(e) => onUpdate({ ...newPatient, condition: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"
-                placeholder="e.g., Post-op ACL"
-              />
-            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Email <span className="text-red-500">*</span></label>

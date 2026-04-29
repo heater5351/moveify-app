@@ -1,4 +1,4 @@
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, Stethoscope, UserPen } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, UserPen } from 'lucide-react';
 import type { Patient } from '../types/index';
 
 type PatientAccountPageProps = {
@@ -63,12 +63,6 @@ export const PatientAccountPage = ({ patient, onBack, onEditProfile }: PatientAc
               <span className="text-slate-700">
                 {new Date(patient.dob).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
               </span>
-            </div>
-          )}
-          {patient.condition && (
-            <div className="flex items-center gap-3 text-sm">
-              <Stethoscope size={15} className="text-slate-400 shrink-0" />
-              <span className="text-slate-700">{patient.condition}</span>
             </div>
           )}
         </div>

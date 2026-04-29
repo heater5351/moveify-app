@@ -16,7 +16,6 @@ async function initDatabase() {
         dob TEXT,
         phone TEXT,
         address TEXT,
-        condition TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
@@ -32,7 +31,6 @@ async function initDatabase() {
         dob TEXT,
         phone TEXT,
         address TEXT,
-        condition TEXT,
         used INTEGER DEFAULT 0,
         expires_at TIMESTAMP NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
@@ -465,6 +463,10 @@ async function initDatabase() {
     `);
 
     // Add filter metadata columns to exercises table
+    // Remove condition field — no longer stored in Moveify
+    await db.query(`ALTER TABLE users DROP COLUMN IF EXISTS condition`);
+    await db.query(`ALTER TABLE invitation_tokens DROP COLUMN IF EXISTS condition`);
+
     // Add Cliniko integration columns to users
     await db.query(`
       ALTER TABLE users

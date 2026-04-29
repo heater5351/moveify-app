@@ -171,7 +171,6 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
           dob: patient.dob,
           phone: patient.phone,
           address: patient.address,
-          condition: patient.condition,
         }),
       });
       if (res.ok) {
@@ -307,7 +306,6 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
         </div>
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-semibold font-display text-secondary-500 tracking-tight">{patient.name}</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{patient.condition}</p>
         </div>
         <div className="hidden md:grid grid-cols-3 gap-6 text-sm">
           <div>

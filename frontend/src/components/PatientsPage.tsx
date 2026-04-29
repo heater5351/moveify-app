@@ -103,7 +103,6 @@ export const PatientsPage = ({ patients, onViewPatient, onAddPatient }: Patients
                   {/* Name */}
                   <div className="col-span-3">
                     <h3 className="font-medium text-slate-900 text-sm">{patient.name}</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">{patient.condition}</p>
                   </div>
 
                   {/* Age */}

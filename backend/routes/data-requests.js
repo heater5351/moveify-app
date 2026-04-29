@@ -217,7 +217,6 @@ router.post('/:id/execute-deletion', requireAdmin, async (req, res) => {
           phone = NULL,
           dob = NULL,
           address = NULL,
-          condition = NULL,
           password_hash = NULL
         WHERE id = $2`,
         [`deleted_${userId}@removed.local`, userId]
@@ -268,7 +267,7 @@ router.get('/:id/download', requireAdmin, async (req, res) => {
 
     // Gather all patient data
     const user = await db.getOne(
-      'SELECT id, name, email, phone, dob, address, condition, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, phone, dob, address, created_at FROM users WHERE id = $1',
       [userId]
     );
     const programs = await db.getAll(

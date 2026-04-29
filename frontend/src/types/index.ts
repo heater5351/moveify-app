@@ -89,7 +89,6 @@ export type Patient = {
   name: string;
   dob: string;
   age: number;
-  condition: string;
   email: string;
   phone: string;
   address: string;
@@ -103,7 +102,6 @@ export type Patient = {
 export type NewPatient = {
   name: string;
   dob: string;
-  condition: string;
   email: string;
   phone: string;
   address: string;

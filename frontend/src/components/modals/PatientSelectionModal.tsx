@@ -39,7 +39,6 @@ export const PatientSelectionModal = ({
                 }`}
             >
               <p className="font-semibold text-slate-800">{patient.name}</p>
-              <p className="text-sm text-slate-500">{patient.condition}</p>
             </button>
           ))}
         </div>

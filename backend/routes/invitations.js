@@ -13,7 +13,7 @@ const router = express.Router();
 // Generate invitation for new patient (called by clinician)
 router.post('/generate', authenticate, requireRole('clinician'), async (req, res) => {
   try {
-    let { email, name, dob, phone, address, condition, clinikoPatientId } = req.body;
+    let { email, name, dob, phone, address, clinikoPatientId } = req.body;
 
     // If a Cliniko patient ID was provided, pull authoritative data from Cliniko
     if (clinikoPatientId) {
@@ -69,9 +69,9 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
 
       // Save invitation (always patient role)
       await client.query(`
-        INSERT INTO invitation_tokens (token, email, role, name, dob, phone, address, condition, expires_at, clinician_id)
-        VALUES ($1, $2, 'patient', $3, $4, $5, $6, $7, $8, $9)
-      `, [token, email, name, dob, phone, address, condition, expiresAt, clinicianId]);
+        INSERT INTO invitation_tokens (token, email, role, name, dob, phone, address, expires_at, clinician_id)
+        VALUES ($1, $2, 'patient', $3, $4, $5, $6, $7, $8)
+      `, [token, email, name, dob, phone, address, expiresAt, clinicianId]);
 
       if (existingUser) {
         // Resend: user row already exists with no password — just reuse it
@@ -86,11 +86,11 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
       } else {
         // New invite: create user with null password
         const userResult = await client.query(`
-          INSERT INTO users (email, password_hash, role, name, dob, phone, address, condition,
+          INSERT INTO users (email, password_hash, role, name, dob, phone, address,
                              cliniko_patient_id, cliniko_synced_at)
-          VALUES ($1, NULL, 'patient', $2, $3, $4, $5, $6, $7, $8)
+          VALUES ($1, NULL, 'patient', $2, $3, $4, $5, $6, $7)
           RETURNING id
-        `, [email, name, dob, phone, address, condition,
+        `, [email, name, dob, phone, address,
             clinikoPatientId || null,
             clinikoPatientId ? new Date().toISOString() : null]);
         patientId = userResult.rows[0].id;
