@@ -465,6 +465,20 @@ async function initDatabase() {
     `);
 
     // Add filter metadata columns to exercises table
+    // Add Cliniko integration columns to users
+    await db.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS cliniko_patient_id INT DEFAULT NULL
+    `);
+    await db.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS cliniko_synced_at TIMESTAMP DEFAULT NULL
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_cliniko_patient_id
+      ON users(cliniko_patient_id)
+    `);
+
     console.log('🔄 Adding exercise filter columns...');
     await db.query(`
       ALTER TABLE exercises

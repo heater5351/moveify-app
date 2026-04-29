@@ -6,6 +6,10 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+if (!process.env.CLINIKO_API_KEY || !process.env.CLINIKO_SUBDOMAIN) {
+  console.warn('WARNING: CLINIKO_API_KEY or CLINIKO_SUBDOMAIN not set — Cliniko integration disabled');
+}
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const invitationRoutes = require('./routes/invitations');
@@ -20,6 +24,7 @@ const adminRoutes = require('./routes/admin');
 const dataRequestRoutes = require('./routes/data-requests');
 const aiRoutes = require('./routes/ai-assistant');
 const feedbackRoutes = require('./routes/feedback');
+const clinikoRoutes = require('./routes/cliniko');
 
 // Scribe routes
 const scribeSessionRoutes = require('./routes/scribe-sessions');
@@ -130,6 +135,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/data-requests', dataRequestRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/cliniko', clinikoRoutes);
 
 // Scribe routes — clinician-only, all under /api/scribe/
 app.use('/api/scribe/sessions', scribeSessionRoutes);
