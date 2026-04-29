@@ -19,10 +19,14 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
     if (clinikoPatientId) {
       try {
         const cp = await cliniko.getPatient(clinikoPatientId);
-        name = name || `${cp.first_name} ${cp.last_name}`.trim();
-        email = email || cp.email;
-        dob = dob || cp.date_of_birth || '';
-        phone = phone || cp.patient_phone_numbers?.[0]?.number || '';
+        name = `${cp.first_name} ${cp.last_name}`.trim();
+        email = cp.email || email;
+        dob = cp.date_of_birth || '';
+        phone = cp.patient_phone_numbers?.[0]?.number || '';
+        const addressParts = [cp.address_1, cp.address_2, cp.address_3, cp.city, cp.state, cp.post_code]
+          .map(p => (p || '').trim()).filter(Boolean);
+        address = addressParts.length > 0 ? addressParts.join(', ') : address;
+        // condition is left as-is — Cliniko doesn't have this field
       } catch (clinikoErr) {
         console.error('Cliniko fetch during invite:', clinikoErr);
         return res.status(502).json({ error: 'Could not fetch patient details from Cliniko. Please try again.' });

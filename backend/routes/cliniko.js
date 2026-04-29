@@ -73,16 +73,20 @@ router.post('/sync/:patientId', async (req, res) => {
     const email = cp.email || null;
     const dob = cp.date_of_birth || null;
     const phone = cp.patient_phone_numbers?.[0]?.number || null;
+    const addressParts = [cp.address_1, cp.address_2, cp.address_3, cp.city, cp.state, cp.post_code]
+      .map(p => (p || '').trim()).filter(Boolean);
+    const address = addressParts.length > 0 ? addressParts.join(', ') : null;
 
-    // Sync always overwrites — Cliniko is the source of truth for demographics
+    // Sync always overwrites from Cliniko — Cliniko is source of truth for demographics
+    // condition is Moveify-only and is never touched
     await db.query(
-      `UPDATE users SET name = $1, email = COALESCE($2, email),
-       dob = $3, phone = COALESCE($4, phone), cliniko_synced_at = NOW() WHERE id = $5`,
-      [name, email, dob, phone, patientId]
+      `UPDATE users SET name = $1, email = COALESCE($2, email), dob = $3,
+       phone = $4, address = $5, cliniko_synced_at = NOW() WHERE id = $6`,
+      [name, email, dob, phone, address, patientId]
     );
 
     audit.log(req, 'cliniko_sync', 'patient', parseInt(patientId), { clinikoPatientId: patient.cliniko_patient_id });
-    res.json({ success: true, name, email, dob, phone, clinikoSyncedAt: new Date().toISOString() });
+    res.json({ success: true, name, email, dob, phone, address, clinikoSyncedAt: new Date().toISOString() });
   } catch (err) {
     console.error('Cliniko sync error:', err);
     res.status(502).json({ error: 'Could not reach Cliniko. Please try again.' });
