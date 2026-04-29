@@ -23,7 +23,10 @@ async function clinikoFetch(path) {
 }
 
 async function searchPatients(query) {
-  const data = await clinikoFetch(`/patients?q=${encodeURIComponent(query)}&sort=last_name`);
+  const q = encodeURIComponent(query);
+  const data = await clinikoFetch(
+    `/patients?q[first_name_or_last_name_cont]=${q}&sort=last_name`
+  );
   return data.patients || [];
 }
 
