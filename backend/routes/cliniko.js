@@ -74,9 +74,10 @@ router.post('/sync/:patientId', async (req, res) => {
     const dob = cp.date_of_birth || null;
     const phone = cp.patient_phone_numbers?.[0]?.number || null;
 
+    // Sync always overwrites — Cliniko is the source of truth for demographics
     await db.query(
-      `UPDATE users SET name = $1, email = COALESCE($2, email), dob = COALESCE($3, dob),
-       phone = COALESCE($4, phone), cliniko_synced_at = NOW() WHERE id = $5`,
+      `UPDATE users SET name = $1, email = COALESCE($2, email),
+       dob = $3, phone = COALESCE($4, phone), cliniko_synced_at = NOW() WHERE id = $5`,
       [name, email, dob, phone, patientId]
     );
 
