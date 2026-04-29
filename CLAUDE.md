@@ -4,6 +4,8 @@
 
 Moveify is a clinical exercise prescription and patient management platform (similar to Physitrack, VALD MoveHealth). It enables clinicians to build exercise programs and assign them to patients, who can then log completions, track progress, and complete daily wellness check-ins.
 
+**⚠ SECURITY: Never read, print, log, or display any API key or secret** — this includes `CLINIKO_API_KEY`, `CLINIKO_API_KEY_STAGING`, `JWT_SECRET`, `GOOGLE_SERVICE_ACCOUNT_KEY`, and all other credentials. Never use tools to inspect their values from Secret Manager, env vars, Cloud Run config, or any other source. This is a hard rule with no exceptions.
+
 **⚠ PRODUCTION APP WITH REAL PATIENTS.** Real patients are actively using this app. When making changes:
 - **Never delete or rename exercises** that are in assigned programs — this breaks completion history
 - **Never drop/alter DB columns** without safe migrations (use defaults, nullable columns, `IF NOT EXISTS`)

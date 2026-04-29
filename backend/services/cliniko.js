@@ -1,4 +1,6 @@
-const CLINIKO_API_KEY = process.env.CLINIKO_API_KEY;
+const CLINIKO_API_KEY = process.env.NODE_ENV === 'production'
+  ? process.env.CLINIKO_API_KEY
+  : process.env.CLINIKO_API_KEY_STAGING;
 const CLINIKO_SUBDOMAIN = process.env.CLINIKO_SUBDOMAIN;
 
 function getAuthHeader() {
