@@ -6,13 +6,28 @@ const db = require('../database/db');
 const { sendInvitationEmail } = require('../services/email');
 const { authenticate, requireRole } = require('../middleware/auth');
 const audit = require('../services/audit');
+const cliniko = require('../services/cliniko');
 
 const router = express.Router();
 
 // Generate invitation for new patient (called by clinician)
 router.post('/generate', authenticate, requireRole('clinician'), async (req, res) => {
   try {
-    const { email, name, dob, phone, address, condition } = req.body;
+    let { email, name, dob, phone, address, condition, clinikoPatientId } = req.body;
+
+    // If a Cliniko patient ID was provided, pull authoritative data from Cliniko
+    if (clinikoPatientId) {
+      try {
+        const cp = await cliniko.getPatient(clinikoPatientId);
+        name = name || `${cp.first_name} ${cp.last_name}`.trim();
+        email = email || cp.email;
+        dob = dob || cp.date_of_birth || '';
+        phone = phone || cp.patient_phone_numbers?.[0]?.number || '';
+      } catch (clinikoErr) {
+        console.error('Cliniko fetch during invite:', clinikoErr);
+        return res.status(502).json({ error: 'Could not fetch patient details from Cliniko. Please try again.' });
+      }
+    }
 
     // Validate required fields
     if (!email || !name) {
@@ -57,13 +72,23 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
       if (existingUser) {
         // Resend: user row already exists with no password — just reuse it
         patientId = existingUser.id;
+        // Update cliniko link if provided
+        if (clinikoPatientId) {
+          await client.query(
+            `UPDATE users SET cliniko_patient_id = $1, cliniko_synced_at = NOW() WHERE id = $2`,
+            [clinikoPatientId, patientId]
+          );
+        }
       } else {
         // New invite: create user with null password
         const userResult = await client.query(`
-          INSERT INTO users (email, password_hash, role, name, dob, phone, address, condition)
-          VALUES ($1, NULL, 'patient', $2, $3, $4, $5, $6)
+          INSERT INTO users (email, password_hash, role, name, dob, phone, address, condition,
+                             cliniko_patient_id, cliniko_synced_at)
+          VALUES ($1, NULL, 'patient', $2, $3, $4, $5, $6, $7, $8)
           RETURNING id
-        `, [email, name, dob, phone, address, condition]);
+        `, [email, name, dob, phone, address, condition,
+            clinikoPatientId || null,
+            clinikoPatientId ? new Date().toISOString() : null]);
         patientId = userResult.rows[0].id;
       }
 

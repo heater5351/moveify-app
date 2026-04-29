@@ -59,6 +59,8 @@ async function formatPatientWithPrograms(patient) {
       phone: patient.phone || '',
       address: patient.address || '',
       dateAdded: patient.created_at,
+      clinikoPatientId: patient.cliniko_patient_id || null,
+      clinikoSyncedAt: patient.cliniko_synced_at || null,
       assignedPrograms: []
     };
   }
@@ -200,6 +202,8 @@ async function formatPatientWithPrograms(patient) {
     address: patient.address || '',
     dateAdded: patient.created_at,
     pendingSetup: patient.pending_setup === true,
+    clinikoPatientId: patient.cliniko_patient_id || null,
+    clinikoSyncedAt: patient.cliniko_synced_at || null,
     assignedPrograms: assignedPrograms
   };
 }
@@ -213,6 +217,7 @@ router.get('/', requireRole('clinician'), async (req, res) => {
     // 1. All patients
     const patients = await db.getAll(`
       SELECT id, email, role, name, dob, phone, address, condition, created_at,
+             cliniko_patient_id, cliniko_synced_at,
              (password_hash IS NULL) AS pending_setup
       FROM users
       WHERE role = 'patient'
@@ -360,6 +365,8 @@ router.get('/', requireRole('clinician'), async (req, res) => {
       address: patient.address || '',
       dateAdded: patient.created_at,
       pendingSetup: patient.pending_setup === true,
+      clinikoPatientId: patient.cliniko_patient_id || null,
+      clinikoSyncedAt: patient.cliniko_synced_at || null,
       assignedPrograms: programsByPatient[patient.id] || []
     }));
 
@@ -379,6 +386,7 @@ router.get('/:patientId', requirePatientAccess, async (req, res) => {
 
     const patient = await db.getOne(`
       SELECT id, email, role, name, dob, phone, address, condition, created_at,
+             cliniko_patient_id, cliniko_synced_at,
              (password_hash IS NULL) AS pending_setup
       FROM users
       WHERE id = $1 AND role = 'patient'

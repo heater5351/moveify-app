@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown, FileText, Mail } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown, FileText, Mail, Link, RefreshCw, Search, ChevronRight } from 'lucide-react';
 import ScribeHistoryPage from './scribe/ScribeHistoryPage';
 import type { Patient, ClinicianFlag, BlockStatusResponse } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
@@ -30,6 +30,77 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
   const [blockMap, setBlockMap] = useState<Record<number, BlockStatusResponse>>({});
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Cliniko link/sync state
+  const [clinikoPatientId, setClinikoPatientId] = useState<string | null>(patient.clinikoPatientId ?? null);
+  const [clinikoSyncedAt, setClinikoSyncedAt] = useState<string | null>(patient.clinikoSyncedAt ?? null);
+  const [showLinkPanel, setShowLinkPanel] = useState(false);
+  const [linkSearch, setLinkSearch] = useState('');
+  const [linkResults, setLinkResults] = useState<{ id: string; first_name: string; last_name: string; email: string | null; date_of_birth: string | null }[]>([]);
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkMsg, setLinkMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const linkDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!showLinkPanel || linkSearch.trim().length < 2) { setLinkResults([]); return; }
+    if (linkDebounce.current) clearTimeout(linkDebounce.current);
+    linkDebounce.current = setTimeout(async () => {
+      setLinkLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/cliniko/patients?q=${encodeURIComponent(linkSearch.trim())}`, { headers: getAuthHeaders() });
+        const data = await res.json();
+        setLinkResults(res.ok ? (data.patients || []) : []);
+      } catch { setLinkResults([]); }
+      finally { setLinkLoading(false); }
+    }, 350);
+    return () => { if (linkDebounce.current) clearTimeout(linkDebounce.current); };
+  }, [linkSearch, showLinkPanel]);
+
+  const handleLinkCliniko = async (cpId: string) => {
+    setLinkMsg(null);
+    try {
+      const res = await fetch(`${API_URL}/cliniko/link/${patient.id}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ clinikoPatientId: cpId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setClinikoPatientId(data.clinikoPatientId);
+        setClinikoSyncedAt(data.clinikoSyncedAt);
+        setShowLinkPanel(false);
+        setLinkSearch('');
+        setLinkMsg({ type: 'success', text: 'Linked to Cliniko' });
+      } else {
+        setLinkMsg({ type: 'error', text: data.error || 'Failed to link' });
+      }
+    } catch {
+      setLinkMsg({ type: 'error', text: 'Network error' });
+    }
+  };
+
+  const handleSyncCliniko = async () => {
+    setSyncing(true);
+    setLinkMsg(null);
+    try {
+      const res = await fetch(`${API_URL}/cliniko/sync/${patient.id}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setClinikoSyncedAt(data.clinikoSyncedAt);
+        setLinkMsg({ type: 'success', text: 'Synced from Cliniko' });
+      } else {
+        setLinkMsg({ type: 'error', text: data.error || 'Failed to sync' });
+      }
+    } catch {
+      setLinkMsg({ type: 'error', text: 'Network error' });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // Fetch unresolved flags for this patient's programs
   useEffect(() => {
@@ -155,6 +226,25 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
               )}
             </div>
           )}
+          {clinikoPatientId ? (
+            <button
+              onClick={handleSyncCliniko}
+              disabled={syncing}
+              title={clinikoSyncedAt ? `Last synced: ${new Date(clinikoSyncedAt).toLocaleDateString()}` : 'Sync from Cliniko'}
+              className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50 px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-sm transition-colors shadow-sm"
+            >
+              <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} />
+              {syncing ? 'Syncing…' : 'Sync from Cliniko'}
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowLinkPanel(v => !v)}
+              className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-sm transition-colors shadow-sm"
+            >
+              <Link size={15} />
+              Link to Cliniko
+            </button>
+          )}
           <button
             onClick={onEdit}
             className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-sm transition-colors shadow-sm"
@@ -164,6 +254,51 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
           </button>
         </div>
       </div>
+
+      {/* Cliniko link panel */}
+      {showLinkPanel && (
+        <div className="bg-white rounded-xl ring-1 ring-slate-200 px-5 py-4">
+          <p className="text-sm font-medium text-slate-700 mb-3">Search Cliniko to link this patient</p>
+          <div className="relative mb-3">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={linkSearch}
+              onChange={(e) => setLinkSearch(e.target.value)}
+              placeholder="Search by name..."
+              className="w-full pl-8 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+              autoFocus
+            />
+          </div>
+          {linkLoading && <p className="text-xs text-slate-400">Searching...</p>}
+          {linkResults.length > 0 && (
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              {linkResults.map((cp) => (
+                <button
+                  key={cp.id}
+                  onClick={() => handleLinkCliniko(cp.id)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 text-left border-b border-slate-100 last:border-0"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800">{cp.first_name} {cp.last_name}</p>
+                    <p className="text-xs text-slate-400">{cp.email || 'No email'}{cp.date_of_birth ? ` · ${cp.date_of_birth}` : ''}</p>
+                  </div>
+                  <ChevronRight size={13} className="text-slate-300" />
+                </button>
+              ))}
+            </div>
+          )}
+          {linkSearch.trim().length >= 2 && !linkLoading && linkResults.length === 0 && (
+            <p className="text-xs text-slate-400">No patients found</p>
+          )}
+        </div>
+      )}
+
+      {linkMsg && (
+        <p className={`text-sm font-medium ${linkMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+          {linkMsg.text}
+        </p>
+      )}
 
       {/* Patient header card */}
       <div className="bg-white rounded-xl ring-1 ring-slate-200 px-7 py-6 flex items-center gap-5">

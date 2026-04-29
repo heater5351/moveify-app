@@ -95,6 +95,8 @@ export type Patient = {
   address: string;
   dateAdded: string;
   pendingSetup?: boolean;
+  clinikoPatientId?: string | null;
+  clinikoSyncedAt?: string | null;
   assignedPrograms: AssignedProgram[];
 }
 
