@@ -1310,6 +1310,10 @@ function App() {
               onOpenNote={handleOpenNote}
               activeNoteSessionId={activeRecordingSessionId}
               notesRefreshKey={notesRefreshKey}
+              onPatientSynced={(updates) => {
+                setViewingPatient(prev => prev ? { ...prev, ...updates } : prev);
+                setPatients(prev => prev.map(p => p.id === viewingPatient!.id ? { ...p, ...updates } : p));
+              }}
             />
           ) : (
             <PatientsPage

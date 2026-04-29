@@ -19,9 +19,10 @@ interface PatientProfileProps {
   onOpenNote: (patientId: number, patientName: string, sessionId?: number) => void;
   activeNoteSessionId?: number | null;
   notesRefreshKey?: number;
+  onPatientSynced?: (updates: Partial<Patient>) => void;
 }
 
-export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram, onOpenNote, activeNoteSessionId, notesRefreshKey }: PatientProfileProps) => {
+export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram, onOpenNote, activeNoteSessionId, notesRefreshKey, onPatientSynced }: PatientProfileProps) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'education' | 'notes'>('overview');
   const [showAssignEducationModal, setShowAssignEducationModal] = useState(false);
   const [educationModulesRefreshKey, setEducationModulesRefreshKey] = useState(0);
@@ -92,6 +93,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
       if (res.ok) {
         setClinikoSyncedAt(data.clinikoSyncedAt);
         setLinkMsg({ type: 'success', text: 'Synced from Cliniko' });
+        onPatientSynced?.({ name: data.name, email: data.email, dob: data.dob, phone: data.phone, address: data.address, clinikoSyncedAt: data.clinikoSyncedAt });
       } else {
         setLinkMsg({ type: 'error', text: data.error || 'Failed to sync' });
       }
