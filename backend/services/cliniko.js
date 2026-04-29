@@ -15,6 +15,8 @@ async function clinikoFetch(path) {
     },
   });
   if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error(`Cliniko API ${res.status} from ${url}:`, body);
     const err = new Error(`Cliniko API error: ${res.status}`);
     err.status = res.status;
     throw err;
