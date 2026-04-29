@@ -93,7 +93,11 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
       if (res.ok) {
         setClinikoSyncedAt(data.clinikoSyncedAt);
         setLinkMsg({ type: 'success', text: 'Synced from Cliniko' });
-        onPatientSynced?.({ name: data.name, dob: data.dob, phone: data.phone, address: data.address, clinikoSyncedAt: data.clinikoSyncedAt });
+        const updates: Partial<Patient> = { name: data.name, clinikoSyncedAt: data.clinikoSyncedAt };
+        if (data.dob) updates.dob = data.dob;
+        if (data.phone) updates.phone = data.phone;
+        if (data.address) updates.address = data.address;
+        onPatientSynced?.(updates);
       } else {
         setLinkMsg({ type: 'error', text: data.error || 'Failed to sync' });
       }

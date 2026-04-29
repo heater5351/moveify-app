@@ -78,8 +78,9 @@ router.post('/sync/:patientId', async (req, res) => {
     const address = addressParts.length > 0 ? addressParts.join(', ') : null;
 
     // Email is never synced — it's the login credential in Moveify and must not be overwritten
+    // COALESCE preserves existing Moveify data if Cliniko has no value for that field
     await db.query(
-      `UPDATE users SET name = $1, dob = $2, phone = $3, address = $4, cliniko_synced_at = NOW() WHERE id = $5`,
+      `UPDATE users SET name = $1, dob = COALESCE($2, dob), phone = COALESCE($3, phone), address = COALESCE($4, address), cliniko_synced_at = NOW() WHERE id = $5`,
       [name, dob, phone, address, patientId]
     );
 
