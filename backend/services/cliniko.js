@@ -25,10 +25,18 @@ async function clinikoFetch(path) {
 }
 
 async function searchPatients(query) {
-  const q = encodeURIComponent(query);
-  const data = await clinikoFetch(
-    `/patients?q[first_name_cont]=${q}&q[last_name_cont]=${q}&q[m]=or&sort=last_name`
-  );
+  // If query contains a space, treat as "first last" and search both fields (AND)
+  // Otherwise search last_name only (most common clinical lookup)
+  let qs;
+  const parts = query.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    const first = encodeURIComponent(parts[0]);
+    const last = encodeURIComponent(parts.slice(1).join(' '));
+    qs = `q[]=first_name:~${first}&q[]=last_name:~${last}`;
+  } else {
+    qs = `q[]=last_name:~${encodeURIComponent(query)}`;
+  }
+  const data = await clinikoFetch(`/patients?${qs}&sort=last_name`);
   return data.patients || [];
 }
 
