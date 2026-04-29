@@ -468,11 +468,16 @@ async function initDatabase() {
     // Add Cliniko integration columns to users
     await db.query(`
       ALTER TABLE users
-      ADD COLUMN IF NOT EXISTS cliniko_patient_id INT DEFAULT NULL
+      ADD COLUMN IF NOT EXISTS cliniko_patient_id TEXT DEFAULT NULL
     `);
     await db.query(`
       ALTER TABLE users
       ADD COLUMN IF NOT EXISTS cliniko_synced_at TIMESTAMP DEFAULT NULL
+    `);
+    // Migrate column type from INT to TEXT if it was created with wrong type
+    await db.query(`
+      ALTER TABLE users
+      ALTER COLUMN cliniko_patient_id TYPE TEXT USING cliniko_patient_id::TEXT
     `);
     await db.query(`
       CREATE INDEX IF NOT EXISTS idx_users_cliniko_patient_id
