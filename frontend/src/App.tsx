@@ -1311,8 +1311,11 @@ function App() {
               activeNoteSessionId={activeRecordingSessionId}
               notesRefreshKey={notesRefreshKey}
               onPatientSynced={(updates) => {
-                setViewingPatient(prev => prev ? { ...prev, ...updates } : prev);
-                setPatients(prev => prev.map(p => p.id === viewingPatient!.id ? { ...p, ...updates } : p));
+                const withAge = updates.dob
+                  ? { ...updates, age: (() => { const d = new Date(updates.dob!), t = new Date(), a = t.getFullYear() - d.getFullYear(), m = t.getMonth() - d.getMonth(); return (m < 0 || (m === 0 && t.getDate() < d.getDate())) ? a - 1 : a; })() }
+                  : updates;
+                setViewingPatient(prev => prev ? { ...prev, ...withAge } : prev);
+                setPatients(prev => prev.map(p => p.id === viewingPatient!.id ? { ...p, ...withAge } : p));
               }}
             />
           ) : (
