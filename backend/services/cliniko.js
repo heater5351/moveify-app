@@ -25,19 +25,26 @@ async function clinikoFetch(path) {
 }
 
 async function searchPatients(query) {
-  // If query contains a space, treat as "first last" and search both fields (AND)
-  // Otherwise search last_name only (most common clinical lookup)
-  let qs;
   const parts = query.trim().split(/\s+/);
   if (parts.length >= 2) {
+    // "John Smith" — search first_name AND last_name (single call)
     const first = encodeURIComponent(parts[0]);
     const last = encodeURIComponent(parts.slice(1).join(' '));
-    qs = `q[]=first_name:~${first}&q[]=last_name:~${last}`;
-  } else {
-    qs = `q[]=last_name:~${encodeURIComponent(query)}`;
+    const data = await clinikoFetch(`/patients?q[]=first_name:~${first}&q[]=last_name:~${last}&sort=last_name`);
+    return data.patients || [];
   }
-  const data = await clinikoFetch(`/patients?${qs}&sort=last_name`);
-  return data.patients || [];
+  // Single word — search first_name and last_name separately then merge (Cliniko has no OR)
+  const q = encodeURIComponent(query);
+  const [byFirst, byLast] = await Promise.all([
+    clinikoFetch(`/patients?q[]=first_name:~${q}&sort=last_name`).then(d => d.patients || []),
+    clinikoFetch(`/patients?q[]=last_name:~${q}&sort=last_name`).then(d => d.patients || []),
+  ]);
+  const seen = new Set();
+  return [...byFirst, ...byLast].filter(p => {
+    if (seen.has(p.id)) return false;
+    seen.add(p.id);
+    return true;
+  });
 }
 
 async function getPatient(clinikoPatientId) {
