@@ -21,6 +21,9 @@ ngrok.yml
 # Service account keys
 *-service-account.json
 
+# Dependencies
+node_modules/
+
 # Old files
 *.tsx.bak
 

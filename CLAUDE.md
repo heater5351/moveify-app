@@ -4,7 +4,7 @@
 
 Moveify is a clinical exercise prescription and patient management platform (similar to Physitrack, VALD MoveHealth). It enables clinicians to build exercise programs and assign them to patients, who can then log completions, track progress, and complete daily wellness check-ins.
 
-**⚠ SECURITY: Never read, print, log, or display any API key or secret** — this includes `CLINIKO_API_KEY`, `CLINIKO_API_KEY_STAGING`, `JWT_SECRET`, `GOOGLE_SERVICE_ACCOUNT_KEY`, and all other credentials. Never use tools to inspect their values from Secret Manager, env vars, Cloud Run config, or any other source. This is a hard rule with no exceptions.
+**⚠ SECURITY: Never read, print, log, or display any API key or secret.** This applies to every credential, including but not limited to: `CLINIKO_API_KEY*`, `JWT_SECRET`, `GOOGLE_SERVICE_ACCOUNT_KEY`, `STRIPE_API_KEY*`, `billing_stripe_webhook_secret*`, `XERO_CLIENT_ID`/`XERO_CLIENT_SECRET`/`XERO_REFRESH_TOKEN`/`XERO_TENANT_ID`, `billing_admin_token`. Never inspect values from Secret Manager, env vars, Cloud Run config, or any other source. Hard rule, no exceptions.
 
 **⚠ PRODUCTION APP WITH REAL PATIENTS.** Real patients are actively using this app. When making changes:
 - **Never delete or rename exercises** that are in assigned programs — this breaks completion history
@@ -17,10 +17,12 @@ Moveify is a clinical exercise prescription and patient management platform (sim
 
 ## Architecture
 
-**Monorepo** with two directories:
+**Monorepo** with these top-level directories:
 
 - `frontend/` — React 19 + TypeScript + Vite SPA
 - `backend/` — Node.js + Express + PostgreSQL API
+- `billing-worker/` — separate Cloud Run service consuming Stripe webhooks and Tyro CSVs, writing to Xero. See `billing-worker/HANDOVER.md` for internals.
+- `clinic-website/` — marketing site (independent)
 
 ### Frontend Stack
 
@@ -41,6 +43,10 @@ Moveify is a clinical exercise prescription and patient management platform (sim
 - **helmet** for security headers
 - **Gmail API** for transactional emails
 - **PM2** for process management in production
+
+### Billing Worker
+
+Cloud Run service `moveify-billing-worker` (separate from `moveify-backend`). Public surface: `/webhooks/stripe` (HMAC-verified) and `/webhooks/tho` (placeholder). All `/admin/*` routes require an `X-Admin-Token` header matching the `billing_admin_token` Secret Manager secret. The worker holds no patient-facing endpoints. See `billing-worker/HANDOVER.md` for full internals (jobs, sheets, Xero adapter).
 
 ### Deployment
 
@@ -181,6 +187,10 @@ cd frontend && npm run lint     # ESLint
 # Backend
 cd backend && npm run dev       # Nodemon dev server on :3000
 cd backend && npm start         # Production server
+
+# Billing worker
+cd billing-worker && npm test                                       # Vitest
+gcloud run services logs tail moveify-billing-worker --region australia-southeast1
 ```
 
 ## Frontend Navigation
@@ -388,6 +398,15 @@ Moveify stores **sensitive health information** (patient demographics, condition
 **Backend changes on dev:** redeploy staging:
 ```
 gcloud run deploy moveify-backend-staging --source backend/ --region australia-southeast1 --platform managed --allow-unauthenticated --add-cloudsql-instances moveify-app:australia-southeast1:moveify-db
+```
+
+**Billing worker changes:** deploy directly (no staging variant exists yet):
+```
+gcloud run deploy moveify-billing-worker --source ./billing-worker --region australia-southeast1 --platform managed --allow-unauthenticated
+```
+After secret rotations or refresh-token updates, force a cold start so cached values reload:
+```
+gcloud run services update moveify-billing-worker --region australia-southeast1 --update-env-vars BUMP=$(date +%s)
 ```
 
 ### Merging dev → main (production release)
