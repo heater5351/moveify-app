@@ -16,7 +16,8 @@
 // pipelines (`runNdisRtwsa`, Tyro CSV ingest). The service catalog tags those
 // services with a `funder` field so we can detect and skip them centrally.
 
-const cliniko = require('../services/cliniko');
+const cliniko = require('../services/cliniko').finance;
+const { getSubscriptionByClinikoId } = require('../services/stripe');
 const {
   appendAppointmentInvoice,
   appendReconciliationFlag,
@@ -31,19 +32,13 @@ const { logger } = require('../lib/logger');
 const CURSOR_KEY = 'cliniko_appointments_last_polled';
 const DEFAULT_BACKFILL_MS = 24 * 60 * 60 * 1000;
 
-// Staging-only Cliniko secret. The referrals pipeline still uses the prod
-// `cliniko-api-key` — only the appointment poller is opted into staging so
-// we don't redirect live referral traffic. Swap to 'cliniko-api-key' when
-// going live.
-const CLINIKO_SECRET = 'cliniko-api-key-staging';
-
 async function pollClinikoAppointments(log = logger) {
   const cursor = (await getWorkerState(CURSOR_KEY)) ||
     new Date(Date.now() - DEFAULT_BACKFILL_MS).toISOString();
   const runAt = new Date().toISOString();
   log.info({ since: cursor }, 'Starting Cliniko appointment poll');
 
-  const appointments = await cliniko.getAppointmentsAll(cursor, CLINIKO_SECRET);
+  const appointments = await cliniko.getAppointmentsAll(cursor);
   log.info({ count: appointments.length }, 'Fetched appointments since cursor');
 
   if (appointments.length === 0) {
@@ -97,7 +92,7 @@ async function processAppointment({ appt, patientCache, log }) {
     await mark(idempKey);
     return 'flagged';
   }
-  const typeData = await cliniko.getAppointmentType(typeId, CLINIKO_SECRET).catch(() => null);
+  const typeData = await cliniko.getAppointmentType(typeId).catch(() => null);
   const typeName = typeData?.name || '';
 
   const service = serviceCatalog.lookup(typeName);
@@ -134,7 +129,7 @@ async function processAppointment({ appt, patientCache, log }) {
   let patient = patientCache.get(String(clinikoPatientId));
   if (!patient) {
     try {
-      patient = await cliniko.getPatient(clinikoPatientId, CLINIKO_SECRET);
+      patient = await cliniko.getPatient(clinikoPatientId);
       patientCache.set(String(clinikoPatientId), patient);
     } catch (err) {
       await flag(
@@ -152,6 +147,22 @@ async function processAppointment({ appt, patientCache, log }) {
   const patientName = [patient.first_name, patient.last_name].filter(Boolean).join(' ').trim() ||
     `Cliniko ${clinikoPatientId}`;
   const patientEmail = patient.email || undefined;
+
+  // Subscription gate: only patients with an active/trialing Stripe subscription
+  // flow through the credit-consumption path. Casual/non-subscribed patients
+  // pay at the desk (Tyro) and are out of scope for this job. Skip cleanly and
+  // mark idempotency so we don't re-check every poll — if they subscribe later,
+  // future appointments will bill correctly; this past one stays uninvoiced
+  // here (already settled via Tyro or manual invoicing).
+  const subscription = await getSubscriptionByClinikoId(clinikoPatientId, patientEmail).catch((err) => {
+    log.warn({ appt_id: appt.id, err: err.message }, 'Stripe subscription lookup failed — treating as unsubscribed');
+    return null;
+  });
+  if (!subscription) {
+    log.debug({ appt_id: appt.id, cliniko_patient_id: clinikoPatientId }, 'No active subscription — skipping appointment');
+    await mark(idempKey);
+    return 'skipped';
+  }
 
   // Mark BEFORE Xero writes (fail-closed pattern). If a downstream call dies,
   // we surface a flag rather than silently re-creating invoices on next poll.

@@ -1,6 +1,6 @@
 'use strict';
 
-const cliniko = require('../services/cliniko');
+const cliniko = require('../services/cliniko').finance;
 const { appendReconciliationFlag, getTab } = require('../services/sheets');
 const { logger } = require('../lib/logger');
 

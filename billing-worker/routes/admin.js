@@ -320,6 +320,27 @@ router.post('/xero-credit-note-reverse', express.json(), async (req, res) => {
   }
 });
 
+// Returns the Xero tenants the current refresh token has access to. After
+// re-consenting via scripts/get-xero-token.js, hit this to discover the new
+// tenant's ID (needed for XERO_TENANT_ID and XERO_SANDBOX_TENANT_IDS).
+router.get('/xero-connections', async (req, res) => {
+  try {
+    const fetch = require('node-fetch');
+    const accessToken = await xero.getAccessToken();
+    const r = await fetch('https://api.xero.com/connections', {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+    });
+    if (!r.ok) {
+      const text = await r.text();
+      return res.status(500).json({ error: `Xero ${r.status}: ${text.slice(0, 300)}` });
+    }
+    const data = await r.json();
+    res.json({ connections: data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Inspect all Xero records for a contact (read-only).
 router.get('/xero-contact-inventory', async (req, res) => {
   const name = req.query.name;

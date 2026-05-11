@@ -1,6 +1,6 @@
 'use strict';
 
-const cliniko = require('../services/cliniko');
+const cliniko = require('../services/cliniko').finance;
 const {
   upsertContact,
   upsertInvoice,

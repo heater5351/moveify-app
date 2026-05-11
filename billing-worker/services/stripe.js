@@ -50,11 +50,15 @@ async function getSubscription(subscriptionId) {
   return stripe.subscriptions.retrieve(subscriptionId);
 }
 
-// Returns the active subscription for a customer, or null
+// Returns an active OR trialing subscription for a customer, or null.
+// We treat trialing as "subscribed" — the patient is in the credit-consumption
+// flow and their session billing should run normally during the trial period.
 async function getActiveSubscription(customerId) {
   const stripe = await getStripe();
-  const subs = await stripe.subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
-  return subs.data[0] || null;
+  const active = await stripe.subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
+  if (active.data[0]) return active.data[0];
+  const trialing = await stripe.subscriptions.list({ customer: customerId, status: 'trialing', limit: 1 });
+  return trialing.data[0] || null;
 }
 
 // Returns the active subscription for a Cliniko patient ID.

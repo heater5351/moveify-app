@@ -15,7 +15,7 @@ const {
   uploadPatientAttachment,
   findOrCreateReferrerContact,
   setPatientReferringDoctor,
-} = require('../services/cliniko');
+} = require('../services/cliniko').admin;
 const { upsertReferral, appendActionRequired } = require('../services/sheets');
 const { check: idempotencyCheck, mark: idempotencyMark } = require('../lib/idempotency');
 

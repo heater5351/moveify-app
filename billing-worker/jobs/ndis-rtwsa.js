@@ -1,6 +1,10 @@
 'use strict';
 
-const cliniko = require('../services/cliniko');
+// Legacy: this job uses createInvoice which Cliniko's API rejects (invoices
+// are read-only). It's kept wired up but inert; pending rewrite to post the
+// equivalent Xero invoice instead. Uses the admin namespace because intent is
+// to write.
+const cliniko = require('../services/cliniko').admin;
 const { sendEmail } = require('../services/gmail');
 const { check, mark } = require('../lib/idempotency');
 const { logger } = require('../lib/logger');

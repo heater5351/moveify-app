@@ -75,18 +75,18 @@ async function clinikoRequest(path, options = {}, secretName = 'cliniko-api-key'
   throw lastErr;
 }
 
-async function getPatients(since) {
+async function getPatients(since, secretName = 'cliniko-api-key') {
   const qs = since ? `?updated_at%5Bgt%5D=${encodeURIComponent(since)}&per_page=100` : '?per_page=100';
-  return clinikoRequest(`/patients${qs}`);
+  return clinikoRequest(`/patients${qs}`, {}, secretName);
 }
 
 async function getPatient(patientId, secretName = 'cliniko-api-key') {
   return clinikoRequest(`/patients/${patientId}`, {}, secretName);
 }
 
-async function getAppointments(since) {
+async function getAppointments(since, secretName = 'cliniko-api-key') {
   const qs = since ? `?updated_at%5Bgt%5D=${encodeURIComponent(since)}&per_page=100` : '?per_page=100';
-  return clinikoRequest(`/appointments${qs}`);
+  return clinikoRequest(`/appointments${qs}`, {}, secretName);
 }
 
 // Paginated variant — follows Cliniko's `links.next` cursor until exhausted.
@@ -106,14 +106,14 @@ async function getAppointmentsAll(since, secretName = 'cliniko-api-key') {
   return all;
 }
 
-async function getInvoices(since) {
+async function getInvoices(since, secretName = 'cliniko-api-key') {
   const qs = since ? `?updated_at%5Bgt%5D=${encodeURIComponent(since)}&per_page=100` : '?per_page=100';
-  return clinikoRequest(`/invoices${qs}`);
+  return clinikoRequest(`/invoices${qs}`, {}, secretName);
 }
 
-async function getPayments(since) {
+async function getPayments(since, secretName = 'cliniko-api-key') {
   const qs = since ? `?updated_at%5Bgt%5D=${encodeURIComponent(since)}&per_page=100` : '?per_page=100';
-  return clinikoRequest(`/payments${qs}`);
+  return clinikoRequest(`/payments${qs}`, {}, secretName);
 }
 
 async function createInvoice(patientId, lineItems) {
@@ -470,24 +470,46 @@ async function setPatientReferringDoctor(patientId, contactId) {
   });
 }
 
+// Two-namespace export — keeps the administrative pipeline (referrals: writes
+// to patients/contacts/attachments) on a distinct API key from the financial
+// pipeline (appointment poller, sync, reconcile: read-only). The two keys are
+// declared in `lib/secrets.js`:
+//   - cliniko-api-key-admin   → full-access Cliniko user (writes)
+//   - cliniko-api-key-finance → read-only Cliniko user (reads)
+// Initially both can point at the same GCP secret. Once the read-only Cliniko
+// user is provisioned and CLINIKO_API_KEY_FINANCE is populated, the finance
+// namespace is physically incapable of writing — Cliniko returns 403 on writes.
+//
+// Admin functions default to 'cliniko-api-key' (which maps to the same target
+// as -admin) — leaving the default keeps backwards compatibility with any
+// legacy call paths while the explicit namespace makes intent obvious.
+
 module.exports = {
-  getPatients,
-  getPatient,
-  getAppointments,
-  getAppointmentsAll,
-  getInvoices,
-  getPayments,
-  createInvoice,
-  createPayment,
-  createCreditPayment,
-  createAppointmentInvoice,
-  getAppointmentType,
-  findPatientByEmail,
-  searchPatientByNameDob,
-  createPatient,
-  updatePatientMissingFields,
-  addPatientNote,
-  uploadPatientAttachment,
-  findOrCreateReferrerContact,
-  setPatientReferringDoctor,
+  admin: {
+    // Reads used during the referrals lookup phase
+    searchPatientByNameDob,
+    findPatientByEmail,
+    // Writes — patients, doctor contacts, attachments, notes
+    createPatient,
+    updatePatientMissingFields,
+    addPatientNote,
+    uploadPatientAttachment,
+    findOrCreateReferrerContact,
+    setPatientReferringDoctor,
+    // Legacy: Cliniko's invoice/payment API is read-only, these will 422/403
+    // in practice but are retained for any old call sites still wired up.
+    createInvoice,
+    createPayment,
+    createCreditPayment,
+    createAppointmentInvoice,
+  },
+  finance: {
+    getPatients:        (since) => getPatients(since, 'cliniko-api-key-finance'),
+    getPatient:         (id) => getPatient(id, 'cliniko-api-key-finance'),
+    getAppointments:    (since) => getAppointments(since, 'cliniko-api-key-finance'),
+    getAppointmentsAll: (since) => getAppointmentsAll(since, 'cliniko-api-key-finance'),
+    getAppointmentType: (id) => getAppointmentType(id, 'cliniko-api-key-finance'),
+    getInvoices:        (since) => getInvoices(since, 'cliniko-api-key-finance'),
+    getPayments:        (since) => getPayments(since, 'cliniko-api-key-finance'),
+  },
 };

@@ -11,6 +11,12 @@ const cache = new Map();
 // Maps logical secret names → GCP Secret Manager names (which may differ from logical names)
 const SECRET_GCP_NAME_MAP = {
   'cliniko-api-key': 'CLINIKO_API_KEY',
+  // Admin = referrals pipeline (writes patients/contacts/attachments).
+  // Finance = appointment poller, sync, reconcile (read-only).
+  // The two map to distinct Cliniko user-scoped API keys; the FINANCE key is
+  // tied to a Cliniko user with read-only permissions, so writes will 403.
+  'cliniko-api-key-admin': 'CLINIKO_API_KEY',
+  'cliniko-api-key-finance': 'CLINIKO_API_KEY_FINANCE',
   'cliniko-api-key-staging': 'CLINIKO_API_KEY_STAGING',
   'stripe-secret-key': 'stripe_api_key_staging',
   'stripe-webhook-secret': 'billing_stripe_webhook_secret_staging',
@@ -30,6 +36,8 @@ const SECRET_GCP_NAME_MAP = {
 // Maps logical secret names → local .env var names
 const SECRET_NAME_MAP = {
   'cliniko-api-key': 'CLINIKO_API_KEY',
+  'cliniko-api-key-admin': 'CLINIKO_API_KEY',
+  'cliniko-api-key-finance': 'CLINIKO_API_KEY',
   'cliniko-api-key-staging': 'CLINIKO_API_KEY_STAGING',
   'stripe-secret-key': 'STRIPE_SECRET_KEY',
   'stripe-webhook-secret': 'STRIPE_WEBHOOK_SECRET',
