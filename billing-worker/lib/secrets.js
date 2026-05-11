@@ -18,7 +18,11 @@ const SECRET_GCP_NAME_MAP = {
   'cliniko-api-key-admin': 'CLINIKO_API_KEY',
   'cliniko-api-key-finance': 'CLINIKO_API_KEY_FINANCE',
   'cliniko-api-key-staging': 'CLINIKO_API_KEY_STAGING',
-  'stripe-secret-key': 'stripe_api_key_staging',
+  // Stripe is in LIVE mode for historical-backfill dry-run into Demo Co Xero.
+  // The Stripe live webhook endpoint must remain DISABLED until the final
+  // cutover to a real prod Xero tenant — otherwise real-time DDs would land
+  // in Demo Co.
+  'stripe-secret-key': 'STRIPE_API_KEY',
   'stripe-webhook-secret': 'billing_stripe_webhook_secret_staging',
   'google-sheets-service-account-credentials': 'moveify-google-service-account-key',
   'gmail-client-id': 'billing-gmail-client-id',

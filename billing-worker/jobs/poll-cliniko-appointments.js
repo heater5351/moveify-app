@@ -17,7 +17,8 @@
 // services with a `funder` field so we can detect and skip them centrally.
 
 const cliniko = require('../services/cliniko').finance;
-const { getSubscriptionByClinikoId } = require('../services/stripe');
+const { findSubscriptionsCoveringDate, getSubscriptionProductName } = require('../services/stripe');
+const { getPpFee } = require('../lib/rates');
 const {
   appendAppointmentInvoice,
   appendReconciliationFlag,
@@ -39,24 +40,72 @@ async function pollClinikoAppointments(log = logger) {
   log.info({ since: cursor }, 'Starting Cliniko appointment poll');
 
   const appointments = await cliniko.getAppointmentsAll(cursor);
-  log.info({ count: appointments.length }, 'Fetched appointments since cursor');
+  log.info({ count: appointments.length }, 'Fetched individual appointments since cursor');
 
-  if (appointments.length === 0) {
+  // Group attendance lives on /attendees, not /group_appointments. Each attendee
+  // is one patient's booking into a group session, with its own `arrived` flag.
+  // We convert each ARRIVED attendee into a synthetic appointment record so it
+  // flows through the same processAppointment pipeline.
+  const attendees = await cliniko.getAttendeesAll(cursor).catch((err) => {
+    log.warn({ err: err.message }, 'getAttendeesAll failed — continuing without group attendances');
+    return [];
+  });
+  log.info({ count: attendees.length }, 'Fetched group attendees since cursor');
+
+  const syntheticGroupAppts = [];
+  const attendeeStats = { total: attendees.length, arrived: 0, not_arrived: 0, cancelled_or_archived: 0, no_group_link: 0, fetched_group: 0 };
+  // Cache parent group_appointment fetches per-run to dedupe.
+  const groupApptCache = new Map();
+  for (const a of attendees) {
+    if (a.cancelled_at || a.archived_at) { attendeeStats.cancelled_or_archived++; continue; }
+    if (!a.arrived) { attendeeStats.not_arrived++; continue; }
+    attendeeStats.arrived++;
+    try {
+      // Booking link points at /bookings/{id}; the booking record references
+      // the parent group_appointment. To avoid an extra hop, prefer the
+      // group_appointment link if Cliniko exposes it directly on the attendee.
+      const bookingUrl = a.booking?.links?.self;
+      const groupId = a.group_appointment?.links?.self?.split('/').pop()
+        || (bookingUrl && bookingUrl.split('/').pop()); // booking_id; we'll fetch booking to resolve group
+      if (!groupId) { attendeeStats.no_group_link++; continue; }
+
+      let group = groupApptCache.get(groupId);
+      if (!group) {
+        group = await cliniko.getGroupAppointment(groupId).catch(() => null);
+        if (group) { groupApptCache.set(groupId, group); attendeeStats.fetched_group++; }
+      }
+      if (!group) continue;
+
+      syntheticGroupAppts.push({
+        id: `group-attendee-${a.id}`,
+        patient_arrived: true,
+        did_not_arrive: false,
+        cancelled_at: null,
+        patient: a.patient, // { links: { self: '.../patients/X' } }
+        appointment_type: group.appointment_type,
+        starts_at: group.starts_at,
+      });
+    } catch (err) {
+      log.warn({ attendee_id: a.id, err: err.message }, 'Failed to build synthetic appointment from attendee');
+    }
+  }
+
+  const allAppts = appointments.concat(syntheticGroupAppts);
+
+  if (allAppts.length === 0) {
     await setWorkerState(CURSOR_KEY, runAt);
     return { processed: 0, invoiced: 0, skipped: 0, flagged: 0 };
   }
 
   // Per-run cache of Cliniko patient lookups so we hit each ID at most once.
-  // Patients live in the staging instance and aren't in the prod Contacts tab,
-  // so we fetch directly from Cliniko rather than going through the sheet.
   const patientCache = new Map();
 
-  const stats = { processed: 0, invoiced: 0, skipped: 0, flagged: 0 };
+  const stats = { processed: 0, invoiced: 0, skipped: 0, flagged: 0, group_attendees_added: syntheticGroupAppts.length, attendee_stats: attendeeStats };
 
-  for (const appt of appointments) {
+  for (const appt of allAppts) {
     stats.processed++;
     try {
-      const result = await processAppointment({ appt, patientCache, log });
+      const result = await processAppointment({ appt, patientCache, log, stats });
       if (result === 'invoiced') stats.invoiced++;
       else if (result === 'flagged') stats.flagged++;
       else stats.skipped++;
@@ -71,12 +120,26 @@ async function pollClinikoAppointments(log = logger) {
   return stats;
 }
 
-async function processAppointment({ appt, patientCache, log }) {
+async function processAppointment({ appt, patientCache, log, stats }) {
   // Trigger condition: patient marked as arrived, not cancelled, not did-not-arrive.
   // Cliniko has no boolean "Completed" — `patient_arrived === true` is the
   // closest equivalent and matches what `sync-cliniko.js` already keys off.
   if (!appt.patient_arrived || appt.did_not_arrive || appt.cancelled_at) {
+    stats.skip_not_attended = (stats.skip_not_attended || 0) + 1;
+    // Track what types are getting skipped at this gate, useful for diagnosing
+    // why expected attended sessions aren't being processed.
+    stats.skip_not_attended_appt_type_ids = stats.skip_not_attended_appt_type_ids || {};
+    const typeId = appt.appointment_type?.links?.self?.split('/').pop() || 'unknown';
+    stats.skip_not_attended_appt_type_ids[typeId] = (stats.skip_not_attended_appt_type_ids[typeId] || 0) + 1;
     return 'skipped';
+  }
+  // For appointments that DID make it past the gate, also track whether the
+  // patient link exists (group appointments may use patient_bookings instead).
+  stats.attended_seen = (stats.attended_seen || 0) + 1;
+  if (!appt.patient?.links?.self) {
+    stats.attended_no_patient_link = (stats.attended_no_patient_link || 0) + 1;
+    stats.attended_no_patient_link_appt_ids = stats.attended_no_patient_link_appt_ids || [];
+    stats.attended_no_patient_link_appt_ids.push(String(appt.id));
   }
 
   const idempKey = `appointment:${appt.id}`;
@@ -111,7 +174,7 @@ async function processAppointment({ appt, patientCache, log }) {
   // Funder-tagged services are handled by separate pipelines — skip here so
   // we don't duplicate invoices created by `runNdisRtwsa` or the Tyro ingest.
   if (service.funder) {
-    log.debug({ appt_id: appt.id, funder: service.funder }, 'Funder-routed service — skipping subscription invoicing');
+    stats[`skip_funder_${service.funder.toLowerCase()}`] = (stats[`skip_funder_${service.funder.toLowerCase()}`] || 0) + 1;
     await mark(idempKey);
     return 'skipped';
   }
@@ -148,18 +211,56 @@ async function processAppointment({ appt, patientCache, log }) {
     `Cliniko ${clinikoPatientId}`;
   const patientEmail = patient.email || undefined;
 
-  // Subscription gate: only patients with an active/trialing Stripe subscription
-  // flow through the credit-consumption path. Casual/non-subscribed patients
-  // pay at the desk (Tyro) and are out of scope for this job. Skip cleanly and
-  // mark idempotency so we don't re-check every poll — if they subscribe later,
-  // future appointments will bill correctly; this past one stays uninvoiced
-  // here (already settled via Tyro or manual invoicing).
-  const subscription = await getSubscriptionByClinikoId(clinikoPatientId, patientEmail).catch((err) => {
+  // Subscription gate: the patient must have been on a paid/trialing Stripe
+  // subscription AT THE TIME of the appointment. This catches three failure
+  // modes the naive "current sub" check misses:
+  //
+  //   1. Backdated billing — appointment was BEFORE the patient subscribed.
+  //      We do NOT retroactively bill against a sub that didn't exist yet.
+  //   2. Cancelled mid-period — patient cancelled after attending. We still
+  //      bill the appointment because they were a subscriber when it happened.
+  //   3. Failed DD — there may be an active sub but no overpayment credit
+  //      yet. We still create the invoice (AUTHORISED, unpaid). When the
+  //      next DD lands, Stream A's handler back-allocates the new overpayment
+  //      to any outstanding invoices for the contact.
+  //
+  // findSubscriptionsCoveringDate walks every Stripe sub (any status) for the
+  // customer and returns those whose [start_date, ended_at || now] spans the
+  // appointment date.
+  const apptStartsAtIso = appt.starts_at || new Date().toISOString();
+  const covering = await findSubscriptionsCoveringDate(clinikoPatientId, patientEmail, patientName, apptStartsAtIso).catch((err) => {
     log.warn({ appt_id: appt.id, err: err.message }, 'Stripe subscription lookup failed — treating as unsubscribed');
-    return null;
+    return [];
   });
-  if (!subscription) {
-    log.debug({ appt_id: appt.id, cliniko_patient_id: clinikoPatientId }, 'No active subscription — skipping appointment');
+  if (covering.length === 0) {
+    stats.skip_no_subscription = (stats.skip_no_subscription || 0) + 1;
+    stats.skip_no_subscription_cliniko_ids = stats.skip_no_subscription_cliniko_ids || [];
+    if (!stats.skip_no_subscription_cliniko_ids.includes(String(clinikoPatientId))) {
+      stats.skip_no_subscription_cliniko_ids.push(String(clinikoPatientId));
+    }
+    await mark(idempKey);
+    return 'skipped';
+  }
+  if (covering.length > 1) {
+    log.warn({ appt_id: appt.id, cliniko_patient_id: clinikoPatientId, count: covering.length }, 'Multiple subscriptions cover this appointment date — using first');
+  }
+
+  // Entitlement check: only proceed if the appointment's service type is part
+  // of the subscription product's covered services. Otherwise this is a casual
+  // session that just happened to fall within a subscription window (e.g., a
+  // T1 block patient also paying casually for a one-off Initial Assessment).
+  const { subscription } = covering[0];
+  const productName = await getSubscriptionProductName(subscription).catch(() => null);
+  const ppFee = productName ? getPpFee(productName) : null;
+  if (!ppFee || !Array.isArray(ppFee.entitlements)) {
+    stats.skip_no_entitlements_config = (stats.skip_no_entitlements_config || 0) + 1;
+    log.warn({ appt_id: appt.id, product: productName || '(unknown)' }, 'Subscription product has no entitlement config — skipping');
+    await mark(idempKey);
+    return 'skipped';
+  }
+  if (!ppFee.entitlements.includes(service.name)) {
+    stats.skip_not_entitled = (stats.skip_not_entitled || 0) + 1;
+    log.info({ appt_id: appt.id, product: productName, service_name: service.name, service_code: service.code }, 'Service not in subscription entitlements — treating as casual');
     await mark(idempKey);
     return 'skipped';
   }
@@ -282,11 +383,14 @@ async function processAppointment({ appt, patientCache, log }) {
     );
   }
 
+  // PHI hygiene: service.name and the description can reveal treatment type.
+  // Log identifiers + amounts only; service.code is the catalog reference and
+  // doesn't disclose treatment specifics.
   log.info(
     {
       appt_id: appt.id,
       cliniko_patient_id: clinikoPatientId,
-      service: service.name,
+      service_code: service.code || 'uncoded',
       xero_invoice_number: invoice.invoiceNumber,
       casual_price: service.casualPrice,
       allocated,

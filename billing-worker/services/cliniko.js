@@ -84,6 +84,35 @@ async function getPatient(patientId, secretName = 'cliniko-api-key') {
   return clinikoRequest(`/patients/${patientId}`, {}, secretName);
 }
 
+// Group appointment attendees. Attendance for groups is tracked here, not on
+// the parent group_appointment record. Each attendee row carries an `arrived`
+// boolean and links to its patient and booking.
+async function getAttendeesAll(since, secretName = 'cliniko-api-key') {
+  const all = [];
+  let path = since
+    ? `/attendees?updated_at%5Bgt%5D=${encodeURIComponent(since)}&per_page=100`
+    : '/attendees?per_page=100';
+  while (path) {
+    const data = await clinikoRequest(path, {}, secretName);
+    all.push(...(data.attendees || []));
+    const next = data.links?.next;
+    if (!next) break;
+    path = next.startsWith(BASE_URL) ? next.slice(BASE_URL.length) : next;
+  }
+  return all;
+}
+
+// Group appointment cache — per-secret to avoid prod/staging cross-contamination.
+const _groupApptCacheByKey = new Map();
+async function getGroupAppointment(id, secretName = 'cliniko-api-key') {
+  let cache = _groupApptCacheByKey.get(secretName);
+  if (!cache) { cache = new Map(); _groupApptCacheByKey.set(secretName, cache); }
+  if (cache.has(id)) return cache.get(id);
+  const data = await clinikoRequest(`/group_appointments/${id}`, {}, secretName);
+  cache.set(id, data);
+  return data;
+}
+
 async function getAppointments(since, secretName = 'cliniko-api-key') {
   const qs = since ? `?updated_at%5Bgt%5D=${encodeURIComponent(since)}&per_page=100` : '?per_page=100';
   return clinikoRequest(`/appointments${qs}`, {}, secretName);
@@ -504,12 +533,14 @@ module.exports = {
     createAppointmentInvoice,
   },
   finance: {
-    getPatients:        (since) => getPatients(since, 'cliniko-api-key-finance'),
-    getPatient:         (id) => getPatient(id, 'cliniko-api-key-finance'),
-    getAppointments:    (since) => getAppointments(since, 'cliniko-api-key-finance'),
-    getAppointmentsAll: (since) => getAppointmentsAll(since, 'cliniko-api-key-finance'),
-    getAppointmentType: (id) => getAppointmentType(id, 'cliniko-api-key-finance'),
-    getInvoices:        (since) => getInvoices(since, 'cliniko-api-key-finance'),
-    getPayments:        (since) => getPayments(since, 'cliniko-api-key-finance'),
+    getPatients:         (since) => getPatients(since, 'cliniko-api-key-finance'),
+    getPatient:          (id) => getPatient(id, 'cliniko-api-key-finance'),
+    getAppointments:     (since) => getAppointments(since, 'cliniko-api-key-finance'),
+    getAppointmentsAll:  (since) => getAppointmentsAll(since, 'cliniko-api-key-finance'),
+    getAppointmentType:  (id) => getAppointmentType(id, 'cliniko-api-key-finance'),
+    getInvoices:         (since) => getInvoices(since, 'cliniko-api-key-finance'),
+    getPayments:         (since) => getPayments(since, 'cliniko-api-key-finance'),
+    getAttendeesAll:     (since) => getAttendeesAll(since, 'cliniko-api-key-finance'),
+    getGroupAppointment: (id) => getGroupAppointment(id, 'cliniko-api-key-finance'),
   },
 };

@@ -320,6 +320,259 @@ router.post('/xero-credit-note-reverse', express.json(), async (req, res) => {
   }
 });
 
+// Backfill historical Stripe paid invoices into Xero. PHI hygiene: response
+// returns only IDs/amounts/dates; never customer name, email, or product tier.
+//
+// Body:
+//   since        — ISO date "YYYY-MM-DD" (required). Inclusive lower bound on
+//                  Stripe invoice.created.
+//   until        — ISO date (optional). Inclusive upper bound; defaults to now.
+//   dryRun       — bool (default true). When true, lists candidates without
+//                  writing anything.
+//   limit        — max invoices to process this call (default 500).
+//
+// Idempotency: each invoice is keyed `stripe-backfill:<invoice.id>`. Safe to
+// rerun — already-processed invoices are skipped as duplicates.
+router.post('/backfill-stripe', express.json(), async (req, res) => {
+  const log = withCorrelation(req);
+  const { since, until, dryRun = true, limit = 500 } = req.body || {};
+  if (!since) return res.status(400).json({ error: 'since (ISO date) required' });
+
+  const sinceTs = Math.floor(new Date(since).getTime() / 1000);
+  if (!Number.isFinite(sinceTs)) return res.status(400).json({ error: 'since must be a valid ISO date' });
+  const untilTs = until ? Math.floor(new Date(until).getTime() / 1000) : Math.floor(Date.now() / 1000);
+
+  try {
+    const { getStripe } = require('../services/stripe');
+    const { backfillInvoice } = require('../jobs/stripe-handler');
+    const stripe = await getStripe();
+
+    // Walk paid invoices in pages
+    const candidates = [];
+    let starting_after;
+    while (candidates.length < limit) {
+      const page = await stripe.invoices.list({
+        status: 'paid',
+        created: { gte: sinceTs, lte: untilTs },
+        limit: 100,
+        ...(starting_after ? { starting_after } : {}),
+      });
+      candidates.push(...page.data);
+      if (!page.has_more) break;
+      starting_after = page.data[page.data.length - 1]?.id;
+    }
+    const slice = candidates.slice(0, limit);
+
+    if (dryRun) {
+      // Return only IDs / amounts / dates. No customer info.
+      return res.json({
+        ok: true,
+        dryRun: true,
+        candidates: slice.length,
+        sample: slice.slice(0, 10).map((i) => ({
+          invoice_id: i.id,
+          amount: Number((i.amount_paid / 100).toFixed(2)),
+          currency: i.currency,
+          created: new Date(i.created * 1000).toISOString().slice(0, 10),
+          paid_at: i.status_transitions?.paid_at
+            ? new Date(i.status_transitions.paid_at * 1000).toISOString().slice(0, 10)
+            : null,
+        })),
+      });
+    }
+
+    const results = { processed: 0, duplicate: 0, failed: 0, zero_amount_skipped: 0 };
+    const failures = [];
+    for (const invoice of slice) {
+      // $0 invoices (trial conversions, prorations etc.) would fail Xero's
+      // overpayment-amount validation. Skip cleanly — no Xero work to do.
+      if (!invoice.amount_paid || invoice.amount_paid <= 0) {
+        results.zero_amount_skipped++;
+        continue;
+      }
+      try {
+        const r = await backfillInvoice(invoice, log);
+        results[r.status] = (results[r.status] || 0) + 1;
+      } catch (err) {
+        results.failed++;
+        failures.push({ invoice_id: invoice.id, error: err.message.slice(0, 200) });
+        log.error({ invoice_id: invoice.id, err: err.message }, 'Stripe backfill: per-invoice failure');
+      }
+    }
+
+    log.info({ ...results, since, until }, 'Stripe backfill complete');
+    res.json({ ok: true, ...results, totalCandidates: candidates.length, failures: failures.slice(0, 20) });
+  } catch (err) {
+    log.error({ err: err.message }, 'backfill-stripe failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Backfill the Cliniko appointment poller. Rewinds the cursor, optionally
+// clears appointment idempotency keys, and runs the existing poller once.
+// The poller's own pagination handles long history windows.
+//
+// Body:
+//   since              — ISO timestamp (required). Cursor will be set here.
+//   clearIdempotency   — bool (default false). Clears all `appointment:*`
+//                        keys before running. Use when re-running backfill
+//                        against a fresh Xero org so prior runs don't skip
+//                        the same appointments.
+//   dryRun             — bool (default false). Just rewinds + reports — no
+//                        actual processing (skip the poller call).
+router.post('/backfill-cliniko-appointments', express.json(), async (req, res) => {
+  const log = withCorrelation(req);
+  const { since, clearIdempotency = false, dryRun = false } = req.body || {};
+  if (!since) return res.status(400).json({ error: 'since (ISO timestamp) required' });
+  if (!Number.isFinite(new Date(since).getTime())) {
+    return res.status(400).json({ error: 'since must be a valid ISO timestamp' });
+  }
+
+  try {
+    const removed = clearIdempotency ? await clearKeysByPrefix('appointment:') : 0;
+    await setWorkerState('cliniko_appointments_last_polled', since);
+
+    if (dryRun) {
+      return res.json({
+        ok: true,
+        dryRun: true,
+        cursor_rewound_to: since,
+        idempotency_keys_cleared: removed,
+      });
+    }
+
+    const { pollClinikoAppointments } = require('../jobs/poll-cliniko-appointments');
+    const stats = await pollClinikoAppointments(log);
+    res.json({ ok: true, cursor_rewound_to: since, idempotency_keys_cleared: removed, ...stats });
+  } catch (err) {
+    log.error({ err: err.message }, 'backfill-cliniko-appointments failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Helper for clearing idempotency keys by prefix (shared with /admin/clear-idempotency)
+async function clearKeysByPrefix(prefix) {
+  const sheets = await getSheets();
+  const spreadsheetId = process.env.SHEETS_LEDGER_ID;
+  const r = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'IdempotencyKeys!A:B' });
+  const rows = r.data.values || [];
+  if (rows.length <= 1) return 0;
+  const kept = [rows[0]]; // header
+  let removed = 0;
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0] || '').startsWith(prefix)) { removed++; continue; }
+    kept.push(rows[i]);
+  }
+  if (removed > 0) {
+    await sheets.spreadsheets.values.clear({ spreadsheetId, range: 'IdempotencyKeys!A:B' });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: 'IdempotencyKeys!A1',
+      valueInputOption: 'RAW',
+      requestBody: { values: kept },
+    });
+  }
+  return removed;
+}
+
+// Returns raw shape of Cliniko's /group_appointments response since a given
+// timestamp. Used to confirm field names before wiring up the poller for
+// group sessions. Only first 3 records to limit PHI exposure.
+router.get('/cliniko-group-appointments-sample', async (req, res) => {
+  const since = req.query.since;
+  try {
+    const { getSecret } = require('../lib/secrets');
+    const fetch = require('node-fetch');
+    const apiKey = (await getSecret('cliniko-api-key-finance')).trim();
+    const auth = Buffer.from(`${apiKey}:`).toString('base64');
+    const qs = since ? `?updated_at%5Bgt%5D=${encodeURIComponent(since)}&per_page=10` : '?per_page=10';
+    const shard = process.env.CLINIKO_SHARD || 'au1';
+    const r = await fetch(`https://api.${shard}.cliniko.com/v1/group_appointments${qs}`, {
+      headers: { Authorization: `Basic ${auth}`, Accept: 'application/json', 'User-Agent': 'MoveifyBillingWorker/1.0' },
+    });
+    if (!r.ok) return res.status(r.status).json({ error: `Cliniko ${r.status}`, body: (await r.text()).slice(0, 500) });
+    const data = await r.json();
+    const total = (data.group_appointments || []).length;
+    res.json({ total, sample: (data.group_appointments || []).slice(0, 3) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/cliniko-appointment-type', async (req, res) => {
+  const id = req.query.id;
+  if (!id) return res.status(400).json({ error: 'id required' });
+  try {
+    const cliniko = require('../services/cliniko').finance;
+    const t = await cliniko.getAppointmentType(String(id));
+    res.json({ id, name: t?.name, category: t?.category, duration_in_minutes: t?.duration_in_minutes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Diagnostic — list a Stripe customer's subscriptions with key date fields.
+// No PHI returned: just IDs, status, and unix timestamps.
+router.get('/stripe-customer-subscriptions', async (req, res) => {
+  const customerId = req.query.id;
+  if (!customerId) return res.status(400).json({ error: 'id query param required' });
+  try {
+    const { getStripe } = require('../services/stripe');
+    const stripe = await getStripe();
+    const list = await stripe.subscriptions.list({ customer: String(customerId), status: 'all', limit: 100 });
+    const fmt = (s) => s ? new Date(s * 1000).toISOString().slice(0, 19) : null;
+    res.json({
+      customer_id: customerId,
+      count: list.data.length,
+      subscriptions: list.data.map((sub) => ({
+        id: sub.id,
+        status: sub.status,
+        start_date: fmt(sub.start_date),
+        created: fmt(sub.created),
+        current_period_start: fmt(sub.current_period_start),
+        current_period_end: fmt(sub.current_period_end),
+        trial_start: fmt(sub.trial_start),
+        trial_end: fmt(sub.trial_end),
+        ended_at: fmt(sub.ended_at),
+        cancel_at: fmt(sub.cancel_at),
+        product: sub.items?.data?.[0]?.price?.product || null,
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Current Stripe↔Cliniko link cache contents.
+router.get('/stripe-cliniko-links', async (req, res) => {
+  try {
+    const rows = await getTab('StripeClinikoLinks');
+    res.json({ count: rows.length, rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Recent StripePayments rows for backfill audit — IDs, amounts, tier only.
+router.get('/stripe-payments-recent', async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 20, 200);
+  try {
+    const rows = await getTab('StripePayments');
+    const recent = rows.slice(-limit).map((r) => ({
+      stripe_invoice_id: r.stripe_invoice_id,
+      cliniko_id: r.cliniko_id,
+      amount: r.amount,
+      tier: r.tier,
+      paid_at: r.paid_at,
+      pp_invoice_id: r.pp_invoice_id,
+      pp_amount: r.pp_amount,
+    }));
+    res.json({ count: recent.length, rows: recent });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Returns the Xero tenants the current refresh token has access to. After
 // re-consenting via scripts/get-xero-token.js, hit this to discover the new
 // tenant's ID (needed for XERO_TENANT_ID and XERO_SANDBOX_TENANT_IDS).

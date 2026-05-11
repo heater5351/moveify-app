@@ -38,6 +38,7 @@ const TAB_HEADERS = {
   TyroIngest: ['transaction_id', 'date', 'patient', 'amount_charged', 'funder', 'status', 'xero_invoice_id', 'xero_invoice_number', 'ingested_at'],
   StripePayments: ['stripe_event_id', 'stripe_invoice_id', 'stripe_subscription_id', 'cliniko_id', 'xero_contact_id', 'xero_overpayment_id', 'amount', 'currency', 'tier', 'paid_at', 'pp_invoice_id', 'pp_amount', 'created_at'],
   AppointmentInvoices: ['cliniko_appointment_id', 'cliniko_patient_id', 'service_name', 'appointment_date', 'appointment_status', 'casual_price', 'xero_invoice_id', 'xero_invoice_number', 'overpayment_allocated', 'gap_amount', 'created_at'],
+  StripeClinikoLinks: ['stripe_customer_id', 'cliniko_id', 'match_method', 'linked_at'],
 };
 
 async function ensureSheets(spreadsheetId) {
@@ -112,6 +113,7 @@ async function upsertRow(tab, primaryKey, rowData) {
 }
 
 async function upsertContact(data) { return upsertRow('Contacts', data.cliniko_id, data); }
+async function upsertStripeClinikoLink(data) { return upsertRow('StripeClinikoLinks', data.stripe_customer_id, data); }
 async function upsertInvoice(data) { return upsertRow('Invoices', data.cliniko_id, data); }
 async function upsertAppointment(data) { return upsertRow('Appointments', data.cliniko_id, data); }
 async function upsertPayment(data) { return upsertRow('Payments', data.cliniko_id, data); }
@@ -259,6 +261,7 @@ module.exports = {
   getSheets,
   ensureSheets,
   upsertContact,
+  upsertStripeClinikoLink,
   upsertInvoice,
   upsertAppointment,
   upsertPayment,
