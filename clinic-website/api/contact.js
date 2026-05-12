@@ -13,40 +13,21 @@ function rateLimit(ip) {
   return true;
 }
 
-async function sendEmail({ name, email, phone, subject, message }) {
-  const auth = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET
-  );
-  auth.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
+function getGmailClient() {
+  const SENDER_EMAIL = process.env.EMAIL_FROM || 'ryan@moveifyhealth.com';
 
-  const gmail = google.gmail({ version: 'v1', auth });
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+    throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY environment variable not set');
+  }
 
-  const to = process.env.CONTACT_EMAIL || 'ryan@moveifyhealth.com';
-  const from = process.env.EMAIL_FROM || 'ryan@moveifyhealth.com';
-
-  const body = [
-    `Name: ${name}`,
-    `Email: ${email}`,
-    `Phone: ${phone || 'Not provided'}`,
-    `Subject: ${subject || 'Not provided'}`,
-    ``,
-    `Message:`,
-    message,
-  ].join('\n');
-
-  const raw = Buffer.from(
-    `From: ${from}\r\n` +
-    `To: ${to}\r\n` +
-    `Subject: Clinic Website Contact: ${subject || 'New enquiry'}\r\n` +
-    `Content-Type: text/plain; charset=utf-8\r\n\r\n` +
-    body
-  ).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-  await gmail.users.messages.send({
-    userId: 'me',
-    requestBody: { raw },
+  const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: ['https://www.googleapis.com/auth/gmail.send'],
+    clientOptions: { subject: SENDER_EMAIL },
   });
+
+  return google.gmail({ version: 'v1', auth });
 }
 
 module.exports = async (req, res) => {
@@ -66,7 +47,33 @@ module.exports = async (req, res) => {
   }
 
   try {
-    await sendEmail({ name, email, phone, subject, message });
+    const gmail = getGmailClient();
+    const to = process.env.CONTACT_EMAIL || 'ryan@moveifyhealth.com';
+    const from = process.env.EMAIL_FROM || 'ryan@moveifyhealth.com';
+
+    const body = [
+      `Name: ${name}`,
+      `Email: ${email}`,
+      `Phone: ${phone || 'Not provided'}`,
+      `Subject: ${subject || 'Not provided'}`,
+      ``,
+      `Message:`,
+      message,
+    ].join('\n');
+
+    const raw = Buffer.from(
+      `From: ${from}\r\n` +
+      `To: ${to}\r\n` +
+      `Subject: Clinic Website Contact: ${subject || 'New enquiry'}\r\n` +
+      `Content-Type: text/plain; charset=utf-8\r\n\r\n` +
+      body
+    ).toString('base64url');
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw },
+    });
+
     return res.status(200).json({ success: true });
   } catch (err) {
     console.error('Email send failed:', err);
