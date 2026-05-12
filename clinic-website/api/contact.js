@@ -40,10 +40,10 @@ module.exports = async (req, res) => {
     return res.status(429).json({ error: 'Too many requests. Please try again later.' });
   }
 
-  const { name, email, phone, subject, message } = req.body;
+  const { name, email, phone, message } = req.body;
 
-  if (!name || !email || !message) {
-    return res.status(400).json({ error: 'Name, email and message are required.' });
+  if (!name || !email || !phone) {
+    return res.status(400).json({ error: 'Name, email and phone are required.' });
   }
 
   try {
@@ -54,11 +54,10 @@ module.exports = async (req, res) => {
     const body = [
       `Name: ${name}`,
       `Email: ${email}`,
-      `Phone: ${phone || 'Not provided'}`,
-      `Subject: ${subject || 'Not provided'}`,
+      `Phone: ${phone}`,
       ``,
       `Message:`,
-      message,
+      message || '(No message provided)',
     ].join('\n');
 
     const raw = Buffer.from(

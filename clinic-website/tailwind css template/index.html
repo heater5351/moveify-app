@@ -921,17 +921,7 @@
                         type="text"
                         name="name"
                         class="block w-full px-5 py-3 rounded-md border border-solid border-alpha-light dark:border-alpha-dark text-inherit text-base focus:border-primary"
-                        placeholder="Full Name"
-                        required
-                      />
-                    </div>
-
-                    <div class="col-12 md:col-6">
-                      <input
-                        type="email"
-                        name="email"
-                        class="block w-full px-5 py-3 rounded-md border border-solid border-alpha-light dark:border-alpha-dark text-inherit text-base focus:border-primary"
-                        placeholder="Email Address"
+                        placeholder="Full Name *"
                         required
                       />
                     </div>
@@ -941,16 +931,17 @@
                         type="tel"
                         name="phone"
                         class="block w-full px-5 py-3 rounded-md border border-solid border-alpha-light dark:border-alpha-dark text-inherit text-base focus:border-primary"
-                        placeholder="Phone Number"
+                        placeholder="Phone Number *"
+                        required
                       />
                     </div>
 
-                    <div class="col-12 md:col-6">
+                    <div class="col-12">
                       <input
-                        type="text"
-                        name="subject"
+                        type="email"
+                        name="email"
                         class="block w-full px-5 py-3 rounded-md border border-solid border-alpha-light dark:border-alpha-dark text-inherit text-base focus:border-primary"
-                        placeholder="Subject"
+                        placeholder="Email Address *"
                         required
                       />
                     </div>
@@ -958,10 +949,9 @@
                     <div class="col-12">
                       <textarea
                         name="message"
-                        rows="5"
+                        rows="4"
                         class="block w-full px-5 py-3 rounded-md border border-solid border-alpha-light dark:border-alpha-dark text-inherit text-base focus:border-primary"
-                        placeholder="Tell us about your health goals or concerns"
-                        required
+                        placeholder="Tell us about your health goals or concerns (optional)"
                       ></textarea>
                     </div>
 
