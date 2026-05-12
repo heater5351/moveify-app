@@ -6,11 +6,5 @@
   "routes": [
     { "src": "/api/contact", "dest": "/api/contact.js" },
     { "src": "/(.*)", "dest": "/tailwind css template/$1" }
-  ],
-  "functions": {
-    "api/contact.js": {
-      "memory": 128,
-      "maxDuration": 10
-    }
-  }
+  ]
 }
