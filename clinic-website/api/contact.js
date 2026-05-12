@@ -14,7 +14,8 @@ function rateLimit(ip) {
 }
 
 function getGmailClient() {
-  const SENDER_EMAIL = process.env.EMAIL_FROM || 'ryan@moveifyhealth.com';
+  const SENDER_EMAIL = process.env.EMAIL_FROM;
+  if (!SENDER_EMAIL) throw new Error('EMAIL_FROM environment variable not set');
 
   if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
     throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY environment variable not set');
@@ -48,8 +49,8 @@ module.exports = async (req, res) => {
 
   try {
     const gmail = getGmailClient();
-    const to = process.env.CONTACT_EMAIL || 'ryan@moveifyhealth.com';
-    const from = process.env.EMAIL_FROM || 'ryan@moveifyhealth.com';
+    const to = process.env.CONTACT_EMAIL || process.env.EMAIL_FROM;
+    const from = to;
 
     const body = [
       `Name: ${name}`,
@@ -63,7 +64,7 @@ module.exports = async (req, res) => {
     const raw = Buffer.from(
       `From: ${from}\r\n` +
       `To: ${to}\r\n` +
-      `Subject: Clinic Website Contact: ${subject || 'New enquiry'}\r\n` +
+      `Subject: New Enquiry from ${name}\r\n` +
       `Content-Type: text/plain; charset=utf-8\r\n\r\n` +
       body
     ).toString('base64url');
