@@ -113,7 +113,7 @@ async function ingestTyroCsv(csvText, log = logger) {
   const counts = {
     total: rows.length,
     processed: 0,
-    skipped: { notApproved: 0, zeroAmount: 0, duplicate: 0 },
+    skipped: { notApproved: 0, zeroAmount: 0, duplicate: 0, paidElsewhere: 0 },
     flagged: { duplicateContact: 0, unallocated: 0 },
     paymentPending: 0,
   };
@@ -148,6 +148,19 @@ async function ingestTyroCsv(csvText, log = logger) {
     const amount = parseAmount(row.amount_charged);
     if (!Number.isFinite(amount) || amount <= 0) {
       counts.skipped.zeroAmount++;
+      continue;
+    }
+
+    // Medicare Patient Claim (PCI) rows submitted via Tyro Health Online portal
+    // are claim records, not income events — no card was swiped, no money moved
+    // through Tyro. The real income is either already invoiced via Stream B
+    // (subscription patients) or appears as a paired card-swipe row (casual
+    // patients). Skip to avoid double-counting revenue.
+    const funder = (row.funder || '').trim().toLowerCase();
+    const cardType = (row.payment_card_type || '').trim();
+    if (funder === 'medicare pci' && !cardType) {
+      counts.skipped.paidElsewhere++;
+      log.info({ txnId, patient: row.patient }, 'Tyro PCI claim row — skipping (no income event)');
       continue;
     }
 
