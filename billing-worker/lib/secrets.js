@@ -18,13 +18,13 @@ const SECRET_GCP_NAME_MAP = {
   'cliniko-api-key-admin': 'CLINIKO_API_KEY',
   'cliniko-api-key-finance': 'CLINIKO_API_KEY_FINANCE',
   'cliniko-api-key-staging': 'CLINIKO_API_KEY_STAGING',
-  // Stripe is in LIVE mode for historical-backfill dry-run into Demo Co Xero.
-  // The Stripe live webhook endpoint must remain DISABLED until the final
-  // cutover to a real prod Xero tenant — otherwise real-time DDs would land
-  // in Demo Co.
+  // Stripe is in LIVE mode and writes to the production Xero tenant
+  // "Moveify Health Solutions" (XERO_TENANT_ID secret). The live webhook
+  // (Stripe `we_*` endpoint pointing at /webhooks/stripe) must use the
+  // live signing secret `billing-stripe-webhook-secret` for HMAC
+  // verification to succeed.
   'stripe-secret-key': 'STRIPE_API_KEY',
-  'stripe-webhook-secret': 'billing_stripe_webhook_secret_staging',
-  'google-sheets-service-account-credentials': 'moveify-google-service-account-key',
+  'stripe-webhook-secret': 'billing-stripe-webhook-secret',
   'gmail-client-id': 'billing-gmail-client-id',
   'gmail-client-secret': 'billing-gmail-client-secret',
   'gmail-refresh-token': 'billing-gmail-refresh-token',
@@ -45,7 +45,6 @@ const SECRET_NAME_MAP = {
   'cliniko-api-key-staging': 'CLINIKO_API_KEY_STAGING',
   'stripe-secret-key': 'STRIPE_SECRET_KEY',
   'stripe-webhook-secret': 'STRIPE_WEBHOOK_SECRET',
-  'google-sheets-service-account-credentials': 'GOOGLE_SHEETS_SERVICE_ACCOUNT_CREDENTIALS',
   'gmail-client-id': 'GMAIL_CLIENT_ID',
   'gmail-client-secret': 'GMAIL_CLIENT_SECRET',
   'gmail-refresh-token': 'GMAIL_REFRESH_TOKEN',

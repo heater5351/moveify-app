@@ -4,7 +4,8 @@ const express = require('express');
 const router = express.Router();
 const { resolveFlag } = require('../jobs/reconcile');
 const { withCorrelation } = require('../lib/logger');
-const { getSheets, getTab, getWorkerState, setWorkerState } = require('../services/sheets');
+const { getTab, getWorkerState, setWorkerState } = require('../services/billing-db');
+const billingDb = require('../services/billing-db');
 const { ensureGmailLabels, listReferralEmails } = require('../services/gmail');
 const { BedrockClient, ListFoundationModelsCommand, ListInferenceProfilesCommand } = require('@aws-sdk/client-bedrock');
 const { getSecret } = require('../lib/secrets');
@@ -60,30 +61,12 @@ router.get('/pending-referrals', async (req, res) => {
 });
 
 router.post('/clear-idempotency', async (req, res) => {
-  const sheets = await getSheets();
-  const spreadsheetId = process.env.SHEETS_LEDGER_ID;
   const { keys, prefix } = req.body || {};
   if (!Array.isArray(keys) && typeof prefix !== 'string') {
     return res.status(400).json({ error: 'keys (array) or prefix (string) required' });
   }
-
-  const existing = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'IdempotencyKeys!A:B' });
-  const rows = existing.data.values || [];
-  const matches = (k) => {
-    if (Array.isArray(keys) && keys.includes(k)) return true;
-    if (typeof prefix === 'string' && prefix.length > 0 && String(k).startsWith(prefix)) return true;
-    return false;
-  };
-  const kept = rows.filter(([k]) => !matches(k));
-
-  await sheets.spreadsheets.values.clear({ spreadsheetId, range: 'IdempotencyKeys!A:B' });
-  if (kept.length > 0) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId, range: 'IdempotencyKeys!A1', valueInputOption: 'RAW',
-      requestBody: { values: kept },
-    });
-  }
-  res.json({ ok: true, removed: rows.length - kept.length, remaining: kept.length });
+  const removed = await billingDb.clearIdempotencyKeys({ keys, prefix });
+  res.json({ ok: true, removed });
 });
 
 router.post('/resolve-flag', async (req, res) => {
@@ -110,32 +93,9 @@ router.post('/resolve-flag', async (req, res) => {
 });
 
 router.post('/seed-bank-rules', async (req, res) => {
-  const sheets = await getSheets();
-  const spreadsheetId = process.env.SHEETS_LEDGER_ID;
-  const rules = [
-    ['STRIPE', 'stripe_payout', '4000', 'Stripe settlements'],
-    ['TYRO SETTLEMENT', 'tyro_revenue', '4001', 'Tyro terminal income'],
-    ['HEALTHPOINT', 'health_fund', '4002', 'Health fund claims'],
-    ['MCARE', 'medicare', '4003', 'Medicare / DVA payments'],
-    ['SQUARE', 'eftpos_revenue', '4004', 'Square terminal income'],
-    ['SPLOSE', 'software', '6100', 'Splose practice management'],
-    ['GOOGLE WORKSPACE', 'software', '6100', 'Google Workspace'],
-    ['MICROSOFT', 'software', '6100', 'Microsoft subscription'],
-    ['CLAUDE.AI', 'software', '6100', 'Anthropic Claude subscription'],
-    ['ELEVENLABS', 'software', '6100', 'ElevenLabs subscription'],
-    ['GUILD INSURANCE', 'insurance', '6200', 'Professional indemnity insurance'],
-    ['CLINIKO', 'software', '6100', 'Cliniko practice management'],
-    ['DIDIMOBILITY', 'equipment', '6300', 'Equipment / mobility aids'],
-    ['JB HI.?FI', 'equipment', '6300', 'JB Hi-Fi equipment purchases'],
-    ['TRANSFER FROM CBA', 'client_payment', '4005', 'Client direct bank transfer via CBA'],
-  ];
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: 'BankRules!A2:D16',
-    valueInputOption: 'RAW',
-    requestBody: { values: rules },
-  });
-  res.json({ ok: true, rows: rules.length });
+  const { DEFAULT_BANK_RULES } = require('../lib/bank-rules');
+  await billingDb.replaceBankRules(DEFAULT_BANK_RULES);
+  res.json({ ok: true, rows: DEFAULT_BANK_RULES.length });
 });
 
 router.get('/bedrock-models', async (req, res) => {
@@ -335,7 +295,7 @@ router.post('/xero-credit-note-reverse', express.json(), async (req, res) => {
 // rerun — already-processed invoices are skipped as duplicates.
 router.post('/backfill-stripe', express.json(), async (req, res) => {
   const log = withCorrelation(req);
-  const { since, until, dryRun = true, limit = 500 } = req.body || {};
+  const { since, until, dryRun = true, limit = 5000 } = req.body || {};
   if (!since) return res.status(400).json({ error: 'since (ISO date) required' });
 
   const sinceTs = Math.floor(new Date(since).getTime() / 1000);
@@ -450,29 +410,8 @@ router.post('/backfill-cliniko-appointments', express.json(), async (req, res) =
   }
 });
 
-// Helper for clearing idempotency keys by prefix (shared with /admin/clear-idempotency)
 async function clearKeysByPrefix(prefix) {
-  const sheets = await getSheets();
-  const spreadsheetId = process.env.SHEETS_LEDGER_ID;
-  const r = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'IdempotencyKeys!A:B' });
-  const rows = r.data.values || [];
-  if (rows.length <= 1) return 0;
-  const kept = [rows[0]]; // header
-  let removed = 0;
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][0] || '').startsWith(prefix)) { removed++; continue; }
-    kept.push(rows[i]);
-  }
-  if (removed > 0) {
-    await sheets.spreadsheets.values.clear({ spreadsheetId, range: 'IdempotencyKeys!A:B' });
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: 'IdempotencyKeys!A1',
-      valueInputOption: 'RAW',
-      requestBody: { values: kept },
-    });
-  }
-  return removed;
+  return billingDb.clearIdempotencyKeys({ prefix });
 }
 
 // Returns raw shape of Cliniko's /group_appointments response since a given
@@ -716,34 +655,18 @@ router.post('/xero-purge-contact', express.json(), async (req, res) => {
 
 router.get('/contacts-diag', async (req, res) => {
   try {
-    const sheets = await getSheets();
-    const spreadsheetId = process.env.SHEETS_LEDGER_ID;
-    const r = await sheets.spreadsheets.values.get({ spreadsheetId, range: 'Contacts!A:Z' });
-    const rows = r.data.values || [];
-    if (rows.length < 1) return res.json({ ok: true, totalRows: 0 });
-    const header = rows[0];
-    const idIdx = header.indexOf('cliniko_id');
-    const fundIdx = header.indexOf('phi_fund');
-    const memIdx = header.indexOf('phi_membership_number');
-    const medIdx = header.indexOf('medicare_reference');
-    const dataRows = rows.slice(1);
-    const ids = dataRows.map((r) => (idIdx >= 0 ? r[idIdx] : ''));
-    const idCounts = ids.reduce((m, id) => { m[id] = (m[id] || 0) + 1; return m; }, {});
-    const duplicateIdGroups = Object.values(idCounts).filter((c) => c > 1).length;
-    const blankIds = ids.filter((x) => !x || !String(x).trim()).length;
-    const fundsPopulated = fundIdx >= 0 ? dataRows.filter((r) => r[fundIdx] && String(r[fundIdx]).trim()).length : 0;
-    const memsPopulated = memIdx >= 0 ? dataRows.filter((r) => r[memIdx] && String(r[memIdx]).trim()).length : 0;
-    const medsPopulated = medIdx >= 0 ? dataRows.filter((r) => r[medIdx] && String(r[medIdx]).trim()).length : 0;
+    const stats = await billingDb.contactsDiag();
+    // duplicateIdGroups isn't meaningful with a PRIMARY KEY constraint —
+    // duplicates can't exist. Kept in the response for backwards compatibility.
     res.json({
       ok: true,
-      header,
-      totalRows: dataRows.length,
-      uniqueClinikoIds: Object.keys(idCounts).length,
-      duplicateIdGroups,
-      blankIds,
-      fundsPopulated,
-      memsPopulated,
-      medsPopulated,
+      totalRows: stats.total_rows,
+      uniqueClinikoIds: stats.unique_cliniko_ids,
+      duplicateIdGroups: 0,
+      blankIds: stats.blank_ids,
+      fundsPopulated: stats.funds_populated,
+      memsPopulated: stats.mems_populated,
+      medsPopulated: stats.meds_populated,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -781,6 +704,229 @@ router.post('/xero-smoke', async (req, res) => {
   } catch (err) {
     log.error({ err: err.message }, 'Xero smoke test failed');
     res.status(500).json({ error: err.message });
+  }
+});
+
+// CSV export of any billing table — replaces the "open the Sheet tab to eyeball
+// it" workflow. Streams CSV to the caller. Protected by the X-Admin-Token
+// middleware mounted at the top of this router.
+router.get('/export/:table', async (req, res) => {
+  const { table } = req.params;
+  const cols = billingDb.COLUMNS[table];
+  if (!cols) return res.status(404).json({ error: `Unknown table: ${table}` });
+
+  const format = String(req.query.format || 'csv').toLowerCase();
+  try {
+    const rows = await billingDb.getTab(table);
+    if (format === 'json') return res.json({ table, count: rows.length, rows });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${table}.csv"`);
+    const escape = (v) => {
+      const s = v === null || v === undefined ? '' : String(v);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    res.write(cols.join(',') + '\n');
+    for (const row of rows) {
+      res.write(cols.map((c) => escape(row[c])).join(',') + '\n');
+    }
+    res.end();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/dashboard-sync', async (req, res) => {
+  const log = withCorrelation(req);
+  try {
+    const { runDashboardSync } = require('../jobs/dashboard-sync');
+    const stats = await runDashboardSync(log);
+    res.json({ ok: true, ...stats });
+  } catch (err) {
+    log.error({ err: err.message }, 'admin dashboard-sync failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Clean-slate tooling for migrating to a new Xero tenant.
+// ────────────────────────────────────────────────────────────────────────────
+
+// TRUNCATE every billing-db table. Schema is preserved. bank_rules and
+// worker cursors are wiped too — caller must re-seed bank_rules (via
+// /admin/seed-bank-rules) and reset cursors before replay.
+//
+// Body:
+//   confirm  — must equal "I-mean-it". Hard guard against accidental hits.
+//   dryRun   — bool (default true). When true, returns the current row counts
+//              per table without truncating.
+router.post('/wipe-billing-state', express.json(), async (req, res) => {
+  const log = withCorrelation(req);
+  const { confirm, dryRun = true } = req.body || {};
+  const { pool } = require('../db/pool');
+
+  const tables = [
+    'contacts', 'invoices', 'appointments', 'payments',
+    'bank_transactions', 'bank_rules', 'reconciliation_flags',
+    'actions_required', 'idempotency_keys', 'worker_state',
+    'referrals', 'tyro_ingest', 'stripe_payments',
+    'appointment_invoices', 'stripe_cliniko_links',
+  ];
+
+  try {
+    const before = {};
+    for (const t of tables) {
+      const r = await pool.query(`SELECT COUNT(*)::int AS n FROM ${t}`);
+      before[t] = r.rows[0].n;
+    }
+
+    if (dryRun) {
+      return res.json({ ok: true, dryRun: true, rowCounts: before, note: 'Pass {"confirm":"I-mean-it","dryRun":false} to actually wipe.' });
+    }
+
+    if (confirm !== 'I-mean-it') {
+      return res.status(400).json({ error: 'confirm must equal "I-mean-it" to wipe state' });
+    }
+
+    // Single TRUNCATE statement is atomic and faster than per-table.
+    // RESTART IDENTITY resets bank_rules' SERIAL pk.
+    await pool.query(`TRUNCATE ${tables.join(', ')} RESTART IDENTITY`);
+    log.warn({ tablesWiped: tables.length, before }, 'BILLING STATE WIPED');
+    res.json({ ok: true, wiped: true, rowCountsBefore: before });
+  } catch (err) {
+    log.error({ err: err.message }, 'wipe-billing-state failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// One-shot orchestrator: re-seed bank rules → sync contacts from Cliniko →
+// backfill Stripe payments (creating Xero overpayments) → backfill Cliniko
+// appointments (raising Xero invoices + allocating credit) → trigger Tyro
+// CSV ingest from the Drive folder.
+//
+// Order matters: Stripe overpayments must land before appointments that
+// consume that credit, or the allocation step short-circuits to "insufficient
+// credit" flags.
+//
+// Body:
+//   confirm        — must equal "I-mean-it".
+//   stripeSince    — ISO date for Stripe backfill `since` (required). e.g.
+//                    "2026-03-25" — when DD billing started.
+//   appointmentsSince — ISO timestamp for Cliniko appointment poller cursor
+//                    (required). Typically same as or earlier than stripeSince.
+//   skipTyroDrive  — bool. Default false. Skip the Drive CSV step.
+//   stripeLimit    — int. Forwarded to /backfill-stripe (default 500).
+//
+// Idempotency: this is safe to re-run after a partial failure. PK constraints
+// dedupe on stripe_event_id, cliniko_appointment_id, tyro transaction_id.
+router.post('/replay-from-scratch', express.json(), async (req, res) => {
+  const log = withCorrelation(req);
+  const {
+    confirm,
+    stripeSince,
+    appointmentsSince,
+    skipTyroDrive = false,
+    stripeLimit = 5000,
+  } = req.body || {};
+
+  if (confirm !== 'I-mean-it') {
+    return res.status(400).json({ error: 'confirm must equal "I-mean-it"' });
+  }
+  if (!stripeSince) return res.status(400).json({ error: 'stripeSince (ISO date) required' });
+  if (!appointmentsSince) return res.status(400).json({ error: 'appointmentsSince (ISO timestamp) required' });
+
+  const report = { steps: [] };
+  const step = async (name, fn) => {
+    const t0 = Date.now();
+    try {
+      const result = await fn();
+      const ms = Date.now() - t0;
+      report.steps.push({ name, ok: true, ms, ...result });
+      log.info({ step: name, ms, result }, 'replay step ok');
+    } catch (err) {
+      const ms = Date.now() - t0;
+      report.steps.push({ name, ok: false, ms, error: err.message });
+      log.error({ step: name, err: err.message }, 'replay step failed');
+      throw err;
+    }
+  };
+
+  try {
+    // 1. Re-seed bank rules (idempotent; same list as /admin/seed-bank-rules).
+    await step('seed-bank-rules', async () => {
+      const { DEFAULT_BANK_RULES } = require('../lib/bank-rules');
+      await billingDb.replaceBankRules(DEFAULT_BANK_RULES);
+      return { rows: DEFAULT_BANK_RULES.length };
+    });
+
+    // 2. Rewind Cliniko sync cursor + run a full sync (populates contacts/invoices/appointments).
+    // Use appointmentsSince as the floor — going further back risks the sync
+    // fetching years of unchanged data on a single tick and timing out.
+    await step('sync-cliniko', async () => {
+      const { syncCliniko } = require('../jobs/sync-cliniko');
+      await billingDb.setWorkerState('cliniko_last_sync', appointmentsSince);
+      const counts = await syncCliniko(log);
+      return counts;
+    });
+
+    // 3. Backfill Stripe payments — creates Xero contacts + overpayments.
+    await step('backfill-stripe', async () => {
+      const { getStripe } = require('../services/stripe');
+      const { backfillInvoice } = require('../jobs/stripe-handler');
+      const sinceTs = Math.floor(new Date(stripeSince).getTime() / 1000);
+      const stripe = await getStripe();
+      const candidates = [];
+      let starting_after;
+      while (candidates.length < stripeLimit) {
+        const page = await stripe.invoices.list({
+          status: 'paid',
+          created: { gte: sinceTs },
+          limit: 100,
+          ...(starting_after ? { starting_after } : {}),
+        });
+        candidates.push(...page.data);
+        if (!page.has_more) break;
+        starting_after = page.data[page.data.length - 1]?.id;
+      }
+      const slice = candidates.slice(0, stripeLimit);
+      // Stripe lists newest first; replay oldest first so credit accrues in order.
+      slice.sort((a, b) => (a.created || 0) - (b.created || 0));
+
+      const results = { processed: 0, duplicate: 0, failed: 0, zero_amount_skipped: 0 };
+      for (const inv of slice) {
+        if (!inv.amount_paid || inv.amount_paid <= 0) { results.zero_amount_skipped++; continue; }
+        try {
+          const r = await backfillInvoice(inv, log);
+          results[r.status] = (results[r.status] || 0) + 1;
+        } catch (err) {
+          results.failed++;
+          log.error({ invoice_id: inv.id, err: err.message }, 'replay stripe: per-invoice failure');
+        }
+      }
+      return { totalCandidates: candidates.length, ...results };
+    });
+
+    // 4. Backfill Cliniko appointments — invoices + credit allocation.
+    await step('backfill-cliniko-appointments', async () => {
+      await billingDb.setWorkerState('cliniko_appointments_last_polled', appointmentsSince);
+      const { pollClinikoAppointments } = require('../jobs/poll-cliniko-appointments');
+      const stats = await pollClinikoAppointments(log);
+      return stats;
+    });
+
+    // 5. Tyro CSVs from Drive folder.
+    if (!skipTyroDrive) {
+      await step('ingest-tyro-drive', async () => {
+        const { ingestTyroFromDrive } = require('../jobs/ingest-tyro-drive');
+        return await ingestTyroFromDrive(log);
+      });
+    } else {
+      report.steps.push({ name: 'ingest-tyro-drive', skipped: true });
+    }
+
+    res.json({ ok: true, report });
+  } catch (err) {
+    res.status(500).json({ ok: false, partialReport: report, error: err.message });
   }
 });
 

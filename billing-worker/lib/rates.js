@@ -142,6 +142,15 @@ const PP_FEES = {
   'Remote Fortnightly': { billableItem: null, amount: 0, billing: '4-weekly', entitlements: ['Exercise Physiology Phone Check In'] },
   // App-only: no supervised sessions; nothing the poller should invoice.
   'App-Only':           { billableItem: null, amount: 0, billing: '4-weekly', entitlements: [] },
+  // Fortnightly Check In: $50 every 2 weeks. No P&P fee — the full $50 funds
+  // the phone check-in itself (1 per cycle). Stripe interval is fortnightly,
+  // anchor uses the line-item period (which Stripe sets correctly per cycle).
+  'Fortnightly Check In + Programming + App Access': {
+    billableItem: null,
+    amount: 0,
+    billing: '4-weekly',
+    entitlements: ['Exercise Physiology Phone Check In'],
+  },
 };
 
 /**

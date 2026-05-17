@@ -12,7 +12,7 @@ const {
   appendStripePayment,
   appendReconciliationFlag,
   upsertStripeClinikoLink,
-} = require('../services/sheets');
+} = require('../services/billing-db');
 const xero = require('../lib/xero');
 const { check, mark } = require('../lib/idempotency');
 const { getPpFee } = require('../lib/rates');
@@ -406,26 +406,41 @@ async function maybeCreatePpInvoice({ invoice, subscription, productName, clinik
 
   // Anchor the idempotency key by billing cadence. Block products share an
   // anchor across the entire subscription's lifetime (one P&P per block);
-  // continuity products use the Stripe invoice's period_start (one P&P per
-  // 4-week cycle).
+  // continuity products use the line item's period.start (one P&P per cycle).
+  //
+  // IMPORTANT: do NOT use `invoice.period_start` — Stripe sets that to the
+  // *previous* period's start (a quirk where the invoice-level period reflects
+  // what was billed-for, not the upcoming period). The line item's period is
+  // what actually advances per cycle.
+  const lineItem = invoice.lines?.data?.[0];
+  const linePeriodStart = lineItem?.period?.start;
+  const linePeriodEnd = lineItem?.period?.end;
   const useBlockAnchor = ppFee.billing === 'block' && subscription?.start_date;
   const anchorSec = useBlockAnchor
     ? subscription.start_date
-    : (invoice.period_start || invoice.created || Math.floor(Date.now() / 1000));
+    : (linePeriodStart || invoice.created || Math.floor(Date.now() / 1000));
   const anchor = new Date(anchorSec * 1000).toISOString().slice(0, 10);
 
-  // The human-readable period range still reflects the Stripe invoice's cycle
-  // (useful in the line description even for block subs).
-  const periodStart = invoice.period_start
-    ? new Date(invoice.period_start * 1000).toISOString().slice(0, 10)
+  const periodStart = linePeriodStart
+    ? new Date(linePeriodStart * 1000).toISOString().slice(0, 10)
     : anchor;
-  const periodEnd = invoice.period_end
-    ? new Date(invoice.period_end * 1000).toISOString().slice(0, 10)
+  const periodEnd = linePeriodEnd
+    ? new Date(linePeriodEnd * 1000).toISOString().slice(0, 10)
     : '';
 
-  const ppKey = `pp:${clinikoId}:${anchor}`;
-  if (await check(ppKey)) {
-    log.info({ cliniko_id: clinikoId, anchor, billing: ppFee.billing }, 'P&P invoice already created for this anchor');
+  // Key includes product name so that a mid-cycle product switch (e.g.
+  // Independent → Maintain) creates a fresh P&P invoice for the new product
+  // rather than colliding with the previous product's key for the same
+  // cliniko_id + anchor date.
+  //
+  // Back-compat: pre-2026-05-16 keys were `pp:<cliniko>:<anchor>` (no product).
+  // We dual-check both formats so existing keys still gate. New writes only
+  // use the new format. The legacy check naturally evaporates as keys age out
+  // (60-day expiry on read + 90-day sweeper).
+  const ppKey = `pp:${clinikoId}:${productName}:${anchor}`;
+  const legacyKey = `pp:${clinikoId}:${anchor}`;
+  if (await check(ppKey) || await check(legacyKey)) {
+    log.info({ cliniko_id: clinikoId, anchor, product: productName, billing: ppFee.billing }, 'P&P invoice already created for this anchor');
     return null;
   }
   await mark(ppKey);
@@ -610,6 +625,29 @@ async function backfillInvoice(invoice, log = logger) {
   if (await check(idempKey)) {
     return { status: 'duplicate', invoice_id: invoice.id };
   }
+
+  // Cross-namespace check: if the live webhook already processed an event
+  // for this invoice, skip the backfill. Stripe events have predictable
+  // shape `invoice.payment_succeeded` per paid invoice, but we don't know
+  // the event_id here — so probe by sweeping the live keys for any that
+  // reference this invoice. Cheap because the table is small (sweeper runs
+  // daily; checkIdempotencyKey enforces 60-day expiry on read).
+  //
+  // Simpler approximation: live webhook events for invoice.payment_succeeded
+  // append to `stripe_payments` keyed by event_id. Probe that table directly.
+  const { getOne } = require('../db/pool');
+  const existing = await getOne(
+    `SELECT 1 FROM stripe_payments
+     WHERE stripe_invoice_id = $1 AND stripe_event_id NOT LIKE 'bf-%'
+     LIMIT 1`,
+    [invoice.id]
+  );
+  if (existing) {
+    log.info({ invoice_id: invoice.id }, 'invoice already processed by live webhook — backfill skip');
+    await mark(idempKey);
+    return { status: 'duplicate', invoice_id: invoice.id, reason: 'live-webhook-already-handled' };
+  }
+
   await mark(idempKey);
   await processInvoicePaid(
     invoice,
