@@ -1,35 +1,21 @@
 'use strict';
 
 const cliniko = require('../services/cliniko').finance;
-const { appendReconciliationFlag, getTab } = require('../services/sheets');
+const { appendReconciliationFlag, getTab } = require('../services/billing-db');
+const { run } = require('../db/pool');
 const { logger } = require('../lib/logger');
 
 async function resolveFlag({ flag_id, resolution, notes }, log = logger) {
-  const sheets = await require('../services/sheets').getSheets();
-  const spreadsheetId = process.env.SHEETS_LEDGER_ID;
-
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: 'ReconciliationFlags!A:A',
-  });
-
-  const rows = res.data.values || [];
-  const rowIndex = rows.findIndex((r) => r[0] === flag_id);
-  if (rowIndex < 0) {
+  const r = await run(
+    `UPDATE reconciliation_flags
+     SET resolved_at = $1, resolution = $2, notes = $3
+     WHERE id = $4`,
+    [new Date().toISOString(), resolution, notes || '', flag_id]
+  );
+  if (r.rowCount === 0) {
     log.warn({ flag_id }, 'Flag not found');
     return false;
   }
-
-  // Columns: id, type, entity_id, cliniko_state, ledger_state, diff, resolved_at, resolution, notes, created_at
-  // resolved_at = col G (index 6), resolution = col H (index 7), notes = col I (index 8)
-  const rowNum = rowIndex + 1;
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `ReconciliationFlags!G${rowNum}:I${rowNum}`,
-    valueInputOption: 'RAW',
-    requestBody: { values: [[new Date().toISOString(), resolution, notes || '']] },
-  });
-
   log.info({ flag_id, resolution }, 'Flag resolved');
   return true;
 }
@@ -66,13 +52,18 @@ async function runReconciliation(log = logger) {
       continue;
     }
 
-    if (ledger.status !== inv.status) {
+    // Coerce both sides to string before comparison. Cliniko returns status as
+    // a number (e.g. 20) while the PG `invoices.status` column is TEXT, so
+    // `inv.status === ledger.status` is always false even when values match.
+    // Pre-migration Sheets storage stringified everything implicitly, masking
+    // this. Strict-equal on stringified values is the correct check.
+    if (String(ledger.status) !== String(inv.status)) {
       await appendReconciliationFlag({
         id: `status-drift:${inv.id}`,
         type: 'invoice_status_drift',
         entity_id: inv.id,
-        cliniko_state: inv.status,
-        ledger_state: ledger.status,
+        cliniko_state: String(inv.status),
+        ledger_state: String(ledger.status),
         diff: `Cliniko: ${inv.status}, ledger: ${ledger.status}`,
         resolved_at: '',
         resolution: '',

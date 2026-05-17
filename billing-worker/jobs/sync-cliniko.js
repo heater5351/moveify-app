@@ -7,7 +7,7 @@ const {
   upsertAppointment,
   getWorkerState,
   setWorkerState,
-} = require('../services/sheets');
+} = require('../services/billing-db');
 const { logger } = require('../lib/logger');
 const { runNdisRtwsa } = require('./ndis-rtwsa');
 

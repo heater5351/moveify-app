@@ -12,6 +12,7 @@ COPY lib/ ./lib/
 COPY services/ ./services/
 COPY jobs/ ./jobs/
 COPY routes/ ./routes/
+COPY db/ ./db/
 
 USER nodejs
 

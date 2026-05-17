@@ -24,7 +24,7 @@ const {
   appendReconciliationFlag,
   getWorkerState,
   setWorkerState,
-} = require('../services/sheets');
+} = require('../services/billing-db');
 const xero = require('../lib/xero');
 const { check, mark } = require('../lib/idempotency');
 const serviceCatalog = require('../lib/service-catalog');

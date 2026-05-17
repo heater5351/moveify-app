@@ -5,7 +5,7 @@ require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const { logger } = require('./lib/logger');
-const { ensureSheets } = require('./services/sheets');
+const { initBillingDb } = require('./db/init');
 
 const webhooksRouter = require('./routes/webhooks');
 const cronRouter = require('./routes/cron');
@@ -55,15 +55,11 @@ app.use((err, req, res, next) => {
 
 async function start() {
   try {
-    // Ensure all 9 Sheet tabs exist before accepting traffic
-    const spreadsheetId = process.env.SHEETS_LEDGER_ID;
-    if (spreadsheetId) {
-      logger.info('Ensuring Sheets tabs exist...');
-      await ensureSheets(spreadsheetId);
-      logger.info('Sheets ready');
-    } else {
-      logger.warn('SHEETS_LEDGER_ID not set — skipping sheet initialisation');
-    }
+    // Apply billing-db schema (idempotent) before accepting traffic.
+    // Postgres is the sole runtime store — failure here is fatal.
+    logger.info('Applying billing-db schema...');
+    await initBillingDb();
+    logger.info('billing-db ready');
 
     app.listen(PORT, () => {
       logger.info({ port: PORT, version: VERSION }, 'Billing worker started');

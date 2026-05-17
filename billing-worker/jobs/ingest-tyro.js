@@ -3,7 +3,7 @@
 const xero = require('../lib/xero');
 const idempotency = require('../lib/idempotency');
 const { logger } = require('../lib/logger');
-const { appendTyroIngest, appendActionRequired, findContactByMembership } = require('../services/sheets');
+const { appendTyroIngest, appendActionRequired, findContactByMembership } = require('../services/billing-db');
 
 const UNALLOCATED_CONTACT_NAME = 'Unallocated Tyro Claim';
 let _unallocatedContactId = null;

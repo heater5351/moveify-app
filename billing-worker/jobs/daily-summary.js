@@ -1,7 +1,7 @@
 'use strict';
 
 const { sendEmail } = require('../services/gmail');
-const { getTab } = require('../services/sheets');
+const { getTab } = require('../services/billing-db');
 const { logger } = require('../lib/logger');
 
 const OPERATOR_EMAIL = 'ryan@moveifyhealth.com';

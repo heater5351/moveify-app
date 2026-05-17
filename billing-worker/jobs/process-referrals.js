@@ -16,7 +16,7 @@ const {
   findOrCreateReferrerContact,
   setPatientReferringDoctor,
 } = require('../services/cliniko').admin;
-const { upsertReferral, appendActionRequired } = require('../services/sheets');
+const { upsertReferral, appendActionRequired } = require('../services/billing-db');
 const { check: idempotencyCheck, mark: idempotencyMark } = require('../lib/idempotency');
 
 function generateId() {

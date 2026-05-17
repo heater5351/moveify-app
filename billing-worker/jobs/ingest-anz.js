@@ -1,7 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
-const { upsertBankTransaction, appendReconciliationFlag, getTab } = require('../services/sheets');
+const { upsertBankTransaction, appendReconciliationFlag, getTab } = require('../services/billing-db');
 const { getStripe } = require('../services/stripe');
 const { logger } = require('../lib/logger');
 
