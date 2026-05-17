@@ -9,23 +9,41 @@ const { runDailySummary } = require('../jobs/daily-summary');
 const { processReferrals } = require('../jobs/process-referrals');
 const { ingestTyroFromDrive } = require('../jobs/ingest-tyro-drive');
 const { pollClinikoAppointments } = require('../jobs/poll-cliniko-appointments');
+const { runDashboardSync } = require('../jobs/dashboard-sync');
 const { withCorrelation, logger } = require('../lib/logger');
+const { OAuth2Client } = require('google-auth-library');
 
-/**
- * Validates the Cloud Scheduler OIDC token.
- * Cloud Run handles OIDC verification at the platform level when the service
- * is deployed with --no-allow-unauthenticated. This middleware adds an extra
- * layer: it checks that the Authorization header is present and the token
- * audience matches this service.
- */
-function requireOidc(req, res, next) {
+// Real Google OIDC verification. Cloud Run is deployed --allow-unauthenticated
+// (so the Stripe webhook can hit /webhooks/stripe), which means Cloud Run does
+// NOT verify the OIDC token for /cron/* — we must do it here.
+//
+// Cloud Scheduler signs each request with a Google-issued OIDC token whose
+// `email` claim equals the configured service account, and whose `aud` claim
+// equals the configured token audience (we use the Cloud Run service URL).
+// Both are checked.
+const ALLOWED_SA = 'billing-worker@moveify-app.iam.gserviceaccount.com';
+const EXPECTED_AUD = process.env.OIDC_EXPECTED_AUDIENCE
+  || 'https://moveify-billing-worker-1097567971198.australia-southeast1.run.app';
+
+const oidcClient = new OAuth2Client();
+
+async function requireOidc(req, res, next) {
   const auth = req.headers['authorization'] || '';
   if (!auth.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Missing OIDC token' });
   }
-  // Token signature is already verified by Cloud Run IAM before the request
-  // reaches this handler. We only need to confirm the header is present.
-  next();
+  const token = auth.slice(7);
+  try {
+    const ticket = await oidcClient.verifyIdToken({ idToken: token, audience: EXPECTED_AUD });
+    const payload = ticket.getPayload();
+    if (payload.email !== ALLOWED_SA || !payload.email_verified) {
+      return res.status(403).json({ error: 'Unauthorized caller' });
+    }
+    next();
+  } catch (err) {
+    logger.warn({ err: err.message }, 'OIDC verification failed');
+    return res.status(401).json({ error: 'Invalid OIDC token' });
+  }
 }
 
 router.use(requireOidc);
@@ -93,6 +111,30 @@ router.post('/ingest-tyro-drive', async (req, res) => {
     res.json({ ok: true, ...result });
   } catch (err) {
     log.error({ err: err.message }, 'ingest-tyro-drive job failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/dashboard-sync', async (req, res) => {
+  const log = withCorrelation(req);
+  try {
+    const stats = await runDashboardSync(log);
+    res.json({ ok: true, ...stats });
+  } catch (err) {
+    log.error({ err: err.message }, 'dashboard-sync failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/sweep-idempotency', async (req, res) => {
+  const log = withCorrelation(req);
+  try {
+    const billingDb = require('../services/billing-db');
+    const removed = await billingDb.sweepIdempotencyKeys(90);
+    log.info({ removed }, 'idempotency sweep complete');
+    res.json({ ok: true, removed });
+  } catch (err) {
+    log.error({ err: err.message }, 'sweep-idempotency failed');
     res.status(500).json({ error: err.message });
   }
 });

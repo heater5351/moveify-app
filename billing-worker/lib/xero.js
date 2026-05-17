@@ -436,7 +436,31 @@ async function getInvoice(invoiceId) {
   return (data.Invoices || [])[0] || null;
 }
 
+// Xero's Aged Receivables By Contact report, flattened into a 2D row array
+// suitable for direct write into a Sheets tab. Header row first, then one
+// row per contact, then any total rows from Xero. Empty cells appear as ''.
+async function getAgedReceivablesSummary() {
+  const data = await xeroFetch('GET', '/Reports/AgedReceivablesByContact');
+  const report = (data.Reports || [])[0];
+  if (!report) return { rows: [['No report returned']] };
+
+  const out = [];
+  for (const section of report.Rows || []) {
+    if (section.RowType === 'Header') {
+      out.push((section.Cells || []).map((c) => String(c.Value ?? '')));
+    } else if (section.RowType === 'Section') {
+      for (const r of section.Rows || []) {
+        out.push((r.Cells || []).map((c) => String(c.Value ?? '')));
+      }
+    } else if (section.RowType === 'Row' || section.RowType === 'SummaryRow') {
+      out.push((section.Cells || []).map((c) => String(c.Value ?? '')));
+    }
+  }
+  return { rows: out };
+}
+
 module.exports = {
+  getAgedReceivablesSummary,
   getAccessToken,
   getOrganisation,
   findContactsByName,
