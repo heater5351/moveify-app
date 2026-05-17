@@ -24,17 +24,18 @@ export const PatientsPage = ({ patients, onViewPatient, onAddPatient }: Patients
   return (
     <>
       <div className="mb-7">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="text-2xl font-semibold font-display text-secondary-500 tracking-tight">Patients</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Manage your patients and their assigned programs</p>
+        <div className="flex items-center justify-between gap-3 mb-5">
+          <div className="min-w-0">
+            <h2 className="text-xl md:text-2xl font-semibold font-display text-secondary-500 tracking-tight">Patients</h2>
+            <p className="hidden md:block text-sm text-slate-500 mt-0.5">Manage your patients and their assigned programs</p>
           </div>
           <button
             onClick={onAddPatient}
-            className="bg-primary-400 hover:bg-primary-500 text-white px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors text-sm shadow-sm"
+            className="flex-shrink-0 bg-primary-400 hover:bg-primary-500 text-white px-4 md:px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors text-sm shadow-sm"
           >
             <Plus size={16} />
-            Add Patient
+            <span className="hidden sm:inline">Add Patient</span>
+            <span className="sm:hidden">Add</span>
           </button>
         </div>
 
@@ -75,8 +76,8 @@ export const PatientsPage = ({ patients, onViewPatient, onAddPatient }: Patients
 
           {/* Directory-style patient list */}
           <div className="bg-white rounded-xl ring-1 ring-slate-200 overflow-hidden">
-            {/* Table Header */}
-            <div className="border-b border-slate-100 px-6 py-3 grid grid-cols-12 gap-6 text-xs font-semibold text-slate-500 uppercase tracking-wide items-center">
+            {/* Table Header — desktop only */}
+            <div className="hidden md:grid border-b border-slate-100 px-6 py-3 grid-cols-12 gap-6 text-xs font-semibold text-slate-500 uppercase tracking-wide items-center">
               <div className="col-span-1"></div>
               <div className="col-span-3">Name</div>
               <div className="col-span-1">Age</div>
@@ -91,37 +92,44 @@ export const PatientsPage = ({ patients, onViewPatient, onAddPatient }: Patients
                 <div
                   key={patient.id}
                   onClick={() => onViewPatient(patient)}
-                  className="px-6 py-3.5 grid grid-cols-12 gap-6 hover:bg-slate-50 cursor-pointer transition-colors items-center"
+                  className="px-4 md:px-6 py-3.5 flex items-center gap-3 md:grid md:grid-cols-12 md:gap-6 hover:bg-slate-50 active:bg-slate-100 cursor-pointer transition-colors"
                 >
                   {/* Avatar */}
-                  <div className="col-span-1">
-                    <div className="w-9 h-9 bg-primary-50 rounded-full flex items-center justify-center border border-primary-100">
+                  <div className="md:col-span-1 flex-shrink-0">
+                    <div className="w-10 h-10 md:w-9 md:h-9 bg-primary-50 rounded-full flex items-center justify-center border border-primary-100">
                       <User className="text-primary-400" size={16} />
                     </div>
                   </div>
 
-                  {/* Name */}
-                  <div className="col-span-3">
+                  {/* Mobile: stacked info */}
+                  <div className="md:hidden flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-medium text-slate-900 text-base truncate">{patient.name}</h3>
+                      {patient.assignedPrograms && patient.assignedPrograms.length > 0 ? (
+                        <span className="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-primary-50 text-primary-600 border border-primary-100">
+                          {patient.assignedPrograms.length} {patient.assignedPrograms.length === 1 ? 'prog' : 'progs'}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-xs text-slate-500 truncate mt-0.5">
+                      {patient.age}y{patient.email ? ` · ${patient.email}` : ''}
+                    </p>
+                  </div>
+
+                  {/* Desktop: column layout */}
+                  <div className="hidden md:block col-span-3">
                     <h3 className="font-medium text-slate-900 text-sm">{patient.name}</h3>
                   </div>
-
-                  {/* Age */}
-                  <div className="col-span-1">
+                  <div className="hidden md:block col-span-1">
                     <p className="text-sm text-slate-600">{patient.age}y</p>
                   </div>
-
-                  {/* Email */}
-                  <div className="col-span-3">
+                  <div className="hidden md:block col-span-3">
                     <p className="text-sm text-slate-500 truncate">{patient.email}</p>
                   </div>
-
-                  {/* Phone */}
-                  <div className="col-span-2">
+                  <div className="hidden md:block col-span-2">
                     <p className="text-sm text-slate-500">{patient.phone}</p>
                   </div>
-
-                  {/* Programs */}
-                  <div className="col-span-2">
+                  <div className="hidden md:block col-span-2">
                     {patient.assignedPrograms && patient.assignedPrograms.length > 0 ? (
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary-50 text-primary-600 border border-primary-100">
                         {patient.assignedPrograms.length} {patient.assignedPrograms.length === 1 ? 'program' : 'programs'}

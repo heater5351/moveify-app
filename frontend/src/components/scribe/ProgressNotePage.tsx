@@ -331,7 +331,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
 
   return (
     <>
-    <div className="max-w-4xl mx-auto flex flex-col" style={{ height: 'calc(100vh - 4rem)' }}>
+    <div className="max-w-4xl mx-auto flex flex-col h-full" style={{ minHeight: 'calc(100dvh - 6rem)' }}>
 
       {/* Header */}
       <div className="flex items-center justify-between py-3 shrink-0">
@@ -416,7 +416,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
       {!isLocked && <div className="flex flex-col flex-1 min-h-0 pt-3">
 
         {/* Controls */}
-        <div className="flex items-center gap-2 mb-3 shrink-0">
+        <div className="flex items-center gap-2 mb-3 shrink-0 flex-wrap">
           {!recordingDone ? (
             <>
               {!isRecording ? (

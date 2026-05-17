@@ -69,3 +69,7 @@ html, body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* Hide scrollbar utility (used by horizontally scrollable mobile tab strips) */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

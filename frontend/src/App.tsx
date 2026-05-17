@@ -1041,20 +1041,20 @@ function App() {
 
       {/* Header & Navigation */}
       <header className="bg-secondary-500 flex-shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="px-6 flex items-center justify-between h-14">
-          <div className="flex items-center">
+        <div className="px-3 md:px-6 flex items-center justify-between h-14 gap-2">
+          <div className="flex items-center min-w-0 flex-1">
             <img
               src="/assets/moveify-logo-dark.png"
               alt="Moveify Logo"
-              className={`${userRole === 'clinician' ? 'h-12' : 'h-10'} w-auto mr-8`}
+              className={`${userRole === 'clinician' ? 'h-9 md:h-12' : 'h-8 md:h-10'} w-auto mr-2 md:mr-8 flex-shrink-0`}
             />
 
             {/* Navigation Tabs - Only show in Clinician mode */}
             {userRole === 'clinician' && (
-              <div className="flex items-stretch h-14">
+              <div className="flex items-stretch h-14 overflow-x-auto no-scrollbar">
                 <button
                   onClick={() => setCurrentPage('exercises')}
-                  className={`px-5 text-sm font-medium border-b-2 transition-colors ${
+                  className={`px-3 md:px-5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                     currentPage === 'exercises'
                       ? 'border-moveify-teal text-white'
                       : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/20'
@@ -1067,7 +1067,7 @@ function App() {
                     setCurrentPage('patients');
                     setViewingPatient(null);
                   }}
-                  className={`px-5 text-sm font-medium border-b-2 transition-colors ${
+                  className={`px-3 md:px-5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                     currentPage === 'patients'
                       ? 'border-moveify-teal text-white'
                       : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/20'
@@ -1077,7 +1077,7 @@ function App() {
                 </button>
                 <button
                   onClick={() => setCurrentPage('education')}
-                  className={`px-5 text-sm font-medium border-b-2 transition-colors ${
+                  className={`px-3 md:px-5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                     currentPage === 'education'
                       ? 'border-moveify-teal text-white'
                       : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/20'
@@ -1087,7 +1087,7 @@ function App() {
                 </button>
                 <button
                   onClick={() => { setCurrentPage('scribe'); setScribeEverOpened(true); setViewingPatient(null); }}
-                  className={`relative px-5 text-sm font-medium border-b-2 transition-colors ${
+                  className={`relative px-3 md:px-5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                     currentPage === 'scribe'
                       ? 'border-moveify-teal text-white'
                       : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/20'
@@ -1101,7 +1101,7 @@ function App() {
                 {loggedInUser?.isAdmin && (
                   <button
                     onClick={() => setCurrentPage('admin')}
-                    className={`px-5 text-sm font-medium border-b-2 transition-colors ${
+                    className={`px-3 md:px-5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                       currentPage === 'admin'
                         ? 'border-moveify-teal text-white'
                         : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/20'
@@ -1118,7 +1118,7 @@ function App() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowAiPanel(!showAiPanel)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   showAiPanel
                     ? 'bg-primary-400 text-white'
                     : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
@@ -1179,7 +1179,7 @@ function App() {
             paddingTop: 'env(safe-area-inset-top)',
           }}
         >
-          <div className="flex-1 overflow-y-auto px-6 py-7">
+          <div className="flex-1 overflow-hidden flex flex-col px-3 md:px-6 py-3 md:py-7">
             <ProgressNotePage
               key={noteKey}
               patientId={activeNote.patientId}
@@ -1291,7 +1291,7 @@ function App() {
           />
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto px-6 py-7">
+        <div className="flex-1 overflow-y-auto px-3 md:px-6 py-4 md:py-7">
           {viewingPatient ? (
             <PatientProfile
               patient={viewingPatient}

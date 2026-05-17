@@ -206,14 +206,14 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <button
           onClick={onBack}
           className="text-sm text-slate-500 hover:text-slate-800 font-medium transition-colors flex items-center gap-1"
         >
           ← Patients
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {patient.pendingSetup && (
             <div className="flex items-center gap-2">
               <button
@@ -306,7 +306,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
       )}
 
       {/* Patient header card */}
-      <div className="bg-white rounded-xl ring-1 ring-slate-200 px-7 py-6 flex items-center gap-5">
+      <div className="bg-white rounded-xl ring-1 ring-slate-200 px-4 md:px-7 py-4 md:py-6 flex items-center gap-4 md:gap-5">
         <div className="w-14 h-14 bg-primary-50 rounded-full flex items-center justify-center border border-primary-100 flex-shrink-0">
           <User className="text-primary-400" size={26} />
         </div>
@@ -330,8 +330,8 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
       </div>
 
       {/* Tab Navigation */}
-      <div className="border-b border-slate-200">
-        <div className="flex gap-1">
+      <div className="border-b border-slate-200 overflow-x-auto no-scrollbar">
+        <div className="flex gap-1 min-w-max">
           {[
             { id: 'overview', label: 'Overview', icon: <User size={15} /> },
             { id: 'analytics', label: 'Progress Analytics', icon: <TrendingUp size={15} /> },
@@ -519,11 +519,11 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
         <ProgressAnalytics patientId={patient.id} apiUrl={API_URL} assignedPrograms={patient.assignedPrograms} />
       ) : activeTab === 'notes' ? (
           <div>
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center justify-between gap-3 mb-5">
               <h2 className="text-sm font-semibold text-slate-700">Progress Notes</h2>
               <button
                 onClick={() => onOpenNote(patient.id, patient.name)}
-                className="bg-primary-400 hover:bg-primary-500 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-1.5 text-sm transition-colors shadow-sm"
+                className="flex-shrink-0 bg-primary-400 hover:bg-primary-500 active:scale-[0.98] text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-1.5 text-sm transition shadow-sm"
               >
                 <FileText size={15} />
                 New Progress Note
