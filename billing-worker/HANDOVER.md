@@ -2,6 +2,12 @@
 
 State as of 2026-05-05. Pick up here.
 
+> **⚠ Architectural note (added 2026-05-16):** the worker's state store moved
+> from Google Sheets → PostgreSQL (`billing` DB in `moveify-db` Cloud SQL
+> instance). Any references below to Sheets tabs (`Referrals`, etc.) now refer
+> to the equivalent Postgres tables (`referrals`, etc.). See `CLAUDE.md`
+> "Billing Worker" section for current state-store + Xero tenant details.
+
 ## Current state
 
 Cloud Run revision **`moveify-billing-worker-00055-fhx`** is the live, working version. Gmail → Bedrock → Cliniko referral pipeline tested end-to-end; both real referrals from the test set processed correctly (patient + DOB + Medicare + doctor contact + practice address + PDF attachment).
