@@ -1179,7 +1179,7 @@ function App() {
             paddingTop: 'env(safe-area-inset-top)',
           }}
         >
-          <div className="flex-1 overflow-hidden flex flex-col px-3 md:px-6 py-3 md:py-7">
+          <div className="flex-1 overflow-y-auto px-3 md:px-6 py-3 md:py-7">
             <ProgressNotePage
               key={noteKey}
               patientId={activeNote.patientId}
