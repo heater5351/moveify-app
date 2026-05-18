@@ -14,6 +14,7 @@ COPY middleware/ ./middleware/
 COPY routes/ ./routes/
 COPY services/ ./services/
 COPY lib/ ./lib/
+COPY scripts/ ./scripts/
 COPY data/ ./data/
 COPY assets/ ./assets/
 
