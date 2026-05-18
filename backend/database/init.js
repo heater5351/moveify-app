@@ -848,6 +848,15 @@ async function initDatabase() {
     `);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_patient_summaries_patient ON patient_summaries(patient_id)`);
 
+    // Migration: patient_summaries.patient_id was created without ON DELETE
+    // CASCADE — same issue as scribe_sessions. Idempotent.
+    await db.query(`
+      ALTER TABLE patient_summaries
+        DROP CONSTRAINT IF EXISTS patient_summaries_patient_id_fkey,
+        ADD CONSTRAINT patient_summaries_patient_id_fkey
+          FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE
+    `);
+
     // Seed default SOAP template (exercise physiology)
     await db.query(`
       INSERT INTO soap_templates (name, discipline, system_prompt, is_default)
