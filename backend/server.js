@@ -37,6 +37,10 @@ const { registerScribeTranscriptionWs } = require('./routes/scribe-transcription
 // Import database init
 const { initDatabase } = require('./database/init');
 
+// Identity Platform Admin SDK (Phase 1 of auth migration — dual-mode)
+const identityPlatform = require('./lib/identity-platform');
+identityPlatform.init();
+
 const app = express();
 // Trust Cloud Run's load balancer (one proxy hop) — required for
 // express-rate-limit to correctly identify client IPs via X-Forwarded-For

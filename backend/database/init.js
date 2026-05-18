@@ -486,6 +486,16 @@ async function initDatabase() {
       ON users(cliniko_patient_id)
     `);
 
+    // Identity Platform UID (Phase 1 of auth migration — nullable until users are imported)
+    await db.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS firebase_uid TEXT UNIQUE
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_firebase_uid
+      ON users(firebase_uid)
+    `);
+
     console.log('🔄 Adding exercise filter columns...');
     await db.query(`
       ALTER TABLE exercises
