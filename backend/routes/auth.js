@@ -1,10 +1,10 @@
 // Authentication routes
 const express = require('express');
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 const db = require('../database/db');
 const { sendPasswordResetEmail } = require('../services/email');
 const { generateToken, authenticate } = require('../middleware/auth');
+const identityPlatform = require('../lib/identity-platform');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -125,43 +125,8 @@ router.patch('/profile', authenticate, async (req, res) => {
   }
 });
 
-// Change password (authenticated user)
-router.patch('/change-password', authenticate, async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'Current password and new password are required' });
-    }
-
-    if (newPassword.length < 8) {
-      return res.status(400).json({ error: 'New password must be at least 8 characters' });
-    }
-
-    const user = await db.getOne('SELECT id, password_hash FROM users WHERE id = $1', [req.user.id]);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const validPassword = await bcrypt.compare(currentPassword, user.password_hash);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Current password is incorrect' });
-    }
-
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, req.user.id]);
-
-    // Invalidate any outstanding password reset tokens
-    await db.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [req.user.id]);
-
-    audit.log(req, 'password_change', 'user', req.user.id);
-
-    res.json({ message: 'Password changed successfully' });
-  } catch (error) {
-    console.error('Change password error:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
+// Change password — handled entirely on the frontend via Firebase SDK
+// (reauthenticateWithCredential + updatePassword). No backend route needed.
 
 // Set default location (clinician)
 router.patch('/default-location', authenticate, async (req, res) => {
@@ -192,7 +157,8 @@ router.patch('/default-location', authenticate, async (req, res) => {
   }
 });
 
-// Request password reset
+// Request password reset — Identity Platform issues the action code; we
+// email Firebase's reset link via our existing Gmail template.
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -201,93 +167,33 @@ router.post('/forgot-password', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    // Find user by email
-    const user = await db.getOne('SELECT id, email FROM users WHERE email = $1', [email]);
-
-    // Always return success to prevent email enumeration
-    if (!user) {
+    const auth = identityPlatform.auth();
+    if (!auth) {
+      console.error('forgot-password called but Identity Platform not initialized');
+      // Don't leak config state to clients
       return res.json({ message: 'If an account exists with this email, you will receive a password reset link.' });
     }
 
-    // Generate secure random token
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
-
-    // Delete any existing tokens for this user
-    await db.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [user.id]);
-
-    // Store the token
-    await db.query(
-      'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
-      [user.id, token, expiresAt]
-    );
-
-    // Send email
+    // Always return success to prevent email enumeration. If the user
+    // doesn't exist in IP, generatePasswordResetLink throws auth/user-not-found.
     try {
-      await sendPasswordResetEmail(user.email, token);
-    } catch (emailError) {
-      console.error('Failed to send reset email:', emailError);
-      // Still return success to prevent enumeration
+      const continueUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const link = await auth.generatePasswordResetLink(email, { url: continueUrl });
+      try {
+        await sendPasswordResetEmail(email, link);
+      } catch (emailError) {
+        console.error('Failed to send reset email:', emailError);
+      }
+      audit.log(req, 'password_reset_requested', 'user', null, { email });
+    } catch (ipError) {
+      if (ipError.code !== 'auth/user-not-found' && ipError.code !== 'auth/email-not-found') {
+        console.error('generatePasswordResetLink error:', ipError);
+      }
     }
 
     res.json({ message: 'If an account exists with this email, you will receive a password reset link.' });
   } catch (error) {
     console.error('Forgot password error:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Verify reset token
-router.get('/verify-reset-token/:token', async (req, res) => {
-  try {
-    const { token } = req.params;
-
-    const resetToken = await db.getOne(
-      'SELECT * FROM password_reset_tokens WHERE token = $1 AND used = FALSE AND expires_at > NOW()',
-      [token]
-    );
-
-    res.json({ valid: !!resetToken });
-  } catch (error) {
-    console.error('Verify token error:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Reset password with token
-router.post('/reset-password', async (req, res) => {
-  try {
-    const { token, newPassword } = req.body;
-
-    if (!token || !newPassword) {
-      return res.status(400).json({ error: 'Token and new password are required' });
-    }
-
-    if (newPassword.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    }
-
-    // Atomically claim the token (prevents race condition with concurrent requests)
-    const resetToken = await db.getOne(
-      'UPDATE password_reset_tokens SET used = TRUE WHERE token = $1 AND used = FALSE AND expires_at > NOW() RETURNING *',
-      [token]
-    );
-
-    if (!resetToken) {
-      return res.status(400).json({ error: 'Invalid or expired reset link' });
-    }
-
-    // Hash new password
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-
-    // Update user's password
-    await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, resetToken.user_id]);
-
-    audit.log(req, 'password_reset', 'user', resetToken.user_id);
-
-    res.json({ message: 'Password reset successfully' });
-  } catch (error) {
-    console.error('Reset password error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

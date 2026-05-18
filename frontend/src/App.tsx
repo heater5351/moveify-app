@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Sparkles } from 'lucide-react';
-import { Routes, Route, useSearchParams, useNavigate } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import type { Patient, ProgramExercise, ProgramConfig, UserRole, NewPatient, CompletionData, User, ExerciseWeekPrescription } from './types/index.ts';
 import { LoginPage } from './components/LoginPage';
 import { SetupPasswordPage } from './components/SetupPasswordPage';
@@ -19,7 +19,6 @@ import { ProgramConfigModal } from './components/modals/ProgramConfigModal';
 import { ProgramView } from './components/ProgramView';
 import { NotificationModal } from './components/modals/NotificationModal';
 import { ConfirmModal } from './components/modals/ConfirmModal';
-import { ResetPasswordModal } from './components/modals/ResetPasswordModal';
 import { BlockBuilderModal } from './components/modals/BlockBuilderModal';
 import { ProgramTemplateModal } from './components/modals/ProgramTemplateModal';
 import { ChangePasswordModal } from './components/modals/ChangePasswordModal';
@@ -848,20 +847,6 @@ function App() {
     }
   };
 
-  // Check for reset password token in URL
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const resetToken = searchParams.get('token');
-  const isResetPasswordPage = window.location.pathname === '/reset-password';
-
-  const handleResetPasswordClose = () => {
-    navigate('/', { replace: true });
-  };
-
-  const handleResetPasswordSuccess = () => {
-    setNotification({ message: 'Password reset successfully! You can now log in.', type: 'success' });
-  };
-
   // Show loading while restoring session
   if (isRestoringSession) {
     return (
@@ -879,17 +864,8 @@ function App() {
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/setup-password" element={<SetupPasswordPage />} />
-          <Route path="/reset-password" element={<LoginPage onLogin={handleLogin} />} />
           <Route path="/" element={<LoginPage onLogin={handleLogin} />} />
         </Routes>
-        {/* Show reset password modal if token is present */}
-        {isResetPasswordPage && resetToken && (
-          <ResetPasswordModal
-            token={resetToken}
-            onClose={handleResetPasswordClose}
-            onSuccess={handleResetPasswordSuccess}
-          />
-        )}
       </>
     );
   }
