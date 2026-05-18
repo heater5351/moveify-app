@@ -751,6 +751,16 @@ async function initDatabase() {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_scribe_sessions_patient ON scribe_sessions(patient_id)`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_scribe_sessions_date ON scribe_sessions(session_date)`);
 
+    // Migration: scribe_sessions.patient_id was created without ON DELETE
+    // CASCADE while every other users(id) FK cascades. Recreate with cascade
+    // so deleting a patient doesn't fail. Idempotent.
+    await db.query(`
+      ALTER TABLE scribe_sessions
+        DROP CONSTRAINT IF EXISTS scribe_sessions_patient_id_fkey,
+        ADD CONSTRAINT scribe_sessions_patient_id_fkey
+          FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE
+    `);
+
     await db.query(`
       CREATE TABLE IF NOT EXISTS transcripts (
         id SERIAL PRIMARY KEY,
