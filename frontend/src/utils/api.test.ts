@@ -1,7 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getToken, setToken, clearAuth, getAuthHeaders, getStoredUser, setStoredUser } from './api';
 
-// Mock localStorage
+// Mock the Firebase token cache before importing the module under test.
+vi.mock('../lib/firebase', () => ({
+  auth: {},
+  getCachedToken: vi.fn(),
+}));
+
+vi.mock('firebase/auth', () => ({
+  signOut: vi.fn(() => Promise.resolve()),
+}));
+
+import { getToken, clearAuth, getAuthHeaders, getStoredUser, setStoredUser } from './api';
+import { getCachedToken } from '../lib/firebase';
+
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
@@ -11,51 +22,50 @@ const localStorageMock = (() => {
     clear: vi.fn(() => { store = {}; }),
   };
 })();
-
 Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock });
 
-describe('Token management', () => {
+describe('Token management (Identity Platform)', () => {
   beforeEach(() => {
     localStorageMock.clear();
     vi.clearAllMocks();
   });
 
-  it('getToken returns null when no token stored', () => {
+  it('getToken returns null when Firebase has no cached token', () => {
+    vi.mocked(getCachedToken).mockReturnValue(null);
     expect(getToken()).toBeNull();
   });
 
-  it('setToken stores and getToken retrieves', () => {
-    setToken('abc123');
-    expect(localStorageMock.setItem).toHaveBeenCalledWith('moveify_token', 'abc123');
-    expect(getToken()).toBe('abc123');
+  it('getToken returns the cached Firebase token', () => {
+    vi.mocked(getCachedToken).mockReturnValue('ip-token-abc');
+    expect(getToken()).toBe('ip-token-abc');
   });
 
-  it('clearAuth removes token and user', () => {
-    setToken('abc123');
+  it('clearAuth removes stored user from localStorage', () => {
+    localStorage.setItem('moveify_user', 'x');
     clearAuth();
-    expect(localStorageMock.removeItem).toHaveBeenCalledWith('moveify_token');
     expect(localStorageMock.removeItem).toHaveBeenCalledWith('moveify_user');
   });
 });
 
 describe('getAuthHeaders', () => {
   beforeEach(() => {
-    localStorageMock.clear();
     vi.clearAllMocks();
   });
 
   it('includes Content-Type header', () => {
+    vi.mocked(getCachedToken).mockReturnValue(null);
     const headers = getAuthHeaders();
     expect(headers['Content-Type']).toBe('application/json');
   });
 
-  it('includes Authorization when token exists', () => {
-    setToken('my-jwt');
+  it('includes Authorization when a token is cached', () => {
+    vi.mocked(getCachedToken).mockReturnValue('my-ip-token');
     const headers = getAuthHeaders();
-    expect(headers['Authorization']).toBe('Bearer my-jwt');
+    expect(headers['Authorization']).toBe('Bearer my-ip-token');
   });
 
   it('omits Authorization when no token', () => {
+    vi.mocked(getCachedToken).mockReturnValue(null);
     const headers = getAuthHeaders();
     expect(headers['Authorization']).toBeUndefined();
   });

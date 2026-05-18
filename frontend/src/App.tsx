@@ -37,7 +37,9 @@ import FloatingRecordingIndicator from './components/scribe/FloatingRecordingInd
 import { AiProtocolModal } from './components/modals/AiProtocolModal';
 import { BugReportModal } from './components/modals/BugReportModal';
 import { API_URL } from './config';
-import { getAuthHeaders, setToken, clearAuth, setStoredUser, getToken } from './utils/api';
+import { getAuthHeaders, clearAuth, setStoredUser } from './utils/api';
+import { auth, waitForTokenReady } from './lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { toLocalDateString } from './utils/date.ts';
 import { useCapacitorBackButton } from './hooks/useCapacitorBackButton';
 
@@ -177,51 +179,59 @@ function App() {
 
   useCapacitorBackButton(handleBackButton);
 
-  // Session restoration on mount
+  // Session restoration on mount — driven by Firebase auth state.
+  // Firebase persists the session in IndexedDB; onAuthStateChanged fires
+  // once the SDK has resolved whether a user is signed in.
   useEffect(() => {
-    const restoreSession = async () => {
-      const token = getToken();
-      if (!token) {
+    let cancelled = false;
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (cancelled) return;
+
+      if (!firebaseUser) {
         setIsRestoringSession(false);
         return;
       }
 
+      // Wait for the in-memory token cache to be populated before any API call
+      await waitForTokenReady();
+      if (cancelled) return;
+
       try {
-        const response = await fetch(`${API_URL}/auth/me`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await fetch(`${API_URL}/auth/me`, { headers: getAuthHeaders() });
 
         if (response.ok) {
           const data = await response.json();
           const user = data.user;
 
           if (user.role === 'patient') {
-            // Fetch patient data
-            const patientResponse = await fetch(`${API_URL}/patients/${user.id}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const patientResponse = await fetch(`${API_URL}/patients/${user.id}`, { headers: getAuthHeaders() });
             if (patientResponse.ok) {
               const patientData = await patientResponse.json();
-              setLoggedInPatient(patientData);
+              if (!cancelled) setLoggedInPatient(patientData);
             }
-            setUserRole('patient');
+            if (!cancelled) setUserRole('patient');
           } else {
-            setLoggedInUser({ id: user.id, email: user.email, name: user.name, phone: user.phone, role: 'clinician', isAdmin: !!user.is_admin, defaultLocationId: user.default_location_id, locationName: user.location_name });
-            setUserRole('clinician');
+            if (!cancelled) {
+              setLoggedInUser({ id: user.id, email: user.email, name: user.name, phone: user.phone, role: 'clinician', isAdmin: !!user.is_admin, defaultLocationId: user.default_location_id, locationName: user.location_name });
+              setUserRole('clinician');
+            }
           }
-          setIsLoggedIn(true);
+          if (!cancelled) setIsLoggedIn(true);
         } else {
-          // Token invalid/expired
           clearAuth();
         }
       } catch {
         clearAuth();
       }
 
-      setIsRestoringSession(false);
-    };
+      if (!cancelled) setIsRestoringSession(false);
+    });
 
-    restoreSession();
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   // Fetch patients from database
@@ -296,10 +306,9 @@ function App() {
   }, [patients]);
 
   // Handlers
-  const handleLogin = (role: UserRole, patient?: Patient, user?: User, token?: string) => {
-    if (token) {
-      setToken(token);
-    }
+  // Firebase manages the token automatically once signInWithEmailAndPassword
+  // succeeds; LoginPage no longer passes one in.
+  const handleLogin = (role: UserRole, patient?: Patient, user?: User) => {
     setIsLoggedIn(true);
     setUserRole(role);
     if (patient) {
