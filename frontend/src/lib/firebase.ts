@@ -27,13 +27,12 @@ if (!firebaseConfig.apiKey) {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// In-memory token cache. Populated by onIdTokenChanged below.
+// In-memory token cache, refreshed automatically by Firebase. Synchronous
+// readers (e.g. getAuthHeaders) read from this; on initial mount the cache
+// is seeded explicitly by the auth-state observer (which awaits getIdToken
+// on the loaded user) before any API call is dispatched, so we never need
+// a "wait" primitive.
 let cachedToken: string | null = null;
-let tokenReadyResolve: ((token: string | null) => void) | null = null;
-const tokenReady: Promise<string | null> = new Promise((resolve) => {
-  tokenReadyResolve = resolve;
-});
-let tokenReadyResolved = false;
 
 onIdTokenChanged(auth, async (user) => {
   if (user) {
@@ -45,18 +44,14 @@ onIdTokenChanged(auth, async (user) => {
   } else {
     cachedToken = null;
   }
-  if (!tokenReadyResolved) {
-    tokenReadyResolved = true;
-    tokenReadyResolve?.(cachedToken);
-  }
 });
 
 export function getCachedToken(): string | null {
   return cachedToken;
 }
 
-export function waitForTokenReady(): Promise<string | null> {
-  return tokenReady;
+export function setCachedToken(token: string | null): void {
+  cachedToken = token;
 }
 
 export function setSessionPersistence(rememberMe: boolean): Promise<void> {

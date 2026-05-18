@@ -38,7 +38,7 @@ import { AiProtocolModal } from './components/modals/AiProtocolModal';
 import { BugReportModal } from './components/modals/BugReportModal';
 import { API_URL } from './config';
 import { getAuthHeaders, clearAuth, setStoredUser } from './utils/api';
-import { auth, waitForTokenReady } from './lib/firebase';
+import { auth, setCachedToken } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { toLocalDateString } from './utils/date.ts';
 import { useCapacitorBackButton } from './hooks/useCapacitorBackButton';
@@ -189,12 +189,21 @@ function App() {
       if (cancelled) return;
 
       if (!firebaseUser) {
+        setCachedToken(null);
         setIsRestoringSession(false);
         return;
       }
 
-      // Wait for the in-memory token cache to be populated before any API call
-      await waitForTokenReady();
+      // Seed the token cache from the freshly-loaded user before any sync
+      // reader (getAuthHeaders) runs. Avoids a race where onIdTokenChanged
+      // fired with null earlier in the page lifecycle.
+      try {
+        const token = await firebaseUser.getIdToken();
+        setCachedToken(token);
+      } catch {
+        setIsRestoringSession(false);
+        return;
+      }
       if (cancelled) return;
 
       try {

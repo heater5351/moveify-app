@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import type { Patient, UserRole, User } from '../types/index.ts';
 import { API_URL } from '../config';
-import { auth, setSessionPersistence, waitForTokenReady } from '../lib/firebase';
+import { auth, setSessionPersistence, setCachedToken } from '../lib/firebase';
 import { getAuthHeaders } from '../utils/api';
 import { ForgotPasswordModal } from './modals/ForgotPasswordModal';
 
@@ -26,9 +26,11 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
       // Persistence — local (survives tab close) if rememberMe, else session-only
       await setSessionPersistence(rememberMe);
 
-      // Identity Platform sign-in. Firebase caches the token automatically.
-      await signInWithEmailAndPassword(auth, email, password);
-      await waitForTokenReady();
+      // Identity Platform sign-in. Seed the in-memory token cache directly
+      // from the signed-in user so the immediate /me call below has it.
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const idToken = await credential.user.getIdToken();
+      setCachedToken(idToken);
 
       // Fetch user row from backend (role, id, is_admin, etc.)
       const meResponse = await fetch(`${API_URL}/auth/me`, { headers: getAuthHeaders() });
