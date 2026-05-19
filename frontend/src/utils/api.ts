@@ -5,6 +5,12 @@ import { auth, getCachedToken } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 
 const USER_KEY = 'moveify_user';
+const LEGACY_TOKEN_KEY = 'moveify_token';
+
+// One-time defensive cleanup of the pre-Identity-Platform JWT entry.
+// Harmless if absent; closes the XSS surface for users carrying a stale
+// orphaned token from a pre-cutover session.
+try { localStorage.removeItem(LEGACY_TOKEN_KEY); } catch { /* SSR / restricted */ }
 
 // Token management — backed by Firebase in-memory cache. localStorage no
 // longer holds the token (closes XSS gap that motivated the migration).
@@ -14,6 +20,7 @@ export function getToken(): string | null {
 
 export function clearAuth(): void {
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(LEGACY_TOKEN_KEY);
   // Fire-and-forget; if signOut races with redirect that's fine
   void signOut(auth).catch(() => { /* already signed out */ });
 }
