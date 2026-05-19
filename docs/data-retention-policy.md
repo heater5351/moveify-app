@@ -1,7 +1,7 @@
 # Moveify Data Retention Policy
 
-**Version:** 1.0
-**Last reviewed:** 2026-03-07
+**Version:** 1.1
+**Last reviewed:** 2026-05-19
 **Owner:** Moveify Health Solutions
 **Review frequency:** Annually or when relevant legislation changes
 
@@ -18,7 +18,7 @@ This policy applies to all personal information and health information held by M
 - Patient records (demographics, conditions, contact details)
 - Health data (exercise programs, completions, pain scores, RPE ratings, daily check-ins)
 - Clinician records (name, email, credentials)
-- Authentication data (hashed passwords, JWT tokens, invitation tokens)
+- Authentication data (hashed passwords in GCP Identity Platform, ID tokens, invitation tokens)
 - Audit logs (access records, IP addresses, timestamps)
 - Education module completion records
 
@@ -74,6 +74,19 @@ Moveify adopts the **most conservative** position across all applicable laws to 
 | **Education module records** (completion/viewed status) | Same as patient health data | Part of the clinical record |
 | **Breach investigation records** | **7 years** from resolution of the breach | NDB scheme obligations; potential regulatory action |
 | **Backup data** | **7-day rolling retention** (current setting) | Operational — not a long-term archive. Backups older than 7 days are automatically deleted by Cloud SQL. |
+
+### 3.0a Data location (residency)
+
+All **patient health data, demographics, programs, completions, check-ins, audit logs, and clinician records** live in Cloud SQL (PostgreSQL) hosted in `australia-southeast1` (Sydney) — Moveify's primary data store does not leave Australia.
+
+**Authentication credentials are an exception.** Since 2026-05-19, password hashes, UIDs, last-sign-in metadata, and email addresses used for sign-in live in **GCP Identity Platform**, which does not offer regional pinning at the project or tenant level. These records sit on Google's global infrastructure as a sub-processor for authentication only.
+
+Justification:
+- Under Privacy Act s 6FA, password hashes and sign-in metadata are access metadata, not "health information"
+- Cross-border disclosure (APP 8) applies to Google as a contractual sub-processor — Google's terms include Standard Contractual Clauses and APP-8 commitments
+- No clinical, health, or program data leaves Australia at any point
+
+If full residency on auth records is later required, the upgrade path is GCP Assured Workloads with the Australia Data Boundary control package. Deferred until/unless a stakeholder requires it. See `docs/identity-platform-migration.md` § "Residency tradeoff (acknowledged)".
 
 ### 3.1 "Last clinical interaction" defined
 
@@ -192,3 +205,4 @@ This policy must be reviewed:
 | Date | Version | Change |
 |------|---------|--------|
 | 2026-03-07 | 1.0 | Initial data retention policy |
+| 2026-05-19 | 1.1 | Auth credentials migrated to GCP Identity Platform; added § 3.0a Data location (residency) noting the auth-only sub-processor split. Patient health data remains in `australia-southeast1`. |
