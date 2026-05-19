@@ -121,12 +121,12 @@ function registerScribeTranscriptionWs(app) {
         if (isFinal && text.trim()) finalSegments.push(text.trim());
       },
       onError(err) {
-        console.error('Deepgram error:', err.message);
+        console.error('Transcribe stream error:', err.message);
         if (ws.readyState === 1) {
           ws.send(JSON.stringify({ type: 'error', message: 'Transcription service error' }));
         }
       },
-      onClose() { console.log('Deepgram stream closed'); },
+      onClose() { console.log('Transcribe stream closed'); },
     });
 
     // Build a minimal req-like object for audit.log (WS doesn't have a standard Express req)
