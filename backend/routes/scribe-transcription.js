@@ -5,8 +5,8 @@
  *
  * Also drives live clinical suggestions (Nova Lite + Claude Sonnet 4.6).
  */
-const jwt = require('jsonwebtoken');
 const db = require('../database/db');
+const { verifyTokenAnyMode } = require('../middleware/auth');
 const { createLiveTranscription } = require('../services/scribe-transcribe');
 const { getPatientSummary } = require('../services/scribe-summary');
 const { generateSuggestion } = require('../services/scribe-suggestions');
@@ -19,13 +19,14 @@ const SUGGESTION_COOLDOWN_MS = 60_000;
 
 function registerScribeTranscriptionWs(app) {
   app.ws('/ws/scribe/transcribe', async (ws, req) => {
-    // Authenticate via query param token (same JWT as HTTP requests)
+    // Authenticate via query param token — dual-mode (Identity Platform RS256
+    // or legacy HS256 JWT), same as HTTP routes via middleware/auth.
     const token = req.query.token;
     if (!token) { ws.close(4001, 'Authentication required'); return; }
 
     let user;
     try {
-      user = jwt.verify(token, process.env.JWT_SECRET);
+      user = await verifyTokenAnyMode(token);
     } catch {
       ws.close(4001, 'Invalid token');
       return;

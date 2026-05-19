@@ -88,6 +88,17 @@ function verifyLegacyToken(token) {
 }
 
 /**
+ * Verify a bearer token in either Identity Platform or legacy JWT mode.
+ * Reusable outside Express (e.g. WebSocket handlers). Throws on failure.
+ */
+async function verifyTokenAnyMode(token) {
+  if (isLikelyIdentityPlatformToken(token) && identityPlatform.isEnabled()) {
+    return await verifyIdentityPlatformToken(token);
+  }
+  return verifyLegacyToken(token);
+}
+
+/**
  * Middleware: verify bearer token (IP RS256 or legacy HS256), set req.user.
  */
 async function authenticate(req, res, next) {
@@ -133,4 +144,4 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { generateToken, authenticate, requireRole };
+module.exports = { generateToken, authenticate, requireRole, verifyTokenAnyMode };
