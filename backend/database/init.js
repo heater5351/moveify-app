@@ -486,6 +486,16 @@ async function initDatabase() {
       ON users(cliniko_patient_id)
     `);
 
+    // Identity Platform UID (Phase 1 of auth migration — nullable until users are imported)
+    await db.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS firebase_uid TEXT UNIQUE
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_firebase_uid
+      ON users(firebase_uid)
+    `);
+
     console.log('🔄 Adding exercise filter columns...');
     await db.query(`
       ALTER TABLE exercises
@@ -741,6 +751,16 @@ async function initDatabase() {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_scribe_sessions_patient ON scribe_sessions(patient_id)`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_scribe_sessions_date ON scribe_sessions(session_date)`);
 
+    // Migration: scribe_sessions.patient_id was created without ON DELETE
+    // CASCADE while every other users(id) FK cascades. Recreate with cascade
+    // so deleting a patient doesn't fail. Idempotent.
+    await db.query(`
+      ALTER TABLE scribe_sessions
+        DROP CONSTRAINT IF EXISTS scribe_sessions_patient_id_fkey,
+        ADD CONSTRAINT scribe_sessions_patient_id_fkey
+          FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE
+    `);
+
     await db.query(`
       CREATE TABLE IF NOT EXISTS transcripts (
         id SERIAL PRIMARY KEY,
@@ -827,6 +847,15 @@ async function initDatabase() {
       )
     `);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_patient_summaries_patient ON patient_summaries(patient_id)`);
+
+    // Migration: patient_summaries.patient_id was created without ON DELETE
+    // CASCADE — same issue as scribe_sessions. Idempotent.
+    await db.query(`
+      ALTER TABLE patient_summaries
+        DROP CONSTRAINT IF EXISTS patient_summaries_patient_id_fkey,
+        ADD CONSTRAINT patient_summaries_patient_id_fkey
+          FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE
+    `);
 
     // Seed default SOAP template (exercise physiology)
     await db.query(`

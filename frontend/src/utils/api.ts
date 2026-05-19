@@ -1,21 +1,21 @@
-// API utility with retry logic, error handling, and JWT auth
+// API utility with retry logic, error handling, and Identity Platform auth.
+// Token lives in memory only (Firebase SDK caches it via onIdTokenChanged).
 import { API_URL } from '../config';
+import { auth, getCachedToken } from '../lib/firebase';
+import { signOut } from 'firebase/auth';
 
-const TOKEN_KEY = 'moveify_token';
 const USER_KEY = 'moveify_user';
 
-// Token management
+// Token management — backed by Firebase in-memory cache. localStorage no
+// longer holds the token (closes XSS gap that motivated the migration).
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
+  return getCachedToken();
 }
 
 export function clearAuth(): void {
-  localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  // Fire-and-forget; if signOut races with redirect that's fine
+  void signOut(auth).catch(() => { /* already signed out */ });
 }
 
 export function getStoredUser(): { id: number; email: string; role: string; name: string } | null {

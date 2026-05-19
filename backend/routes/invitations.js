@@ -1,10 +1,10 @@
 // Invitation routes
 const express = require('express');
 const crypto = require('crypto');
-const bcrypt = require('bcrypt');
 const db = require('../database/db');
 const { sendInvitationEmail } = require('../services/email');
 const { authenticate, requireRole } = require('../middleware/auth');
+const identityPlatform = require('../lib/identity-platform');
 const audit = require('../services/audit');
 const cliniko = require('../services/cliniko');
 
@@ -189,24 +189,62 @@ router.post('/set-password', async (req, res) => {
       return res.status(400).json({ error: 'You must consent to health data collection to create an account' });
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
+    // Look up the user row created at invite time
+    const user = await db.getOne(
+      'SELECT id, name FROM users WHERE email = $1 AND role = $2',
+      [invitation.email, invitation.role]
+    );
+    if (!user) {
+      // Token was valid but user row missing — invitation issued without
+      // creating the row. Should not happen given the /generate transaction.
+      return res.status(500).json({ error: 'User account not found' });
+    }
+    const uid = String(user.id);
 
-    // Update user account with password (and consent for patients)
+    // Create or update the Identity Platform user with the chosen password.
+    // Idempotent: a resend that already created the IP user falls through
+    // to updateUser. (createUser is the common path; updateUser handles
+    // resends/replays.)
+    const auth = identityPlatform.auth();
+    if (!auth) {
+      return res.status(500).json({ error: 'Authentication service unavailable' });
+    }
+    try {
+      await auth.createUser({
+        uid,
+        email: invitation.email,
+        emailVerified: true,
+        password,
+        displayName: user.name || undefined,
+        disabled: false,
+      });
+    } catch (ipError) {
+      if (ipError.code === 'auth/uid-already-exists' || ipError.code === 'auth/email-already-exists') {
+        // Existing IP user — update its password instead. Look up by email
+        // in case uid mapping diverged historically.
+        let existing;
+        try {
+          existing = await auth.getUser(uid);
+        } catch {
+          existing = await auth.getUserByEmail(invitation.email);
+        }
+        await auth.updateUser(existing.uid, { password });
+      } else {
+        console.error('IP createUser error during set-password:', ipError);
+        return res.status(500).json({ error: 'Failed to set password' });
+      }
+    }
+
+    // Mirror the IP uid back to the local users row + consent for patients
     if (invitation.role === 'patient') {
       await db.query(`
         UPDATE users
-        SET password_hash = $1, health_data_consent = TRUE, health_data_consent_date = NOW(), consent_version = '1.0'
-        WHERE email = $2 AND role = $3
-      `, [passwordHash, invitation.email, invitation.role]);
+        SET firebase_uid = $1, health_data_consent = TRUE, health_data_consent_date = NOW(), consent_version = '1.0'
+        WHERE id = $2
+      `, [uid, user.id]);
     } else {
-      await db.query(`
-        UPDATE users SET password_hash = $1 WHERE email = $2 AND role = $3
-      `, [passwordHash, invitation.email, invitation.role]);
+      await db.query(`UPDATE users SET firebase_uid = $1 WHERE id = $2`, [uid, user.id]);
     }
-
-    // Get the user ID
-    const user = await db.getOne('SELECT id FROM users WHERE email = $1', [invitation.email]);
 
     // Audit log consent
     audit.log(req, 'health_data_consent', 'user', user.id, { consent_version: '1.0' });

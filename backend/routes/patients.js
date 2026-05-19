@@ -216,7 +216,7 @@ router.get('/', requireRole('clinician'), async (req, res) => {
     const patients = await db.getAll(`
       SELECT id, email, role, name, dob, phone, address, created_at,
              cliniko_patient_id, cliniko_synced_at,
-             (password_hash IS NULL) AS pending_setup
+             (password_hash IS NULL AND firebase_uid IS NULL) AS pending_setup
       FROM users
       WHERE role = 'patient'
       ORDER BY created_at DESC
@@ -384,7 +384,7 @@ router.get('/:patientId', requirePatientAccess, async (req, res) => {
     const patient = await db.getOne(`
       SELECT id, email, role, name, dob, phone, address, created_at,
              cliniko_patient_id, cliniko_synced_at,
-             (password_hash IS NULL) AS pending_setup
+             (password_hash IS NULL AND firebase_uid IS NULL) AS pending_setup
       FROM users
       WHERE id = $1 AND role = 'patient'
     `, [patientId]);

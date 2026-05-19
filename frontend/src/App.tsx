@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Sparkles } from 'lucide-react';
-import { Routes, Route, useSearchParams, useNavigate } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import type { Patient, ProgramExercise, ProgramConfig, UserRole, NewPatient, CompletionData, User, ExerciseWeekPrescription } from './types/index.ts';
 import { LoginPage } from './components/LoginPage';
 import { SetupPasswordPage } from './components/SetupPasswordPage';
@@ -19,7 +19,6 @@ import { ProgramConfigModal } from './components/modals/ProgramConfigModal';
 import { ProgramView } from './components/ProgramView';
 import { NotificationModal } from './components/modals/NotificationModal';
 import { ConfirmModal } from './components/modals/ConfirmModal';
-import { ResetPasswordModal } from './components/modals/ResetPasswordModal';
 import { BlockBuilderModal } from './components/modals/BlockBuilderModal';
 import { ProgramTemplateModal } from './components/modals/ProgramTemplateModal';
 import { ChangePasswordModal } from './components/modals/ChangePasswordModal';
@@ -37,7 +36,9 @@ import FloatingRecordingIndicator from './components/scribe/FloatingRecordingInd
 import { AiProtocolModal } from './components/modals/AiProtocolModal';
 import { BugReportModal } from './components/modals/BugReportModal';
 import { API_URL } from './config';
-import { getAuthHeaders, setToken, clearAuth, setStoredUser, getToken } from './utils/api';
+import { getAuthHeaders, clearAuth, setStoredUser } from './utils/api';
+import { auth, setCachedToken } from './lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { toLocalDateString } from './utils/date.ts';
 import { useCapacitorBackButton } from './hooks/useCapacitorBackButton';
 
@@ -177,51 +178,68 @@ function App() {
 
   useCapacitorBackButton(handleBackButton);
 
-  // Session restoration on mount
+  // Session restoration on mount — driven by Firebase auth state.
+  // Firebase persists the session in IndexedDB; onAuthStateChanged fires
+  // once the SDK has resolved whether a user is signed in.
   useEffect(() => {
-    const restoreSession = async () => {
-      const token = getToken();
-      if (!token) {
+    let cancelled = false;
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (cancelled) return;
+
+      if (!firebaseUser) {
+        setCachedToken(null);
         setIsRestoringSession(false);
         return;
       }
 
+      // Seed the token cache from the freshly-loaded user before any sync
+      // reader (getAuthHeaders) runs. Avoids a race where onIdTokenChanged
+      // fired with null earlier in the page lifecycle.
       try {
-        const response = await fetch(`${API_URL}/auth/me`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const token = await firebaseUser.getIdToken();
+        setCachedToken(token);
+      } catch {
+        setIsRestoringSession(false);
+        return;
+      }
+      if (cancelled) return;
+
+      try {
+        const response = await fetch(`${API_URL}/auth/me`, { headers: getAuthHeaders() });
 
         if (response.ok) {
           const data = await response.json();
           const user = data.user;
 
           if (user.role === 'patient') {
-            // Fetch patient data
-            const patientResponse = await fetch(`${API_URL}/patients/${user.id}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const patientResponse = await fetch(`${API_URL}/patients/${user.id}`, { headers: getAuthHeaders() });
             if (patientResponse.ok) {
               const patientData = await patientResponse.json();
-              setLoggedInPatient(patientData);
+              if (!cancelled) setLoggedInPatient(patientData);
             }
-            setUserRole('patient');
+            if (!cancelled) setUserRole('patient');
           } else {
-            setLoggedInUser({ id: user.id, email: user.email, name: user.name, phone: user.phone, role: 'clinician', isAdmin: !!user.is_admin, defaultLocationId: user.default_location_id, locationName: user.location_name });
-            setUserRole('clinician');
+            if (!cancelled) {
+              setLoggedInUser({ id: user.id, email: user.email, name: user.name, phone: user.phone, role: 'clinician', isAdmin: !!user.is_admin, defaultLocationId: user.default_location_id, locationName: user.location_name });
+              setUserRole('clinician');
+            }
           }
-          setIsLoggedIn(true);
+          if (!cancelled) setIsLoggedIn(true);
         } else {
-          // Token invalid/expired
           clearAuth();
         }
       } catch {
         clearAuth();
       }
 
-      setIsRestoringSession(false);
-    };
+      if (!cancelled) setIsRestoringSession(false);
+    });
 
-    restoreSession();
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   // Fetch patients from database
@@ -296,10 +314,9 @@ function App() {
   }, [patients]);
 
   // Handlers
-  const handleLogin = (role: UserRole, patient?: Patient, user?: User, token?: string) => {
-    if (token) {
-      setToken(token);
-    }
+  // Firebase manages the token automatically once signInWithEmailAndPassword
+  // succeeds; LoginPage no longer passes one in.
+  const handleLogin = (role: UserRole, patient?: Patient, user?: User) => {
     setIsLoggedIn(true);
     setUserRole(role);
     if (patient) {
@@ -830,20 +847,6 @@ function App() {
     }
   };
 
-  // Check for reset password token in URL
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const resetToken = searchParams.get('token');
-  const isResetPasswordPage = window.location.pathname === '/reset-password';
-
-  const handleResetPasswordClose = () => {
-    navigate('/', { replace: true });
-  };
-
-  const handleResetPasswordSuccess = () => {
-    setNotification({ message: 'Password reset successfully! You can now log in.', type: 'success' });
-  };
-
   // Show loading while restoring session
   if (isRestoringSession) {
     return (
@@ -861,17 +864,8 @@ function App() {
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/setup-password" element={<SetupPasswordPage />} />
-          <Route path="/reset-password" element={<LoginPage onLogin={handleLogin} />} />
           <Route path="/" element={<LoginPage onLogin={handleLogin} />} />
         </Routes>
-        {/* Show reset password modal if token is present */}
-        {isResetPasswordPage && resetToken && (
-          <ResetPasswordModal
-            token={resetToken}
-            onClose={handleResetPasswordClose}
-            onSuccess={handleResetPasswordSuccess}
-          />
-        )}
       </>
     );
   }

@@ -1,12 +1,12 @@
 /**
  * WebSocket route for real-time audio transcription.
- * Browser sends audio chunks → Deepgram Nova-2 → returns transcript fragments.
+ * Browser sends audio chunks → AWS Transcribe Streaming → transcript fragments.
  * Processed in ap-southeast-2 (Sydney). PHI stays in Australia.
  *
- * Also drives live clinical suggestions (Nova Lite + Claude Sonnet 4.6).
+ * Also drives live clinical suggestions via Claude.
  */
-const jwt = require('jsonwebtoken');
 const db = require('../database/db');
+const { verifyTokenAnyMode } = require('../middleware/auth');
 const { createLiveTranscription } = require('../services/scribe-transcribe');
 const { getPatientSummary } = require('../services/scribe-summary');
 const { generateSuggestion } = require('../services/scribe-suggestions');
@@ -19,13 +19,16 @@ const SUGGESTION_COOLDOWN_MS = 60_000;
 
 function registerScribeTranscriptionWs(app) {
   app.ws('/ws/scribe/transcribe', async (ws, req) => {
-    // Authenticate via query param token (same JWT as HTTP requests)
+    // Authenticate via query param token — dual-mode (Identity Platform RS256
+    // or legacy HS256 JWT), same as HTTP routes via middleware/auth.
     const token = req.query.token;
     if (!token) { ws.close(4001, 'Authentication required'); return; }
 
     let user;
     try {
-      user = jwt.verify(token, process.env.JWT_SECRET);
+      // Skip the revocation check — WS sessions are short-lived and the
+      // ~100-400ms HTTP round-trip dominates Record-button latency.
+      user = await verifyTokenAnyMode(token, { checkRevoked: false });
     } catch {
       ws.close(4001, 'Invalid token');
       return;

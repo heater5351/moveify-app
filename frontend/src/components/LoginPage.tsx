@@ -1,10 +1,13 @@
 import { useState } from 'react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import type { Patient, UserRole, User } from '../types/index.ts';
 import { API_URL } from '../config';
+import { auth, setSessionPersistence, setCachedToken } from '../lib/firebase';
+import { getAuthHeaders } from '../utils/api';
 import { ForgotPasswordModal } from './modals/ForgotPasswordModal';
 
 interface LoginPageProps {
-  onLogin: (role: UserRole, patient?: Patient, user?: User, token?: string) => void;
+  onLogin: (role: UserRole, patient?: Patient, user?: User) => void;
 }
 
 export const LoginPage = ({ onLogin }: LoginPageProps) => {
@@ -15,98 +18,68 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
-  // Helper function to retry fetch with exponential backoff
-  const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 2) => {
-    for (let i = 0; i <= maxRetries; i++) {
-      try {
-        const response = await fetch(url, options);
-        return response;
-      } catch (error: unknown) {
-        const err = error as Error;
-        if (i < maxRetries && (err.name === 'AbortError' || err.message.includes('fetch'))) {
-          const delay = Math.min(1000 * Math.pow(2, i), 3000);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          continue;
-        }
-        throw error;
-      }
-    }
-    throw new Error('Max retries exceeded');
-  };
-
   const handleLoginSubmit = async () => {
     setLoginError('');
     setIsLoading(true);
 
     try {
-      const response = await fetchWithRetry(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, rememberMe }),
-      });
+      // Persistence — local (survives tab close) if rememberMe, else session-only
+      await setSessionPersistence(rememberMe);
 
-      const data = await response.json();
+      // Identity Platform sign-in. Seed the in-memory token cache directly
+      // from the signed-in user so the immediate /me call below has it.
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const idToken = await credential.user.getIdToken();
+      setCachedToken(idToken);
 
-      if (response.ok) {
-        const user = data.user;
-        const token = data.token;
+      // Fetch user row from backend (role, id, is_admin, etc.)
+      const meResponse = await fetch(`${API_URL}/auth/me`, { headers: getAuthHeaders() });
+      if (!meResponse.ok) {
+        throw new Error('Failed to load user profile');
+      }
+      const { user } = await meResponse.json();
 
-        if (user.role === 'patient') {
-          // Fetch THIS patient's full data including assigned program
-          try {
-            const patientController = new AbortController();
-            const patientTimeoutId = setTimeout(() => patientController.abort(), 15000);
-
-            const patientResponse = await fetchWithRetry(`${API_URL}/patients/${user.id}`, {
-              signal: patientController.signal,
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            clearTimeout(patientTimeoutId);
-
-            if (patientResponse.ok) {
-              const patientWithProgram = await patientResponse.json();
-              onLogin('patient', patientWithProgram, undefined, token);
-            } else {
-              throw new Error('Failed to fetch patient data');
-            }
-          } catch {
-            // Fallback: create patient object without program
-            const patient: Patient = {
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              dob: user.dob || '',
-              age: user.dob ? (() => { const d = new Date(user.dob), t = new Date(), a = t.getFullYear() - d.getFullYear(), m = t.getMonth() - d.getMonth(); return (m < 0 || (m === 0 && t.getDate() < d.getDate())) ? a - 1 : a; })() : 0,
-              phone: user.phone || '',
-              address: user.address || '',
-              dateAdded: user.created_at,
-              assignedPrograms: []
-            };
-            onLogin('patient', patient, undefined, token);
+      if (user.role === 'patient') {
+        try {
+          const patientResponse = await fetch(`${API_URL}/patients/${user.id}`, { headers: getAuthHeaders() });
+          if (patientResponse.ok) {
+            const patientWithProgram = await patientResponse.json();
+            onLogin('patient', patientWithProgram);
+            return;
           }
-        } else {
-          // Clinician login
-          const clinicianUser: User = {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: 'clinician',
-            isAdmin: !!user.is_admin
-          };
-          onLogin('clinician', undefined, clinicianUser, token);
-        }
+        } catch { /* fall through to minimal patient */ }
+        const patient: Patient = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          dob: user.dob || '',
+          age: user.dob ? (() => { const d = new Date(user.dob), t = new Date(), a = t.getFullYear() - d.getFullYear(), m = t.getMonth() - d.getMonth(); return (m < 0 || (m === 0 && t.getDate() < d.getDate())) ? a - 1 : a; })() : 0,
+          phone: user.phone || '',
+          address: user.address || '',
+          dateAdded: user.created_at,
+          assignedPrograms: []
+        };
+        onLogin('patient', patient);
       } else {
-        setLoginError(data.error || 'Invalid email or password');
+        const clinicianUser: User = {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: 'clinician',
+          isAdmin: !!user.is_admin
+        };
+        onLogin('clinician', undefined, clinicianUser);
       }
     } catch (error: unknown) {
-      const err = error as Error;
-      if (err.name === 'AbortError') {
-        setLoginError('Login timed out. The server may be slow or unavailable. Please try again.');
-      } else if (err.message === 'Max retries exceeded') {
-        setLoginError('Connection failed after multiple attempts. Please check your internet connection.');
+      const err = error as { code?: string; message?: string };
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+        setLoginError('Invalid email or password');
+      } else if (err.code === 'auth/too-many-requests') {
+        setLoginError('Too many failed attempts. Please try again later.');
+      } else if (err.code === 'auth/network-request-failed') {
+        setLoginError('Network error. Please check your connection and try again.');
       } else {
-        setLoginError('Connection error. Please make sure the server is running and try again.');
+        setLoginError(err.message || 'Sign-in failed. Please try again.');
       }
     } finally {
       setIsLoading(false);

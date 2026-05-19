@@ -115,9 +115,7 @@ function wrapEmail(content) {
 </html>`;
 }
 
-async function sendPasswordResetEmail(toEmail, resetToken) {
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-
+async function sendPasswordResetEmail(toEmail, resetUrl) {
   const htmlBody = wrapEmail(`
     <h2 style="margin: 0 0 12px 0; font-size: 20px; font-weight: 700; color: #132232;">Reset your password</h2>
     <p style="margin: 0 0 24px 0; font-size: 14px; color: #64748b; line-height: 1.7;">

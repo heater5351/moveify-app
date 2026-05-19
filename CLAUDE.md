@@ -22,7 +22,7 @@ Moveify is a clinical exercise prescription and patient management platform (sim
 - `frontend/` — React 19 + TypeScript + Vite SPA
 - `backend/` — Node.js + Express + PostgreSQL API
 - `billing-worker/` — separate Cloud Run service consuming Stripe webhooks and Tyro CSVs, writing to Xero. See `billing-worker/HANDOVER.md` for internals.
-- `clinic-website/` — marketing site (independent)
+- `clinic-website/` — marketing site (independent). **Source lives on the `clinic-website` branch, NOT `dev`/`main`.** See "Clinic Website" section below.
 
 ### Frontend Stack
 
@@ -397,6 +397,21 @@ Moveify stores **sensitive health information** (patient demographics, condition
 - **Always validate authorization** before returning patient data — a patient must only see their own data; any clinician can access any patient
 - **Treat all patient-facing endpoints as security-critical** — validate input, sanitize output, check roles
 - **Do not add analytics, tracking, or third-party scripts** that could access patient health data without explicit legal review
+
+## Clinic Website
+
+The marketing site at **https://www.moveifyhealth.com** lives on its own orphan-style branch `clinic-website` (not on `dev` or `main`). It is a static Tailwind site deployed by Vercel, separate from the patient app.
+
+**To work on it:** use the existing git worktree at `../moveify-clinic-website` (sibling to this repo). Editing the `clinic-website/` directory on `dev` will not affect the live site — that directory on `dev` is empty/stale by design.
+
+- Homepage HTML: `clinic-website/tailwind css template/index.html`
+- Privacy policy: `clinic-website/tailwind css template/privacy-policy.html`
+- Copy reference doc: `clinic-website/COPY.md` (canonical source for homepage copy rewrites)
+- Vercel config: `clinic-website/vercel.json` (routes `/(.*)` → `tailwind css template/$1`)
+
+**Deploy:** push to `origin/clinic-website` → Vercel auto-deploys. No backend redeploy needed.
+
+If the worktree is missing, recreate with: `git worktree add ../moveify-clinic-website clinic-website`
 
 ## Workflow
 

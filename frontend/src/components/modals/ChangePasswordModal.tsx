@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, Eye, EyeOff } from 'lucide-react';
-import { API_URL } from '../../config';
-import { getAuthHeaders } from '../../utils/api';
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
 
 type ChangePasswordModalProps = {
   onClose: () => void;
@@ -38,22 +38,33 @@ export const ChangePasswordModal = ({ onClose, onSuccess }: ChangePasswordModalP
     setIsSubmitting(true);
 
     try {
-      const res = await fetch(`${API_URL}/auth/change-password`, {
-        method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ currentPassword, newPassword })
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        onSuccess();
-        onClose();
-      } else {
-        setError(data.error || 'Failed to change password');
+      const user = auth.currentUser;
+      if (!user || !user.email) {
+        setError('You are not signed in.');
+        return;
       }
-    } catch {
-      setError('Connection error. Please try again.');
+
+      // Re-prove the current password before changing it (Firebase requires
+      // a recent credential to update password).
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, newPassword);
+
+      onSuccess();
+      onClose();
+    } catch (err: unknown) {
+      const e = err as { code?: string; message?: string };
+      if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+        setError('Current password is incorrect');
+      } else if (e.code === 'auth/weak-password') {
+        setError('New password is too weak. Use at least 8 characters.');
+      } else if (e.code === 'auth/too-many-requests') {
+        setError('Too many attempts. Please try again later.');
+      } else if (e.code === 'auth/network-request-failed') {
+        setError('Network error. Please check your connection.');
+      } else {
+        setError(e.message || 'Failed to change password');
+      }
     } finally {
       setIsSubmitting(false);
     }
