@@ -47,14 +47,14 @@ function isLikelyIdentityPlatformToken(token) {
   return decoded.header.alg === 'RS256' && !!decoded.header.kid;
 }
 
-async function verifyIdentityPlatformToken(token) {
+async function verifyIdentityPlatformToken(token, { checkRevoked = true } = {}) {
   const ipAuth = identityPlatform.auth();
   if (!ipAuth) {
     const err = new Error('Identity Platform not configured');
     err.code = 'IP_DISABLED';
     throw err;
   }
-  const decoded = await ipAuth.verifyIdToken(token, true /* checkRevoked */);
+  const decoded = await ipAuth.verifyIdToken(token, checkRevoked);
 
   // Map IP uid → local users row to get id/role/is_admin. Fall back to email
   // lookup so newly-imported users (where firebase_uid backfill ran but the
@@ -90,10 +90,15 @@ function verifyLegacyToken(token) {
 /**
  * Verify a bearer token in either Identity Platform or legacy JWT mode.
  * Reusable outside Express (e.g. WebSocket handlers). Throws on failure.
+ *
+ * `checkRevoked` defaults to true (extra HTTP roundtrip to Firebase to
+ * confirm the token hasn't been revoked). Set to false for short-lived
+ * contexts like WebSocket session establishment where the 100-400ms
+ * cost outweighs the security gain.
  */
-async function verifyTokenAnyMode(token) {
+async function verifyTokenAnyMode(token, { checkRevoked = true } = {}) {
   if (isLikelyIdentityPlatformToken(token) && identityPlatform.isEnabled()) {
-    return await verifyIdentityPlatformToken(token);
+    return await verifyIdentityPlatformToken(token, { checkRevoked });
   }
   return verifyLegacyToken(token);
 }

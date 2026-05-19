@@ -1,9 +1,9 @@
 /**
  * WebSocket route for real-time audio transcription.
- * Browser sends audio chunks → Deepgram Nova-2 → returns transcript fragments.
+ * Browser sends audio chunks → AWS Transcribe Streaming → transcript fragments.
  * Processed in ap-southeast-2 (Sydney). PHI stays in Australia.
  *
- * Also drives live clinical suggestions (Nova Lite + Claude Sonnet 4.6).
+ * Also drives live clinical suggestions via Claude.
  */
 const db = require('../database/db');
 const { verifyTokenAnyMode } = require('../middleware/auth');
@@ -26,7 +26,9 @@ function registerScribeTranscriptionWs(app) {
 
     let user;
     try {
-      user = await verifyTokenAnyMode(token);
+      // Skip the revocation check — WS sessions are short-lived and the
+      // ~100-400ms HTTP round-trip dominates Record-button latency.
+      user = await verifyTokenAnyMode(token, { checkRevoked: false });
     } catch {
       ws.close(4001, 'Invalid token');
       return;
