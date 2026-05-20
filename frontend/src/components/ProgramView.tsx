@@ -3,9 +3,22 @@ import { ArrowLeft, MoreVertical, ChevronLeft, ChevronRight, Pause, Info, Play, 
 import type { AssignedProgram, BlockStatusResponse, BlockWeekRow } from '../types/index.ts';
 import { formatDuration, getExerciseType } from '../utils/duration';
 import { exercises as defaultExercises } from '../data/exercises';
-import { LazyVideoCard } from './LazyVideoCard';
+import { LazyVideoCard, getThumbnailUrl } from './LazyVideoCard';
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
+
+const POSTER_VERSION = 1;
+const getPosterUrl = (videoUrl: string) => `${videoUrl}-poster.jpg?v=${POSTER_VERSION}`;
+
+// Resolves to the URL if loadable, else null. Uses Image() so CORS isn't required for the probe.
+function probeImage(url: string): Promise<string | null> {
+  return new Promise(resolve => {
+    const img = new globalThis.Image();
+    img.onload = () => resolve(url);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
 
 interface ProgramViewProps {
   program: AssignedProgram;
@@ -107,6 +120,63 @@ export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, on
     }
   };
 
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    setShowActionsMenu(false);
+    setPdfLoading(true);
+    try {
+      const [{ pdf }, { ProgramPDF }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./ProgramPDF'),
+      ]);
+
+      // Resolve poster → thumbnail → null for each exercise (parallel).
+      const entries = await Promise.all(
+        program.exercises.map(async (ex, idx) => {
+          const key = `${ex.id}-${idx}`;
+          const videoUrl = getVideoUrl(ex);
+          if (!videoUrl) return [key, null] as const;
+          const poster = await probeImage(getPosterUrl(videoUrl));
+          if (poster) return [key, poster] as const;
+          const thumb = await probeImage(getThumbnailUrl(videoUrl));
+          return [key, thumb] as const;
+        })
+      );
+      const imageUrls = Object.fromEntries(entries);
+
+      const logoUrl = `${window.location.origin}/assets/moveify-logo.png`;
+      const generatedDate = new Date().toLocaleDateString('en-AU', {
+        day: 'numeric', month: 'short', year: 'numeric',
+      });
+
+      const blob = await pdf(
+        <ProgramPDF
+          program={program}
+          patientName={patientName}
+          logoUrl={logoUrl}
+          imageUrls={imageUrls}
+          generatedDate={generatedDate}
+        />
+      ).toBlob();
+
+      const safeName = (program.config.name || 'program').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${patientName.replace(/\s+/g, '-')}-${safeName}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('PDF generation failed', err);
+      alert('Could not generate PDF. Please try again.');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   const renderPrescription = (exercise: typeof program.exercises[0]) => {
     const exType = getExerciseType(exercise);
     if (exType === 'cardio') {
@@ -146,6 +216,13 @@ export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, on
           </button>
           {showActionsMenu && (
             <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg ring-1 ring-slate-200 py-1 w-44 z-10">
+              <button
+                onClick={handleDownloadPdf}
+                disabled={pdfLoading}
+                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {pdfLoading ? 'Generating…' : 'Download PDF'}
+              </button>
               <button
                 onClick={() => { setShowActionsMenu(false); onDuplicate(); }}
                 className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
