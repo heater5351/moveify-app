@@ -88,7 +88,7 @@ async function main() {
 
       const duration = probeDuration(videoPath);
       const t1 = (duration * 0.25).toFixed(2);
-      const t2 = (duration * 0.75).toFixed(2);
+      const t2 = (duration * 0.60).toFixed(2);
 
       // HDR tonemap chain matches generate-thumbnails.js — handles iPhone HLG/DV
       // source while being a no-op on SDR. See that file for chain rationale.

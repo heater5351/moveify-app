@@ -1,6 +1,15 @@
 import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
 import type { AssignedProgram, ProgramExercise } from '../types/index.ts';
 import { formatDuration, getExerciseType } from '../utils/duration';
+import { exercises as defaultExercises } from '../data/exercises';
+
+// name → static library description (canonical movement cues). Built once at module load.
+const libraryDescriptionMap = new Map<string, string>();
+for (const ex of defaultExercises) {
+  if (ex.description) libraryDescriptionMap.set(ex.name.toLowerCase(), ex.description);
+}
+const getLibraryCues = (exercise: ProgramExercise): string =>
+  exercise.description || libraryDescriptionMap.get(exercise.name.toLowerCase()) || '';
 
 const styles = StyleSheet.create({
   page: { padding: 32, fontSize: 10, fontFamily: 'Helvetica', color: '#1e293b' },
@@ -15,7 +24,10 @@ const styles = StyleSheet.create({
   right: { width: '60%' },
   exerciseName: { fontSize: 12, fontWeight: 'bold', color: '#132232', marginBottom: 4 },
   prescription: { fontSize: 11, color: '#46c1c0', fontWeight: 'bold', marginBottom: 6 },
-  instructions: { fontSize: 9, color: '#475569', lineHeight: 1.4 },
+  instructions: { fontSize: 9, color: '#475569', lineHeight: 1.4, marginTop: 4 },
+  cuesLabel: { fontSize: 8, fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 6, marginBottom: 2 },
+  cues: { fontSize: 9, color: '#475569', lineHeight: 1.4 },
+  notesLabel: { fontSize: 8, fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 6, marginBottom: 2 },
   poster: { width: '100%', objectFit: 'contain' },
   placeholder: { width: '100%', height: 90, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center' },
   placeholderText: { fontSize: 9, color: '#94a3b8' },
@@ -74,13 +86,23 @@ export const ProgramPDF = ({ program, patientName, logoUrl, imageUrls, generated
       {program.exercises.map((ex, idx) => {
         const key = `${ex.id}-${idx}`;
         const imgUrl = imageUrls[key];
+        const cues = getLibraryCues(ex);
         return (
           <View key={key} style={styles.row} wrap={false}>
             <View style={styles.left}>
               <Text style={styles.exerciseName}>{ex.name}</Text>
               <Text style={styles.prescription}>{describePrescription(ex)}</Text>
+              {cues ? (
+                <>
+                  <Text style={styles.cuesLabel}>How to do it</Text>
+                  <Text style={styles.cues}>{cues}</Text>
+                </>
+              ) : null}
               {ex.instructions ? (
-                <Text style={styles.instructions}>{ex.instructions}</Text>
+                <>
+                  <Text style={styles.notesLabel}>Notes from your clinician</Text>
+                  <Text style={styles.instructions}>{ex.instructions}</Text>
+                </>
               ) : null}
             </View>
             <View style={styles.right}>

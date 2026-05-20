@@ -9,7 +9,7 @@ import { getAuthHeaders } from '../utils/api';
 
 // Bump this when bucket CORS or poster contents change — forces fresh-origin
 // fetch and bypasses any stale GCS edge cache lacking CORS response headers.
-const PDF_ASSET_VERSION = 2;
+const PDF_ASSET_VERSION = 3;
 const getPdfPosterUrl = (videoUrl: string) => `${videoUrl}-poster.jpg?v=${PDF_ASSET_VERSION}`;
 const getPdfThumbnailUrl = (videoUrl: string) => `${videoUrl}.jpg?v=${PDF_ASSET_VERSION}`;
 
