@@ -28,9 +28,10 @@ const FORCED_PATIENT_ID = PATIENT_ARG ? Number(PATIENT_ARG.split('=')[1]) : null
 
 const EMAIL = process.env.MOVEIFY_EMAIL;
 const PASSWORD = process.env.MOVEIFY_PASSWORD;
+const TOKEN = process.env.MOVEIFY_TOKEN;
 
-if (!EMAIL || !PASSWORD) {
-  console.error('Set MOVEIFY_EMAIL and MOVEIFY_PASSWORD env vars first.');
+if (!TOKEN && (!EMAIL || !PASSWORD)) {
+  console.error('Provide MOVEIFY_TOKEN OR both MOVEIFY_EMAIL and MOVEIFY_PASSWORD.');
   process.exit(1);
 }
 
@@ -120,14 +121,21 @@ const EXERCISES = [
 ];
 
 async function main() {
-  console.log('Logging in...');
-  const { token } = await api('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
-  });
+  let token = TOKEN;
+  if (!token) {
+    console.log('Logging in...');
+    const login = await api('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
+    });
+    token = login.token;
+  } else {
+    console.log('Using provided MOVEIFY_TOKEN.');
+  }
 
   console.log('Fetching patients...');
-  const patients = await api('/patients', {}, token);
+  const patientsRes = await api('/patients', {}, token);
+  const patients = Array.isArray(patientsRes) ? patientsRes : patientsRes.patients || [];
 
   if (LIST_ONLY) {
     for (const p of patients) console.log(`  ${p.id}\t${p.name}\t${p.email || ''}`);
