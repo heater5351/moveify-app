@@ -3,12 +3,15 @@ import { ArrowLeft, MoreVertical, ChevronLeft, ChevronRight, Pause, Info, Play, 
 import type { AssignedProgram, BlockStatusResponse, BlockWeekRow } from '../types/index.ts';
 import { formatDuration, getExerciseType } from '../utils/duration';
 import { exercises as defaultExercises } from '../data/exercises';
-import { LazyVideoCard, getThumbnailUrl } from './LazyVideoCard';
+import { LazyVideoCard } from './LazyVideoCard';
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
 
-const POSTER_VERSION = 1;
-const getPosterUrl = (videoUrl: string) => `${videoUrl}-poster.jpg?v=${POSTER_VERSION}`;
+// Bump this when bucket CORS or poster contents change — forces fresh-origin
+// fetch and bypasses any stale GCS edge cache lacking CORS response headers.
+const PDF_ASSET_VERSION = 2;
+const getPdfPosterUrl = (videoUrl: string) => `${videoUrl}-poster.jpg?v=${PDF_ASSET_VERSION}`;
+const getPdfThumbnailUrl = (videoUrl: string) => `${videoUrl}.jpg?v=${PDF_ASSET_VERSION}`;
 
 // Fetches the image as a base64 data URI so it can be embedded directly in the PDF,
 // bypassing any runtime fetch the PDF renderer would do (and any CORS quirks with it).
@@ -147,9 +150,9 @@ export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, on
           const key = `${ex.id}-${idx}`;
           const videoUrl = getVideoUrl(ex);
           if (!videoUrl) return [key, null] as const;
-          const poster = await fetchImageAsDataUri(getPosterUrl(videoUrl));
+          const poster = await fetchImageAsDataUri(getPdfPosterUrl(videoUrl));
           if (poster) return [key, poster] as const;
-          const thumb = await fetchImageAsDataUri(getThumbnailUrl(videoUrl));
+          const thumb = await fetchImageAsDataUri(getPdfThumbnailUrl(videoUrl));
           return [key, thumb] as const;
         })
       );
