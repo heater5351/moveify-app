@@ -1,0 +1,13 @@
+[
+  {
+    "origin": [
+      "https://www.moveifyapp.com",
+      "https://moveifyapp.com",
+      "https://moveify-app-git-dev-heater5351s-projects.vercel.app",
+      "http://localhost:5173"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type"],
+    "maxAgeSeconds": 3600
+  }
+]

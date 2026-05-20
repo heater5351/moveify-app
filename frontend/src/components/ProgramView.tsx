@@ -10,14 +10,23 @@ import { getAuthHeaders } from '../utils/api';
 const POSTER_VERSION = 1;
 const getPosterUrl = (videoUrl: string) => `${videoUrl}-poster.jpg?v=${POSTER_VERSION}`;
 
-// Resolves to the URL if loadable, else null. Uses Image() so CORS isn't required for the probe.
-function probeImage(url: string): Promise<string | null> {
-  return new Promise(resolve => {
-    const img = new globalThis.Image();
-    img.onload = () => resolve(url);
-    img.onerror = () => resolve(null);
-    img.src = url;
-  });
+// Fetches the image as a base64 data URI so it can be embedded directly in the PDF,
+// bypassing any runtime fetch the PDF renderer would do (and any CORS quirks with it).
+// Returns null if the image is missing or unfetchable.
+async function fetchImageAsDataUri(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('FileReader failed'));
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
 }
 
 interface ProgramViewProps {
@@ -131,15 +140,16 @@ export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, on
         import('./ProgramPDF'),
       ]);
 
-      // Resolve poster → thumbnail → null for each exercise (parallel).
+      // Resolve poster → thumbnail → null for each exercise (parallel). Inlines as
+      // data URIs so the PDF renderer doesn't need to re-fetch at render time.
       const entries = await Promise.all(
         program.exercises.map(async (ex, idx) => {
           const key = `${ex.id}-${idx}`;
           const videoUrl = getVideoUrl(ex);
           if (!videoUrl) return [key, null] as const;
-          const poster = await probeImage(getPosterUrl(videoUrl));
+          const poster = await fetchImageAsDataUri(getPosterUrl(videoUrl));
           if (poster) return [key, poster] as const;
-          const thumb = await probeImage(getThumbnailUrl(videoUrl));
+          const thumb = await fetchImageAsDataUri(getThumbnailUrl(videoUrl));
           return [key, thumb] as const;
         })
       );
