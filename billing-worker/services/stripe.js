@@ -112,7 +112,7 @@ async function getSubscriptionByClinikoId(clinikoId, patientEmail) {
 async function findSubscriptionsCoveringDate(clinikoId, patientEmail, patientName, dateIso) {
   const stripe = await getStripe();
   const targetMs = new Date(dateIso).getTime();
-  if (!Number.isFinite(targetMs)) return [];
+  if (!Number.isFinite(targetMs)) return { covering: [], reason: 'bad_date' };
 
   let customers = [];
 
@@ -179,7 +179,10 @@ async function findSubscriptionsCoveringDate(clinikoId, patientEmail, patientNam
 
   if (customers.length === 0) {
     logger.info({ cliniko_id: clinikoId, date: dateIso }, 'COVERAGE_DIAG: no candidate customers resolved');
-    return [];
+    // No Stripe customer resolvable yet — the patient may subscribe shortly
+    // after attending (link written by a later DD). Caller should keep this
+    // retryable rather than marking it permanently skipped.
+    return { covering: [], reason: 'no_customer' };
   }
 
   // 7-day grace period BEFORE sub.start_date — handles the common pattern of
@@ -212,7 +215,12 @@ async function findSubscriptionsCoveringDate(clinikoId, patientEmail, patientNam
       }
     }
   }
-  return covering;
+  // A Stripe customer exists but no subscription window covers this date
+  // (e.g. the appointment predates the patient's first subscription, or falls
+  // after cancellation). This is definitively a casual visit as far as the
+  // subscription poller is concerned — caller can mark it done so it stops
+  // being reconsidered, rather than flagging it as unresolved forever.
+  return { covering, reason: covering.length ? 'ok' : 'outside_window' };
 }
 
 // Returns the Stripe product name for a subscription (e.g. "T2 Progress")
