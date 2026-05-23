@@ -110,6 +110,13 @@ async function appendRow(table, pkColumn, row) {
 
 async function upsertContact(data) { return upsertRow('contacts', 'cliniko_id', data); }
 async function upsertStripeClinikoLink(data) { return upsertRow('stripe_cliniko_links', 'stripe_customer_id', data); }
+async function getStripeClinikoLinksByClinikoId(clinikoId) {
+  return getAll(
+    `SELECT stripe_customer_id, cliniko_id, match_method, linked_at
+     FROM stripe_cliniko_links WHERE cliniko_id = $1`,
+    [String(clinikoId)]
+  );
+}
 async function upsertInvoice(data) { return upsertRow('invoices', 'cliniko_id', data); }
 async function upsertAppointment(data) { return upsertRow('appointments', 'cliniko_id', data); }
 async function upsertPayment(data) { return upsertRow('payments', 'cliniko_id', data); }
@@ -283,6 +290,7 @@ module.exports = {
   // upserts
   upsertContact,
   upsertStripeClinikoLink,
+  getStripeClinikoLinksByClinikoId,
   upsertInvoice,
   upsertAppointment,
   upsertPayment,

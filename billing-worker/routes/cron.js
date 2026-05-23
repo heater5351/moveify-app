@@ -3,7 +3,6 @@
 const express = require('express');
 const router = express.Router();
 const { syncCliniko } = require('../jobs/sync-cliniko');
-const { ingestAnzCsv } = require('../jobs/ingest-anz');
 const { runReconciliation } = require('../jobs/reconcile');
 const { runDailySummary } = require('../jobs/daily-summary');
 const { processReferrals } = require('../jobs/process-referrals');
@@ -55,18 +54,6 @@ router.post('/sync-cliniko', async (req, res) => {
     res.json({ ok: true, counts });
   } catch (err) {
     log.error({ err: err.message }, 'sync-cliniko job failed');
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.post('/ingest-anz-csv', express.text({ type: 'text/csv', limit: '5mb' }), async (req, res) => {
-  const log = withCorrelation(req);
-  if (!req.body) return res.status(400).json({ error: 'Empty CSV body' });
-  try {
-    const result = await ingestAnzCsv(req.body, log);
-    res.json({ ok: true, ...result });
-  } catch (err) {
-    log.error({ err: err.message }, 'ingest-anz-csv job failed');
     res.status(500).json({ error: err.message });
   }
 });
@@ -135,6 +122,122 @@ router.post('/sweep-idempotency', async (req, res) => {
     res.json({ ok: true, removed });
   } catch (err) {
     log.error({ err: err.message }, 'sweep-idempotency failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// READ-ONLY audit: compares the backend billing DB against Xero and surfaces
+// likely replay/test cruft. Writes nothing. Logs PHI-safe (IDs, amounts,
+// invoice numbers, statuses — never names or health data). Optional
+// clinikoIds[] triggers a per-patient Xero-vs-backend deep dive.
+router.post('/billing-audit', express.json(), async (req, res) => {
+  const log = withCorrelation(req);
+  const { clinikoIds = [] } = req.body || {};
+  try {
+    const { getAll } = require('../db/pool');
+    const xero = require('../lib/xero');
+
+    // 1) Overall backend table health
+    const counts = {};
+    for (const t of ['stripe_payments', 'appointment_invoices', 'stripe_cliniko_links', 'reconciliation_flags', 'idempotency_keys']) {
+      const r = await getAll(`SELECT COUNT(*)::int AS n FROM ${t}`);
+      counts[t] = r[0].n;
+    }
+    const openFlags = await getAll(`SELECT type, COUNT(*)::int AS n FROM reconciliation_flags WHERE resolved_at IS NULL GROUP BY type ORDER BY n DESC`);
+    log.info({ counts, open_flags_by_type: openFlags }, 'AUDIT: backend table counts');
+
+    // 2) Duplicate / multiplicity detection
+    const dupApptInv = await getAll(`SELECT cliniko_appointment_id, COUNT(*)::int AS n FROM appointment_invoices GROUP BY cliniko_appointment_id HAVING COUNT(*) > 1 ORDER BY n DESC LIMIT 50`);
+    const dupStripeInv = await getAll(`SELECT stripe_invoice_id, COUNT(*)::int AS n FROM stripe_payments GROUP BY stripe_invoice_id HAVING COUNT(*) > 1 ORDER BY n DESC LIMIT 50`);
+    const multiLink = await getAll(`SELECT cliniko_id, COUNT(*)::int AS n FROM stripe_cliniko_links GROUP BY cliniko_id HAVING COUNT(*) > 1 ORDER BY n DESC LIMIT 50`);
+    log.info({
+      appt_invoices_with_dupes: dupApptInv.length,
+      stripe_invoices_with_dupes: dupStripeInv.length,
+      cliniko_ids_with_multiple_links: multiLink.length,
+      sample_dup_appt: dupApptInv.slice(0, 10),
+      sample_dup_stripe_inv: dupStripeInv.slice(0, 10),
+      sample_multi_link: multiLink.slice(0, 10),
+    }, 'AUDIT: backend multiplicity check');
+
+    // 3) Per-patient Xero-vs-backend deep dive
+    for (const cid of clinikoIds.map(String)) {
+      const sp = await getAll(`SELECT stripe_invoice_id, amount, pp_invoice_id, pp_amount, xero_overpayment_id, paid_at FROM stripe_payments WHERE cliniko_id = $1 ORDER BY paid_at`, [cid]);
+      const ai = await getAll(`SELECT cliniko_appointment_id, xero_invoice_number, casual_price, overpayment_allocated, gap_amount, appointment_date FROM appointment_invoices WHERE cliniko_patient_id = $1 ORDER BY appointment_date`, [cid]);
+      const links = await getAll(`SELECT stripe_customer_id, match_method FROM stripe_cliniko_links WHERE cliniko_id = $1`, [cid]);
+
+      let xeroState = { contact_found: false };
+      const contact = await xero.getContactByClinikoId(cid).catch((e) => { log.warn({ cid, err: e.message }, 'AUDIT: Xero contact lookup failed'); return null; });
+      if (contact) {
+        const invoices = await xero.getContactInvoices(contact.ContactID).catch(() => []);
+        const ops = await xero.getContactOverpayments(contact.ContactID).catch(() => []);
+        xeroState = {
+          contact_found: true,
+          xero_contact_id: contact.ContactID,
+          invoices: (invoices || []).map((i) => ({ num: i.InvoiceNumber, status: i.Status, total: i.Total, due: i.AmountDue })),
+          overpayments: (ops || []).map((o) => ({ id: o.overpaymentId, total: o.total, remaining: o.remaining })),
+        };
+      }
+
+      log.info({
+        cliniko_id: cid,
+        backend: {
+          stripe_payments: sp.length,
+          stripe_payments_amount_sum: sp.reduce((a, r) => a + Number(r.amount || 0), 0),
+          links: links.length,
+          appointment_invoices: ai.map((r) => ({ appt: r.cliniko_appointment_id, num: r.xero_invoice_number, price: r.casual_price, alloc: r.overpayment_allocated, gap: r.gap_amount, date: r.appointment_date })),
+          stripe_payment_rows: sp.map((r) => ({ inv: r.stripe_invoice_id, amt: r.amount, pp: r.pp_amount, op: r.xero_overpayment_id })),
+        },
+        xero: xeroState,
+      }, 'AUDIT: per-patient Xero-vs-backend');
+    }
+
+    res.json({ ok: true, counts });
+  } catch (err) {
+    log.error({ err: err.message }, 'billing-audit failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Targeted reprocess for appointments that were skipped before their patient's
+// Stripe link existed (poller link-store bug). Finds arrived individual
+// appointments since `since` for the given Cliniko patient IDs, clears ONLY
+// those appointment idempotency keys, rewinds the cursor, and runs the poller
+// once so they invoice + allocate the now-resolvable overpayment credit.
+// Scoped by patient ID so already-invoiced appointments for other patients in
+// the window keep their keys and are not re-billed.
+router.post('/reprocess-appointments', express.json(), async (req, res) => {
+  const log = withCorrelation(req);
+  const { clinikoPatientIds, since } = req.body || {};
+  if (!Array.isArray(clinikoPatientIds) || clinikoPatientIds.length === 0) {
+    return res.status(400).json({ error: 'clinikoPatientIds (non-empty array) required' });
+  }
+  if (!since || !Number.isFinite(new Date(since).getTime())) {
+    return res.status(400).json({ error: 'since (valid ISO timestamp) required' });
+  }
+  try {
+    const cliniko = require('../services/cliniko').finance;
+    const billingDb = require('../services/billing-db');
+    const targets = new Set(clinikoPatientIds.map(String));
+
+    const appts = await cliniko.getAppointmentsAll(since);
+    const keys = [];
+    const matched = [];
+    for (const a of appts) {
+      const pid = a.patient?.links?.self?.split('/').pop();
+      if (!targets.has(String(pid))) continue;
+      if (!a.patient_arrived || a.did_not_arrive || a.cancelled_at) continue;
+      keys.push(`appointment:${a.id}`);
+      matched.push({ appt_id: String(a.id), cliniko_patient_id: String(pid), starts_at: a.starts_at });
+    }
+
+    const removed = keys.length ? await billingDb.clearIdempotencyKeys({ keys }) : 0;
+    await billingDb.setWorkerState('cliniko_appointments_last_polled', since);
+    log.info({ matched_count: matched.length, keys_cleared: removed, since }, 'reprocess-appointments: cleared keys, running poller');
+
+    const stats = await pollClinikoAppointments(log);
+    res.json({ ok: true, matched, keys_cleared: removed, cursor_rewound_to: since, ...stats });
+  } catch (err) {
+    log.error({ err: err.message }, 'reprocess-appointments failed');
     res.status(500).json({ error: err.message });
   }
 });

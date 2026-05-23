@@ -116,20 +116,24 @@ async function findSubscriptionsCoveringDate(clinikoId, patientEmail, patientNam
 
   let customers = [];
 
-  // 1) Sheets-cached links written by stripe-handler when it successfully
-  // resolves a Stripe customer to a Cliniko patient. Carries the load when
-  // the Stripe API key is restricted (can't write customer.metadata).
+  // 1) Postgres-cached links written by stripe-handler (upsertStripeClinikoLink)
+  // when it resolves a Stripe customer to a Cliniko patient. Carries the load
+  // because the live Stripe key is restricted (can't write customer.metadata),
+  // so the metadata path below is usually empty. (Previously read a since-
+  // deleted Sheets module — the require threw and was silently swallowed,
+  // disabling this path entirely; see the Sheets→Postgres migration.)
   try {
-    const { getTab } = require('./sheets');
-    const links = await getTab('StripeClinikoLinks');
-    const matched = links.filter((r) => String(r.cliniko_id) === String(clinikoId));
-    for (const link of matched) {
+    const { getStripeClinikoLinksByClinikoId } = require('./billing-db');
+    const links = await getStripeClinikoLinksByClinikoId(clinikoId);
+    for (const link of links) {
       try {
         const c = await stripe.customers.retrieve(link.stripe_customer_id);
         if (c && !c.deleted) customers.push(c);
       } catch (_) { /* customer may have been deleted; ignore */ }
     }
-  } catch (_) { /* Sheets unavailable — fall through to other paths */ }
+  } catch (err) {
+    logger.warn({ err: err.message, cliniko_id: clinikoId }, 'Postgres link lookup failed — falling through to metadata/email');
+  }
 
   // 2) Trust explicit cliniko_id metadata on Stripe customers (in case
   // someone set it manually or a future write succeeds).
@@ -246,10 +250,54 @@ async function getProductNameFromInvoice(invoice) {
   return null;
 }
 
+// Resolves the Stripe processing fee for a paid invoice. Stripe nets this fee
+// out of the payout, so it must be booked as an expense for the Stripe clearing
+// account to reconcile against the (net) bank deposit. The fee comes from the
+// charge's balance_transaction. In AU, balance_transaction.fee is GST-inclusive.
+//
+// Returns { fee, currency, chargeId, balanceTransactionId } in dollars, or null
+// if the charge / balance transaction can't be resolved yet (some async payment
+// methods settle the balance transaction after the invoice.payment_succeeded
+// webhook — card payments expose it immediately, which is our case).
+async function getInvoiceFee(invoice) {
+  const stripe = await getStripe();
+
+  let chargeId = typeof invoice.charge === 'string'
+    ? invoice.charge
+    : invoice.charge?.id || null;
+
+  // Newer Stripe API versions drop invoice.charge — resolve via the payment intent.
+  if (!chargeId) {
+    const piId = typeof invoice.payment_intent === 'string'
+      ? invoice.payment_intent
+      : invoice.payment_intent?.id || null;
+    if (piId) {
+      const pi = await stripe.paymentIntents.retrieve(piId);
+      chargeId = typeof pi.latest_charge === 'string'
+        ? pi.latest_charge
+        : pi.latest_charge?.id || null;
+    }
+  }
+
+  if (!chargeId) return null;
+
+  const charge = await stripe.charges.retrieve(chargeId, { expand: ['balance_transaction'] });
+  const bt = charge.balance_transaction;
+  if (!bt || typeof bt === 'string') return null; // not settled yet
+
+  return {
+    fee: Number((bt.fee / 100).toFixed(2)),
+    currency: bt.currency,
+    chargeId,
+    balanceTransactionId: bt.id,
+  };
+}
+
 module.exports = {
   getStripe,
   constructWebhookEvent,
   getBalanceTransactions,
+  getInvoiceFee,
   getCharge,
   getCustomer,
   updateCustomerMetadata,

@@ -348,6 +348,43 @@ async function createPayment({ invoiceId, amount, date, accountCode, accountId, 
   return created.Payments[0].PaymentID;
 }
 
+// Posts a SPEND money bank transaction — used to book processor fees (e.g.
+// Stripe) that are netted out of a settlement before it reaches the bank. The
+// spend reduces the clearing account balance so it reconciles to the actual
+// (net) payout that lands on the bank feed. `amount` is GST-inclusive by
+// default (lineAmountTypes='Inclusive'); Xero splits the GST per `taxType`.
+async function createSpendTransaction({
+  contactId, bankAccountAccountId, bankAccountCode, amount, accountCode,
+  taxType = 'INPUT', date, reference, description, lineAmountTypes = 'Inclusive',
+}) {
+  if (!contactId || (!bankAccountAccountId && !bankAccountCode) || !amount || !accountCode) {
+    throw new Error('createSpendTransaction: contactId, bank account, amount, and accountCode required');
+  }
+  const bankAccount = bankAccountAccountId
+    ? { AccountID: bankAccountAccountId }
+    : { Code: bankAccountCode };
+
+  const created = await xeroFetch('POST', '/BankTransactions', {
+    BankTransactions: [{
+      Type: 'SPEND',
+      Contact: { ContactID: contactId },
+      BankAccount: bankAccount,
+      Date: date,
+      Reference: reference,
+      LineAmountTypes: lineAmountTypes,
+      LineItems: [{
+        Description: description || 'Merchant fee',
+        Quantity: 1,
+        UnitAmount: amount,
+        AccountCode: accountCode,
+        TaxType: taxType,
+      }],
+      Status: 'AUTHORISED',
+    }],
+  });
+  return created.BankTransactions[0].BankTransactionID;
+}
+
 async function createCreditNote({ contactId, lineItems, reference, date }) {
   if (!contactId) throw new Error('createCreditNote: contactId required');
   if (!Array.isArray(lineItems) || lineItems.length === 0) throw new Error('createCreditNote: lineItems required');
@@ -414,6 +451,13 @@ async function findContactByName(name) {
   return (data.Contacts || [])[0] || null;
 }
 
+// Read-only lookup of a Xero contact by Cliniko ID (stored as AccountNumber).
+// Unlike findOrCreateContact this never creates — returns null if not found.
+async function getContactByClinikoId(clinikoId) {
+  const data = await xeroFetch('GET', `/Contacts?where=${encodeURIComponent(`AccountNumber="${clinikoId}"`)}`);
+  return (data.Contacts || [])[0] || null;
+}
+
 async function getContactBankTransactions(contactId) {
   const where = encodeURIComponent(`Contact.ContactID=guid("${contactId}")`);
   const data = await xeroFetch('GET', `/BankTransactions?where=${where}`);
@@ -470,6 +514,7 @@ module.exports = {
   applyOverpayment,
   getContactOverpayments,
   createPayment,
+  createSpendTransaction,
   createCreditNote,
   applyCreditNote,
   getInvoice,
@@ -480,6 +525,7 @@ module.exports = {
   deleteBankTransaction,
   deleteOverpayment,
   findContactByName,
+  getContactByClinikoId,
   getContactBankTransactions,
   getContactInvoices,
 };

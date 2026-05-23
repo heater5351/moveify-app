@@ -238,7 +238,22 @@ async function processAppointment({ appt, patientCache, log, stats }) {
     if (!stats.skip_no_subscription_cliniko_ids.includes(String(clinikoPatientId))) {
       stats.skip_no_subscription_cliniko_ids.push(String(clinikoPatientId));
     }
-    await mark(idempKey);
+    // Deliberately DO NOT mark the idempotency key here. An appointment can be
+    // attended just before the patient's first DD lands (their subscription /
+    // Stripe link doesn't exist at poll time). If we marked it, it would be
+    // permanently skipped and the session would never invoice once the link
+    // appears — leaving the eventual overpayment credit unallocated. Leaving it
+    // unmarked lets a later poll (after the link is written) invoice it, and the
+    // flag below makes any that age out of the cursor window discoverable.
+    // The flag id is keyed by appt id, so ON CONFLICT DO NOTHING dedupes re-polls.
+    await flag(
+      'appointment_unresolved_subscription',
+      appt.id,
+      clinikoPatientId,
+      `Arrived appointment ${appt.id} on ${apptStartsAtIso.slice(0, 10)} — no Stripe subscription resolved at poll time. Will retry on later polls; reprocess if the patient later subscribes.`,
+      log,
+      'Left unmarked for retry — see poller no_subscription handling',
+    );
     return 'skipped';
   }
   if (covering.length > 1) {

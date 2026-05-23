@@ -6,6 +6,7 @@ const {
   getSubscription,
   getSubscriptionProductName,
   getProductNameFromInvoice,
+  getInvoiceFee,
 } = require('../services/stripe');
 const {
   getTab,
@@ -184,6 +185,93 @@ async function handleInvoicePaid(event, log) {
   return processInvoicePaid(event.data.object, { eventId: event.id, eventCreated: event.created, source: 'webhook' }, log);
 }
 
+const STRIPE_FEE_CONTACT_NAME = 'Stripe';
+let _stripeFeeContactId = null;
+async function getStripeFeeContactId() {
+  if (_stripeFeeContactId) return _stripeFeeContactId;
+  _stripeFeeContactId = await xero.findOrCreateContact({ name: STRIPE_FEE_CONTACT_NAME });
+  return _stripeFeeContactId;
+}
+
+/**
+ * Books the Stripe processing fee as a SPEND on the Stripe clearing account.
+ * Stripe nets the fee out of the payout, so the clearing account (which we
+ * credited with the GROSS amount via the overpayment) would otherwise carry a
+ * permanent residual equal to fees. This spend reduces the clearing balance to
+ * the net payout that actually lands on the bank feed, and books the fee to the
+ * Merchant Fees expense account (GST on Expenses — Stripe AU fees include GST).
+ *
+ * Best-effort: the overpayment (the revenue-critical record) is already
+ * committed when this runs. A failure here flags for manual follow-up rather
+ * than throwing — a throw would 500 the webhook, and on Stripe's retry the
+ * event idempotency key is already marked, so nothing re-runs (no duplicate
+ * overpayment, but also no retry of the fee). Flagging is the safe path.
+ */
+async function bookStripeFee({ invoice, clearingAccountId, paidAtDate, ctx, log }) {
+  // Feature switch: fee booking is OFF unless the account code is configured.
+  // Treated as a silent no-op (not a flag) so the feature can ship dormant and
+  // be enabled by setting the env var once validated.
+  const feeAccountCode = process.env.XERO_MERCHANT_FEES_ACCOUNT_CODE;
+  if (!feeAccountCode) {
+    log.debug({ invoice_id: invoice.id }, 'Stripe fee booking disabled (XERO_MERCHANT_FEES_ACCOUNT_CODE unset)');
+    return;
+  }
+
+  let feeInfo;
+  try {
+    feeInfo = await getInvoiceFee(invoice);
+  } catch (err) {
+    log.warn({ invoice_id: invoice.id, err: err.message }, 'Failed to resolve Stripe fee — leaving unbooked');
+    feeInfo = null;
+  }
+
+  if (!feeInfo || !feeInfo.fee || feeInfo.fee <= 0) {
+    await appendReconciliationFlag({
+      id: `stripe-fee-missing:${ctx.eventId}`,
+      type: 'stripe_fee_unbooked',
+      entity_id: invoice.id,
+      cliniko_state: '',
+      ledger_state: '',
+      diff: 'Could not resolve Stripe processing fee (charge/balance_transaction unavailable)',
+      resolved_at: '',
+      resolution: '',
+      notes: 'Clearing account will carry this fee as a residual until booked manually',
+      created_at: new Date().toISOString(),
+    });
+    return;
+  }
+
+  try {
+    const contactId = await getStripeFeeContactId();
+    const txnId = await xero.createSpendTransaction({
+      contactId,
+      bankAccountAccountId: clearingAccountId,
+      amount: feeInfo.fee,
+      accountCode: feeAccountCode,
+      taxType: process.env.XERO_MERCHANT_FEES_TAX_TYPE || 'BASEXCLUDED',
+      date: paidAtDate,
+      reference: `Stripe fee ${invoice.id}`,
+      description: `Stripe processing fee — ${feeInfo.chargeId}`,
+      lineAmountTypes: (process.env.XERO_MERCHANT_FEES_TAX_TYPE && process.env.XERO_MERCHANT_FEES_TAX_TYPE !== 'BASEXCLUDED') ? 'Inclusive' : 'NoTax',
+    });
+    log.info({ invoice_id: invoice.id, fee: feeInfo.fee, bank_txn_id: txnId }, 'Stripe fee booked to clearing account');
+  } catch (err) {
+    log.error({ invoice_id: invoice.id, fee: feeInfo.fee, err: err.message }, 'Stripe fee booking failed — clearing residual until resolved');
+    await appendReconciliationFlag({
+      id: `stripe-fee-fail:${ctx.eventId}`,
+      type: 'stripe_fee_unbooked',
+      entity_id: invoice.id,
+      cliniko_state: '',
+      ledger_state: `fee $${feeInfo.fee.toFixed(2)}`,
+      diff: `createSpendTransaction failed: ${err.message}`,
+      resolved_at: '',
+      resolution: '',
+      notes: '',
+      created_at: new Date().toISOString(),
+    });
+  }
+}
+
 /**
  * Replays a paid Stripe invoice into Xero. Drives both the live webhook path
  * (via handleInvoicePaid) and the historical backfill path. PHI hygiene: only
@@ -324,6 +412,12 @@ async function processInvoicePaid(invoice, ctx, log) {
     { cliniko_id: clinikoId, xero_contact_id: xeroContactId, xero_overpayment_id: overpaymentId, amount: amountDollars },
     'Xero overpayment created'
   );
+
+  // Book the Stripe processing fee against the clearing account. Stripe nets the
+  // fee from the payout, so without this the clearing account carries a residual
+  // equal to fees and never reconciles to the actual (net) bank deposit.
+  // Best-effort — flags rather than throws on failure (see bookStripeFee).
+  await bookStripeFee({ invoice, clearingAccountId, paidAtDate, ctx, log });
 
   // Maybe create P&P invoice for this cycle, allocating from the overpayment we just made
   const ppResult = await maybeCreatePpInvoice({

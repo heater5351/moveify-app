@@ -1,7 +1,7 @@
 {
   "name": "moveify-billing-worker",
   "version": "1.0.0",
-  "description": "Moveify billing automation worker — Stripe, NDIS/RTWSA, ANZ reconciliation",
+  "description": "Moveify billing automation worker — Stripe, NDIS/RTWSA, Tyro/Cliniko ingest",
   "main": "worker.js",
   "scripts": {
     "start": "node worker.js",
