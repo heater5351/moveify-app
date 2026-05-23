@@ -126,6 +126,29 @@ router.post('/sweep-idempotency', async (req, res) => {
   }
 });
 
+// Bulk-resolve open reconciliation flags by id or type. Used for housekeeping
+// (clearing noise flags after manual review). Sets resolved_at so they drop off
+// the open list; does NOT touch any Xero/invoice state.
+router.post('/resolve-flags', express.json(), async (req, res) => {
+  const log = withCorrelation(req);
+  const { ids, types, resolution = 'dismissed', notes = '' } = req.body || {};
+  if ((!Array.isArray(ids) || ids.length === 0) && (!Array.isArray(types) || types.length === 0)) {
+    return res.status(400).json({ error: 'ids[] or types[] required' });
+  }
+  try {
+    const { run } = require('../db/pool');
+    const now = new Date().toISOString();
+    const result = (Array.isArray(ids) && ids.length)
+      ? await run(`UPDATE reconciliation_flags SET resolved_at = $1, resolution = $2, notes = $3 WHERE id = ANY($4) AND resolved_at IS NULL`, [now, resolution, notes, ids])
+      : await run(`UPDATE reconciliation_flags SET resolved_at = $1, resolution = $2, notes = $3 WHERE type = ANY($4) AND resolved_at IS NULL`, [now, resolution, notes, types]);
+    log.info({ resolved: result.rowCount, types: types || null, ids: ids || null }, 'resolve-flags complete');
+    res.json({ ok: true, resolved: result.rowCount });
+  } catch (err) {
+    log.error({ err: err.message }, 'resolve-flags failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // READ-ONLY audit: compares the backend billing DB against Xero and surfaces
 // likely replay/test cruft. Writes nothing. Logs PHI-safe (IDs, amounts,
 // invoice numbers, statuses — never names or health data). Optional

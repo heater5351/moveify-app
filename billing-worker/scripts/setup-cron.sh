@@ -24,7 +24,9 @@ JOBS=(
   "billing-sync-cliniko|*/15 * * * *|/cron/sync-cliniko"
   "billing-poll-cliniko-appointments|*/15 * * * *|/cron/poll-cliniko-appointments"
   "process-referrals|*/15 * * * *|/cron/process-referrals"
-  "billing-reconcile|0 1 * * *|/cron/reconcile"
+  # billing-reconcile disabled 2026-05-23: it compared against Cliniko invoices,
+  # which are not a reliable source of truth. Rework to Xero<->backend if a
+  # reconciler is needed. (Live job paused via `gcloud scheduler jobs pause`.)
   "billing-daily-summary|30 1 * * *|/cron/daily-summary"
   "billing-ingest-tyro-drive|0 6 * * *|/cron/ingest-tyro-drive"
   "billing-sweep-idempotency|0 3 * * 0|/cron/sweep-idempotency"
