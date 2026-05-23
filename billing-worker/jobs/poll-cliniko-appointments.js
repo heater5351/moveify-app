@@ -22,6 +22,7 @@ const { getPpFee } = require('../lib/rates');
 const {
   appendAppointmentInvoice,
   appendReconciliationFlag,
+  getAppointmentInvoiceByApptId,
   getWorkerState,
   setWorkerState,
 } = require('../services/billing-db');
@@ -145,6 +146,20 @@ async function processAppointment({ appt, patientCache, log, stats }) {
   const idempKey = `appointment:${appt.id}`;
   if (await check(idempKey)) {
     log.debug({ appt_id: appt.id }, 'Appointment already processed — skipping');
+    return 'skipped';
+  }
+
+  // Defense-in-depth against duplicate invoicing. The idempotency key is the
+  // primary guard, but a manual reprocess (or cleared key) can bypass it — if
+  // we then re-invoice an appointment that already has a ledger invoice we
+  // create a duplicate (this happened once: a cleared key re-billed an
+  // already-paid session). Refuse to raise a second invoice for an appointment
+  // that already has one, and re-mark the key so it stops being reconsidered.
+  const existingInvoice = await getAppointmentInvoiceByApptId(appt.id).catch(() => null);
+  if (existingInvoice && existingInvoice.xero_invoice_number) {
+    stats.skip_already_invoiced = (stats.skip_already_invoiced || 0) + 1;
+    log.info({ appt_id: appt.id, xero_invoice_number: existingInvoice.xero_invoice_number }, 'Appointment already has a ledger invoice — skipping to avoid duplicate');
+    await mark(idempKey);
     return 'skipped';
   }
 

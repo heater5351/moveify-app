@@ -126,6 +126,13 @@ async function upsertReferral(data) { return upsertRow('referrals', 'gmail_messa
 async function appendTyroIngest(data) { return appendRow('tyro_ingest', 'transaction_id', data); }
 async function appendStripePayment(data) { return appendRow('stripe_payments', 'stripe_event_id', data); }
 async function appendAppointmentInvoice(data) { return appendRow('appointment_invoices', 'cliniko_appointment_id', data); }
+async function getAppointmentInvoiceByApptId(clinikoAppointmentId) {
+  return getOne(
+    `SELECT cliniko_appointment_id, xero_invoice_number, xero_invoice_id
+     FROM appointment_invoices WHERE cliniko_appointment_id = $1`,
+    [String(clinikoAppointmentId)]
+  );
+}
 async function appendActionRequired(data) { return appendRow('actions_required', 'id', data); }
 async function appendReconciliationFlag(data) { return appendRow('reconciliation_flags', 'id', data); }
 
@@ -301,6 +308,7 @@ module.exports = {
   appendTyroIngest,
   appendStripePayment,
   appendAppointmentInvoice,
+  getAppointmentInvoiceByApptId,
   appendReconciliationFlag,
   // state
   getWorkerState,
