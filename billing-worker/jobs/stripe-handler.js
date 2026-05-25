@@ -207,14 +207,22 @@ async function getStripeFeeContactId() {
  * event idempotency key is already marked, so nothing re-runs (no duplicate
  * overpayment, but also no retry of the fee). Flagging is the safe path.
  */
-async function bookStripeFee({ invoice, clearingAccountId, paidAtDate, ctx, log }) {
+async function bookStripeFee({ invoice, clearingAccountId, paidAtDate, ctx, log, dryRun = false }) {
   // Feature switch: fee booking is OFF unless the account code is configured.
   // Treated as a silent no-op (not a flag) so the feature can ship dormant and
   // be enabled by setting the env var once validated.
   const feeAccountCode = process.env.XERO_MERCHANT_FEES_ACCOUNT_CODE;
   if (!feeAccountCode) {
     log.debug({ invoice_id: invoice.id }, 'Stripe fee booking disabled (XERO_MERCHANT_FEES_ACCOUNT_CODE unset)');
-    return;
+    return { status: 'disabled', invoice_id: invoice.id };
+  }
+
+  // Fee-level idempotency: the live webhook and the historical backfill share
+  // this key, so a fee is booked at most once per invoice regardless of path.
+  const feeKey = `stripe-fee:${invoice.id}`;
+  if (await check(feeKey)) {
+    log.debug({ invoice_id: invoice.id }, 'Stripe fee already booked — skipping');
+    return { status: 'already_booked', invoice_id: invoice.id };
   }
 
   let feeInfo;
@@ -226,19 +234,26 @@ async function bookStripeFee({ invoice, clearingAccountId, paidAtDate, ctx, log 
   }
 
   if (!feeInfo || !feeInfo.fee || feeInfo.fee <= 0) {
-    await appendReconciliationFlag({
-      id: `stripe-fee-missing:${ctx.eventId}`,
-      type: 'stripe_fee_unbooked',
-      entity_id: invoice.id,
-      cliniko_state: '',
-      ledger_state: '',
-      diff: 'Could not resolve Stripe processing fee (charge/balance_transaction unavailable)',
-      resolved_at: '',
-      resolution: '',
-      notes: 'Clearing account will carry this fee as a residual until booked manually',
-      created_at: new Date().toISOString(),
-    });
-    return;
+    if (!dryRun) {
+      await appendReconciliationFlag({
+        id: `stripe-fee-missing:${ctx.eventId}`,
+        type: 'stripe_fee_unbooked',
+        entity_id: invoice.id,
+        cliniko_state: '',
+        ledger_state: '',
+        diff: 'Could not resolve Stripe processing fee (charge/balance_transaction unavailable)',
+        resolved_at: '',
+        resolution: '',
+        notes: 'Clearing account will carry this fee as a residual until booked manually',
+        created_at: new Date().toISOString(),
+      });
+    }
+    return { status: 'no_fee', invoice_id: invoice.id };
+  }
+
+  if (dryRun) {
+    log.info({ invoice_id: invoice.id, fee: feeInfo.fee, date: paidAtDate }, 'Stripe fee backfill (dry-run): would book');
+    return { status: 'would_book', invoice_id: invoice.id, fee: feeInfo.fee, date: paidAtDate };
   }
 
   try {
@@ -254,7 +269,9 @@ async function bookStripeFee({ invoice, clearingAccountId, paidAtDate, ctx, log 
       description: `Stripe processing fee — ${feeInfo.chargeId}`,
       lineAmountTypes: (process.env.XERO_MERCHANT_FEES_TAX_TYPE && process.env.XERO_MERCHANT_FEES_TAX_TYPE !== 'BASEXCLUDED') ? 'Inclusive' : 'NoTax',
     });
-    log.info({ invoice_id: invoice.id, fee: feeInfo.fee, bank_txn_id: txnId }, 'Stripe fee booked to clearing account');
+    await mark(feeKey);
+    log.info({ invoice_id: invoice.id, fee: feeInfo.fee, bank_txn_id: txnId, date: paidAtDate }, 'Stripe fee booked to clearing account');
+    return { status: 'booked', invoice_id: invoice.id, fee: feeInfo.fee, bank_txn_id: txnId };
   } catch (err) {
     log.error({ invoice_id: invoice.id, fee: feeInfo.fee, err: err.message }, 'Stripe fee booking failed — clearing residual until resolved');
     await appendReconciliationFlag({
@@ -269,7 +286,53 @@ async function bookStripeFee({ invoice, clearingAccountId, paidAtDate, ctx, log 
       notes: '',
       created_at: new Date().toISOString(),
     });
+    return { status: 'failed', invoice_id: invoice.id, error: err.message };
   }
+}
+
+/**
+ * Backfills Stripe processing fees for historical payments that were processed
+ * before fee booking was enabled. Walks the stripe_payments ledger (the set of
+ * real, already-processed payments), resolves each invoice's fee from Stripe,
+ * and books a SPEND to the merchant-fees account dated at the original payment.
+ * Idempotent via the shared `stripe-fee:<invoice>` key, so it is safe to re-run
+ * and will not collide with fees already booked by the live webhook path.
+ */
+async function backfillStripeFees({ since, until, dryRun = true }, log = logger) {
+  const clearingAccountId = process.env.XERO_STRIPE_CLEARING_ACCOUNT_ID;
+  if (!clearingAccountId) throw new Error('XERO_STRIPE_CLEARING_ACCOUNT_ID not set');
+  if (!process.env.XERO_MERCHANT_FEES_ACCOUNT_CODE) throw new Error('XERO_MERCHANT_FEES_ACCOUNT_CODE not set');
+
+  const { getStripe } = require('../services/stripe');
+  const { getAll } = require('../db/pool');
+  const stripe = await getStripe();
+
+  const rows = await getAll(
+    `SELECT stripe_invoice_id, paid_at FROM stripe_payments
+     WHERE stripe_invoice_id IS NOT NULL AND stripe_invoice_id <> ''
+       AND ($1::timestamptz IS NULL OR paid_at >= $1::timestamptz)
+       AND ($2::timestamptz IS NULL OR paid_at <= $2::timestamptz)
+     ORDER BY paid_at`,
+    [since || null, until || null]
+  );
+
+  const summary = { total: rows.length, booked: 0, would_book: 0, already_booked: 0, no_fee: 0, failed: 0, fee_sum: 0 };
+  for (const row of rows) {
+    let invoice;
+    try {
+      invoice = await stripe.invoices.retrieve(row.stripe_invoice_id);
+    } catch (err) {
+      summary.failed++;
+      log.warn({ stripe_invoice_id: row.stripe_invoice_id, err: err.message }, 'backfill-fees: invoice retrieve failed (test/deleted invoice?) — skipping');
+      continue;
+    }
+    const paidAtDate = (row.paid_at ? new Date(row.paid_at).toISOString() : new Date().toISOString()).slice(0, 10);
+    const r = await bookStripeFee({ invoice, clearingAccountId, paidAtDate, ctx: { eventId: `feebf-${invoice.id}` }, log, dryRun });
+    if (summary[r.status] !== undefined) summary[r.status]++;
+    if ((r.status === 'booked' || r.status === 'would_book') && r.fee) summary.fee_sum = Math.round((summary.fee_sum + r.fee) * 100) / 100;
+  }
+  log.info({ since: since || null, until: until || null, dryRun, ...summary }, 'backfill-stripe-fees complete');
+  return summary;
 }
 
 /**
@@ -751,4 +814,4 @@ async function backfillInvoice(invoice, log = logger) {
   return { status: 'processed', invoice_id: invoice.id };
 }
 
-module.exports = { handleStripeEvent, backfillInvoice };
+module.exports = { handleStripeEvent, backfillInvoice, backfillStripeFees };

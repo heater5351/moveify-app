@@ -126,6 +126,22 @@ router.post('/sweep-idempotency', async (req, res) => {
   }
 });
 
+// Backfill Stripe processing fees for historical payments (pre-fee-booking).
+// Dry-run by default — set dryRun:false to actually write SPEND txns to Xero.
+// Idempotent (shared stripe-fee:<invoice> key); safe to re-run.
+router.post('/backfill-stripe-fees', express.json(), async (req, res) => {
+  const log = withCorrelation(req);
+  const { since, until, dryRun = true } = req.body || {};
+  try {
+    const { backfillStripeFees } = require('../jobs/stripe-handler');
+    const result = await backfillStripeFees({ since, until, dryRun }, log);
+    res.json({ ok: true, dryRun, ...result });
+  } catch (err) {
+    log.error({ err: err.message }, 'backfill-stripe-fees failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Bulk-resolve open reconciliation flags by id or type. Used for housekeeping
 // (clearing noise flags after manual review). Sets resolved_at so they drop off
 // the open list; does NOT touch any Xero/invoice state.
