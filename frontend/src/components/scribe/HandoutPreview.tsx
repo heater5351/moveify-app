@@ -113,8 +113,8 @@ export default function HandoutPreview({
     min-height: 0 !important;
     height: auto !important;
   }
-  /* Don't split tables, rows, or images across a page boundary. */
-  table, tr, img { break-inside: avoid !important; page-break-inside: avoid !important; }
+  /* Don't split tables, rows, images, or individual paragraphs across pages. */
+  table, tr, img, .docx-wrapper p { break-inside: avoid !important; page-break-inside: avoid !important; }
 </style></head><body>${html}</body></html>`);
     win.document.close();
     setTimeout(() => {

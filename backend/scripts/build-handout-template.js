@@ -49,17 +49,19 @@ function para(runs, opts = {}) {
 function sectionHeading(text) {
   return new Paragraph({
     spacing: { before: 160, after: 100 },
+    keepNext: true,
     children: [txt(text, { bold: true, color: TEAL, size: 22, allCaps: true })],
   });
 }
 function subHeading(text) {
   return new Paragraph({
     spacing: { before: 120, after: 60 },
+    keepNext: true,
     children: [txt(text, { bold: true, color: TEAL, size: 18, allCaps: true })],
   });
 }
 function body(text, opts = {}) {
-  return new Paragraph({ spacing: { after: 100 }, children: [txt(text, { color: NAVY, size: 19, ...opts })] });
+  return new Paragraph({ spacing: { after: 100 }, keepLines: true, children: [txt(text, { color: NAVY, size: 19, ...opts })] });
 }
 
 // ---- Header: logo + title -------------------------------------------------
@@ -128,7 +130,9 @@ const tiers = [
 ];
 const tierParas = [];
 for (const [name, detail] of tiers) {
-  tierParas.push(new Paragraph({ spacing: { before: 100, after: 30 }, children: [txt(name, { bold: true, color: NAVY, size: 19 })] }));
+  // keepNext keeps the tier name with its detail; keepLines keeps each block
+  // intact — together they stop a tier splitting across a page boundary.
+  tierParas.push(new Paragraph({ spacing: { before: 100, after: 30 }, keepNext: true, keepLines: true, children: [txt(name, { bold: true, color: NAVY, size: 19 })] }));
   tierParas.push(body(detail));
 }
 
