@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { X, Download, RefreshCw, Loader2 } from 'lucide-react';
+import { X, Download, RefreshCw, Loader2, Printer } from 'lucide-react';
 import type { HandoutSections } from '../../types';
 import { fetchHandoutDocx, saveBlob } from '../../utils/scribe-api';
 
@@ -91,6 +91,10 @@ export default function HandoutPreview({
     if (blob) saveBlob(blob, `Handout_${patientFirstName || 'Patient'}.docx`);
   }
 
+  function handlePrint() {
+    window.print();
+  }
+
   const fieldLabel = 'text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1';
   const textarea = 'w-full border border-gray-200 rounded-lg p-2.5 text-sm text-secondary-700 leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-primary-300';
 
@@ -109,6 +113,13 @@ export default function HandoutPreview({
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Regenerate AI
+          </button>
+          <button
+            onClick={handlePrint}
+            disabled={!blob || rendering}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
+          >
+            <Printer className="w-3.5 h-3.5" /> Print / PDF
           </button>
           <button
             onClick={handleDownload}
@@ -165,9 +176,25 @@ export default function HandoutPreview({
               <Loader2 className="w-3.5 h-3.5 animate-spin" /> Updating…
             </div>
           )}
-          <div ref={previewRef} className="py-6 flex flex-col items-center" />
+          <div id="handout-print-area" ref={previewRef} className="py-6 flex flex-col items-center" />
         </div>
       </div>
+
+      {/* Print only the rendered document — hide app chrome, drop browser page margins
+          so the .docx's own section margins map 1:1. */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #handout-print-area, #handout-print-area * { visibility: visible !important; }
+          #handout-print-area {
+            position: absolute; left: 0; top: 0; width: 100%;
+            padding: 0 !important; overflow: visible !important; background: #fff !important;
+          }
+          #handout-print-area .docx-wrapper { background: #fff !important; padding: 0 !important; display: block !important; }
+          #handout-print-area .docx-wrapper > section.docx { box-shadow: none !important; margin: 0 auto !important; }
+          @page { size: A4; margin: 0; }
+        }
+      `}</style>
     </div>
   );
 }
