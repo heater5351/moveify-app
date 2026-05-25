@@ -70,7 +70,7 @@ export default function HandoutPreview({
         await renderAsync(docx, previewRef.current, undefined, {
           className: 'docx-render',
           inWrapper: true,
-          breakPages: true,
+          breakPages: false,
           ignoreLastRenderedPageBreak: true,
         });
       }
@@ -106,16 +106,13 @@ export default function HandoutPreview({
   html, body { margin: 0; padding: 0; background: #fff; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   .docx-wrapper { background: #fff !important; padding: 0 !important; box-shadow: none !important; }
-  /* docx-preview pins each section to a fixed A4 height; let it flow so content
-     paginates naturally and force a clean break only between docx sections. */
+  /* Continuous single section — let the browser paginate naturally. */
   .docx-wrapper > section.docx {
     box-shadow: none !important;
     margin: 0 auto !important;
     min-height: 0 !important;
     height: auto !important;
-    page-break-after: always;
   }
-  .docx-wrapper > section.docx:last-child { page-break-after: auto; }
   /* Don't split tables, rows, or images across a page boundary. */
   table, tr, img { break-inside: avoid !important; page-break-inside: avoid !important; }
 </style></head><body>${html}</body></html>`);

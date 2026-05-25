@@ -164,7 +164,7 @@ const doc = new Document({
       sectionHeading("2  What We'll Focus On"),
       para([txt('{{what_we_focus}}', { color: NAVY, size: 19 })]),
 
-      new Paragraph({ children: [new PageBreak()] }),
+      new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: TEAL } }, spacing: { before: 160, after: 160 } }),
 
       sectionHeading('Section 3 — Your Options'),
       subHeading('Treatment Blocks — 6 Weeks'),
