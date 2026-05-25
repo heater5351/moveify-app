@@ -126,6 +126,63 @@ router.post('/sweep-idempotency', async (req, res) => {
   }
 });
 
+// READ-ONLY revenue summary for a period. Combines the authoritative Xero P&L
+// total income with the worker ledger's precise P&P/session breakdown.
+// Body: { since, until } as YYYY-MM-DD; until is EXCLUSIVE (e.g. April =
+// since 2026-04-01, until 2026-05-01).
+router.post('/revenue-summary', express.json(), async (req, res) => {
+  const log = withCorrelation(req);
+  const { since, until } = req.body || {};
+  if (!since || !until || !Number.isFinite(new Date(since).getTime()) || !Number.isFinite(new Date(until).getTime())) {
+    return res.status(400).json({ error: 'since and until (YYYY-MM-DD, until exclusive) required' });
+  }
+  try {
+    const { getAll } = require('../db/pool');
+    const xero = require('../lib/xero');
+    const sinceDate = since.slice(0, 10);
+    const untilDate = until.slice(0, 10);
+    const plToDate = new Date(new Date(untilDate).getTime() - 86400000).toISOString().slice(0, 10); // inclusive end
+
+    // P&P + Stripe cash, by paid_at (the DD payment date the P&P invoice is dated)
+    const pp = (await getAll(
+      `SELECT COUNT(*)::int AS payments,
+              COALESCE(SUM(amount),0) AS stripe_gross,
+              COUNT(DISTINCT pp_invoice_id) FILTER (WHERE pp_invoice_id IS NOT NULL AND pp_invoice_id <> '')::int AS pp_count,
+              COALESCE(SUM(pp_amount),0) AS pp_total
+       FROM stripe_payments WHERE paid_at >= $1::timestamptz AND paid_at < $2::timestamptz`,
+      [sinceDate, untilDate]
+    ))[0];
+    const ppByTier = await getAll(
+      `SELECT tier,
+              COUNT(DISTINCT pp_invoice_id) FILTER (WHERE pp_invoice_id <> '')::int AS pp_count,
+              COALESCE(SUM(pp_amount),0) AS pp_total,
+              COUNT(*)::int AS payments
+       FROM stripe_payments WHERE paid_at >= $1::timestamptz AND paid_at < $2::timestamptz
+       GROUP BY tier ORDER BY pp_total DESC`,
+      [sinceDate, untilDate]
+    );
+    // Session revenue, by appointment_date (TEXT YYYY-MM-DD)
+    const sess = (await getAll(
+      `SELECT COUNT(*)::int AS sessions,
+              COALESCE(SUM(casual_price),0) AS session_revenue,
+              COALESCE(SUM(overpayment_allocated),0) AS allocated,
+              COALESCE(SUM(gap_amount),0) AS gap
+       FROM appointment_invoices WHERE appointment_date >= $1 AND appointment_date < $2`,
+      [sinceDate, untilDate]
+    ))[0];
+
+    const pl = await xero.getProfitAndLoss(sinceDate, plToDate).catch((e) => ({ rows: [], totalIncome: null, error: e.message }));
+
+    log.info({ since: sinceDate, until: untilDate, xero_total_income: pl.totalIncome, stripe: pp, sessions: sess }, 'REVENUE: summary');
+    log.info({ pp_by_tier: ppByTier }, 'REVENUE: P&P by tier');
+    log.info({ pl_rows: pl.rows }, 'REVENUE: Xero P&L rows');
+    res.json({ ok: true, xero_total_income: pl.totalIncome, stripe: pp, sessions: sess, pp_by_tier: ppByTier });
+  } catch (err) {
+    log.error({ err: err.message }, 'revenue-summary failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Backfill Stripe processing fees for historical payments (pre-fee-booking).
 // Dry-run by default — set dryRun:false to actually write SPEND txns to Xero.
 // Idempotent (shared stripe-fee:<invoice> key); safe to re-run.

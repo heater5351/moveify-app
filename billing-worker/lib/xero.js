@@ -503,8 +503,35 @@ async function getAgedReceivablesSummary() {
   return { rows: out };
 }
 
+// Profit & Loss report for a date range. Returns the flattened rows (header +
+// section rows + summary rows) plus a best-effort extracted total income figure.
+// fromDate/toDate are inclusive YYYY-MM-DD.
+async function getProfitAndLoss(fromDate, toDate) {
+  const data = await xeroFetch('GET', `/Reports/ProfitAndLoss?fromDate=${encodeURIComponent(fromDate)}&toDate=${encodeURIComponent(toDate)}`);
+  const report = (data.Reports || [])[0];
+  if (!report) return { rows: [], totalIncome: null };
+
+  const out = [];
+  let totalIncome = null;
+  for (const section of report.Rows || []) {
+    const pushRow = (r) => {
+      const cells = (r.Cells || []).map((c) => String(c.Value ?? ''));
+      out.push({ rowType: r.RowType, cells });
+      // Xero labels the income total "Total Income" / "Total Trading Income".
+      if (r.RowType === 'SummaryRow' && /total\s+(trading\s+|operating\s+)?income/i.test(cells[0] || '')) {
+        const v = parseFloat((cells[cells.length - 1] || '').replace(/[^0-9.\-]/g, ''));
+        if (Number.isFinite(v)) totalIncome = v;
+      }
+    };
+    if (section.RowType === 'Section') (section.Rows || []).forEach(pushRow);
+    else pushRow(section);
+  }
+  return { rows: out, totalIncome };
+}
+
 module.exports = {
   getAgedReceivablesSummary,
+  getProfitAndLoss,
   getAccessToken,
   getOrganisation,
   findContactsByName,
