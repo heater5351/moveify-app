@@ -92,7 +92,29 @@ export default function HandoutPreview({
   }
 
   function handlePrint() {
-    window.print();
+    if (!previewRef.current) return;
+    // docx-preview injects its <style> inside the rendered container, so cloning
+    // innerHTML carries the document styling into a clean print window — this
+    // sidesteps the modal's layout/overflow which mangles in-page printing.
+    const html = previewRef.current.innerHTML;
+    const win = window.open('', '_blank', 'width=900,height=1200');
+    if (!win) { alert('Please allow pop-ups for this site to print.'); return; }
+    win.document.write(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Patient Handout</title>
+<style>
+  @page { size: A4; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  .docx-wrapper { background: #fff !important; padding: 0 !important; box-shadow: none !important; }
+  .docx-wrapper > section.docx { box-shadow: none !important; margin: 0 auto !important; }
+</style></head><body>${html}</body></html>`);
+    win.document.close();
+    setTimeout(() => {
+      win.focus();
+      win.print();
+      win.addEventListener('afterprint', () => win.close(), { once: true });
+      setTimeout(() => { if (!win.closed) win.close(); }, 5000);
+    }, 500);
   }
 
   const fieldLabel = 'text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1';
@@ -176,25 +198,9 @@ export default function HandoutPreview({
               <Loader2 className="w-3.5 h-3.5 animate-spin" /> Updating…
             </div>
           )}
-          <div id="handout-print-area" ref={previewRef} className="py-6 flex flex-col items-center" />
+          <div ref={previewRef} className="py-6 flex flex-col items-center" />
         </div>
       </div>
-
-      {/* Print only the rendered document — hide app chrome, drop browser page margins
-          so the .docx's own section margins map 1:1. */}
-      <style>{`
-        @media print {
-          body * { visibility: hidden !important; }
-          #handout-print-area, #handout-print-area * { visibility: visible !important; }
-          #handout-print-area {
-            position: absolute; left: 0; top: 0; width: 100%;
-            padding: 0 !important; overflow: visible !important; background: #fff !important;
-          }
-          #handout-print-area .docx-wrapper { background: #fff !important; padding: 0 !important; display: block !important; }
-          #handout-print-area .docx-wrapper > section.docx { box-shadow: none !important; margin: 0 auto !important; }
-          @page { size: A4; margin: 0; }
-        }
-      `}</style>
     </div>
   );
 }
