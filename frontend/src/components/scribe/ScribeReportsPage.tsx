@@ -233,6 +233,7 @@ export default function ScribeReportsPage() {
           assessmentDate={new Date(activeHandout.session.sessionDate).toLocaleDateString('en-AU', {
             day: '2-digit', month: '2-digit', year: 'numeric',
           })}
+          sessionId={activeHandout.session.id}
           onClose={() => setActiveHandout(null)}
           onRegenerate={handleGenerate}
         />
