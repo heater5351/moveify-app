@@ -1,11 +1,13 @@
-import { useEffect, useRef } from 'react';
-import { X, Printer, RefreshCw, Pencil } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { X, Printer, RefreshCw, Pencil, Download, Loader2 } from 'lucide-react';
 import type { HandoutSections } from '../../types';
+import { downloadHandoutDocx } from '../../utils/scribe-api';
 
 interface HandoutPreviewProps {
   sections: HandoutSections;
   patientFirstName: string;
   assessmentDate: string;
+  sessionId: number;
   onClose: () => void;
   onRegenerate: () => void;
 }
@@ -82,11 +84,32 @@ export default function HandoutPreview({
   sections,
   patientFirstName,
   assessmentDate,
+  sessionId,
   onClose,
   onRegenerate,
 }: HandoutPreviewProps) {
   const foundRef = useRef<HTMLDivElement>(null);
   const focusRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [dlError, setDlError] = useState('');
+
+  async function handleDownloadDocx() {
+    setDownloading(true);
+    setDlError('');
+    try {
+      await downloadHandoutDocx(sessionId, {
+        patientFirstName,
+        assessmentDate,
+        found: foundRef.current?.innerText || '',
+        focus: focusRef.current?.innerText || '',
+        clinicalContext: sections.clinicalContext || '',
+      });
+    } catch (e) {
+      setDlError(e instanceof Error ? e.message : 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   useEffect(() => {
     if (foundRef.current) foundRef.current.innerText = cleanText(sections.found);
@@ -207,12 +230,20 @@ export default function HandoutPreview({
             >
               <RefreshCw className="w-3.5 h-3.5" /> Regenerate
             </button>
+            {dlError && <span className="text-xs text-red-500">{dlError}</span>}
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg text-white font-semibold transition"
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition"
+            >
+              <Printer className="w-3.5 h-3.5" /> Print / PDF
+            </button>
+            <button
+              onClick={handleDownloadDocx}
+              disabled={downloading}
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg text-white font-semibold transition disabled:opacity-50"
               style={{ background: TEAL }}
             >
-              <Printer className="w-3.5 h-3.5" /> Print / Save PDF
+              {downloading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</> : <><Download className="w-3.5 h-3.5" /> Download DOCX</>}
             </button>
             <button
               onClick={onClose}

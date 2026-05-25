@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { generateHandout } = require('../services/scribe-llm');
+const { generateHandoutDocx } = require('../services/scribe-handout-docx');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -31,6 +32,31 @@ router.post('/:sessionId/handout/generate', async (req, res) => {
   } catch (err) {
     console.error('Generate handout error:', err.message);
     res.status(500).json({ error: 'Failed to generate handout' });
+  }
+});
+
+// POST /api/scribe/sessions/:sessionId/handout/docx
+// Generate a DOCX from edited handout content. Ephemeral — nothing saved.
+router.post('/:sessionId/handout/docx', async (req, res) => {
+  try {
+    const session = await db.query(
+      'SELECT id, clinician_id FROM scribe_sessions WHERE id = $1',
+      [req.params.sessionId]
+    );
+    if (session.rows.length === 0) return res.status(404).json({ error: 'Session not found' });
+    if (session.rows[0].clinician_id !== req.user.id) return res.status(403).json({ error: 'Access denied' });
+
+    const buffer = await generateHandoutDocx(req.body);
+    const safeName = (req.body.patientFirstName || 'Patient').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
+    audit.log(req, 'handout_docx_generated', 'scribe_session', parseInt(req.params.sessionId), {});
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'Content-Disposition': `attachment; filename="Handout_${safeName}.docx"`,
+    });
+    res.send(buffer);
+  } catch (err) {
+    console.error('Generate handout DOCX error:', err.message);
+    res.status(500).json({ error: 'Failed to generate handout DOCX' });
   }
 });
 

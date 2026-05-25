@@ -1,11 +1,12 @@
 /**
- * LLM service for SOAP note and handout generation via AWS Bedrock (Amazon Nova Pro).
- * Inference runs in ap-southeast-2 (Sydney). PHI stays in Australia.
+ * LLM service for SOAP note and handout generation via AWS Bedrock (DeepSeek V3.2).
+ * Inference runs in-region in ap-southeast-2 (Sydney) — DeepSeek V3.2 is In-Region
+ * only (no cross-region routing), so PHI never leaves Australia.
  */
 const { BedrockRuntimeClient, ConverseCommand } = require('@aws-sdk/client-bedrock-runtime');
 
 const client = new BedrockRuntimeClient({ region: 'ap-southeast-2' });
-const MODEL_ID = 'amazon.nova-pro-v1:0';
+const MODEL_ID = 'deepseek.v3.2';
 
 const DEFAULT_SYSTEM_PROMPT = `You are an experienced clinical exercise physiologist scribe. Given a transcript of a patient consultation, generate a structured SOAP note following Australian allied health clinical standards.
 

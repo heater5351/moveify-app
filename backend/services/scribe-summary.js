@@ -1,14 +1,14 @@
 /**
  * Rolling patient summary service.
  * Generates/updates a cumulative patient summary after each completed session.
- * Uses AWS Bedrock Nova Pro, ap-southeast-2. PHI stays in Australia.
+ * Uses AWS Bedrock DeepSeek V3.2, in-region ap-southeast-2. PHI stays in Australia.
  */
 const { BedrockRuntimeClient, ConverseCommand } = require('@aws-sdk/client-bedrock-runtime');
 const db = require('../database/db');
 const { encrypt, decrypt } = require('./scribe-encryption');
 
 const client = new BedrockRuntimeClient({ region: 'ap-southeast-2' });
-const MODEL_ID = 'amazon.nova-pro-v1:0';
+const MODEL_ID = 'deepseek.v3.2';
 
 const SUMMARY_SYSTEM_PROMPT = `You are a clinical documentation assistant. Maintain a concise rolling summary of a patient's treatment history.
 

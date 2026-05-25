@@ -74,6 +74,27 @@ export async function downloadReportDocx(sessionId: number, data: Record<string,
   URL.revokeObjectURL(url);
 }
 
+export async function downloadHandoutDocx(sessionId: number, data: Record<string, string>): Promise<void> {
+  const res = await apiFetch(`/sessions/${sessionId}/handout/docx`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'DOCX generation failed');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Handout_${data.patientFirstName || 'Patient'}.docx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export async function generateReport(
   sessionId: number,
   type: 'cdmp',

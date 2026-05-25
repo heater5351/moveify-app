@@ -556,6 +556,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
         sections={handoutSections}
         patientFirstName={patientName.split(' ')[0]}
         assessmentDate={today}
+        sessionId={sessionId ?? existingSessionId ?? 0}
         onClose={() => setHandoutSections(null)}
         onRegenerate={handleGenerateHandout}
       />
