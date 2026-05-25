@@ -74,7 +74,7 @@ export async function downloadReportDocx(sessionId: number, data: Record<string,
   URL.revokeObjectURL(url);
 }
 
-export async function downloadHandoutDocx(sessionId: number, data: Record<string, string>): Promise<void> {
+export async function fetchHandoutDocx(sessionId: number, data: Record<string, string>): Promise<Blob> {
   const res = await apiFetch(`/sessions/${sessionId}/handout/docx`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -84,11 +84,14 @@ export async function downloadHandoutDocx(sessionId: number, data: Record<string
     const err = await res.json().catch(() => ({}));
     throw new Error((err as { error?: string }).error || 'DOCX generation failed');
   }
-  const blob = await res.blob();
+  return res.blob();
+}
+
+export function saveBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Handout_${data.patientFirstName || 'Patient'}.docx`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

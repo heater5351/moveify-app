@@ -25,6 +25,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@react-pdf/renderer": "^4.5.1",
     "@tailwindcss/vite": "^4.2.2",
+    "docx-preview": "^0.3.7",
     "firebase": "^11.10.0",
     "lucide-react": "^0.562.0",
     "react": "^19.2.0",
