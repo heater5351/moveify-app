@@ -45,7 +45,6 @@ const SCOPES = [
   'accounting.payments',
   'accounting.contacts',
   'accounting.settings',
-  'accounting.reports.read',
 ].join(' ');
 
 const STATE = crypto.randomBytes(16).toString('hex');
