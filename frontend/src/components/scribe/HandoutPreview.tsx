@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { X, Download, RefreshCw, Loader2, Printer } from 'lucide-react';
+import { X, Download, RefreshCw, Loader2 } from 'lucide-react';
 import type { HandoutSections } from '../../types';
 import { fetchHandoutDocx, saveBlob } from '../../utils/scribe-api';
 
@@ -91,40 +91,6 @@ export default function HandoutPreview({
     if (blob) saveBlob(blob, `Handout_${patientFirstName || 'Patient'}.docx`);
   }
 
-  function handlePrint() {
-    if (!previewRef.current) return;
-    // docx-preview injects its <style> inside the rendered container, so cloning
-    // innerHTML carries the document styling into a clean print window — this
-    // sidesteps the modal's layout/overflow which mangles in-page printing.
-    const html = previewRef.current.innerHTML;
-    const win = window.open('', '_blank', 'width=900,height=1200');
-    if (!win) { alert('Please allow pop-ups for this site to print.'); return; }
-    win.document.write(`<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Patient Handout</title>
-<style>
-  @page { size: A4; margin: 0; }
-  html, body { margin: 0; padding: 0; background: #fff; }
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  .docx-wrapper { background: #fff !important; padding: 0 !important; box-shadow: none !important; }
-  /* Continuous single section — let the browser paginate naturally. */
-  .docx-wrapper > section.docx {
-    box-shadow: none !important;
-    margin: 0 auto !important;
-    min-height: 0 !important;
-    height: auto !important;
-  }
-  /* Don't split tables, rows, images, or individual paragraphs across pages. */
-  table, tr, img, .docx-wrapper p { break-inside: avoid !important; page-break-inside: avoid !important; }
-</style></head><body>${html}</body></html>`);
-    win.document.close();
-    setTimeout(() => {
-      win.focus();
-      win.print();
-      win.addEventListener('afterprint', () => win.close(), { once: true });
-      setTimeout(() => { if (!win.closed) win.close(); }, 5000);
-    }, 500);
-  }
-
   const fieldLabel = 'text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1';
   const textarea = 'w-full border border-gray-200 rounded-lg p-2.5 text-sm text-secondary-700 leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-primary-300';
 
@@ -143,13 +109,6 @@ export default function HandoutPreview({
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Regenerate AI
-          </button>
-          <button
-            onClick={handlePrint}
-            disabled={!blob || rendering}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
-          >
-            <Printer className="w-3.5 h-3.5" /> Print / PDF
           </button>
           <button
             onClick={handleDownload}
