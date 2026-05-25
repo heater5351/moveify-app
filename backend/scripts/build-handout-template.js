@@ -46,10 +46,11 @@ function txt(text, opts = {}) {
 function para(runs, opts = {}) {
   return new Paragraph({ children: Array.isArray(runs) ? runs : [runs], spacing: { after: 120 }, ...opts });
 }
-function sectionHeading(text) {
+function sectionHeading(text, opts = {}) {
   return new Paragraph({
     spacing: { before: 160, after: 100 },
     keepNext: true,
+    pageBreakBefore: opts.pageBreakBefore || false,
     children: [txt(text, { bold: true, color: TEAL, size: 22, allCaps: true })],
   });
 }
@@ -168,9 +169,7 @@ const doc = new Document({
       sectionHeading("2  What We'll Focus On"),
       para([txt('{{what_we_focus}}', { color: NAVY, size: 19 })]),
 
-      new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: TEAL } }, spacing: { before: 160, after: 160 } }),
-
-      sectionHeading('Section 3 — Your Options'),
+      sectionHeading('Section 3 — Your Options', { pageBreakBefore: true }),
       subHeading('Treatment Blocks — 6 Weeks'),
       body('Payment: weekly direct debit over 6 weeks, or pay in full with 5% discount. Includes: unlimited gym access + Moveify app.'),
       ...tierParas,
