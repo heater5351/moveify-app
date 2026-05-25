@@ -1,10 +1,14 @@
 /**
  * One-off generator for backend/assets/Handout_Template.docx.
  *
- * Produces a working docxtemplater template (placeholders embedded as literal
- * text) so the handout DOCX pipeline functions end-to-end immediately. The
- * layout here is intentionally plain — it is meant to be restyled in Word by
- * the clinician without any code change, exactly like GP_Report_Template.docx.
+ * Replicates the "Geometric Whitepaper" (V4) patient-handout design as closely
+ * as docx allows: full-width navy banners (shaded cells), big teal section
+ * numerals, a 3-column tier grid, and navy table headers. The diagonal corner
+ * accent and some finesse from the HTML design can't survive in docx, but the
+ * layout and colour blocking carry over. Restyle in LibreOffice without code.
+ *
+ * Font: Manrope (install it in LibreOffice for an exact match; otherwise it
+ * substitutes a metric-compatible sans).
  *
  * Run: node backend/scripts/build-handout-template.js
  */
@@ -12,188 +16,300 @@ const fs = require('fs');
 const path = require('path');
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  WidthType, BorderStyle, AlignmentType, ImageRun, HeadingLevel, PageBreak, ShadingType,
+  WidthType, BorderStyle, AlignmentType, ImageRun, ShadingType, VerticalAlign,
 } = require('docx');
 
 const NAVY = '132232';
 const TEAL = '46C1C0';
-const LABEL = 'D0EEEE';
-const GREY = '64748B';
+const OCEAN = '045E62';
+const INK = '1A2230';
+const SUB = '56606E';
+const SOFT = '94A3B8';
+const RULE = 'E2E8F0';
+const FONT = 'Manrope';
 
 const ASSETS = path.join(__dirname, '../assets');
 const LOGO_PATH = path.join(ASSETS, 'gp-report-logo.png');
 const OUT_PATH = path.join(ASSETS, 'Handout_Template.docx');
 
-// Read PNG intrinsic dimensions (IHDR width/height live at bytes 16–24) so the
-// logo keeps its aspect ratio.
-function pngSize(buf) {
-  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
-}
-
+function pngSize(buf) { return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) }; }
 const logoBuf = fs.readFileSync(LOGO_PATH);
 const { width: lw, height: lh } = pngSize(logoBuf);
-const LOGO_H = 96; // px (~25mm)
+const LOGO_H = 50;
 const LOGO_W = Math.round((lw / lh) * LOGO_H);
 
-const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
-const NO_BORDERS = { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER };
-const CELL_BORDER = { style: BorderStyle.SINGLE, size: 4, color: 'B0BEC5' };
-const CELL_BORDERS = { top: CELL_BORDER, bottom: CELL_BORDER, left: CELL_BORDER, right: CELL_BORDER };
+const NB = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+const NONE = { top: NB, bottom: NB, left: NB, right: NB };
+function edge(color, size = 4) { return { style: BorderStyle.SINGLE, size, color }; }
 
-function txt(text, opts = {}) {
-  return new TextRun({ text, font: 'Calibri', ...opts });
-}
-function para(runs, opts = {}) {
-  return new Paragraph({ children: Array.isArray(runs) ? runs : [runs], spacing: { after: 120 }, ...opts });
-}
-function sectionHeading(text, opts = {}) {
-  return new Paragraph({
-    spacing: { before: 160, after: 100 },
-    keepNext: true,
-    pageBreakBefore: opts.pageBreakBefore || false,
-    children: [txt(text, { bold: true, color: TEAL, size: 22, allCaps: true })],
+function t(text, opts = {}) { return new TextRun({ text, font: FONT, ...opts }); }
+function shadeCell(fill, children, opts = {}) {
+  return new TableCell({
+    shading: { type: ShadingType.CLEAR, color: 'auto', fill },
+    borders: NONE,
+    margins: { top: 220, bottom: 200, left: 360, right: 360 },
+    children, ...opts,
   });
 }
+function fullWidthTable(rows) {
+  return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: NONE, rows });
+}
+
+// ── Masthead: logo (left) + practice meta (right), bottom rule ──────────────
+function masthead() {
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: { top: NB, left: NB, right: NB, bottom: edge(RULE, 4), insideHorizontal: NB, insideVertical: NB },
+    rows: [new TableRow({ children: [
+      new TableCell({
+        borders: NONE, verticalAlign: VerticalAlign.CENTER, margins: { top: 120, bottom: 160, left: 0, right: 0 },
+        children: [new Paragraph({ children: [new ImageRun({ data: logoBuf, transformation: { width: LOGO_W, height: LOGO_H } })] })],
+      }),
+      new TableCell({
+        borders: NONE, verticalAlign: VerticalAlign.CENTER, margins: { top: 120, bottom: 160, left: 0, right: 0 },
+        children: [
+          new Paragraph({ alignment: AlignmentType.RIGHT, children: [t('Moveify Health Solutions', { bold: true, color: NAVY, size: 17 })] }),
+          new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 20 }, children: [
+            t('4 George St, Williamstown SA 5351', { color: SUB, size: 17 }),
+            t('  ·  ', { color: TEAL, bold: true, size: 17 }),
+            t('0435 524 991', { color: SUB, size: 17 }),
+            t('  ·  ', { color: TEAL, bold: true, size: 17 }),
+            t('ryan@moveifyhealth.com', { color: SUB, size: 17 }),
+          ] }),
+        ],
+      }),
+    ] })],
+  });
+}
+
+// ── Navy banner: eyebrow + big title + sub, with a teal accent bar on right ──
+function banner(eyebrowRuns, titleRuns, subRuns) {
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: NONE,
+    columnWidths: [8600, 1000],
+    rows: [new TableRow({ children: [
+      new TableCell({
+        shading: { type: ShadingType.CLEAR, color: 'auto', fill: NAVY }, borders: NONE,
+        margins: { top: 360, bottom: 340, left: 360, right: 200 },
+        children: [
+          new Paragraph({ spacing: { after: 120 }, children: eyebrowRuns }),
+          new Paragraph({ spacing: { after: 120 }, children: titleRuns }),
+          new Paragraph({ children: subRuns }),
+        ],
+      }),
+      new TableCell({ shading: { type: ShadingType.CLEAR, color: 'auto', fill: TEAL }, borders: NONE, children: [new Paragraph({ children: [] })] }),
+    ] })],
+  });
+}
+
+function eyebrow(text) {
+  return [t(text.toUpperCase(), { color: TEAL, bold: true, size: 17, allCaps: true, characterSpacing: 40 })];
+}
+
+// ── Numbered section: big teal numeral | uppercase title + body ─────────────
+function section(num, title, bodyToken, asideText) {
+  const contentChildren = [
+    new Paragraph({ spacing: { after: 80 }, children: [t(title.toUpperCase(), { bold: true, color: NAVY, size: 26, allCaps: true, characterSpacing: 16 })] }),
+  ];
+  if (bodyToken) {
+    contentChildren.push(new Paragraph({ keepLines: true, children: [t(bodyToken, { color: INK, size: 21 })] }));
+  }
+  if (asideText) {
+    contentChildren.push(new Paragraph({
+      spacing: { before: 120 }, keepLines: true,
+      border: { top: edge(TEAL, 16) },
+      children: [t(asideText, { color: OCEAN, bold: true, size: 20 })],
+    }));
+  }
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: NONE,
+    columnWidths: [1100, 8500],
+    rows: [new TableRow({ cantSplit: true, children: [
+      new TableCell({ borders: NONE, margins: { top: 80, bottom: 240, left: 0, right: 200 }, children: [
+        new Paragraph({ children: [t(String(num), { bold: true, color: TEAL, size: 64 })] }),
+      ] }),
+      new TableCell({ borders: NONE, margins: { top: 80, bottom: 240, left: 0, right: 0 }, children: contentChildren }),
+    ] })],
+  });
+}
+
+// ── Tables (assessment results / casual options) ────────────────────────────
+function navyHeaderCell(text, widthPct) {
+  return new TableCell({
+    shading: { type: ShadingType.CLEAR, color: 'auto', fill: NAVY },
+    borders: { top: NB, left: NB, right: NB, bottom: NB },
+    margins: { top: 120, bottom: 120, left: 200, right: 200 },
+    width: widthPct ? { size: widthPct, type: WidthType.PERCENTAGE } : undefined,
+    children: [new Paragraph({ children: [t(text.toUpperCase(), { bold: true, color: 'FFFFFF', size: 17, allCaps: true, characterSpacing: 24 })] })],
+  });
+}
+function bodyCell(runsOrText, opts = {}) {
+  const runs = typeof runsOrText === 'string' ? [t(runsOrText, { color: INK, size: 20, ...opts })] : runsOrText;
+  return new TableCell({
+    borders: { top: NB, left: NB, right: NB, bottom: edge(RULE, 4) },
+    margins: { top: 140, bottom: 140, left: 200, right: 200 },
+    children: [new Paragraph({ children: runs })],
+  });
+}
+
+function assessmentTable() {
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: NONE,
+    columnWidths: [3100, 2100, 4400],
+    rows: [
+      new TableRow({ tableHeader: true, children: [navyHeaderCell('Test', 32), navyHeaderCell('Result', 22), navyHeaderCell('Interpretation')] }),
+      new TableRow({ children: [
+        bodyCell([t('{{#assessment_rows}}{{test}}', { color: NAVY, bold: true, size: 20 })]),
+        bodyCell([t('{{result}}', { color: NAVY, bold: true, size: 20 })]),
+        bodyCell([t('{{interpretation}}{{/assessment_rows}}', { color: SUB, size: 20 })]),
+      ] }),
+    ],
+  });
+}
+
+// ── Page 2: teal tier band + 3-column tier grid ─────────────────────────────
+function tierBand() {
+  return fullWidthTable([new TableRow({ children: [
+    shadeCell(TEAL, [new Paragraph({ children: [t('Choose Your Tier', { bold: true, color: NAVY, size: 30 })] })]),
+  ] })]);
+}
+
+function tierCell(pill, name, price, per, includes, isFirst, isLast) {
+  return new TableCell({
+    borders: { top: NB, bottom: edge(NAVY, 24), left: NB, right: isLast ? NB : edge(RULE, 4) },
+    margins: { top: 240, bottom: 280, left: isFirst ? 0 : 200, right: isLast ? 0 : 200 },
+    children: [
+      new Paragraph({ spacing: { after: 80 }, border: { bottom: edge(TEAL, 16) }, children: [t(pill.toUpperCase(), { bold: true, color: TEAL, size: 15, allCaps: true, characterSpacing: 24 })] }),
+      new Paragraph({ spacing: { before: 120, after: 120 }, children: [t(name, { bold: true, color: NAVY, size: 26 })] }),
+      new Paragraph({ children: [t(price, { bold: true, color: NAVY, size: 48 })] }),
+      new Paragraph({ spacing: { after: 120 }, children: [t(per, { color: SUB, size: 18 })] }),
+      new Paragraph({ keepLines: true, spacing: { after: 120 }, children: [t(includes, { color: INK, size: 19 })] }),
+      new Paragraph({ border: { top: edge(RULE, 4) }, spacing: { before: 80 }, children: [t('↓ Medicare & private health rebates available', { color: OCEAN, bold: true, size: 16 })] }),
+    ],
+  });
+}
+
+function tierGrid() {
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: NONE,
+    columnWidths: [3200, 3200, 3200],
+    rows: [new TableRow({ cantSplit: true, children: [
+      tierCell('Tier 1', 'Foundation', '$510', '$85 / week over 6 weeks', '60-min program design, 4 group sessions, and a 30-min reassessment.', true, false),
+      tierCell('Tier 2', 'Progress', '$680', '$113.33 / week over 6 weeks', '60-min program design, 4 × 30-min weekly 1:1 sessions, and a 30-min reassessment.', false, false),
+      tierCell('Tier 3', 'Performance', '$860', '$143.33 / week over 6 weeks', '60-min program design, 4 × 45-min weekly 1:1 sessions, and a 30-min reassessment.', false, true),
+    ] })],
+  });
+}
+
 function subHeading(text) {
   return new Paragraph({
-    spacing: { before: 120, after: 60 },
-    keepNext: true,
-    children: [txt(text, { bold: true, color: TEAL, size: 18, allCaps: true })],
+    spacing: { before: 240, after: 160 }, keepNext: true,
+    children: [t('▬  ', { color: TEAL, bold: true, size: 26 }), t(text.toUpperCase(), { bold: true, color: NAVY, size: 26, allCaps: true, characterSpacing: 16 })],
   });
 }
-function body(text, opts = {}) {
-  return new Paragraph({ spacing: { after: 100 }, keepLines: true, children: [txt(text, { color: NAVY, size: 19, ...opts })] });
+
+function casualTable() {
+  const rows = [
+    ['1:1 Consultation (60 min)', '$170', 'Full program design or complex consultation'],
+    ['1:1 Consultation (45 min)', '$130', 'Standard clinical session'],
+    ['1:1 Consultation (30 min)', '$85', 'Follow-up or program adjustment'],
+    ['Group Session (45–60 min)', '$30', 'Supervised floor session with your program'],
+    ['Phone Check-in (10 min)', '$50', 'Brief clinical check-in'],
+  ];
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: NONE,
+    columnWidths: [4400, 1600, 3600],
+    rows: [
+      new TableRow({ tableHeader: true, children: [navyHeaderCell('Service', 44), navyHeaderCell('Fee', 16), navyHeaderCell('Details')] }),
+      ...rows.map(([s, f, d]) => new TableRow({ cantSplit: true, children: [
+        bodyCell([t(s, { color: INK, size: 20 })]),
+        bodyCell([t(f, { color: NAVY, bold: true, size: 20 })]),
+        bodyCell([t(d, { color: SUB, size: 20 })]),
+      ] })),
+    ],
+  });
 }
 
-// ---- Header: logo + title -------------------------------------------------
-const header = new Table({
-  width: { size: 100, type: WidthType.PERCENTAGE },
-  borders: NO_BORDERS,
-  rows: [
-    new TableRow({
+function offsets() {
+  function offsetCell(name, runs, isFirst) {
+    return new TableCell({
+      borders: NONE, margins: { top: 0, bottom: 0, left: isFirst ? 0 : 200, right: isFirst ? 200 : 0 },
       children: [
-        new TableCell({
-          width: { size: 45, type: WidthType.PERCENTAGE },
-          borders: NO_BORDERS,
-          children: [new Paragraph({ children: [new ImageRun({ data: logoBuf, transformation: { width: LOGO_W, height: LOGO_H } })] })],
-        }),
-        new TableCell({
-          width: { size: 55, type: WidthType.PERCENTAGE },
-          borders: NO_BORDERS,
-          verticalAlign: 'center',
-          children: [
-            new Paragraph({ alignment: AlignmentType.RIGHT, children: [txt('Exercise Physiology Assessment Summary', { bold: true, color: NAVY, size: 21 })] }),
-            new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 40 }, children: [txt('{{patient_first_name}} · {{assessment_date}}', { color: GREY, size: 18 })] }),
-          ],
-        }),
+        new Paragraph({ border: { bottom: edge(TEAL, 16) }, spacing: { after: 120 }, children: [t(name.toUpperCase(), { bold: true, color: NAVY, size: 20, allCaps: true, characterSpacing: 12 })] }),
+        new Paragraph({ keepLines: true, children: runs }),
       ],
-    }),
-  ],
-});
-
-// ---- Assessment results table (docxtemplater row loop) --------------------
-function headerCell(text) {
-  return new TableCell({
-    shading: { type: ShadingType.CLEAR, fill: TEAL, color: 'auto' },
-    borders: CELL_BORDERS,
-    margins: { top: 60, bottom: 60, left: 120, right: 120 },
-    children: [new Paragraph({ children: [txt(text, { bold: true, color: 'FFFFFF', size: 18 })] })],
-  });
-}
-function loopCell(content, opts = {}) {
-  return new TableCell({
-    borders: CELL_BORDERS,
-    margins: { top: 60, bottom: 60, left: 120, right: 120 },
-    children: [new Paragraph({ children: [txt(content, { color: NAVY, size: 18, ...opts })] })],
+    });
+  }
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE }, borders: NONE, columnWidths: [4800, 4800],
+    rows: [new TableRow({ children: [
+      offsetCell('Medicare CDM', [
+        t('If you have a Chronic Disease Management plan from your GP, you are eligible for up to 5 Medicare-rebated allied health sessions per calendar year. Each eligible 1:1 session earns a rebate of ', { color: INK, size: 20 }),
+        t('$61.80', { color: NAVY, bold: true, size: 20 }), t('.', { color: INK, size: 20 }),
+      ], true),
+      offsetCell('Private Health', [
+        t('If you hold extras cover, you may be able to claim a rebate on Exercise Physiology sessions. You cannot claim both Medicare and PHI on the same session.', { color: INK, size: 20 }),
+      ], false),
+    ] })],
   });
 }
 
-const oaTable = new Table({
-  width: { size: 100, type: WidthType.PERCENTAGE },
-  rows: [
-    new TableRow({ tableHeader: true, children: [headerCell('Test'), headerCell('Result'), headerCell('Interpretation')] }),
-    // Single loop row — open tag in first cell, close tag in last cell.
-    new TableRow({
-      children: [
-        loopCell('{{#oa_rows}}{{test}}', { bold: true }),
-        loopCell('{{result}}'),
-        loopCell('{{interpretation}}{{/oa_rows}}'),
-      ],
-    }),
-  ],
-});
-
-// ---- Pricing tiers (static) ----------------------------------------------
-const tiers = [
-  ['Tier 1 — Foundation · $525 ($87.50/week)', '60-min program design + 6 group sessions + 30-min reassessment + phone check-in. Medicare offset: up to $123.60 back · net cost from $401.40. Pay in full: $498.75 (5% discount). Best for: stable presentations, general deconditioning, independent patients.'],
-  ['Tier 2 — Progress · $695 ($115.83/week)', '60-min program design + 5 × 30-min weekly 1:1s + 30-min reassessment. Medicare offset: up to $309 back · net cost from $386. Pay in full: $660.25 (5% discount). Best for: MSK and chronic disease, patients needing regular clinical oversight.'],
-  ['Tier 3 — Performance · $875 ($145.83/week)', '60-min program design + 5 × 45-min weekly 1:1s + 30-min reassessment. Medicare offset: up to $309 back · net cost from $566. Pay in full: $831.25 (5% discount). Best for: complex neuro, cardiac, post-surgical, multi-morbidity.'],
-];
-const tierParas = [];
-for (const [name, detail] of tiers) {
-  // keepNext keeps the tier name with its detail; keepLines keeps each block
-  // intact — together they stop a tier splitting across a page boundary.
-  tierParas.push(new Paragraph({ spacing: { before: 100, after: 30 }, keepNext: true, keepLines: true, children: [txt(name, { bold: true, color: NAVY, size: 19 })] }));
-  tierParas.push(body(detail));
-}
-
-// ---- Casual options table (static) ---------------------------------------
-const casual = [
-  ['1:1 Consultation (60 min)', '$170', 'Full program design or complex consultation'],
-  ['1:1 Consultation (45 min)', '$130', 'Standard clinical session'],
-  ['1:1 Consultation (30 min)', '$85', 'Follow-up or program adjustment'],
-  ['Group Session (45-60 min)', '$30', 'Supervised floor session with your program'],
-  ['Phone Check-in (10 min)', '$50', 'Brief clinical check-in'],
-];
-const casualTable = new Table({
-  width: { size: 100, type: WidthType.PERCENTAGE },
-  rows: [
-    new TableRow({ tableHeader: true, children: [headerCell('Service'), headerCell('Fee'), headerCell('Details')] }),
-    ...casual.map(([s, f, d]) => new TableRow({ children: [loopCell(s, { bold: true }), loopCell(f, { bold: true, color: TEAL }), loopCell(d, { color: GREY })] })),
-  ],
-});
+const SPACER = (h = 160) => new Paragraph({ spacing: { after: h }, children: [] });
 
 const doc = new Document({
-  styles: { default: { document: { run: { font: 'Calibri' } } } },
+  styles: { default: { document: { run: { font: FONT } } } },
   sections: [{
-    properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } },
+    properties: { page: { margin: { top: 480, bottom: 480, left: 620, right: 620 } } },
     children: [
-      header,
-      new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: TEAL } }, spacing: { after: 160 } }),
+      // ───────── PAGE 1 ─────────
+      masthead(),
+      banner(
+        eyebrow('Exercise Physiology  ·  Assessment Summary'),
+        [t('A plan for ', { bold: true, color: 'FFFFFF', size: 52 }), t('{{patient_first_name}}', { bold: true, color: TEAL, size: 52 }), t('.', { bold: true, color: 'FFFFFF', size: 52 })],
+        [t('Prepared ', { color: 'E6EDF2', size: 22 }), t('{{assessment_date}}', { color: 'FFFFFF', bold: true, size: 22 })],
+      ),
+      SPACER(240),
+      section(1, "What's Going On", '{{whats_going_on}}'),
+      section(2, "What We're Aiming For", '{{our_aims}}'),
+      section(3, "How We'll Get There", '{{how_we_get_there}}', '↘ 1:1 support is flexible. See Your Options.'),
+      section(4, 'What You Can Expect', '{{what_to_expect}}'),
+      section(5, 'Your Assessment Results', null),
+      assessmentTable(),
 
-      sectionHeading('1  What We Found'),
-      para([txt('{{what_we_found}}', { color: NAVY, size: 19 })]),
-      subHeading('Assessment Results'),
-      oaTable,
-
-      sectionHeading("2  What We'll Focus On"),
-      para([txt('{{what_we_focus}}', { color: NAVY, size: 19 })]),
-
-      sectionHeading('Section 3 — Your Options', { pageBreakBefore: true }),
-      subHeading('Treatment Blocks — 6 Weeks'),
-      body('Payment: weekly direct debit over 6 weeks, or pay in full with 5% discount. Includes: unlimited gym access + Moveify app.'),
-      ...tierParas,
-      subHeading('Not Ready to Commit? Casual Options'),
-      body("If you'd prefer to try a session or two before committing to a block, that's completely fine."),
-      casualTable,
-      body('Note: if you decide to commit to a treatment block within 7 days of your casual sessions, the fees paid are credited toward your block price.', { color: GREY, size: 16 }),
-
-      sectionHeading('Section 4 — Medicare and Health Fund Offsets'),
-      subHeading('Medicare CDM Rebates'),
-      body('If you have a Chronic Disease Management (CDM) plan from your GP, you are eligible for up to 5 Medicare-rebated allied health sessions per calendar year. Each eligible 1:1 session earns a rebate of $61.80.'),
-      subHeading('Private Health Insurance'),
-      body('If you hold extras cover, you may be able to claim a rebate on Exercise Physiology sessions. You cannot claim both Medicare and PHI on the same session.'),
-
-      sectionHeading('Section 5 — Next Steps'),
-      body('• Choose your program above and let Ryan know today'),
-      body("• If you'd like to take this home and think it over, that's completely fine"),
-      body('• Questions? Call or email: ryan@moveifyhealth.com'),
-
+      // ───────── PAGE 2 ─────────
+      new Paragraph({ pageBreakBefore: true, children: [] }),
+      masthead(),
+      banner(
+        eyebrow('Treatment Options  ·  Page 2 of 2'),
+        [t('Your ', { bold: true, color: 'FFFFFF', size: 52 }), t('treatment', { bold: true, color: TEAL, size: 52 }), t(' options.', { bold: true, color: 'FFFFFF', size: 52 })],
+        [t('6-week blocks', { color: 'E6EDF2', size: 22 }), t('  ·  ', { color: TEAL, bold: true, size: 22 }), t('Three tiers of 1:1 support', { color: 'FFFFFF', bold: true, size: 22 })],
+      ),
+      SPACER(240),
+      new Paragraph({ keepLines: true, spacing: { after: 240 }, children: [
+        t('How it works. ', { bold: true, color: NAVY, size: 21 }),
+        t('Payment is weekly direct debit over 6 weeks, or pay in full with a 5% discount. Every tier includes unlimited gym access and the Moveify app. The clinical program is the same across all three — the tiers differ in how much 1:1 support and supervision you receive.', { color: INK, size: 21 }),
+      ] }),
+      tierBand(),
+      SPACER(160),
+      tierGrid(),
+      subHeading('Casual Options'),
+      casualTable(),
+      new Paragraph({ spacing: { before: 120 }, keepLines: true, children: [t('↳  ', { color: TEAL, bold: true, size: 22 }), t('Commit to a treatment block within 7 days of your casual sessions and the fees paid are credited toward your block price.', { color: OCEAN, size: 19 })] }),
+      subHeading('Rebates & Offsets'),
+      offsets(),
       new Paragraph({
-        spacing: { before: 200 },
-        alignment: AlignmentType.CENTER,
-        border: { top: { style: BorderStyle.SINGLE, size: 6, color: 'E5E7EB' } },
-        children: [txt('Moveify Health Solutions · ryan@moveifyhealth.com · 0435 524 991 · ABN 52 263 141 529 · 4 George St, Williamstown SA', { color: '9CA3AF', size: 15 })],
+        spacing: { before: 360, after: 80 }, border: { top: edge(RULE, 4) },
+        children: [t('Ready when you are. ', { bold: true, color: NAVY, size: 26 }), t('Call or email any time.', { bold: true, color: TEAL, size: 26 })],
+      }),
+      new Paragraph({ children: [t('ryan@moveifyhealth.com', { color: NAVY, bold: true, size: 20 }), t('  ·  ', { color: TEAL, bold: true, size: 20 }), t('0435 524 991', { color: SUB, size: 20 })] }),
+      new Paragraph({
+        spacing: { before: 280 }, alignment: AlignmentType.CENTER, border: { top: edge(RULE, 4) },
+        children: [t('Moveify Health Solutions', { color: SOFT, size: 15 }), t('  ·  ', { color: TEAL, bold: true, size: 15 }), t('ABN 52 263 141 529', { color: SOFT, size: 15 }), t('  ·  ', { color: TEAL, bold: true, size: 15 }), t('4 George St, Williamstown SA 5351', { color: SOFT, size: 15 })],
       }),
     ],
   }],

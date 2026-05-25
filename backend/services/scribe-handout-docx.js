@@ -49,14 +49,16 @@ async function generateHandoutDocx(data) {
     nullGetter() { return ''; },
   });
 
-  const oa_rows = parseOaRows(data.clinicalContext);
+  const assessment_rows = parseOaRows(data.clinicalContext);
 
   doc.render({
     patient_first_name: clean(data.patientFirstName),
     assessment_date:    data.assessmentDate || '',
-    what_we_found:      clean(data.found),
-    what_we_focus:      clean(data.focus),
-    oa_rows,
+    whats_going_on:     clean(data.whatsGoingOn),
+    our_aims:           clean(data.ourAims),
+    how_we_get_there:   clean(data.howWeGetThere),
+    what_to_expect:     clean(data.whatToExpect),
+    assessment_rows,
   });
 
   return doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });

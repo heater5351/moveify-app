@@ -35,8 +35,10 @@ export default function HandoutPreview({
   onClose,
   onRegenerate,
 }: HandoutPreviewProps) {
-  const [foundText, setFoundText] = useState(() => cleanText(sections.found));
-  const [focusText, setFocusText] = useState(() => cleanText(sections.focus));
+  const [goingOn, setGoingOn] = useState(() => cleanText(sections.whatsGoingOn));
+  const [aims, setAims] = useState(() => cleanText(sections.ourAims));
+  const [approach, setApproach] = useState(() => cleanText(sections.howWeGetThere));
+  const [expect, setExpect] = useState(() => cleanText(sections.whatToExpect));
   const [contextText, setContextText] = useState(() => cleanText(sections.clinicalContext || ''));
 
   const [blob, setBlob] = useState<Blob | null>(null);
@@ -47,8 +49,10 @@ export default function HandoutPreview({
 
   // Reset the fields if a fresh set of sections arrives (e.g. after Regenerate).
   useEffect(() => {
-    setFoundText(cleanText(sections.found));
-    setFocusText(cleanText(sections.focus));
+    setGoingOn(cleanText(sections.whatsGoingOn));
+    setAims(cleanText(sections.ourAims));
+    setApproach(cleanText(sections.howWeGetThere));
+    setExpect(cleanText(sections.whatToExpect));
     setContextText(cleanText(sections.clinicalContext || ''));
   }, [sections]);
 
@@ -59,8 +63,10 @@ export default function HandoutPreview({
       const docx = await fetchHandoutDocx(sessionId, {
         patientFirstName,
         assessmentDate,
-        found: foundText,
-        focus: focusText,
+        whatsGoingOn: goingOn,
+        ourAims: aims,
+        howWeGetThere: approach,
+        whatToExpect: expect,
         clinicalContext: contextText,
       });
       setBlob(docx);
@@ -79,7 +85,7 @@ export default function HandoutPreview({
     } finally {
       setRendering(false);
     }
-  }, [sessionId, patientFirstName, assessmentDate, foundText, focusText, contextText]);
+  }, [sessionId, patientFirstName, assessmentDate, goingOn, aims, approach, expect, contextText]);
 
   // Debounced regenerate whenever the editable content changes (and on mount).
   useEffect(() => {
@@ -129,22 +135,20 @@ export default function HandoutPreview({
         {/* Editor panel */}
         <div className="w-[360px] shrink-0 bg-white border-r border-gray-200 overflow-y-auto p-4 space-y-4">
           <div>
-            <p className={fieldLabel}>What We Found</p>
-            <textarea
-              value={foundText}
-              onChange={e => setFoundText(e.target.value)}
-              rows={7}
-              className={textarea}
-            />
+            <p className={fieldLabel}>What's Going On</p>
+            <textarea value={goingOn} onChange={e => setGoingOn(e.target.value)} rows={5} className={textarea} />
           </div>
           <div>
-            <p className={fieldLabel}>What We'll Focus On</p>
-            <textarea
-              value={focusText}
-              onChange={e => setFocusText(e.target.value)}
-              rows={6}
-              className={textarea}
-            />
+            <p className={fieldLabel}>What We're Aiming For</p>
+            <textarea value={aims} onChange={e => setAims(e.target.value)} rows={4} className={textarea} />
+          </div>
+          <div>
+            <p className={fieldLabel}>How We'll Get There</p>
+            <textarea value={approach} onChange={e => setApproach(e.target.value)} rows={4} className={textarea} />
+          </div>
+          <div>
+            <p className={fieldLabel}>What You Can Expect</p>
+            <textarea value={expect} onChange={e => setExpect(e.target.value)} rows={4} className={textarea} />
           </div>
           <div>
             <p className={fieldLabel}>Assessment Results</p>

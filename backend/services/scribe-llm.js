@@ -40,35 +40,32 @@ async function generateSoapNote(transcript, systemPrompt) {
   return { content: response.output.message.content[0].text, model: MODEL_ID };
 }
 
-const HANDOUT_SYSTEM_PROMPT = `You are a clinical documentation assistant for Moveify Health Solutions, an Accredited Exercise Physiology practice in Williamstown, South Australia.
+const HANDOUT_SYSTEM_PROMPT = `You are a clinical documentation assistant for Moveify Health Solutions, an Accredited Exercise Physiology practice in Williamstown, South Australia. Patients are typically injured athletes and older adults (roughly 45–75).
 
-Your task is to generate the patient-facing sections of an assessment handout (Sections 1 and 2 only) from a session transcript provided by the Exercise Physiologist. The transcript is a raw, unstructured record of a clinical conversation — approximately the first 45 minutes of a 60-minute Gateway Assessment.
+Your task is to generate the four narrative sections of a patient assessment handout from a session transcript provided by the Exercise Physiologist. The transcript is a raw, unstructured record of a clinical conversation.
 
-Section 1 — WHAT WE FOUND
-Summarise the key assessment findings in plain language, speaking directly to the patient. Use 4–6 bullet points covering:
-- The patient's main presenting concerns and how long they have been present
-- Relevant history or contributing factors mentioned in the session
-- Key physical findings from the assessment (movement, strength, endurance, function)
-- How these findings relate to their daily life, work, or goals
-- Any lifestyle or health factors discussed that are relevant to exercise
+Produce these four sections, each as a short, warm paragraph (2–4 sentences). Use the EXACT headings shown:
 
-Section 2 — WHAT WE'LL FOCUS ON
-Outline the treatment priorities, speaking directly to the patient. Use 3–5 bullet points covering:
-- The primary movement, strength, or endurance goals for their program
-- Any specific exercises, activities, or habits that will be targeted
-- How the program will address the key findings from Section 1
-- Any lifestyle, pain management, or self-management strategies discussed
+WHAT'S GOING ON
+What you found and what it means for the patient, in plain language. Their main concern, how long it has been present, relevant contributing factors, and the key physical findings (movement, strength, endurance, function) tied to their daily life or goals.
+
+WHAT WE'RE AIMING FOR
+The goals for the program, ideally reflecting the patient's own stated goals from the session (e.g. return to a sport, lift grandchildren, walk without pain). Make it feel personal.
+
+HOW WE'LL GET THERE
+The clinical approach: the type of work (strength, load management, mobility), how it addresses the findings, and how it progresses through the program. Describe the APPROACH only. Do NOT mention session counts, frequency, tiers, or pricing — that is covered separately.
+
+WHAT YOU CAN EXPECT
+What the journey looks like: the phases of the program, early signs things are working, and that you will reassess and adjust. CRITICAL: only state a specific timeframe (weeks/months) if the clinician explicitly gave one in the transcript. If they did not, describe the phases and the reassessment point WITHOUT inventing a date. Never fabricate a prognosis.
 
 Rules:
-- Write in plain, warm language suitable for adults aged 45–75
-- ALWAYS use second person ("you", "your") when referring to the patient — never use their name or write in the third person (e.g. write "you have been experiencing lower back pain" not "Ryan has been experiencing lower back pain")
-- ALWAYS use first person plural ("we", "our") when referring to the clinician or practice (e.g. "we found", "we will focus on", "our assessment showed")
-- Never use clinical jargon without an immediate plain-language explanation
-- Never include diagnoses, pathology results, or sensitive medical information unless explicitly appropriate for the patient
-- Never use asterisks (*), emojis, or markdown formatting anywhere in the output
-- Do not include pricing, Medicare information, or next steps — those are added separately
-- Output only the two sections in plain text, using the exact headings: WHAT WE FOUND / WHAT WE'LL FOCUS ON
-- Do not include any preamble, explanation, or text outside the two sections`;
+- Plain, warm, capable language. Treat the reader as intelligent.
+- ALWAYS second person ("you", "your") for the patient — never use their name or the third person.
+- ALWAYS first person plural ("we", "our") for the clinic.
+- No clinical jargon without an immediate plain-language explanation.
+- No em dashes. No asterisks, emojis, or markdown formatting. No bullet points — write flowing prose.
+- Do not fabricate anything not supported by the transcript.
+- Output only the four sections in plain text with the exact headings above. No preamble or text outside them.`;
 
 const CLINICAL_CONTEXT_SYSTEM_PROMPT = `You are a clinical exercise physiologist analyzing assessment data from a patient transcript.
 
@@ -102,11 +99,12 @@ async function generateHandout(transcript, patientFirstName, assessmentDate) {
   const response = await client.send(command);
   const raw = response.output.message.content[0].text;
   const cleaned = raw.replace(/\*\*/g, '').replace(/\*/g, '');
-  const foundMatch = cleaned.match(/WHAT WE FOUND\s*\n([\s\S]*?)(?=WHAT WE(?:'|')LL FOCUS ON|$)/i);
-  const focusMatch = cleaned.match(/WHAT WE(?:'|')LL FOCUS ON\s*\n([\s\S]*?)$/i);
+  const grab = (re) => { const m = cleaned.match(re); return m ? m[1].trim() : ''; };
   const sections = {
-    found: foundMatch ? foundMatch[1].trim() : '',
-    focus: focusMatch ? focusMatch[1].trim() : '',
+    whatsGoingOn:  grab(/WHAT(?:'|')?S GOING ON\s*\n([\s\S]*?)(?=WHAT WE(?:'|')?RE AIMING FOR|HOW WE(?:'|')?LL GET THERE|WHAT YOU CAN EXPECT|$)/i),
+    ourAims:       grab(/WHAT WE(?:'|')?RE AIMING FOR\s*\n([\s\S]*?)(?=HOW WE(?:'|')?LL GET THERE|WHAT YOU CAN EXPECT|$)/i),
+    howWeGetThere: grab(/HOW WE(?:'|')?LL GET THERE\s*\n([\s\S]*?)(?=WHAT YOU CAN EXPECT|$)/i),
+    whatToExpect:  grab(/WHAT YOU CAN EXPECT\s*\n([\s\S]*?)$/i),
   };
   let clinicalContext = '';
   try {

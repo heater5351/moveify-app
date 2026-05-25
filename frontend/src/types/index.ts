@@ -338,8 +338,10 @@ export type SoapTemplate = {
 }
 
 export type HandoutSections = {
-  found: string;
-  focus: string;
+  whatsGoingOn: string;
+  ourAims: string;
+  howWeGetThere: string;
+  whatToExpect: string;
   clinicalContext?: string;
 }
 
