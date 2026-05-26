@@ -18,6 +18,15 @@ function clean(text) {
     .trim();
 }
 
+// Split a section's text into bullet points: one per non-empty line, with any
+// leading bullet/marker glyph stripped (the template adds the bullet itself).
+function toBullets(text) {
+  return clean(text)
+    .split('\n')
+    .map(l => l.replace(/^[-•·*–—]+\s*/, '').trim())
+    .filter(Boolean);
+}
+
 function parseOaRows(raw) {
   if (!raw) return [];
   return raw.split('\n')
@@ -54,10 +63,10 @@ async function generateHandoutDocx(data) {
   doc.render({
     patient_first_name: clean(data.patientFirstName),
     assessment_date:    data.assessmentDate || '',
-    whats_going_on:     clean(data.whatsGoingOn),
-    our_aims:           clean(data.ourAims),
-    how_we_get_there:   clean(data.howWeGetThere),
-    what_to_expect:     clean(data.whatToExpect),
+    whats_going_on:     toBullets(data.whatsGoingOn),
+    our_aims:           toBullets(data.ourAims),
+    how_we_get_there:   toBullets(data.howWeGetThere),
+    what_to_expect:     toBullets(data.whatToExpect),
     assessment_rows,
   });
 

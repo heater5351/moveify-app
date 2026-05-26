@@ -107,13 +107,20 @@ function eyebrow(text) {
   return [t(text.toUpperCase(), { color: TEAL, bold: true, size: 17, allCaps: true, characterSpacing: 40 })];
 }
 
-// ── Numbered section: big teal numeral | uppercase title + body ─────────────
-function section(num, title, bodyToken, asideText) {
+// ── Numbered section: big teal numeral | uppercase title + bulleted body ────
+// `loopVar` is the name of an array token (e.g. 'whats_going_on'). docxtemplater
+// repeats the bullet paragraph once per item via the {{#..}}/{{/..}} pair.
+function section(num, title, loopVar, asideText) {
   const contentChildren = [
     new Paragraph({ spacing: { after: 100 }, children: [t(title.toUpperCase(), { bold: true, color: NAVY, size: 28, allCaps: true, characterSpacing: 16 })] }),
   ];
-  if (bodyToken) {
-    contentChildren.push(new Paragraph({ keepLines: true, children: [t(bodyToken, { color: INK, size: 23 })] }));
+  if (loopVar) {
+    contentChildren.push(new Paragraph({ children: [t(`{{#${loopVar}}}`)] }));
+    contentChildren.push(new Paragraph({
+      bullet: { level: 0 }, keepLines: true, spacing: { after: 100 },
+      children: [t('{{.}}', { color: INK, size: 23 })],
+    }));
+    contentChildren.push(new Paragraph({ children: [t(`{{/${loopVar}}}`)] }));
   }
   if (asideText) {
     contentChildren.push(new Paragraph({
@@ -278,10 +285,10 @@ const doc = new Document({
         [t('Prepared ', { color: 'E6EDF2', size: 22 }), t('{{assessment_date}}', { color: 'FFFFFF', bold: true, size: 22 })],
       ),
       SPACER(240),
-      section(1, "What's Going On", '{{whats_going_on}}'),
-      section(2, "What We're Aiming For", '{{our_aims}}'),
-      section(3, "How We'll Get There", '{{how_we_get_there}}', '↘ 1:1 support is flexible. See Your Options.'),
-      section(4, 'What You Can Expect', '{{what_to_expect}}'),
+      section(1, "What's Going On", 'whats_going_on'),
+      section(2, "What We're Aiming For", 'our_aims'),
+      section(3, "How We'll Get There", 'how_we_get_there', '↘ 1:1 support is flexible. See Your Options.'),
+      section(4, 'What You Can Expect', 'what_to_expect'),
 
       // ───────── PAGE 2 — Assessment results ─────────
       new Paragraph({ pageBreakBefore: true, children: [] }),
@@ -295,24 +302,9 @@ const doc = new Document({
       subHeading('Your Results at a Glance'),
       assessmentTable(),
       subHeading('What Your Results Mean'),
-      new Paragraph({ keepLines: true, spacing: { after: 200 }, children: [
-        t('Reading the table. ', { bold: true, color: NAVY, size: 23 }),
-        t('Each test is compared against ', { color: INK, size: 23 }),
-        t('normative data', { bold: true, color: NAVY, size: 23 }),
-        t(' — large reference datasets that describe the typical range for someone of your age, sex, and activity level. Your result is read relative to that range, so it tells us not just a raw number but where you sit among people like you. Where a value falls within the expected range, it is a strength we will protect and build on; where it falls below, it is an opportunity area your program is built to target.', { color: INK, size: 23 }),
-      ] }),
-      new Paragraph({ keepLines: true, spacing: { after: 200 }, children: [
-        t('We read patterns, not single numbers. ', { bold: true, color: NAVY, size: 23 }),
-        t('One result rarely tells the whole story. We look across the tests together — for example, how your strength, mobility, and balance relate to one another — because it is the pattern that explains your symptoms and points to the most effective starting point. A score outside the usual range is never a cause for alarm; it is simply where we begin.', { color: INK, size: 23 }),
-      ] }),
-      new Paragraph({ keepLines: true, spacing: { after: 200 }, children: [
-        t('How this shapes your program. ', { bold: true, color: NAVY, size: 23 }),
-        t('These results set your baseline and directly calibrate your plan — the exercises we select, the loads we start at, and how quickly we progress are all chosen from where you are today. We repeat the same tests at your reassessment so the change is measured objectively, in black and white, rather than by feel alone.', { color: INK, size: 23 }),
-      ] }),
-      new Paragraph({ keepLines: true, border: { top: edge(TEAL, 16) }, spacing: { before: 40 }, children: [
-        t('↳  ', { color: TEAL, bold: true, size: 23 }),
-        t('Paired with this handout is a detailed normative-data reference for every test we performed, with the full reference ranges so you can see exactly how your numbers compare.', { color: OCEAN, bold: true, size: 21 }),
-      ] }),
+      new Paragraph({ keepLines: true, children: [t(
+        'Each result above is compared against the typical range for someone of your age, sex, and activity level, which is why the interpretation column matters more than the raw number on its own — it tells us where you sit relative to people like you. Where a value sits within the expected range it is a strength we will protect; where it sits below, it is simply where we begin, and it directly shapes the exercises we choose and the loads we start at. None of these numbers is a verdict, and we repeat the same tests at your reassessment so your progress is measured objectively rather than by feel alone.',
+        { color: INK, size: 23 })] }),
 
       // ───────── PAGE 3 — Treatment options ─────────
       new Paragraph({ pageBreakBefore: true, children: [] }),
