@@ -177,30 +177,34 @@ function tierBand() {
   ] })]);
 }
 
-function tierCell(pill, name, price, per, includes, isFirst, isLast) {
-  return new TableCell({
-    borders: { top: NB, bottom: edge(NAVY, 24), left: NB, right: isLast ? NB : edge(RULE, 4) },
-    margins: { top: 240, bottom: 280, left: isFirst ? 0 : 200, right: isLast ? 0 : 200 },
-    children: [
-      new Paragraph({ spacing: { after: 80 }, border: { bottom: edge(TEAL, 16) }, children: [t(pill.toUpperCase(), { bold: true, color: TEAL, size: 15, allCaps: true, characterSpacing: 24 })] }),
-      new Paragraph({ spacing: { before: 120, after: 120 }, children: [t(name, { bold: true, color: NAVY, size: 26 })] }),
-      new Paragraph({ children: [t(price, { bold: true, color: NAVY, size: 48 })] }),
-      new Paragraph({ spacing: { after: 120 }, children: [t(per, { color: SUB, size: 18 })] }),
-      new Paragraph({ keepLines: true, spacing: { after: 120 }, children: [t(includes, { color: INK, size: 19 })] }),
-      new Paragraph({ border: { top: edge(RULE, 4) }, spacing: { before: 80 }, children: [t('↓ Medicare & private health rebates available', { color: OCEAN, bold: true, size: 16 })] }),
-    ],
-  });
-}
-
-function tierGrid() {
+// Full-width tier card: price/identity on the left, what's included on the
+// right. Stacked vertically so the section fills the page edge to edge.
+function tierCard(pill, name, price, per, includes) {
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
-    borders: NONE,
-    columnWidths: [3200, 3200, 3200],
+    borders: { top: NB, bottom: edge(NAVY, 24), left: NB, right: NB, insideHorizontal: NB, insideVertical: NB },
+    columnWidths: [3800, 5800],
     rows: [new TableRow({ cantSplit: true, children: [
-      tierCell('Tier 1', 'Foundation', '$510', '$85 / week over 6 weeks', '60-min program design, 4 group sessions, and a 30-min reassessment.', true, false),
-      tierCell('Tier 2', 'Progress', '$680', '$113.33 / week over 6 weeks', '60-min program design, 4 × 30-min weekly 1:1 sessions, and a 30-min reassessment.', false, false),
-      tierCell('Tier 3', 'Performance', '$860', '$143.33 / week over 6 weeks', '60-min program design, 4 × 45-min weekly 1:1 sessions, and a 30-min reassessment.', false, true),
+      new TableCell({
+        borders: { top: NB, bottom: NB, left: NB, right: edge(RULE, 4) },
+        verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 260, bottom: 280, left: 0, right: 360 },
+        children: [
+          new Paragraph({ spacing: { after: 80 }, border: { bottom: edge(TEAL, 16) }, children: [t(pill.toUpperCase(), { bold: true, color: TEAL, size: 16, allCaps: true, characterSpacing: 24 })] }),
+          new Paragraph({ spacing: { before: 120, after: 80 }, children: [t(name, { bold: true, color: NAVY, size: 30 })] }),
+          new Paragraph({ children: [t(price, { bold: true, color: NAVY, size: 56 })] }),
+          new Paragraph({ children: [t(per, { color: SUB, size: 19 })] }),
+        ],
+      }),
+      new TableCell({
+        borders: NONE,
+        verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 260, bottom: 280, left: 360, right: 0 },
+        children: [
+          new Paragraph({ keepLines: true, spacing: { after: 140 }, children: [t(includes, { color: INK, size: 23 })] }),
+          new Paragraph({ children: [t('↓ Medicare & private health rebates available', { color: OCEAN, bold: true, size: 18 })] }),
+        ],
+      }),
     ] })],
   });
 }
@@ -288,12 +292,27 @@ const doc = new Document({
         [t('Measured ', { color: 'E6EDF2', size: 22 }), t('{{assessment_date}}', { color: 'FFFFFF', bold: true, size: 22 })],
       ),
       SPACER(240),
-      section(5, 'Your Assessment Results', null),
+      subHeading('Your Results at a Glance'),
       assessmentTable(),
       subHeading('What Your Results Mean'),
-      new Paragraph({ keepLines: true, children: [t(
-        'Each measurement above is a snapshot, not a verdict. We compare your results against what is typical for your age and goals to find your starting point — the areas where focused work will make the biggest difference. A score outside the usual range is not a cause for alarm; it is simply where we begin, and it is exactly what your program is built to improve. We will repeat these tests at your reassessment so you can see your progress in black and white.',
-        { color: INK, size: 23 })] }),
+      new Paragraph({ keepLines: true, spacing: { after: 200 }, children: [
+        t('Reading the table. ', { bold: true, color: NAVY, size: 23 }),
+        t('Each test is compared against ', { color: INK, size: 23 }),
+        t('normative data', { bold: true, color: NAVY, size: 23 }),
+        t(' — large reference datasets that describe the typical range for someone of your age, sex, and activity level. Your result is read relative to that range, so it tells us not just a raw number but where you sit among people like you. Where a value falls within the expected range, it is a strength we will protect and build on; where it falls below, it is an opportunity area your program is built to target.', { color: INK, size: 23 }),
+      ] }),
+      new Paragraph({ keepLines: true, spacing: { after: 200 }, children: [
+        t('We read patterns, not single numbers. ', { bold: true, color: NAVY, size: 23 }),
+        t('One result rarely tells the whole story. We look across the tests together — for example, how your strength, mobility, and balance relate to one another — because it is the pattern that explains your symptoms and points to the most effective starting point. A score outside the usual range is never a cause for alarm; it is simply where we begin.', { color: INK, size: 23 }),
+      ] }),
+      new Paragraph({ keepLines: true, spacing: { after: 200 }, children: [
+        t('How this shapes your program. ', { bold: true, color: NAVY, size: 23 }),
+        t('These results set your baseline and directly calibrate your plan — the exercises we select, the loads we start at, and how quickly we progress are all chosen from where you are today. We repeat the same tests at your reassessment so the change is measured objectively, in black and white, rather than by feel alone.', { color: INK, size: 23 }),
+      ] }),
+      new Paragraph({ keepLines: true, border: { top: edge(TEAL, 16) }, spacing: { before: 40 }, children: [
+        t('↳  ', { color: TEAL, bold: true, size: 23 }),
+        t('Paired with this handout is a detailed normative-data reference for every test we performed, with the full reference ranges so you can see exactly how your numbers compare.', { color: OCEAN, bold: true, size: 21 }),
+      ] }),
 
       // ───────── PAGE 3 — Treatment options ─────────
       new Paragraph({ pageBreakBefore: true, children: [] }),
@@ -309,8 +328,12 @@ const doc = new Document({
         t('Payment is weekly direct debit over 6 weeks, or pay in full with a 5% discount. Every tier includes unlimited gym access and the Moveify app. The clinical program is the same across all three — the tiers differ in how much 1:1 support and supervision you receive.', { color: INK, size: 23 }),
       ] }),
       tierBand(),
-      SPACER(160),
-      tierGrid(),
+      SPACER(200),
+      tierCard('Tier 3', 'Performance', '$860', '$143.33 / week over 6 weeks', '60-min program design, 4 × 45-min weekly 1:1 sessions, and a 30-min reassessment.'),
+      SPACER(220),
+      tierCard('Tier 2', 'Progress', '$680', '$113.33 / week over 6 weeks', '60-min program design, 4 × 30-min weekly 1:1 sessions, and a 30-min reassessment.'),
+      SPACER(220),
+      tierCard('Tier 1', 'Foundation', '$510', '$85 / week over 6 weeks', '60-min program design, 4 group sessions, and a 30-min reassessment.'),
 
       // ───────── PAGE 4 — Casual options & rebates ─────────
       new Paragraph({ pageBreakBefore: true, children: [] }),
