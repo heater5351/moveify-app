@@ -110,16 +110,16 @@ function eyebrow(text) {
 // ── Numbered section: big teal numeral | uppercase title + body ─────────────
 function section(num, title, bodyToken, asideText) {
   const contentChildren = [
-    new Paragraph({ spacing: { after: 80 }, children: [t(title.toUpperCase(), { bold: true, color: NAVY, size: 26, allCaps: true, characterSpacing: 16 })] }),
+    new Paragraph({ spacing: { after: 100 }, children: [t(title.toUpperCase(), { bold: true, color: NAVY, size: 28, allCaps: true, characterSpacing: 16 })] }),
   ];
   if (bodyToken) {
-    contentChildren.push(new Paragraph({ keepLines: true, children: [t(bodyToken, { color: INK, size: 21 })] }));
+    contentChildren.push(new Paragraph({ keepLines: true, children: [t(bodyToken, { color: INK, size: 23 })] }));
   }
   if (asideText) {
     contentChildren.push(new Paragraph({
-      spacing: { before: 120 }, keepLines: true,
+      spacing: { before: 140 }, keepLines: true,
       border: { top: edge(TEAL, 16) },
-      children: [t(asideText, { color: OCEAN, bold: true, size: 20 })],
+      children: [t(asideText, { color: OCEAN, bold: true, size: 21 })],
     }));
   }
   return new Table({
@@ -162,9 +162,9 @@ function assessmentTable() {
     rows: [
       new TableRow({ tableHeader: true, children: [navyHeaderCell('Test', 32), navyHeaderCell('Result', 22), navyHeaderCell('Interpretation')] }),
       new TableRow({ children: [
-        bodyCell([t('{{#assessment_rows}}{{test}}', { color: NAVY, bold: true, size: 20 })]),
-        bodyCell([t('{{result}}', { color: NAVY, bold: true, size: 20 })]),
-        bodyCell([t('{{interpretation}}{{/assessment_rows}}', { color: SUB, size: 20 })]),
+        bodyCell([t('{{#assessment_rows}}{{test}}', { color: NAVY, bold: true, size: 22 })]),
+        bodyCell([t('{{result}}', { color: NAVY, bold: true, size: 22 })]),
+        bodyCell([t('{{interpretation}}{{/assessment_rows}}', { color: SUB, size: 22 })]),
       ] }),
     ],
   });
@@ -227,9 +227,9 @@ function casualTable() {
     rows: [
       new TableRow({ tableHeader: true, children: [navyHeaderCell('Service', 44), navyHeaderCell('Fee', 16), navyHeaderCell('Details')] }),
       ...rows.map(([s, f, d]) => new TableRow({ cantSplit: true, children: [
-        bodyCell([t(s, { color: INK, size: 20 })]),
-        bodyCell([t(f, { color: NAVY, bold: true, size: 20 })]),
-        bodyCell([t(d, { color: SUB, size: 20 })]),
+        bodyCell([t(s, { color: INK, size: 22 })]),
+        bodyCell([t(f, { color: NAVY, bold: true, size: 22 })]),
+        bodyCell([t(d, { color: SUB, size: 22 })]),
       ] })),
     ],
   });
@@ -249,11 +249,11 @@ function offsets() {
     width: { size: 100, type: WidthType.PERCENTAGE }, borders: NONE, columnWidths: [4800, 4800],
     rows: [new TableRow({ children: [
       offsetCell('Medicare CDM', [
-        t('If you have a Chronic Disease Management plan from your GP, you are eligible for up to 5 Medicare-rebated allied health sessions per calendar year. Each eligible 1:1 session earns a rebate of ', { color: INK, size: 20 }),
-        t('$61.80', { color: NAVY, bold: true, size: 20 }), t('.', { color: INK, size: 20 }),
+        t('If you have a Chronic Disease Management plan from your GP, you are eligible for up to 5 Medicare-rebated allied health sessions per calendar year. Each eligible 1:1 session earns a rebate of ', { color: INK, size: 22 }),
+        t('$61.80', { color: NAVY, bold: true, size: 22 }), t('.', { color: INK, size: 22 }),
       ], true),
       offsetCell('Private Health', [
-        t('If you hold extras cover, you may be able to claim a rebate on Exercise Physiology sessions. You cannot claim both Medicare and PHI on the same session.', { color: INK, size: 20 }),
+        t('If you hold extras cover, you may be able to claim a rebate on Exercise Physiology sessions. You cannot claim both Medicare and PHI on the same session.', { color: INK, size: 22 }),
       ], false),
     ] })],
   });
@@ -278,25 +278,43 @@ const doc = new Document({
       section(2, "What We're Aiming For", '{{our_aims}}'),
       section(3, "How We'll Get There", '{{how_we_get_there}}', '↘ 1:1 support is flexible. See Your Options.'),
       section(4, 'What You Can Expect', '{{what_to_expect}}'),
-      section(5, 'Your Assessment Results', null),
-      assessmentTable(),
 
-      // ───────── PAGE 2 ─────────
+      // ───────── PAGE 2 — Assessment results ─────────
       new Paragraph({ pageBreakBefore: true, children: [] }),
       masthead(),
       banner(
-        eyebrow('Treatment Options  ·  Page 2 of 2'),
+        eyebrow('Exercise Physiology  ·  Assessment'),
+        [t('Understanding your ', { bold: true, color: 'FFFFFF', size: 52 }), t('results', { bold: true, color: TEAL, size: 52 }), t('.', { bold: true, color: 'FFFFFF', size: 52 })],
+        [t('Measured ', { color: 'E6EDF2', size: 22 }), t('{{assessment_date}}', { color: 'FFFFFF', bold: true, size: 22 })],
+      ),
+      SPACER(240),
+      section(5, 'Your Assessment Results', null),
+      assessmentTable(),
+      subHeading('What Your Results Mean'),
+      new Paragraph({ keepLines: true, children: [t(
+        'Each measurement above is a snapshot, not a verdict. We compare your results against what is typical for your age and goals to find your starting point — the areas where focused work will make the biggest difference. A score outside the usual range is not a cause for alarm; it is simply where we begin, and it is exactly what your program is built to improve. We will repeat these tests at your reassessment so you can see your progress in black and white.',
+        { color: INK, size: 23 })] }),
+
+      // ───────── PAGE 3 — Treatment options ─────────
+      new Paragraph({ pageBreakBefore: true, children: [] }),
+      masthead(),
+      banner(
+        eyebrow('Treatment Options'),
         [t('Your ', { bold: true, color: 'FFFFFF', size: 52 }), t('treatment', { bold: true, color: TEAL, size: 52 }), t(' options.', { bold: true, color: 'FFFFFF', size: 52 })],
         [t('6-week blocks', { color: 'E6EDF2', size: 22 }), t('  ·  ', { color: TEAL, bold: true, size: 22 }), t('Three tiers of 1:1 support', { color: 'FFFFFF', bold: true, size: 22 })],
       ),
       SPACER(240),
       new Paragraph({ keepLines: true, spacing: { after: 240 }, children: [
-        t('How it works. ', { bold: true, color: NAVY, size: 21 }),
-        t('Payment is weekly direct debit over 6 weeks, or pay in full with a 5% discount. Every tier includes unlimited gym access and the Moveify app. The clinical program is the same across all three — the tiers differ in how much 1:1 support and supervision you receive.', { color: INK, size: 21 }),
+        t('How it works. ', { bold: true, color: NAVY, size: 23 }),
+        t('Payment is weekly direct debit over 6 weeks, or pay in full with a 5% discount. Every tier includes unlimited gym access and the Moveify app. The clinical program is the same across all three — the tiers differ in how much 1:1 support and supervision you receive.', { color: INK, size: 23 }),
       ] }),
       tierBand(),
       SPACER(160),
       tierGrid(),
+
+      // ───────── PAGE 4 — Casual options & rebates ─────────
+      new Paragraph({ pageBreakBefore: true, children: [] }),
+      masthead(),
       subHeading('Casual Options'),
       casualTable(),
       new Paragraph({ spacing: { before: 120 }, keepLines: true, children: [t('↳  ', { color: TEAL, bold: true, size: 22 }), t('Commit to a treatment block within 7 days of your casual sessions and the fees paid are credited toward your block price.', { color: OCEAN, size: 19 })] }),
