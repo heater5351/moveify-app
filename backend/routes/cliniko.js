@@ -72,6 +72,7 @@ router.post('/sync/:patientId', async (req, res) => {
 
     const name = `${cp.first_name} ${cp.last_name}`.trim();
     const dob = cp.date_of_birth || null;
+    const sex = cp.sex || null;
     const phone = cp.patient_phone_numbers?.[0]?.number || null;
     const addressParts = [cp.address_1, cp.address_2, cp.address_3, cp.city, cp.state, cp.post_code]
       .map(p => (p || '').trim()).filter(Boolean);
@@ -80,12 +81,12 @@ router.post('/sync/:patientId', async (req, res) => {
     // Email is never synced — it's the login credential in Moveify and must not be overwritten
     // COALESCE preserves existing Moveify data if Cliniko has no value for that field
     await db.query(
-      `UPDATE users SET name = $1, dob = COALESCE($2, dob), phone = COALESCE($3, phone), address = COALESCE($4, address), cliniko_synced_at = NOW() WHERE id = $5`,
-      [name, dob, phone, address, patientId]
+      `UPDATE users SET name = $1, dob = COALESCE($2, dob), sex = COALESCE($3, sex), phone = COALESCE($4, phone), address = COALESCE($5, address), cliniko_synced_at = NOW() WHERE id = $6`,
+      [name, dob, sex, phone, address, patientId]
     );
 
     audit.log(req, 'cliniko_sync', 'patient', parseInt(patientId), { clinikoPatientId: patient.cliniko_patient_id });
-    res.json({ success: true, name, dob, phone, address, clinikoSyncedAt: new Date().toISOString() });
+    res.json({ success: true, name, dob, sex, phone, address, clinikoSyncedAt: new Date().toISOString() });
   } catch (err) {
     console.error('Cliniko sync error:', err);
     res.status(502).json({ error: 'Could not reach Cliniko. Please try again.' });

@@ -1,0 +1,472 @@
+{
+  "_meta": {
+    "description": "Machine-readable normative reference values derived from docs/normative-data.md. The MD remains the human source of truth (with citations). Code classifies a measured value against these bands/cutoffs using patient age+sex; the LLM only writes the prose. Review against the MD before relying on it clinically.",
+    "sexValues": ["male", "female", "any"],
+    "units": ["seconds", "reps", "kg", "mmHg", "mmol_L", "degrees", "cm", "m_s", "points", "metres", "bpm", "ratio"],
+    "directions": ["higher_better", "lower_better", "target_range", "none"],
+    "types": ["norm_referenced", "threshold", "screen", "qualitative"],
+    "caveatFlags": {
+      "no_norm_under_50": "No validated norm below 50; interpret younger patients against the youngest band as a lenient bound.",
+      "no_norm_under_60": "No validated norm below 60.",
+      "symmetry_not_norm": "Interpret side-to-side symmetry and own baseline, not a population norm.",
+      "screen_not_diagnose": "Screening only — an abnormal value flags a GP referral, never a diagnosis.",
+      "course_length_bias": "Distance/score depends on course length; a 10 m track reads ~30-50 m lower than the 30 m standard. Prefer serial change on the same track.",
+      "wide_sd": "Wide population SD — weight change/symmetry over a single absolute value.",
+      "method_dependent": "Value depends heavily on measurement method/instrument; report the method.",
+      "near_ceiling_under_50": "Healthy younger adults sit near the ceiling; interpret a drop, not a norm."
+    }
+  },
+  "tests": {
+    "thirty_second_sit_to_stand": {
+      "displayName": "30-Second Sit-to-Stand",
+      "aliases": ["30cst", "30 second sit to stand", "30s sit to stand", "30 second chair stand", "sit to stand 30", "chair stand test", "30 sec sts"],
+      "unit": "reps", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 60, "ageMax": 64, "sex": "male", "low": 14, "high": 19 },
+        { "ageMin": 60, "ageMax": 64, "sex": "female", "low": 12, "high": 17 },
+        { "ageMin": 65, "ageMax": 69, "sex": "male", "low": 12, "high": 18 },
+        { "ageMin": 65, "ageMax": 69, "sex": "female", "low": 11, "high": 16 },
+        { "ageMin": 70, "ageMax": 74, "sex": "male", "low": 12, "high": 17 },
+        { "ageMin": 70, "ageMax": 74, "sex": "female", "low": 10, "high": 15 },
+        { "ageMin": 75, "ageMax": 79, "sex": "male", "low": 11, "high": 17 },
+        { "ageMin": 75, "ageMax": 79, "sex": "female", "low": 10, "high": 15 },
+        { "ageMin": 80, "ageMax": 84, "sex": "male", "low": 10, "high": 15 },
+        { "ageMin": 80, "ageMax": 84, "sex": "female", "low": 9, "high": 14 }
+      ],
+      "cutoffs": [{ "op": "<", "value": 8, "meaning": "lower functional ability" }],
+      "mdc": { "value": 2.5, "unit": "reps", "note": "change of ~3 reps is meaningful" },
+      "caveats": ["no_norm_under_60"],
+      "rangeMeaning": "interquartile (25th-75th percentile) normal range for age/sex",
+      "sourceShort": "Rikli & Jones 1999"
+    },
+    "timed_up_and_go": {
+      "displayName": "Timed Up and Go (TUG)",
+      "aliases": ["tug", "timed up and go", "timed up & go", "get up and go"],
+      "unit": "seconds", "direction": "lower_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 60, "ageMax": 69, "sex": "any", "mean": 8.1 },
+        { "ageMin": 70, "ageMax": 79, "sex": "any", "mean": 9.2 },
+        { "ageMin": 80, "ageMax": 99, "sex": "any", "mean": 11.3 }
+      ],
+      "cutoffs": [
+        { "op": ">=", "value": 13.5, "meaning": "high fall risk" },
+        { "op": ">=", "value": 12, "meaning": "increased fall risk (STEADI screen)" }
+      ],
+      "mdc": { "value": 3, "unit": "seconds", "note": "population-specific (stroke ~2.9 to PD ~4.9)" },
+      "caveats": ["no_norm_under_60"],
+      "sourceShort": "Bohannon 2006"
+    },
+    "grip_strength": {
+      "displayName": "Grip Strength (dynamometry)",
+      "aliases": ["grip strength", "handgrip", "hand grip", "grip", "jamar", "hand grip strength", "hgs"],
+      "unit": "kg", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 40, "ageMax": 44, "sex": "male", "mean": 55.6, "sd": 7.9, "low": 50.3, "high": 60.7 },
+        { "ageMin": 40, "ageMax": 44, "sex": "female", "mean": 33.4, "sd": 5.0, "low": 29.6, "high": 36.8 },
+        { "ageMin": 45, "ageMax": 49, "sex": "male", "mean": 56.6, "sd": 7.5, "low": 50.7, "high": 61.5 },
+        { "ageMin": 45, "ageMax": 49, "sex": "female", "mean": 32.7, "sd": 5.1, "low": 29.1, "high": 36.1 },
+        { "ageMin": 50, "ageMax": 54, "sex": "male", "mean": 53.8, "sd": 8.2, "low": 48.3, "high": 59.2 },
+        { "ageMin": 50, "ageMax": 54, "sex": "female", "mean": 31.2, "sd": 4.9, "low": 28.0, "high": 34.4 },
+        { "ageMin": 55, "ageMax": 59, "sex": "male", "mean": 52.8, "sd": 7.7, "low": 47.9, "high": 58.0 },
+        { "ageMin": 55, "ageMax": 59, "sex": "female", "mean": 29.7, "sd": 4.4, "low": 26.4, "high": 33.2 },
+        { "ageMin": 60, "ageMax": 64, "sex": "male", "mean": 49.2, "sd": 7.5, "low": 44.3, "high": 53.8 },
+        { "ageMin": 60, "ageMax": 64, "sex": "female", "mean": 28.9, "sd": 4.4, "low": 25.9, "high": 32.0 },
+        { "ageMin": 65, "ageMax": 69, "sex": "male", "mean": 46.8, "sd": 7.5, "low": 41.3, "high": 51.9 },
+        { "ageMin": 65, "ageMax": 69, "sex": "female", "mean": 27.2, "sd": 4.6, "low": 24.1, "high": 30.2 },
+        { "ageMin": 70, "ageMax": 74, "sex": "male", "mean": 45.2, "sd": 7.2, "low": 40.0, "high": 50.3 },
+        { "ageMin": 70, "ageMax": 74, "sex": "female", "mean": 26.0, "sd": 5.0, "low": 23.4, "high": 29.3 },
+        { "ageMin": 75, "ageMax": 79, "sex": "male", "mean": 42.4, "sd": 6.4, "low": 38.2, "high": 46.8 },
+        { "ageMin": 75, "ageMax": 79, "sex": "female", "mean": 25.4, "sd": 5.2, "low": 21.6, "high": 28.4 }
+      ],
+      "cutoffs": [
+        { "op": "<", "value": 27, "meaning": "low strength / probable sarcopenia (EWGSOP2)", "sex": "male" },
+        { "op": "<", "value": 16, "meaning": "low strength / probable sarcopenia (EWGSOP2)", "sex": "female" }
+      ],
+      "mdc": { "value": 6, "unit": "kg", "note": "change >= ~6 kg is real (MCID 5-6.5 kg)" },
+      "rangeMeaning": "p25-p75 normal range for age/sex (Tromsø)",
+      "caveats": [],
+      "sourceShort": "Svinoy 2023 (Tromso); EWGSOP2"
+    },
+    "gait_speed": {
+      "displayName": "Gait Speed (comfortable)",
+      "aliases": ["gait speed", "walking speed", "comfortable gait speed", "usual gait speed", "4m walk", "10m walk", "walk speed"],
+      "unit": "m_s", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 50, "ageMax": 59, "sex": "female", "mean": 1.10, "sd": 0.24 },
+        { "ageMin": 50, "ageMax": 59, "sex": "male", "mean": 1.12, "sd": 0.24 },
+        { "ageMin": 60, "ageMax": 69, "sex": "female", "mean": 0.99, "sd": 0.24 },
+        { "ageMin": 60, "ageMax": 69, "sex": "male", "mean": 1.03, "sd": 0.23 },
+        { "ageMin": 70, "ageMax": 79, "sex": "female", "mean": 0.92, "sd": 0.24 },
+        { "ageMin": 70, "ageMax": 79, "sex": "male", "mean": 0.95, "sd": 0.24 },
+        { "ageMin": 80, "ageMax": 99, "sex": "female", "mean": 0.76, "sd": 0.22 },
+        { "ageMin": 80, "ageMax": 99, "sex": "male", "mean": 0.84, "sd": 0.24 }
+      ],
+      "cutoffs": [
+        { "op": "<", "value": 0.6, "meaning": "predicts functional decline" },
+        { "op": "<", "value": 0.8, "meaning": "slow gait / limited community ambulation" },
+        { "op": "<", "value": 1.0, "meaning": "frailty marker" }
+      ],
+      "mdc": { "value": 0.1, "unit": "m_s", "note": "meaningful change ~0.10 m/s" },
+      "caveats": [],
+      "sourceShort": "Bohannon 2008"
+    },
+    "five_times_sit_to_stand": {
+      "displayName": "Five Times Sit-to-Stand (5xSTS)",
+      "aliases": ["5xsts", "5x sit to stand", "five times sit to stand", "ftsst", "5 times sit to stand", "5 rep sit to stand", "sit to stand x5", "5tsts"],
+      "unit": "seconds", "direction": "lower_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 19, "ageMax": 49, "sex": "any", "mean": 6.2 },
+        { "ageMin": 50, "ageMax": 59, "sex": "any", "mean": 7.1 },
+        { "ageMin": 60, "ageMax": 69, "sex": "any", "mean": 11.4 },
+        { "ageMin": 70, "ageMax": 79, "sex": "any", "mean": 12.6 },
+        { "ageMin": 80, "ageMax": 89, "sex": "any", "mean": 14.8 }
+      ],
+      "cutoffs": [
+        { "op": ">=", "value": 12, "meaning": "flag for fall-risk assessment" },
+        { "op": ">", "value": 15, "meaning": "predicts recurrent falls" }
+      ],
+      "mdc": { "value": 2.3, "unit": "seconds", "note": "~2-2.5 s meaningful in clinical groups" },
+      "caveats": [],
+      "sourceShort": "Bohannon 2006/2007"
+    },
+    "six_minute_walk": {
+      "displayName": "6-Minute Walk Test",
+      "aliases": ["6mwt", "6 minute walk", "six minute walk", "6 min walk", "6 minute walk test", "6mwd"],
+      "unit": "metres", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 40, "ageMax": 80, "sex": "male", "mean": 576 },
+        { "ageMin": 40, "ageMax": 80, "sex": "female", "mean": 494 }
+      ],
+      "referenceEquation": {
+        "male": "(7.57 * height_cm) - (5.02 * age) - (1.76 * weight_kg) - 309",
+        "female": "(2.11 * height_cm) - (2.29 * weight_kg) - (5.78 * age) + 667",
+        "note": "Enright 1998; report as % predicted. Requires height+weight."
+      },
+      "cutoffs": [],
+      "mdc": { "value": 30, "unit": "metres", "note": "MCID 14-30.5 m" },
+      "caveats": ["course_length_bias"],
+      "sourceShort": "Enright 1998",
+      "note": "Median is a coarse reference; prefer the Enright equation (needs height/weight). On a 10 m track expect ~30-50 m lower than 30 m norms."
+    },
+    "mini_bestest": {
+      "displayName": "Mini-BESTest",
+      "aliases": ["mini bestest", "mini-bestest", "mini best test", "mini balance evaluation systems test"],
+      "unit": "points", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 50, "ageMax": 59, "sex": "any", "mean": 26.3 },
+        { "ageMin": 60, "ageMax": 69, "sex": "any", "mean": 24.7 },
+        { "ageMin": 70, "ageMax": 79, "sex": "any", "mean": 21.0 },
+        { "ageMin": 80, "ageMax": 89, "sex": "any", "mean": 19.6 }
+      ],
+      "cutoffs": [{ "op": "<=", "value": 20, "meaning": "associated with fall history" }],
+      "mdc": { "value": 4, "unit": "points", "note": "change >= ~4 points is meaningful (MDC95 ~3.5)" },
+      "caveats": ["near_ceiling_under_50"],
+      "maxScore": 28,
+      "sourceShort": "O'Hoski 2014"
+    },
+    "four_stage_balance_single_leg": {
+      "displayName": "Single-Leg Stance (eyes open)",
+      "aliases": ["single leg stance", "single leg balance", "one leg stance", "unipedal stance", "single leg stand", "4 stage balance single leg", "slst"],
+      "unit": "seconds", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 40, "ageMax": 49, "sex": "any", "mean": 41.9 },
+        { "ageMin": 50, "ageMax": 59, "sex": "any", "mean": 41.2 },
+        { "ageMin": 60, "ageMax": 69, "sex": "any", "mean": 32.1 },
+        { "ageMin": 70, "ageMax": 79, "sex": "any", "mean": 21.5 },
+        { "ageMin": 80, "ageMax": 99, "sex": "any", "mean": 9.4 }
+      ],
+      "cutoffs": [
+        { "op": "<", "value": 5, "meaning": "strongly associated with falls" },
+        { "op": "<", "value": 10, "meaning": "(age >= 50) higher mortality association" }
+      ],
+      "caveats": ["symmetry_not_norm"],
+      "note": "The 4-Stage Balance Test itself is pass/fail (10 s per stage; failing tandem = increased fall risk). These graded norms are for the single-leg-stance component (eyes open).",
+      "sourceShort": "Springer 2007"
+    },
+    "neck_flexor_endurance": {
+      "displayName": "Deep Neck Flexor Endurance",
+      "aliases": ["neck flexor endurance", "deep neck flexor", "dnf", "dnfet", "chin tuck endurance", "cranio-cervical flexion endurance"],
+      "unit": "seconds", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 18, "ageMax": 99, "sex": "male", "mean": 38.9, "sd": 20.1 },
+        { "ageMin": 18, "ageMax": 99, "sex": "female", "mean": 29.4, "sd": 13.7 }
+      ],
+      "cutoffs": [{ "op": "<=", "value": 21, "meaning": "overlaps neck-pain range; suggests cervical flexor dysfunction" }],
+      "caveats": ["wide_sd"],
+      "sourceShort": "Domenech 2011"
+    },
+    "single_leg_calf_raise": {
+      "displayName": "Single-Leg Calf Raise (heel-rise to fatigue)",
+      "aliases": ["single leg calf raise", "calf raise", "heel raise", "single leg heel raise", "calf raise test", "heel rise test", "slcr", "single leg heel rise"],
+      "unit": "reps", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 18, "ageMax": 81, "sex": "male", "mean": 26, "low": 14, "high": 53 },
+        { "ageMin": 18, "ageMax": 81, "sex": "female", "mean": 24, "low": 13, "high": 43 }
+      ],
+      "cutoffs": [],
+      "caveats": ["symmetry_not_norm"],
+      "rangeMeaning": "median (95% reference interval); sample skewed young/active, declines with age",
+      "note": "For older patients prefer an age-adjusted estimate; >10-15% side-to-side deficit is a key flag.",
+      "sourceShort": "Visser 2025 (Calf Raise App)"
+    },
+    "single_leg_rise_test": {
+      "displayName": "Single-Leg Sit-to-Stand",
+      "aliases": ["single leg rise test", "single leg sit to stand", "one leg sit to stand", "single leg rise", "slsts"],
+      "unit": "reps", "direction": "higher_better", "type": "qualitative",
+      "bands": [],
+      "cutoffs": [{ "op": ">", "value": 22, "meaning": "(ACLR cohort) better knee health; not a general norm" }],
+      "caveats": ["symmetry_not_norm"],
+      "note": "No robust age/sex norm exists. Interpret side-to-side symmetry and own baseline, not a population norm.",
+      "sourceShort": "no validated population norm"
+    },
+    "blood_pressure": {
+      "displayName": "Blood Pressure (resting)",
+      "aliases": ["blood pressure", "bp", "resting bp", "systolic", "diastolic"],
+      "unit": "mmHg", "direction": "target_range", "type": "screen",
+      "compound": "systolic_diastolic",
+      "categories": [
+        { "label": "optimal", "systolicMax": 119, "diastolicMax": 79 },
+        { "label": "normal", "systolicMax": 129, "diastolicMax": 84 },
+        { "label": "high-normal", "systolicMax": 139, "diastolicMax": 89 },
+        { "label": "grade 1 (mild) hypertension", "systolicMax": 159, "diastolicMax": 99 },
+        { "label": "grade 2 (moderate) hypertension", "systolicMax": 179, "diastolicMax": 109 },
+        { "label": "grade 3 (severe) hypertension", "systolicMax": 999, "diastolicMax": 999 }
+      ],
+      "cutoffs": [
+        { "op": ">=", "value": 140, "meaning": "hypertension (systolic)", "component": "systolic" },
+        { "op": ">=", "value": 180, "meaning": "do not commence vigorous exercise; recheck/refer", "component": "systolic" }
+      ],
+      "caveats": ["screen_not_diagnose"],
+      "sourceShort": "Heart Foundation (Australia)"
+    },
+    "blood_glucose_fasting": {
+      "displayName": "Fasting Blood Glucose",
+      "aliases": ["fasting blood glucose", "fasting glucose", "fasting bgl", "fbg", "fpg", "fasting blood sugar"],
+      "unit": "mmol_L", "direction": "target_range", "type": "screen",
+      "categories": [
+        { "label": "normal", "max": 6.0 },
+        { "label": "impaired fasting glucose (pre-diabetes)", "max": 6.9 },
+        { "label": "diabetes range", "max": 999 }
+      ],
+      "cutoffs": [
+        { "op": ">=", "value": 7.0, "meaning": "diabetes range (confirm with GP)" },
+        { "op": "<", "value": 4.0, "meaning": "hypoglycaemia; treat before exercise" }
+      ],
+      "caveats": ["screen_not_diagnose"],
+      "sourceShort": "WHO / Diabetes Australia"
+    },
+    "blood_glucose_random": {
+      "displayName": "Random/Non-Fasting Blood Glucose",
+      "aliases": ["random blood glucose", "random glucose", "non fasting glucose", "casual glucose", "random bgl", "non-fasting bgl", "rbg"],
+      "unit": "mmol_L", "direction": "target_range", "type": "screen",
+      "categories": [
+        { "label": "normal", "max": 7.7 },
+        { "label": "elevated (confirm)", "max": 11.0 },
+        { "label": "diabetes range (with symptoms)", "max": 999 }
+      ],
+      "cutoffs": [
+        { "op": ">=", "value": 11.1, "meaning": "diabetes range with symptoms (confirm with GP)" },
+        { "op": ">=", "value": 14, "meaning": "delay vigorous exercise (check ketones)" },
+        { "op": "<", "value": 4.0, "meaning": "hypoglycaemia; treat before exercise" }
+      ],
+      "caveats": ["screen_not_diagnose"],
+      "sourceShort": "WHO / Diabetes Australia"
+    },
+    "resting_heart_rate": {
+      "displayName": "Resting Heart Rate",
+      "aliases": ["resting heart rate", "rhr", "resting hr", "resting pulse", "heart rate at rest"],
+      "unit": "bpm", "direction": "target_range", "type": "threshold",
+      "bands": [{ "ageMin": 18, "ageMax": 99, "sex": "any", "low": 60, "high": 100 }],
+      "cutoffs": [
+        { "op": "<", "value": 60, "meaning": "bradycardia (often athletic; refer if symptomatic)" },
+        { "op": ">", "value": 100, "meaning": "resting tachycardia; investigate/refer" }
+      ],
+      "caveats": [],
+      "rangeMeaning": "normal adult range; lower within range often indicates better fitness",
+      "sourceShort": "AHA"
+    },
+    "waist_circumference": {
+      "displayName": "Waist Circumference",
+      "aliases": ["waist circumference", "waist", "wc", "waist measurement"],
+      "unit": "cm", "direction": "lower_better", "type": "threshold",
+      "cutoffs": [
+        { "op": ">=", "value": 94, "meaning": "increased cardiometabolic risk", "sex": "male" },
+        { "op": ">=", "value": 102, "meaning": "substantially increased cardiometabolic risk", "sex": "male" },
+        { "op": ">=", "value": 80, "meaning": "increased cardiometabolic risk", "sex": "female" },
+        { "op": ">=", "value": 88, "meaning": "substantially increased cardiometabolic risk", "sex": "female" }
+      ],
+      "caveats": ["screen_not_diagnose"],
+      "note": "Europid/Australian cut-offs; lower thresholds apply for Asian populations.",
+      "sourceShort": "NHMRC / IDF / WHO"
+    },
+    "shoulder_flexion_rom": {
+      "displayName": "Shoulder Flexion ROM",
+      "aliases": ["shoulder flexion", "shoulder flexion rom", "shoulder flexion range"],
+      "unit": "degrees", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 20, "ageMax": 44, "sex": "female", "mean": 172.0 },
+        { "ageMin": 20, "ageMax": 44, "sex": "male", "mean": 168.8 },
+        { "ageMin": 45, "ageMax": 69, "sex": "female", "mean": 168.1 },
+        { "ageMin": 45, "ageMax": 69, "sex": "male", "mean": 164.0 }
+      ],
+      "cutoffs": [],
+      "mdc": { "value": 5, "unit": "degrees", "note": "intrarater goniometry ~5 deg" },
+      "caveats": ["symmetry_not_norm"],
+      "sourceShort": "Soucie 2011"
+    },
+    "hip_flexion_rom": {
+      "displayName": "Hip Flexion ROM",
+      "aliases": ["hip flexion", "hip flexion rom", "hip flexion range"],
+      "unit": "degrees", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 20, "ageMax": 44, "sex": "female", "mean": 133.8 },
+        { "ageMin": 20, "ageMax": 44, "sex": "male", "mean": 130.4 },
+        { "ageMin": 45, "ageMax": 69, "sex": "female", "mean": 130.8 },
+        { "ageMin": 45, "ageMax": 69, "sex": "male", "mean": 127.2 }
+      ],
+      "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "sourceShort": "Soucie 2011"
+    },
+    "hip_extension_rom": {
+      "displayName": "Hip Extension ROM",
+      "aliases": ["hip extension", "hip extension rom", "hip extension range"],
+      "unit": "degrees", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 20, "ageMax": 44, "sex": "female", "mean": 18.1 },
+        { "ageMin": 20, "ageMax": 44, "sex": "male", "mean": 17.4 },
+        { "ageMin": 45, "ageMax": 69, "sex": "female", "mean": 16.7 },
+        { "ageMin": 45, "ageMax": 69, "sex": "male", "mean": 13.5 }
+      ],
+      "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "sourceShort": "Soucie 2011"
+    },
+    "knee_flexion_rom": {
+      "displayName": "Knee Flexion ROM",
+      "aliases": ["knee flexion", "knee flexion rom", "knee flexion range"],
+      "unit": "degrees", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 20, "ageMax": 44, "sex": "female", "mean": 141.9 },
+        { "ageMin": 20, "ageMax": 44, "sex": "male", "mean": 137.7 },
+        { "ageMin": 45, "ageMax": 69, "sex": "female", "mean": 137.8 },
+        { "ageMin": 45, "ageMax": 69, "sex": "male", "mean": 132.9 }
+      ],
+      "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "sourceShort": "Soucie 2011"
+    },
+    "ankle_dorsiflexion_rom": {
+      "displayName": "Ankle Dorsiflexion ROM",
+      "aliases": ["ankle dorsiflexion", "dorsiflexion", "ankle df", "ankle dorsiflexion rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 20, "ageMax": 44, "sex": "female", "mean": 13.8 },
+        { "ageMin": 20, "ageMax": 44, "sex": "male", "mean": 12.7 },
+        { "ageMin": 45, "ageMax": 69, "sex": "female", "mean": 11.6 },
+        { "ageMin": 45, "ageMax": 69, "sex": "male", "mean": 11.9 }
+      ],
+      "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "sourceShort": "Soucie 2011"
+    },
+    "ankle_plantarflexion_rom": {
+      "displayName": "Ankle Plantarflexion ROM",
+      "aliases": ["ankle plantarflexion", "plantarflexion", "ankle pf", "ankle plantarflexion rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 20, "ageMax": 44, "sex": "female", "mean": 62.1 },
+        { "ageMin": 20, "ageMax": 44, "sex": "male", "mean": 54.6 },
+        { "ageMin": 45, "ageMax": 69, "sex": "female", "mean": 56.5 },
+        { "ageMin": 45, "ageMax": 69, "sex": "male", "mean": 49.4 }
+      ],
+      "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "sourceShort": "Soucie 2011"
+    },
+    "cervical_rom": {
+      "displayName": "Cervical ROM",
+      "aliases": ["cervical rom", "neck rom", "cervical range", "neck range of motion", "cervical range of motion"],
+      "unit": "degrees", "direction": "higher_better", "type": "norm_referenced",
+      "movements": {
+        "extension": 67.1, "flexion": 46.1, "rotation": 62.4, "lateral_flexion": 36.8
+      },
+      "bands": [], "cutoffs": [],
+      "caveats": ["method_dependent"],
+      "note": "CROM active ROM, mixed-age mean (Youdas). Declines ~3 deg/decade (~5 deg/decade for extension) - apply age adjustment. Females generally > males except flexion.",
+      "sourceShort": "Youdas 1992"
+    },
+    "shoulder_abduction_rom": {
+      "displayName": "Shoulder Abduction ROM",
+      "aliases": ["shoulder abduction", "shoulder abduction rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "threshold",
+      "standardValue": 180, "cutoffs": [], "caveats": ["symmetry_not_norm", "method_dependent"],
+      "note": "AAOS standard adult value (0-180), not age/sex-stratified.",
+      "sourceShort": "AAOS"
+    },
+    "wrist_flexion_rom": {
+      "displayName": "Wrist Flexion ROM",
+      "aliases": ["wrist flexion", "wrist flexion rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "threshold",
+      "standardValue": 80, "cutoffs": [], "caveats": ["symmetry_not_norm", "method_dependent"],
+      "note": "AAOS standard adult value (0-80), not age/sex-stratified.",
+      "sourceShort": "AAOS"
+    },
+    "wrist_extension_rom": {
+      "displayName": "Wrist Extension ROM",
+      "aliases": ["wrist extension", "wrist extension rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "threshold",
+      "standardValue": 70, "cutoffs": [], "caveats": ["symmetry_not_norm", "method_dependent"],
+      "note": "AAOS standard adult value (0-70), not age/sex-stratified.",
+      "sourceShort": "AAOS"
+    },
+    "lumbar_flexion_rom": {
+      "displayName": "Lumbar/Thoracolumbar Flexion ROM",
+      "aliases": ["lumbar flexion", "lumbar rom", "thoracolumbar flexion", "lumbar flexion rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["method_dependent"],
+      "note": "Highly method-dependent (AAOS flexion 0-80 vs AMA 0-60). Pick one instrument and interpret against the patient's own change.",
+      "sourceShort": "AAOS / AMA"
+    },
+    "thoracic_extension_test": {
+      "displayName": "Thoracic Extension",
+      "aliases": ["thoracic extension", "thoracic extension test", "t-spine extension"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["method_dependent", "symmetry_not_norm"],
+      "note": "No universal norm (can't isolate from lumbar/combined motion). Track own change/symmetry, don't quote a population normal.",
+      "sourceShort": "no validated norm"
+    },
+    "pectoralis_minor_length": {
+      "displayName": "Pectoralis Minor Length",
+      "aliases": ["pectoralis minor length", "pec minor length", "pec minor", "pectoralis minor", "pmi", "pectoralis minor index"],
+      "unit": "cm", "direction": "higher_better", "type": "norm_referenced",
+      "bands": [
+        { "ageMin": 18, "ageMax": 99, "sex": "male", "mean": 14.59, "sd": 1.61 },
+        { "ageMin": 18, "ageMax": 99, "sex": "female", "mean": 12.95, "sd": 1.42 }
+      ],
+      "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Lower length/PMI = tighter. Same rater for re-tests (inter-rater only moderate).",
+      "sourceShort": "asymptomatic-adult normative pilot; Struyf (reliability)"
+    },
+    "modified_thomas_test": {
+      "displayName": "Modified Thomas Test (hip flexor length)",
+      "aliases": ["modified thomas test", "thomas test", "mtt", "hip flexor length"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [{ "ageMin": 18, "ageMax": 99, "sex": "any", "mean": 5.4, "sd": 9.7 }],
+      "cutoffs": [], "caveats": ["wide_sd", "symmetry_not_norm"],
+      "note": "Healthy hip extension ~5.4 deg but very wide SD; valid only if pelvic tilt controlled. Otherwise treat as pass/fail (thigh at/below horizontal = normal) + symmetry.",
+      "sourceShort": "Modified Thomas validity studies"
+    },
+    "latissimus_dorsi_length": {
+      "displayName": "Latissimus Dorsi Length",
+      "aliases": ["latissimus dorsi length", "lat length", "lat dorsi length", "latissimus length"],
+      "unit": "none", "direction": "none", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Pass/fail (positive = cannot reach 180 deg shoulder flexion with lumbar flat). Poor-moderate reliability; no usable norm. Symmetry + own change only.",
+      "sourceShort": "no usable norm"
+    },
+    "serratus_anterior_assessment": {
+      "displayName": "Serratus Anterior Assessment",
+      "aliases": ["serratus anterior length", "serratus length", "serratus anterior", "serratus assessment"],
+      "unit": "none", "direction": "none", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "No validated length test or norm. Report observationally (scapular winging, dyskinesis, protraction strength asymmetry).",
+      "sourceShort": "no validated length norm"
+    }
+  }
+}

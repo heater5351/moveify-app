@@ -4,6 +4,7 @@
  * only (no cross-region routing), so PHI never leaves Australia.
  */
 const { BedrockRuntimeClient, ConverseCommand } = require('@aws-sdk/client-bedrock-runtime');
+const { interpret, buildInterpretation } = require('./normative-data');
 
 const client = new BedrockRuntimeClient({ region: 'ap-southeast-2' });
 const MODEL_ID = 'deepseek.v3.2';
@@ -74,7 +75,7 @@ Your task is to extract objective, measured clinical findings and present them i
 Rules:
 - ONLY include findings that have an actual numeric or graded measurement (e.g. "45°", "4/5", "45 sec", "120/80 mmHg", "Grade 2"). Never include a finding if the only evidence is a subjective patient report or a qualitative clinician observation with no number or grade.
 - The Result column must contain only the patient's actual measured value. Never put normative data, comparisons, or descriptive text in the Result column.
-- The Interpretation column should be one short sentence. Include a normative comparison here if relevant (e.g. "Below norm of 50–60° — suggests lumbar restriction").
+- The Interpretation column should be one short, factual sentence describing the functional meaning of the finding. Do NOT state specific normative numbers, percentiles, population averages, or fall-risk cut-offs from memory — those are added separately from a verified normative database. Describe only the clinical/functional meaning (e.g. "Limited ankle dorsiflexion may affect squat depth and gait").
 - Never wrap test names in square brackets. Write the test name as plain text only (e.g. "ROM Forward Bending", not "[ROM Forward Bending]").
 - Never use asterisks (*), emojis, or markdown formatting anywhere in the output.
 
@@ -83,10 +84,34 @@ Test Name | Measured Value | Interpretation
 
 Only include findings actually present in the transcript. Do not fabricate data. If no objective measurements are present, output nothing.`;
 
-async function generateHandout(transcript, patientFirstName, assessmentDate) {
+/**
+ * Replace each assessment row's interpretation with a normative-data-grounded one
+ * where the test is recognised and the patient's age/sex allow classification.
+ * Rows that don't match the dataset keep the model's own interpretation (fallback).
+ * `clinicalContext` is the raw "Test | Result | Interpretation" block.
+ * No patient values are logged.
+ */
+function groundClinicalContext(clinicalContext, age, sex) {
+  if (!clinicalContext) return clinicalContext;
+  return clinicalContext.split('\n').map(line => {
+    if (!line.includes('|')) return line;
+    const cols = line.split('|').map(s => s.trim());
+    const [test, result] = cols;
+    if (!test || !result) return line;
+    try {
+      const res = interpret(test, result, age, sex);
+      const grounded = res && buildInterpretation(res);
+      if (grounded) return `${test} | ${result} | ${grounded}`;
+    } catch { /* fall through to the model's interpretation */ }
+    return line;
+  }).join('\n');
+}
+
+async function generateHandout(transcript, patientFirstName, assessmentDate, demographics = {}) {
   if (!transcript || transcript.trim().length < 10) {
     throw new Error('Transcript too short to generate a handout');
   }
+  const { age = null, sex = null } = demographics;
   // patientFirstName is intentionally not sent — the system prompt uses "you"/"your" only.
   // assessmentDate is administrative metadata, not needed for content generation.
   const userMessage = `The following is a transcript of a Gateway Assessment session. Generate Sections 1 and 2 of the patient assessment handout.\n\nTranscript:\n${transcript}`;
@@ -120,6 +145,8 @@ async function generateHandout(transcript, patientFirstName, assessmentDate) {
       .replace(/\*+/g, '')
       .replace(/\[|\]/g, '')
       .trim();
+    // Ground the interpretation column in peer-reviewed norms (deterministic).
+    clinicalContext = groundClinicalContext(clinicalContext, age, sex);
   } catch (err) {
     console.error('Clinical context generation failed:', err.message);
   }
@@ -155,4 +182,4 @@ async function generateReport(soapNoteContent, systemPrompt) {
   };
 }
 
-module.exports = { generateSoapNote, generateHandout, generateReport };
+module.exports = { generateSoapNote, generateHandout, generateReport, groundClinicalContext };

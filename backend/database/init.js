@@ -485,6 +485,12 @@ async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_users_cliniko_patient_id
       ON users(cliniko_patient_id)
     `);
+    // Patient sex (synced from Cliniko) — used to select age/sex-stratified
+    // normative reference values when interpreting assessment results.
+    await db.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS sex TEXT DEFAULT NULL
+    `);
 
     // Identity Platform UID (Phase 1 of auth migration — nullable until users are imported)
     await db.query(`

@@ -8,6 +8,30 @@ const audit = require('../services/audit');
 const router = express.Router();
 router.use(authenticate, requireRole('clinician'));
 
+// Derive age (years) + sex from the patient record for normative-data grounding.
+// Returns {} when unknown so generation falls back to age/sex-agnostic norms.
+function ageFromDob(dob) {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age >= 0 && age < 130 ? age : null;
+}
+
+async function getPatientDemographics(patientId) {
+  if (!patientId) return {};
+  try {
+    const r = await db.query('SELECT dob, sex FROM users WHERE id = $1', [patientId]);
+    if (r.rows.length === 0) return {};
+    return { age: ageFromDob(r.rows[0].dob), sex: r.rows[0].sex || null };
+  } catch {
+    return {};
+  }
+}
+
 // POST /api/scribe/sessions/:sessionId/handout/generate
 // Ephemeral — no content saved. Audit log only.
 router.post('/:sessionId/handout/generate', async (req, res) => {
@@ -18,13 +42,16 @@ router.post('/:sessionId/handout/generate', async (req, res) => {
     if (!assessmentDate) return res.status(400).json({ error: 'assessmentDate required' });
 
     const session = await db.query(
-      'SELECT id, clinician_id FROM scribe_sessions WHERE id = $1',
+      'SELECT id, clinician_id, patient_id FROM scribe_sessions WHERE id = $1',
       [req.params.sessionId]
     );
     if (session.rows.length === 0) return res.status(404).json({ error: 'Session not found' });
     if (session.rows[0].clinician_id !== req.user.id) return res.status(403).json({ error: 'Access denied' });
 
-    const { sections, model } = await generateHandout(transcript, patientFirstName, assessmentDate);
+    // Pull demographics for normative-data grounding (age/sex). Never logged.
+    const demographics = await getPatientDemographics(session.rows[0].patient_id);
+
+    const { sections, model } = await generateHandout(transcript, patientFirstName, assessmentDate, demographics);
     const wordCount = transcript.split(/\s+/).length;
     audit.log(req, 'handout_generated', 'scribe_session', parseInt(req.params.sessionId), { wordCount, model });
 
