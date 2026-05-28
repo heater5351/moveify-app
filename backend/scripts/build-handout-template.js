@@ -186,7 +186,7 @@ function tierBand() {
 
 // Full-width tier card: price/identity on the left, what's included on the
 // right. Stacked vertically so the section fills the page edge to edge.
-function tierCard(pill, name, price, per, includes) {
+function tierCard(pill, name, weekly, total, upfront, includes) {
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     borders: { top: NB, bottom: edge(NAVY, 24), left: NB, right: NB, insideHorizontal: NB, insideVertical: NB },
@@ -198,9 +198,17 @@ function tierCard(pill, name, price, per, includes) {
         margins: { top: 260, bottom: 280, left: 0, right: 360 },
         children: [
           new Paragraph({ spacing: { after: 80 }, border: { bottom: edge(TEAL, 16) }, children: [t(pill.toUpperCase(), { bold: true, color: TEAL, size: 16, allCaps: true, characterSpacing: 24 })] }),
-          new Paragraph({ spacing: { before: 120, after: 80 }, children: [t(name, { bold: true, color: NAVY, size: 30 })] }),
-          new Paragraph({ children: [t(price, { bold: true, color: NAVY, size: 56 })] }),
-          new Paragraph({ children: [t(per, { color: SUB, size: 19 })] }),
+          new Paragraph({ spacing: { before: 120, after: 100 }, children: [t(name, { bold: true, color: NAVY, size: 30 })] }),
+          // Hero = weekly figure (feels smaller / more affordable), with the
+          // total and pay-in-full price underneath for transparency.
+          new Paragraph({ children: [t(weekly, { bold: true, color: NAVY, size: 56 })] }),
+          new Paragraph({ spacing: { after: 100 }, children: [t('per week · 6-week direct debit', { color: SUB, size: 18 })] }),
+          new Paragraph({ border: { top: edge(RULE, 4) }, spacing: { before: 80 }, children: [
+            t(`${total} total`, { bold: true, color: NAVY, size: 18 }),
+            t('  ·  ', { color: TEAL, bold: true, size: 18 }),
+            t(`or ${upfront} paid in full `, { color: INK, size: 18 }),
+            t('(save 5%)', { bold: true, color: OCEAN, size: 18 }),
+          ] }),
         ],
       }),
       new TableCell({
@@ -318,11 +326,11 @@ const doc = new Document({
       SPACER(240),
       new Paragraph({ keepLines: true, spacing: { after: 240 }, children: [
         t('How it works. ', { bold: true, color: NAVY, size: 23 }),
-        t('Payment is weekly direct debit over 6 weeks, or pay in full with a 5% discount. Every tier includes unlimited gym access and the Moveify app. The clinical program is the same across all three — the tiers differ in how much 1:1 support and supervision you receive.', { color: INK, size: 23 }),
+        t('Payment is a weekly direct debit over 6 weeks. The clinical program is the same across all three tiers — they differ in how much 1:1 support and supervision you receive.', { color: INK, size: 23 }),
       ] }),
       tierBand(),
       SPACER(200),
-      tierCard('Tier 3', 'Performance', '$860', '$143.33 / week over 6 weeks', [
+      tierCard('Tier 3', 'Performance', '$143.33', '$860', '$817', [
         '60-min 1:1 program design',
         '4 × 45-min weekly 1:1 sessions',
         '30-min reassessment',
@@ -331,7 +339,7 @@ const doc = new Document({
         'Ongoing support',
       ]),
       SPACER(220),
-      tierCard('Tier 2', 'Progress', '$680', '$113.33 / week over 6 weeks', [
+      tierCard('Tier 2', 'Progress', '$113.33', '$680', '$646', [
         '60-min 1:1 program design',
         '4 × 30-min weekly 1:1 sessions',
         '30-min reassessment',
@@ -340,7 +348,7 @@ const doc = new Document({
         'Ongoing support',
       ]),
       SPACER(220),
-      tierCard('Tier 1', 'Foundation', '$510', '$85 / week over 6 weeks', [
+      tierCard('Tier 1', 'Foundation', '$85', '$510', '$484.50', [
         '60-min 1:1 program design',
         '4 × group sessions',
         '30-min reassessment',
