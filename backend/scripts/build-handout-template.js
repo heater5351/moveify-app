@@ -206,10 +206,13 @@ function tierCard(pill, name, price, per, includes) {
       new TableCell({
         borders: NONE,
         verticalAlign: VerticalAlign.CENTER,
-        margins: { top: 260, bottom: 280, left: 360, right: 0 },
+        margins: { top: 240, bottom: 260, left: 360, right: 0 },
         children: [
-          new Paragraph({ keepLines: true, spacing: { after: 140 }, children: [t(includes, { color: INK, size: 23 })] }),
-          new Paragraph({ children: [t('↓ Medicare & private health rebates available', { color: OCEAN, bold: true, size: 18 })] }),
+          ...includes.map(line => new Paragraph({
+            bullet: { level: 0 }, keepLines: true, spacing: { after: 40 },
+            children: [t(line, { color: INK, size: 20 })],
+          })),
+          new Paragraph({ spacing: { before: 120 }, children: [t('↓ Medicare & private health rebates available', { color: OCEAN, bold: true, size: 18 })] }),
         ],
       }),
     ] })],
@@ -319,11 +322,32 @@ const doc = new Document({
       ] }),
       tierBand(),
       SPACER(200),
-      tierCard('Tier 3', 'Performance', '$860', '$143.33 / week over 6 weeks', '60-min program design, 4 × 45-min weekly 1:1 sessions, and a 30-min reassessment.'),
+      tierCard('Tier 3', 'Performance', '$860', '$143.33 / week over 6 weeks', [
+        '60-min 1:1 program design',
+        '4 × 45-min weekly 1:1 sessions',
+        '30-min reassessment',
+        'Unlimited gym access',
+        'Moveify app access',
+        'Ongoing support',
+      ]),
       SPACER(220),
-      tierCard('Tier 2', 'Progress', '$680', '$113.33 / week over 6 weeks', '60-min program design, 4 × 30-min weekly 1:1 sessions, and a 30-min reassessment.'),
+      tierCard('Tier 2', 'Progress', '$680', '$113.33 / week over 6 weeks', [
+        '60-min 1:1 program design',
+        '4 × 30-min weekly 1:1 sessions',
+        '30-min reassessment',
+        'Unlimited gym access',
+        'Moveify app access',
+        'Ongoing support',
+      ]),
       SPACER(220),
-      tierCard('Tier 1', 'Foundation', '$510', '$85 / week over 6 weeks', '60-min program design, 4 group sessions, and a 30-min reassessment.'),
+      tierCard('Tier 1', 'Foundation', '$510', '$85 / week over 6 weeks', [
+        '60-min 1:1 program design',
+        '4 × group sessions',
+        '30-min reassessment',
+        'Unlimited gym access',
+        'Moveify app access',
+        'Ongoing support',
+      ]),
 
       // ───────── PAGE 4 — Casual options & rebates ─────────
       new Paragraph({ pageBreakBefore: true, children: [] }),
