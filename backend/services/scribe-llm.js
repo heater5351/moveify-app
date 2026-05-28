@@ -137,7 +137,7 @@ async function generateHandout(transcript, patientFirstName, assessmentDate, dem
   const { age = null, sex = null } = demographics;
   // patientFirstName is intentionally not sent — the system prompt uses "you"/"your" only.
   // assessmentDate is administrative metadata, not needed for content generation.
-  const userMessage = `The following is a transcript of a Gateway Assessment session. Generate Sections 1 and 2 of the patient assessment handout.\n\nTranscript:\n${transcript}`;
+  const userMessage = `The following is a transcript of a Gateway Assessment session. Generate ALL FOUR sections of the patient assessment handout — WHAT'S GOING ON, WHAT WE'RE AIMING FOR, HOW WE'LL GET THERE, and WHAT YOU CAN EXPECT — using the exact headings.\n\nTranscript:\n${transcript}`;
   const command = new ConverseCommand({
     modelId: MODEL_ID,
     messages: [{ role: 'user', content: [{ text: userMessage }] }],
