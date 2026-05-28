@@ -138,41 +138,50 @@ async function generateHandout(transcript, patientFirstName, assessmentDate, dem
   // patientFirstName is intentionally not sent — the system prompt uses "you"/"your" only.
   // assessmentDate is administrative metadata, not needed for content generation.
   const userMessage = `The following is a transcript of a Gateway Assessment session. Generate ALL FOUR sections of the patient assessment handout — WHAT'S GOING ON, WHAT WE'RE AIMING FOR, HOW WE'LL GET THERE, and WHAT YOU CAN EXPECT — using the exact headings.\n\nTranscript:\n${transcript}`;
-  const command = new ConverseCommand({
-    modelId: MODEL_ID,
-    messages: [{ role: 'user', content: [{ text: userMessage }] }],
-    system: [{ text: HANDOUT_SYSTEM_PROMPT }],
-    inferenceConfig: { maxTokens: 2000 },
-  });
-  const response = await client.send(command);
-  const raw = response.output.message.content[0].text;
-  const cleaned = raw.replace(/\*\*/g, '').replace(/\*/g, '');
-  const grab = (re) => { const m = cleaned.match(re); return m ? m[1].trim() : ''; };
-  const sections = {
-    whatsGoingOn:  grab(/WHAT(?:'|')?S GOING ON\s*\n([\s\S]*?)(?=WHAT WE(?:'|')?RE AIMING FOR|HOW WE(?:'|')?LL GET THERE|WHAT YOU CAN EXPECT|$)/i),
-    ourAims:       grab(/WHAT WE(?:'|')?RE AIMING FOR\s*\n([\s\S]*?)(?=HOW WE(?:'|')?LL GET THERE|WHAT YOU CAN EXPECT|$)/i),
-    howWeGetThere: grab(/HOW WE(?:'|')?LL GET THERE\s*\n([\s\S]*?)(?=WHAT YOU CAN EXPECT|$)/i),
-    whatToExpect:  grab(/WHAT YOU CAN EXPECT\s*\n([\s\S]*?)$/i),
-  };
-  let clinicalContext = '';
-  try {
-    const ctxCmd = new ConverseCommand({
+
+  // The narrative sections and the clinical-findings extraction are independent
+  // (both derive from the transcript) — run them in parallel to keep total
+  // latency under the client timeout.
+  const sectionsPromise = (async () => {
+    const command = new ConverseCommand({
       modelId: MODEL_ID,
-      messages: [{ role: 'user', content: [{ text: `Extract and interpret clinical findings from this transcript:\n\n${transcript}` }] }],
-      system: [{ text: CLINICAL_CONTEXT_SYSTEM_PROMPT }],
-      inferenceConfig: { maxTokens: 800 },
+      messages: [{ role: 'user', content: [{ text: userMessage }] }],
+      system: [{ text: HANDOUT_SYSTEM_PROMPT }],
+      inferenceConfig: { maxTokens: 2000 },
     });
-    const ctxRes = await client.send(ctxCmd);
-    // Strip asterisks and square brackets that the model may still produce
-    clinicalContext = ctxRes.output.message.content[0].text
-      .replace(/\*+/g, '')
-      .replace(/\[|\]/g, '')
-      .trim();
-    // Ground the interpretation column in peer-reviewed norms (deterministic).
-    clinicalContext = groundClinicalContext(clinicalContext, age, sex);
-  } catch (err) {
-    console.error('Clinical context generation failed:', err.message);
-  }
+    const response = await client.send(command);
+    const cleaned = response.output.message.content[0].text.replace(/\*\*/g, '').replace(/\*/g, '');
+    const grab = (re) => { const m = cleaned.match(re); return m ? m[1].trim() : ''; };
+    return {
+      whatsGoingOn:  grab(/WHAT(?:'|')?S GOING ON\s*\n([\s\S]*?)(?=WHAT WE(?:'|')?RE AIMING FOR|HOW WE(?:'|')?LL GET THERE|WHAT YOU CAN EXPECT|$)/i),
+      ourAims:       grab(/WHAT WE(?:'|')?RE AIMING FOR\s*\n([\s\S]*?)(?=HOW WE(?:'|')?LL GET THERE|WHAT YOU CAN EXPECT|$)/i),
+      howWeGetThere: grab(/HOW WE(?:'|')?LL GET THERE\s*\n([\s\S]*?)(?=WHAT YOU CAN EXPECT|$)/i),
+      whatToExpect:  grab(/WHAT YOU CAN EXPECT\s*\n([\s\S]*?)$/i),
+    };
+  })();
+
+  const contextPromise = (async () => {
+    try {
+      const ctxCmd = new ConverseCommand({
+        modelId: MODEL_ID,
+        messages: [{ role: 'user', content: [{ text: `Extract and interpret clinical findings from this transcript:\n\n${transcript}` }] }],
+        system: [{ text: CLINICAL_CONTEXT_SYSTEM_PROMPT }],
+        inferenceConfig: { maxTokens: 800 },
+      });
+      const ctxRes = await client.send(ctxCmd);
+      const raw = ctxRes.output.message.content[0].text
+        .replace(/\*+/g, '')
+        .replace(/\[|\]/g, '')
+        .trim();
+      // Ground the interpretation column in peer-reviewed norms (deterministic).
+      return groundClinicalContext(raw, age, sex);
+    } catch (err) {
+      console.error('Clinical context generation failed:', err.message);
+      return '';
+    }
+  })();
+
+  const [sections, clinicalContext] = await Promise.all([sectionsPromise, contextPromise]);
 
   // "What Your Results Mean" — a content-aware summary built from the grounded
   // findings (why the notable results matter functionally). Best-effort.

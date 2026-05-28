@@ -35,7 +35,7 @@ export async function generateHandout(
   assessmentDate: string
 ): Promise<{ sections: { whatsGoingOn: string; ourAims: string; howWeGetThere: string; whatToExpect: string; clinicalContext?: string }; model: string }> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30_000);
+  const timer = setTimeout(() => controller.abort(), 60_000);
   try {
     const res = await apiFetch(`/sessions/${sessionId}/handout/generate`, {
       method: 'POST',
