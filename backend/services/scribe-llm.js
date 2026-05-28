@@ -70,7 +70,9 @@ Rules:
 
 const CLINICAL_CONTEXT_SYSTEM_PROMPT = `You are a clinical exercise physiologist analyzing assessment data from a patient transcript.
 
-Your task is to extract objective, measured clinical findings and present them in a table for the patient handout.
+Your task is to extract EVERY objective, measured clinical finding and present them in a table for the patient handout.
+
+Be exhaustive and systematic: read the transcript from start to finish and capture every measurement, in the order it appears. Do not summarise, group, or drop any measured finding — it is a failure to omit a measurement that is present. Include bilateral results as separate or combined rows (e.g. "Calf Raise | L 8 / R 15 | ...").
 
 Rules:
 - ONLY include findings that have an actual numeric or graded measurement (e.g. "45°", "4/5", "45 sec", "120/80 mmHg", "Grade 2"). Never include a finding if the only evidence is a subjective patient report or a qualitative clinician observation with no number or grade.
@@ -166,7 +168,9 @@ async function generateHandout(transcript, patientFirstName, assessmentDate, dem
         modelId: MODEL_ID,
         messages: [{ role: 'user', content: [{ text: `Extract and interpret clinical findings from this transcript:\n\n${transcript}` }] }],
         system: [{ text: CLINICAL_CONTEXT_SYSTEM_PROMPT }],
-        inferenceConfig: { maxTokens: 800 },
+        // temperature 0 → deterministic extraction so the same transcript yields
+        // the same set of findings every run (fixes 3-vs-6 inconsistency).
+        inferenceConfig: { maxTokens: 1200, temperature: 0 },
       });
       const ctxRes = await client.send(ctxCmd);
       const raw = ctxRes.output.message.content[0].text
