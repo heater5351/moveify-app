@@ -90,18 +90,28 @@ export default function ScribeReportsPage() {
           recommendations:     result.sections.managementPlan      || '',
         });
       } else {
+        // Prefer the live transcript; fall back to the saved SOAP note if the
+        // transcript has expired (deleted 48h after recording) or is missing.
+        let sourceText = '';
         const transcriptRes = await apiFetch(`/sessions/${selectedSession.id}/transcript`);
-        if (!transcriptRes.ok) throw new Error('Could not load transcript for this session');
-        const transcriptData = await transcriptRes.json();
-        const transcript = transcriptData.content;
-        if (!transcript) throw new Error('No transcript found for this session');
+        if (transcriptRes.ok) {
+          sourceText = (await transcriptRes.json()).content || '';
+        } else if (transcriptRes.status === 410 || transcriptRes.status === 404) {
+          const noteRes = await apiFetch(`/sessions/${selectedSession.id}/soap-note`);
+          if (noteRes.ok) sourceText = (await noteRes.json()).content || '';
+        } else {
+          throw new Error('Could not load this session — please try again.');
+        }
+        if (!sourceText) {
+          throw new Error('No transcript or saved note for this session. The transcript is deleted 48 hours after recording — generate the handout within 48 hours, or save a SOAP note first.');
+        }
 
         const firstName = selectedSession.patientName.split(' ')[0];
         const assessmentDate = new Date(selectedSession.sessionDate).toLocaleDateString('en-AU', {
           day: '2-digit', month: '2-digit', year: 'numeric',
         });
 
-        const result = await generateHandout(selectedSession.id, transcript, firstName, assessmentDate);
+        const result = await generateHandout(selectedSession.id, sourceText, firstName, assessmentDate);
         setActiveHandout({ sections: result.sections, session: selectedSession });
       }
     } catch (err) {
