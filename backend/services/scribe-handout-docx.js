@@ -60,6 +60,11 @@ async function generateHandoutDocx(data) {
 
   const assessment_rows = parseOaRows(data.clinicalContext);
 
+  // "What Your Results Mean" — content-aware summary when available, otherwise a
+  // generic explainer of how the interpretations are derived.
+  const RESULTS_SUMMARY_FALLBACK =
+    'Each result above is compared against the typical range for someone of your age, sex, and activity level, which is why the interpretation matters more than the raw number on its own. Where a value sits within the expected range it is a strength we will protect; where it sits below, it is simply where we begin, and it directly shapes the exercises we choose and the loads we start at. None of these numbers is a verdict, and we repeat the same tests at your reassessment so your progress is measured objectively rather than by feel alone.';
+
   doc.render({
     patient_first_name: clean(data.patientFirstName),
     assessment_date:    data.assessmentDate || '',
@@ -68,6 +73,7 @@ async function generateHandoutDocx(data) {
     how_we_get_there:   toBullets(data.howWeGetThere),
     what_to_expect:     toBullets(data.whatToExpect),
     assessment_rows,
+    results_summary:    clean(data.resultsSummary) || RESULTS_SUMMARY_FALLBACK,
   });
 
   return doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });

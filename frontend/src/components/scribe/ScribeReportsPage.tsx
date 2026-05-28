@@ -45,7 +45,7 @@ export default function ScribeReportsPage() {
   const [selectedSession, setSelectedSession] = useState<SessionItem | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState('');
-  const [activeHandout, setActiveHandout] = useState<{ sections: HandoutSections; session: SessionItem } | null>(null);
+  const [activeHandout, setActiveHandout] = useState<{ sections: HandoutSections; session: SessionItem; source: 'transcript' | 'note' } | null>(null);
 
   useEffect(() => { loadSessions(); }, []);
 
@@ -93,12 +93,16 @@ export default function ScribeReportsPage() {
         // Prefer the live transcript; fall back to the saved SOAP note if the
         // transcript has expired (deleted 48h after recording) or is missing.
         let sourceText = '';
+        let usedSource: 'transcript' | 'note' = 'transcript';
         const transcriptRes = await apiFetch(`/sessions/${selectedSession.id}/transcript`);
         if (transcriptRes.ok) {
           sourceText = (await transcriptRes.json()).content || '';
         } else if (transcriptRes.status === 410 || transcriptRes.status === 404) {
           const noteRes = await apiFetch(`/sessions/${selectedSession.id}/soap-note`);
-          if (noteRes.ok) sourceText = (await noteRes.json()).content || '';
+          if (noteRes.ok) {
+            sourceText = (await noteRes.json()).content || '';
+            usedSource = 'note';
+          }
         } else {
           throw new Error('Could not load this session — please try again.');
         }
@@ -112,7 +116,7 @@ export default function ScribeReportsPage() {
         });
 
         const result = await generateHandout(selectedSession.id, sourceText, firstName, assessmentDate);
-        setActiveHandout({ sections: result.sections, session: selectedSession });
+        setActiveHandout({ sections: result.sections, session: selectedSession, source: usedSource });
       }
     } catch (err) {
       setGenError(err instanceof Error ? err.message : 'Generation failed');
@@ -244,6 +248,7 @@ export default function ScribeReportsPage() {
             day: '2-digit', month: '2-digit', year: 'numeric',
           })}
           sessionId={activeHandout.session.id}
+          source={activeHandout.source}
           onClose={() => setActiveHandout(null)}
           onRegenerate={handleGenerate}
         />

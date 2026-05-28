@@ -8,6 +8,7 @@ interface HandoutPreviewProps {
   patientFirstName: string;
   assessmentDate: string;
   sessionId: number;
+  source?: 'transcript' | 'note';
   onClose: () => void;
   onRegenerate: () => void;
 }
@@ -32,6 +33,7 @@ export default function HandoutPreview({
   patientFirstName,
   assessmentDate,
   sessionId,
+  source = 'transcript',
   onClose,
   onRegenerate,
 }: HandoutPreviewProps) {
@@ -40,6 +42,7 @@ export default function HandoutPreview({
   const [approach, setApproach] = useState(() => cleanText(sections.howWeGetThere));
   const [expect, setExpect] = useState(() => cleanText(sections.whatToExpect));
   const [contextText, setContextText] = useState(() => cleanText(sections.clinicalContext || ''));
+  const [resultsSummary, setResultsSummary] = useState(() => cleanText(sections.resultsSummary || ''));
 
   const [blob, setBlob] = useState<Blob | null>(null);
   const [rendering, setRendering] = useState(false);
@@ -54,6 +57,7 @@ export default function HandoutPreview({
     setApproach(cleanText(sections.howWeGetThere));
     setExpect(cleanText(sections.whatToExpect));
     setContextText(cleanText(sections.clinicalContext || ''));
+    setResultsSummary(cleanText(sections.resultsSummary || ''));
   }, [sections]);
 
   const generateAndRender = useCallback(async () => {
@@ -68,6 +72,7 @@ export default function HandoutPreview({
         howWeGetThere: approach,
         whatToExpect: expect,
         clinicalContext: contextText,
+        resultsSummary,
       });
       setBlob(docx);
       if (previewRef.current) {
@@ -85,7 +90,7 @@ export default function HandoutPreview({
     } finally {
       setRendering(false);
     }
-  }, [sessionId, patientFirstName, assessmentDate, goingOn, aims, approach, expect, contextText]);
+  }, [sessionId, patientFirstName, assessmentDate, goingOn, aims, approach, expect, contextText, resultsSummary]);
 
   // Debounced regenerate whenever the editable content changes (and on mount).
   useEffect(() => {
@@ -107,6 +112,9 @@ export default function HandoutPreview({
         <div>
           <h2 className="font-display font-bold text-secondary-700 text-base">Patient Handout</h2>
           <p className="text-xs text-gray-400 mt-0.5">Edit the text on the left — the preview is the exact document you'll download</p>
+          {source === 'note' && (
+            <p className="text-[11px] text-amber-600 mt-1 font-medium">Generated from the saved note — the transcript had expired (deleted 48h after recording).</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {error && <span className="text-xs text-red-500">{error}</span>}
@@ -159,6 +167,10 @@ export default function HandoutPreview({
               rows={5}
               className={`${textarea} font-mono text-xs`}
             />
+          </div>
+          <div>
+            <p className={fieldLabel}>What Your Results Mean</p>
+            <textarea value={resultsSummary} onChange={e => setResultsSummary(e.target.value)} rows={6} className={textarea} />
           </div>
         </div>
 

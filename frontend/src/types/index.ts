@@ -343,6 +343,7 @@ export type HandoutSections = {
   howWeGetThere: string;
   whatToExpect: string;
   clinicalContext?: string;
+  resultsSummary?: string;
 }
 
 export type ReportSections = {

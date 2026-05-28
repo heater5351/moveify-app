@@ -302,9 +302,7 @@ const doc = new Document({
       subHeading('Your Results at a Glance'),
       assessmentTable(),
       subHeading('What Your Results Mean'),
-      new Paragraph({ keepLines: true, children: [t(
-        'Each result above is compared against the typical range for someone of your age, sex, and activity level, which is why the interpretation column matters more than the raw number on its own — it tells us where you sit relative to people like you. Where a value sits within the expected range it is a strength we will protect; where it sits below, it is simply where we begin, and it directly shapes the exercises we choose and the loads we start at. None of these numbers is a verdict, and we repeat the same tests at your reassessment so your progress is measured objectively rather than by feel alone.',
-        { color: INK, size: 23 })] }),
+      new Paragraph({ keepLines: true, children: [t('{{results_summary}}', { color: INK, size: 23 })] }),
 
       // ───────── PAGE 3 — Treatment options ─────────
       new Paragraph({ pageBreakBefore: true, children: [] }),

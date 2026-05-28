@@ -107,6 +107,29 @@ function groundClinicalContext(clinicalContext, age, sex) {
   }).join('\n');
 }
 
+const RESULTS_SUMMARY_SYSTEM_PROMPT = `You are writing the "What Your Results Mean" paragraph of a patient assessment handout for an Accredited Exercise Physiology clinic. Patients are typically injured athletes and adults aged 45-75.
+
+You are given the patient's assessment results, each with a grounded interpretation (within/below/above the expected range for their age and sex, plus any clinical flags). Write ONE warm, plain-language paragraph that ties the findings together and explains, in human terms, WHY they matter.
+
+Requirements:
+- 4 to 6 sentences, flowing prose (no bullet points, no headings, no lists).
+- Second person throughout ("you", "your"). Never use the patient's name.
+- First person plural for the clinic ("we", "our").
+- Summarise the overall picture, then explain the functional meaning of the notable findings. Draw on the relevant rationale, for example:
+  - reduced balance → higher risk of falls and loss of confidence on your feet
+  - reduced range of motion → movements like reaching, squatting, or stairs become harder and other areas compensate
+  - reduced strength or muscle endurance → everyday tasks (stairs, carrying, getting off a low chair) tire you sooner and independence is harder to maintain
+  - reduced walking speed or aerobic capacity → less endurance for daily activity and a known marker of general health
+  - elevated blood pressure or blood glucose → a screening flag to review with your GP, important for long-term heart and metabolic health (never state or imply a diagnosis)
+- Frame below-range findings as a starting point that shapes your program, not a verdict.
+- End reassuringly: we re-measure the same tests at reassessment so progress is objective.
+
+Rules:
+- Only discuss findings actually present in the data. Do not invent results.
+- For blood pressure or glucose, describe them as screening flags to discuss with a GP — never diagnose.
+- No specific numbers or percentiles are needed in this paragraph.
+- No em dashes, asterisks, emojis, or markdown. Output only the paragraph.`;
+
 async function generateHandout(transcript, patientFirstName, assessmentDate, demographics = {}) {
   if (!transcript || transcript.trim().length < 10) {
     throw new Error('Transcript too short to generate a handout');
@@ -150,7 +173,36 @@ async function generateHandout(transcript, patientFirstName, assessmentDate, dem
   } catch (err) {
     console.error('Clinical context generation failed:', err.message);
   }
-  return { sections: { ...sections, clinicalContext: clinicalContext || undefined }, model: MODEL_ID };
+
+  // "What Your Results Mean" — a content-aware summary built from the grounded
+  // findings (why the notable results matter functionally). Best-effort.
+  let resultsSummary = '';
+  if (clinicalContext) {
+    try {
+      const sumCmd = new ConverseCommand({
+        modelId: MODEL_ID,
+        messages: [{ role: 'user', content: [{ text: `Patient assessment results with grounded interpretations:\n\n${clinicalContext}\n\nWrite the "What Your Results Mean" paragraph.` }] }],
+        system: [{ text: RESULTS_SUMMARY_SYSTEM_PROMPT }],
+        inferenceConfig: { maxTokens: 600 },
+      });
+      const sumRes = await client.send(sumCmd);
+      resultsSummary = sumRes.output.message.content[0].text
+        .replace(/\*+/g, '')
+        .replace(/^#+\s*/gm, '')
+        .trim();
+    } catch (err) {
+      console.error('Results summary generation failed:', err.message);
+    }
+  }
+
+  return {
+    sections: {
+      ...sections,
+      clinicalContext: clinicalContext || undefined,
+      resultsSummary: resultsSummary || undefined,
+    },
+    model: MODEL_ID,
+  };
 }
 
 async function generateReport(soapNoteContent, systemPrompt) {
