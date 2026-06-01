@@ -56,6 +56,10 @@ what to know now, links).
   Frontend — `components/AgreementPage.tsx` (public `/agreement*` routes) +
   `modals/GenerateAgreementModal.tsx`.
 - **Deps:** backend gains `pdfkit`.
+- **Going live:** run `billing-worker/scripts/create-agreement-prices.js` (TEST key first:
+  `STRIPE_SECRET_KEY=sk_test_… node scripts/create-agreement-prices.js`) to create the
+  Products/Prices and print the `STRIPE_PRICE_*` env lines; `--dry-run` lists the catalog with
+  no key. Idempotent (find-or-reuse). Amounts in that script must be re-confirmed before live.
 - Plan + rationale: vault *Build Plan - Service Agreement & Stripe Subscription Automation* /
   *Decision - Service Agreement and Stripe Automation Direction*.
 
