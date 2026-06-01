@@ -1,7 +1,10 @@
-const CLINIKO_API_KEY = process.env.NODE_ENV === 'production'
+// .trim() guards against a trailing newline in the Secret Manager value, which
+// would corrupt the Basic-auth header and yield a 401 (Secret Manager secrets
+// created via `echo` commonly carry one). The billing-worker trims for the same reason.
+const CLINIKO_API_KEY = ((process.env.NODE_ENV === 'production'
   ? process.env.CLINIKO_API_KEY
-  : process.env.CLINIKO_API_KEY_STAGING;
-const CLINIKO_SUBDOMAIN = process.env.CLINIKO_SUBDOMAIN;
+  : process.env.CLINIKO_API_KEY_STAGING) || '').trim();
+const CLINIKO_SUBDOMAIN = (process.env.CLINIKO_SUBDOMAIN || '').trim();
 
 function getAuthHeader() {
   return 'Basic ' + Buffer.from(`${CLINIKO_API_KEY}:`).toString('base64');
