@@ -29,8 +29,8 @@ const SECRET_GCP_NAME_MAP = {
   'stripe-webhook-secret': 'billing-stripe-webhook-secret',
   // Stripe TEST-mode secrets — used only by a worker with STRIPE_MODE=test (the
   // staging worker). The live worker leaves STRIPE_MODE unset and never reads these.
-  'stripe-secret-key-test': 'STRIPE_API_KEY_TEST',
-  'stripe-webhook-secret-test': 'billing-stripe-webhook-secret-test',
+  'stripe-secret-key-test': 'stripe_api_key_staging',
+  'stripe-webhook-secret-test': 'billing_stripe_webhook_secret_staging',
   'gmail-client-id': 'billing-gmail-client-id',
   'gmail-client-secret': 'billing-gmail-client-secret',
   'gmail-refresh-token': 'billing-gmail-refresh-token',
