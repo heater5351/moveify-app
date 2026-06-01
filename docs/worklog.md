@@ -22,6 +22,36 @@ what to know now, links).
 
 ---
 
+## 2026-06-01 — Cliniko API-key consolidation + block-progress activated
+
+- **Key consolidation:** the standalone `CLINIKO_API_KEY` and `CLINIKO_API_KEY_STAGING`
+  Secret Manager secrets were **deleted**. `CLINIKO_API_KEY` turned out to be a **dead key**
+  (401 on every request) — its admin-write consumers (billing-worker referrals pipeline) had
+  been silently failing, masked by low referral volume. All consumers now use:
+  - **`CLINIKO_API_KEY_ADMIN`** — full-access (writes + default reads). Backend `CLINIKO_API_KEY`
+    env (prod + staging) now sources from it; billing-worker `lib/secrets.js` maps
+    `cliniko-api-key`/`-admin`/`-staging` → `CLINIKO_API_KEY_ADMIN`.
+  - **`CLINIKO_API_KEY_FINANCE`** — read-only (poller/sync/reconcile). Unchanged.
+  - Both `1097567971198-compute@` (backend) and `billing-worker@` SAs granted `secretAccessor`
+    on `CLINIKO_API_KEY_ADMIN`.
+- **Backend trim fix:** `backend/services/cliniko.js` now `.trim()`s the key/subdomain (Secret
+  Manager values often carry a trailing newline → malformed Basic-auth header → 401). The
+  billing-worker already trimmed.
+- **Staging Cliniko was misconfigured:** it set `CLINIKO_API_KEY_STAGING` env, but deployed
+  services run `NODE_ENV=production`, so the code reads `CLINIKO_API_KEY`. Fixed by setting
+  staging's `CLINIKO_API_KEY` env from the admin secret (the `_STAGING` path is local-dev only).
+- **Block-progress → `appointment_notes` activated:** the worker's block-progress feature
+  (writes a `[BLOCK] …` session-count line into Cliniko) was deployed-but-paused, uncommitted,
+  and untested. Now **committed** (`jobs/sync-block-progress.js`, `lib/block-bundles.js`,
+  `services/cliniko.js` additions, `routes/cron.js`), **tested** (new `tests/block-bundles.test.mjs`,
+  20 cases — first vitest suite in the worker), validated via dry-run, and the Cloud Scheduler
+  job `billing-sync-block-progress` is **un-paused** (runs every 15 min, real writes).
+- **Worker Dockerfile:** `npm ci` → `npm install --omit=dev` (adding vitest's Linux-only optional
+  deps broke `npm ci`'s strict cross-platform lockfile check).
+- **Known follow-up:** prod backend lacks the trim fix — if `CLINIKO_API_KEY_ADMIN` has a trailing
+  newline, prod Import-from-Cliniko/manual-sync could still 401. Verify in-app; ship the trim fix
+  to prod if needed.
+
 ## 2026-06-01 — Automatic Cliniko → Moveify patient sync (scheduled)
 
 - **What changed:** Cliniko-linked patients' demographics now refresh automatically on a

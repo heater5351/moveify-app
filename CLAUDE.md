@@ -396,7 +396,7 @@ or via `POST /api/cliniko/link/:patientId`. Linked patients are then kept fresh 
 | `GOOGLE_CLIENT_SECRET` | No | — | Gmail API OAuth client secret |
 | `GOOGLE_REFRESH_TOKEN` | No | — | Gmail API OAuth refresh token |
 | `EMAIL_FROM` | No | `ryan@moveifyhealth.com` | Sender email address |
-| `CLINIKO_API_KEY` / `CLINIKO_API_KEY_STAGING` | No | — | Cliniko API key (prod uses `CLINIKO_API_KEY`, dev/staging uses the `_STAGING` variant). Cliniko integration disabled if unset. |
+| `CLINIKO_API_KEY` | No | — | Cliniko API key. Deployed services run `NODE_ENV=production`, so this is the var the code reads (the `CLINIKO_API_KEY_STAGING` fallback is local-dev only). On Cloud Run (prod **and** staging) it sources from the **`CLINIKO_API_KEY_ADMIN`** Secret Manager secret. `.trim()`-ed in code to survive trailing newlines. Cliniko integration disabled if unset. |
 | `CLINIKO_SUBDOMAIN` | No | — | Cliniko shard subdomain (e.g. `au1`) for the API base URL |
 | `CRON_OIDC_SA` | No (prod for auto-sync) | — | Service-account email allowed to call `/api/internal/cron/*` (Cloud Scheduler caller). Cron 503s if unset. |
 | `CRON_OIDC_AUDIENCE` | No (prod for auto-sync) | — | Expected OIDC `aud` for cron calls = this service's Cloud Run URL. Cron 503s if unset. |
