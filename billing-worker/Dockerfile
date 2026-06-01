@@ -5,7 +5,12 @@ RUN addgroup -g 1001 nodejs && adduser -S -u 1001 -G nodejs nodejs
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+# npm install (not ci): the lockfile is generated on dev machines (Windows/npm 11)
+# and can omit Linux-only optional deps of devDependencies (e.g. vitest's native
+# toolchain). `npm ci` validates the entire lockfile and fails on that mismatch
+# even with --omit=dev; `npm install --omit=dev` reconciles it and still pins
+# versions from the lockfile.
+RUN npm install --omit=dev --no-audit --no-fund
 
 COPY worker.js ./
 COPY lib/ ./lib/
