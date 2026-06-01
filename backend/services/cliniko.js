@@ -7,8 +7,10 @@ function getAuthHeader() {
   return 'Basic ' + Buffer.from(`${CLINIKO_API_KEY}:`).toString('base64');
 }
 
+const BASE_URL = () => `https://api.${CLINIKO_SUBDOMAIN}.cliniko.com/v1`;
+
 async function clinikoFetch(path) {
-  const url = `https://api.${CLINIKO_SUBDOMAIN}.cliniko.com/v1${path}`;
+  const url = `${BASE_URL()}${path}`;
   const res = await fetch(url, {
     headers: {
       Authorization: getAuthHeader(),
@@ -53,4 +55,24 @@ async function getPatient(clinikoPatientId) {
   return clinikoFetch(`/patients/${clinikoPatientId}`);
 }
 
-module.exports = { searchPatients, getPatient };
+// Incrementally fetch patients modified since `since` (ISO timestamp), following
+// Cliniko's `links.next` cursor until exhausted. Returns the flat array of patient
+// records. Pass a falsy `since` to pull all patients (first-run / full backfill).
+// Filters with the Ransack predicate updated_at[gt]= so only changed records come back.
+async function getPatientsUpdatedSince(since) {
+  const all = [];
+  let path = since
+    ? `/patients?updated_at%5Bgt%5D=${encodeURIComponent(since)}&per_page=100`
+    : '/patients?per_page=100';
+  while (path) {
+    const data = await clinikoFetch(path);
+    all.push(...(data.patients || []));
+    const next = data.links?.next;
+    if (!next) break;
+    const base = BASE_URL();
+    path = next.startsWith(base) ? next.slice(base.length) : next;
+  }
+  return all;
+}
+
+module.exports = { searchPatients, getPatient, getPatientsUpdatedSince };

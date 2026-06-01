@@ -492,6 +492,16 @@ async function initDatabase() {
       ADD COLUMN IF NOT EXISTS sex TEXT DEFAULT NULL
     `);
 
+    // Generic key/value store for app-level state (e.g. the incremental Cliniko
+    // auto-sync cursor). Keep keys namespaced and values small.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS app_state (
+        key        TEXT PRIMARY KEY,
+        value      TEXT,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
     // Identity Platform UID (Phase 1 of auth migration — nullable until users are imported)
     await db.query(`
       ALTER TABLE users

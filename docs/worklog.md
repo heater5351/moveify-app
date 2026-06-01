@@ -22,6 +22,30 @@ what to know now, links).
 
 ---
 
+## 2026-06-01 — Automatic Cliniko → Moveify patient sync (scheduled)
+
+- **What changed:** Cliniko-linked patients' demographics now refresh automatically on a
+  schedule instead of only via the manual per-patient sync button. New backend job
+  `jobs/sync-cliniko-patients.js` pulls Cliniko patients changed since a stored cursor
+  (`updated_at[gt]`), matches them to Moveify users by `cliniko_patient_id`, and applies the
+  **same** field mapping the manual sync uses. Direction is Cliniko → Moveify only; **email
+  is never synced** (login credential). First run (no cursor) fetches each linked patient
+  individually; steady state uses the incremental list.
+- **Shared logic:** extracted into `services/cliniko-sync.js` (`buildPatientFields`,
+  `applySync`, plus `getState`/`setState`). `routes/cliniko.js POST /sync/:patientId` was
+  refactored to call it, so manual + auto sync are identical.
+- **Trigger:** Cloud Scheduler → OIDC-protected `POST /api/internal/cron/sync-cliniko-patients`
+  (`routes/internal-cron.js`, mirrors the billing-worker's `requireOidc`). Admins can also run
+  it on demand via `POST /api/cliniko/sync-all`.
+- **New env vars (backend Cloud Run):** `CRON_OIDC_SA` (scheduler service-account email) and
+  `CRON_OIDC_AUDIENCE` (this service's Cloud Run URL). Without both, the cron endpoint 503s.
+- **Schema:** additive `app_state` table (key/value/updated_at) for the sync cursor
+  (`cliniko_patient_last_sync`). No `users` column changes.
+- **New dep:** `google-auth-library` (was transitive via `googleapis`) now explicit.
+- **Deploy note:** set the two env vars and create the Cloud Scheduler job per environment
+  (staging URL + prod URL) — see `CLAUDE.md` "Cliniko Patient Sync".
+- Updated `CLAUDE.md` (new section + env-var table + schema table).
+
 ## 2026-06-01 — Async `getAuthHeaders` + token-expiry fix
 
 - **Problem:** clinicians kept getting "Token expired" / bounced to login. Root cause:

@@ -335,12 +335,45 @@ Defined in `backend/database/init.js`. Key tables:
 | `clinician_patients` | clinician_id, patient_id | **Legacy** — still exists in schema but no longer queried. Kept for migration safety |
 | `audit_logs` | user_id, action, resource_type, resource_id, details (JSONB), ip_address | Audit trail for key operations |
 | `invitation_tokens` | ..., clinician_id | Links invitations to the clinician who created them |
+| `app_state` | key (PK), value, updated_at | Generic key/value store. Holds the Cliniko auto-sync cursor `cliniko_patient_last_sync` |
 
 ### Database patterns
 
 - **Transactions:** use `const client = await db.getClient()` then `client.query('BEGIN')` / `COMMIT` / `ROLLBACK` / `client.release()`. Used in program creation.
 - **No joins in patient loading** — `patients.js` fetches patient → programs → exercises → completions in sequential queries (N+1 pattern)
 - **Date handling:** use `toLocalDateString()` helper to avoid UTC timezone shifts
+
+## Cliniko Patient Sync
+
+Cliniko is the source of truth for patient demographics. A Moveify patient is **linked** to a
+Cliniko record (`users.cliniko_patient_id`) at invite time (clinician picks the Cliniko patient)
+or via `POST /api/cliniko/link/:patientId`. Linked patients are then kept fresh automatically.
+
+- **Direction is Cliniko → Moveify only** (read-only against Cliniko). Synced fields:
+  `name` (always), `dob`/`sex`/`phone`/`address` (COALESCE — only fill blanks). **Email is
+  never synced** — it's the Moveify login credential.
+- **Shared logic:** `services/cliniko-sync.js` — `buildPatientFields(cp)` + `applySync(userId, cp)`.
+  Used by both the manual per-patient sync (`POST /api/cliniko/sync/:patientId`) and the
+  scheduled job, so they behave identically. **Change the mapping here, not in the routes.**
+- **Scheduled job:** `jobs/sync-cliniko-patients.js`. Pulls Cliniko patients changed since the
+  `app_state.cliniko_patient_last_sync` cursor (`getPatientsUpdatedSince`, paginated) and applies
+  only those matching a linked Moveify user. First run (no cursor) fetches each linked patient
+  individually to avoid a full-clinic pull. Per-patient failures are caught/counted (no PHI logged).
+- **Triggers:**
+  - Cloud Scheduler → `POST /api/internal/cron/sync-cliniko-patients` (`routes/internal-cron.js`),
+    OIDC-verified (mirrors the billing-worker's `requireOidc`) using `CRON_OIDC_SA` +
+    `CRON_OIDC_AUDIENCE`. Mounted **before** the per-IP rate limiter.
+  - `POST /api/cliniko/sync-all` (admin) — on-demand run of the same job (testing / manual).
+- **Deploy (per environment):** set `CRON_OIDC_SA` + `CRON_OIDC_AUDIENCE` on the Cloud Run
+  service, then create the scheduler job. Demographics change rarely, so it runs **twice
+  daily** (12-hourly) rather than continuously — keep it low to conserve Cliniko API quota:
+  ```
+  gcloud scheduler jobs create http moveify-sync-cliniko-patients \
+    --location=australia-southeast1 --schedule="0 */12 * * *" --time-zone="Australia/Sydney" \
+    --uri="<BACKEND_URL>/api/internal/cron/sync-cliniko-patients" --http-method=POST \
+    --oidc-service-account-email="<CRON_OIDC_SA>" --oidc-token-audience="<BACKEND_URL>"
+  ```
+  Use the `moveify-backend-staging` URL for staging and `moveify-backend` URL for prod.
 
 ## Environment Variables
 
@@ -363,6 +396,10 @@ Defined in `backend/database/init.js`. Key tables:
 | `GOOGLE_CLIENT_SECRET` | No | — | Gmail API OAuth client secret |
 | `GOOGLE_REFRESH_TOKEN` | No | — | Gmail API OAuth refresh token |
 | `EMAIL_FROM` | No | `ryan@moveifyhealth.com` | Sender email address |
+| `CLINIKO_API_KEY` / `CLINIKO_API_KEY_STAGING` | No | — | Cliniko API key (prod uses `CLINIKO_API_KEY`, dev/staging uses the `_STAGING` variant). Cliniko integration disabled if unset. |
+| `CLINIKO_SUBDOMAIN` | No | — | Cliniko shard subdomain (e.g. `au1`) for the API base URL |
+| `CRON_OIDC_SA` | No (prod for auto-sync) | — | Service-account email allowed to call `/api/internal/cron/*` (Cloud Scheduler caller). Cron 503s if unset. |
+| `CRON_OIDC_AUDIENCE` | No (prod for auto-sync) | — | Expected OIDC `aud` for cron calls = this service's Cloud Run URL. Cron 503s if unset. |
 
 ### Frontend (`frontend/.env`)
 

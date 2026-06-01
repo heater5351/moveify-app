@@ -25,6 +25,7 @@ const dataRequestRoutes = require('./routes/data-requests');
 const aiRoutes = require('./routes/ai-assistant');
 const feedbackRoutes = require('./routes/feedback');
 const clinikoRoutes = require('./routes/cliniko');
+const internalCronRoutes = require('./routes/internal-cron');
 
 // Scribe routes
 const scribeSessionRoutes = require('./routes/scribe-sessions');
@@ -122,6 +123,10 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many requests. Please slow down.' }
 });
+
+// Internal cron — mounted before the per-IP apiLimiter (Cloud Scheduler is the
+// only caller; OIDC verification in the route is the access gate).
+app.use('/api/internal/cron', internalCronRoutes);
 
 app.use('/api', apiLimiter);
 

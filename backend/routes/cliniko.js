@@ -3,6 +3,8 @@ const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/ownership');
 const cliniko = require('../services/cliniko');
+const clinikoSync = require('../services/cliniko-sync');
+const { syncClinikoPatients } = require('../jobs/sync-cliniko-patients');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -72,26 +74,29 @@ router.post('/sync/:patientId', async (req, res) => {
 
     const cp = await cliniko.getPatient(patient.cliniko_patient_id);
 
-    const name = `${cp.first_name} ${cp.last_name}`.trim();
-    const dob = cp.date_of_birth || null;
-    const sex = cp.sex || null;
-    const phone = cp.patient_phone_numbers?.[0]?.number || null;
-    const addressParts = [cp.address_1, cp.address_2, cp.address_3, cp.city, cp.state, cp.post_code]
-      .map(p => (p || '').trim()).filter(Boolean);
-    const address = addressParts.length > 0 ? addressParts.join(', ') : null;
-
-    // Email is never synced — it's the login credential in Moveify and must not be overwritten
-    // COALESCE preserves existing Moveify data if Cliniko has no value for that field
-    await db.query(
-      `UPDATE users SET name = $1, dob = COALESCE($2, dob), sex = COALESCE($3, sex), phone = COALESCE($4, phone), address = COALESCE($5, address), cliniko_synced_at = NOW() WHERE id = $6`,
-      [name, dob, sex, phone, address, patientId]
-    );
+    // applySync owns the field mapping + COALESCE UPDATE (email is never synced) —
+    // shared with the scheduled auto-sync job so both paths behave identically.
+    const fields = await clinikoSync.applySync(patientId, cp);
 
     audit.log(req, 'cliniko_sync', 'patient', parseInt(patientId), { clinikoPatientId: patient.cliniko_patient_id });
-    res.json({ success: true, name, dob, sex, phone, address, clinikoSyncedAt: new Date().toISOString() });
+    res.json({ success: true, ...fields, clinikoSyncedAt: new Date().toISOString() });
   } catch (err) {
     console.error('Cliniko sync error:', err);
     res.status(502).json({ error: 'Could not reach Cliniko. Please try again.' });
+  }
+});
+
+// POST /api/cliniko/sync-all — on-demand run of the scheduled auto-sync job that
+// refreshes every Cliniko-linked patient. Same work Cloud Scheduler triggers; this
+// route is the admin/manual entry point (testing + a future "sync everyone" button).
+router.post('/sync-all', requireAdmin, async (req, res) => {
+  try {
+    const stats = await syncClinikoPatients();
+    audit.log(req, 'cliniko_sync_all', 'patient', null, stats);
+    res.json({ success: true, ...stats });
+  } catch (err) {
+    console.error('Cliniko sync-all error:', err);
+    res.status(502).json({ error: 'Cliniko sync failed. Please try again.' });
   }
 });
 
