@@ -10,14 +10,16 @@ const cache = new Map();
 
 // Maps logical secret names → GCP Secret Manager names (which may differ from logical names)
 const SECRET_GCP_NAME_MAP = {
-  'cliniko-api-key': 'CLINIKO_API_KEY',
-  // Admin = referrals pipeline (writes patients/contacts/attachments).
-  // Finance = appointment poller, sync, reconcile (read-only).
+  // Admin = referrals pipeline (writes patients/contacts/attachments) AND the
+  // default for all calls. Finance = appointment poller, sync, reconcile (read-only).
   // The two map to distinct Cliniko user-scoped API keys; the FINANCE key is
   // tied to a Cliniko user with read-only permissions, so writes will 403.
-  'cliniko-api-key-admin': 'CLINIKO_API_KEY',
+  // (Consolidated 2026-06-01: the standalone CLINIKO_API_KEY secret was retired;
+  // the full-access key now lives only in CLINIKO_API_KEY_ADMIN.)
+  'cliniko-api-key': 'CLINIKO_API_KEY_ADMIN',
+  'cliniko-api-key-admin': 'CLINIKO_API_KEY_ADMIN',
   'cliniko-api-key-finance': 'CLINIKO_API_KEY_FINANCE',
-  'cliniko-api-key-staging': 'CLINIKO_API_KEY_STAGING',
+  'cliniko-api-key-staging': 'CLINIKO_API_KEY_ADMIN',
   // Stripe is in LIVE mode and writes to the production Xero tenant
   // "Moveify Health Solutions" (XERO_TENANT_ID secret). The live webhook
   // (Stripe `we_*` endpoint pointing at /webhooks/stripe) must use the
