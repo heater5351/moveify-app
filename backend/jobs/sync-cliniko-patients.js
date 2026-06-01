@@ -74,8 +74,9 @@ async function syncClinikoPatients() {
   await clinikoSync.setState(CURSOR_KEY, runAt);
 
   const stats = { candidates, updated, skipped, failed, fullBackfill: !since };
-  // Synthetic req — audit.js reads req.user (null = system) and req.ip.
-  audit.log({ user: null, ip: 'system:cron' }, 'cliniko_auto_sync', 'patient', null, stats);
+  // Synthetic req — audit.js reads req.user (null = system origin) and req.ip.
+  // ip must be null, not a label: audit_logs.ip_address is Postgres type `inet`.
+  audit.log({ user: null, ip: null }, 'cliniko_auto_sync', 'patient', null, stats);
   return stats;
 }
 
