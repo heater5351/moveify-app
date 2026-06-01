@@ -223,6 +223,118 @@ async function findSubscriptionsCoveringDate(clinikoId, patientEmail, patientNam
   return { covering, reason: covering.length ? 'ok' : 'outside_window' };
 }
 
+// ─── Sign-up automation (agreement → setup Checkout → schedule) ──────────────
+
+// Finds an existing Stripe customer by metadata.cliniko_id, else creates one.
+// Always (re)writes the agreement metadata so the checkout.session.completed
+// handler can read tier/path/start_date back off the customer. Returns the
+// customer object.
+async function findOrCreateCustomer({ clinikoId, name, email, metadata = {} }) {
+  const stripe = await getStripe();
+  const merged = { cliniko_id: String(clinikoId), ...metadata };
+
+  const found = await stripe.customers.search({
+    query: `metadata['cliniko_id']:'${clinikoId}'`,
+    limit: 1,
+  });
+  if (found.data[0]) {
+    return stripe.customers.update(found.data[0].id, {
+      metadata: merged,
+      ...(name ? { name } : {}),
+      ...(email ? { email } : {}),
+    });
+  }
+
+  return stripe.customers.create({
+    ...(name ? { name } : {}),
+    ...(email ? { email } : {}),
+    metadata: merged,
+  });
+}
+
+// Creates a Checkout Session in SETUP mode — collects + saves a payment method
+// (card, BECS, wallets, Link) without charging. payment_method_types is omitted
+// so Stripe's dashboard-configured dynamic payment methods drive what's shown.
+// `currency: 'aud'` so AU methods (incl. au_becs_debit) are eligible.
+async function createSetupCheckoutSession({ customerId, successUrl, cancelUrl, metadata = {} }) {
+  const stripe = await getStripe();
+  return stripe.checkout.sessions.create({
+    mode: 'setup',
+    customer: customerId,
+    currency: 'aud',
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    metadata,
+  });
+}
+
+// Retrieves a Checkout Session with the setup_intent expanded so the resulting
+// payment_method can be read without a second round-trip.
+async function retrieveCheckoutSession(sessionId) {
+  const stripe = await getStripe();
+  return stripe.checkout.sessions.retrieve(sessionId, { expand: ['setup_intent'] });
+}
+
+// Resolves the saved payment method id from a (possibly expanded) setup_intent.
+async function getSetupIntentPaymentMethod(setupIntent) {
+  const stripe = await getStripe();
+  const si = typeof setupIntent === 'string'
+    ? await stripe.setupIntents.retrieve(setupIntent)
+    : setupIntent;
+  if (!si) return null;
+  return typeof si.payment_method === 'string'
+    ? si.payment_method
+    : si.payment_method?.id || null;
+}
+
+// Sets the customer's default payment method for invoices. Required before any
+// schedule/subscription can auto-charge.
+async function setDefaultPaymentMethod(customerId, paymentMethodId) {
+  const stripe = await getStripe();
+  return stripe.customers.update(customerId, {
+    invoice_settings: { default_payment_method: paymentMethodId },
+  });
+}
+
+// Creates a self-capping Subscription Schedule for a block.
+//   - standard block:  one phase, `iterations` weekly debits, end_behavior=cancel.
+//   - post-casual:      a trial phase (`trialIterations` free week(s), no charge)
+//                       then a paid phase of `iterations` debits, then cancel.
+// `default_settings.default_payment_method` is set explicitly so the first
+// invoice can auto-charge even if the customer-level default isn't picked up.
+async function createSubscriptionSchedule({ customerId, priceId, iterations, trialIterations = 0, paymentMethodId, startDate }) {
+  const stripe = await getStripe();
+  const phases = [];
+  if (trialIterations > 0) {
+    phases.push({ items: [{ price: priceId, quantity: 1 }], iterations: trialIterations, trial: true });
+  }
+  phases.push({ items: [{ price: priceId, quantity: 1 }], iterations });
+
+  return stripe.subscriptionSchedules.create({
+    customer: customerId,
+    start_date: startDate || 'now',
+    end_behavior: 'cancel',
+    default_settings: { default_payment_method: paymentMethodId },
+    phases,
+  });
+}
+
+// Creates a plain rolling subscription for continuity tiers (interval baked
+// into the Price). No end — cancelled manually on notice. A future startDate is
+// expressed as `trial_end` so the first charge lands on that date with no
+// proration; a past/empty startDate bills immediately.
+async function createSubscription({ customerId, priceId, paymentMethodId, startDate }) {
+  const stripe = await getStripe();
+  const startSec = startDate ? Math.floor(new Date(startDate).getTime() / 1000) : 0;
+  const inFuture = startSec > Math.floor(Date.now() / 1000) + 60;
+  return stripe.subscriptions.create({
+    customer: customerId,
+    items: [{ price: priceId }],
+    default_payment_method: paymentMethodId,
+    ...(inFuture ? { trial_end: startSec } : {}),
+  });
+}
+
 // Returns the Stripe product name for a subscription (e.g. "T2 Progress")
 async function getSubscriptionProductName(subscription) {
   const stripe = await getStripe();
@@ -315,4 +427,11 @@ module.exports = {
   findSubscriptionsCoveringDate,
   getSubscriptionProductName,
   getProductNameFromInvoice,
+  findOrCreateCustomer,
+  createSetupCheckoutSession,
+  retrieveCheckoutSession,
+  getSetupIntentPaymentMethod,
+  setDefaultPaymentMethod,
+  createSubscriptionSchedule,
+  createSubscription,
 };

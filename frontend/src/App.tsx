@@ -13,6 +13,8 @@ import { PatientPortal } from './components/PatientPortal';
 import { ProgramBuilder } from './components/ProgramBuilder';
 import { EducationLibrary } from './components/EducationLibrary';
 import { AddPatientModal } from './components/modals/AddPatientModal';
+import { GenerateAgreementModal } from './components/modals/GenerateAgreementModal';
+import { AgreementPage, AgreementResultPage } from './components/AgreementPage';
 import { EditPatientModal } from './components/modals/EditPatientModal';
 import { PatientSelectionModal } from './components/modals/PatientSelectionModal';
 import { ProgramConfigModal } from './components/modals/ProgramConfigModal';
@@ -116,6 +118,8 @@ function App() {
 
   // Modal states
   const [showAddPatientModal, setShowAddPatientModal] = useState(false);
+  const [showGenerateAgreementModal, setShowGenerateAgreementModal] = useState(false);
+  const agreementAutomationEnabled = import.meta.env.VITE_AGREEMENT_AUTOMATION_ENABLED === 'true';
   const [showEditPatientModal, setShowEditPatientModal] = useState(false);
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [showProgramConfigModal, setShowProgramConfigModal] = useState(false);
@@ -848,6 +852,19 @@ function App() {
     }
   };
 
+  // Public agreement pages — available regardless of auth state. The patient
+  // typically reaches these via an operator-minted tokenised link without
+  // logging in, so this gate runs before the session/auth checks below.
+  if (window.location.pathname.startsWith('/agreement')) {
+    return (
+      <Routes>
+        <Route path="/agreement" element={<AgreementPage />} />
+        <Route path="/agreement/success" element={<AgreementResultPage variant="success" />} />
+        <Route path="/agreement/cancelled" element={<AgreementResultPage variant="cancelled" />} />
+      </Routes>
+    );
+  }
+
   // Show loading while restoring session
   if (isRestoringSession) {
     return (
@@ -915,6 +932,10 @@ function App() {
             });
           }}
         />
+      )}
+
+      {showGenerateAgreementModal && (
+        <GenerateAgreementModal onClose={() => setShowGenerateAgreementModal(false)} />
       )}
 
       {showEditPatientModal && editingPatient && (
@@ -1318,6 +1339,7 @@ function App() {
               patients={patients}
               onViewPatient={setViewingPatient}
               onAddPatient={() => setShowAddPatientModal(true)}
+              onGenerateAgreement={agreementAutomationEnabled ? () => setShowGenerateAgreementModal(true) : undefined}
             />
           )}
         </div>

@@ -11,6 +11,8 @@ const { BedrockClient, ListFoundationModelsCommand, ListInferenceProfilesCommand
 const { getSecret } = require('../lib/secrets');
 const xero = require('../lib/xero');
 const { ingestTyroCsv } = require('../jobs/ingest-tyro');
+const stripeService = require('../services/stripe');
+const { lookupPlan, getPlanPriceId } = require('../lib/service-catalog');
 
 // Admin routes are protected by a shared-secret token. The caller must send
 // X-Admin-Token: <value> matching the billing-admin-token secret.
@@ -88,6 +90,56 @@ router.post('/resolve-flag', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     log.error({ err: err.message }, 'resolve-flag failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Agreement automation: create a setup-mode Checkout session for a patient who
+// has just signed the service agreement. Called by the backend (X-Admin-Token)
+// — see backend/routes/agreements.js. The setup Checkout collects + saves a
+// payment method (card / BECS / wallet); the resulting checkout.session.completed
+// webhook builds the schedule/subscription. Gated behind AGREEMENT_AUTOMATION_ENABLED
+// so it ships dormant. No PHI is logged — only cliniko_id, tier/path and Stripe IDs.
+router.post('/agreements/checkout-setup', async (req, res) => {
+  const log = withCorrelation(req);
+  if (process.env.AGREEMENT_AUTOMATION_ENABLED !== 'true') {
+    return res.status(503).json({ error: 'Agreement automation disabled' });
+  }
+
+  const { clinikoId, name, email, tier, path, startDate, successUrl, cancelUrl } = req.body || {};
+  if (!clinikoId || !tier || !path) {
+    return res.status(400).json({ error: 'clinikoId, tier and path are required' });
+  }
+  if (!successUrl || !cancelUrl) {
+    return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
+  }
+  const plan = lookupPlan(tier, path);
+  if (!plan) return res.status(400).json({ error: `Unknown plan for tier='${tier}' path='${path}'` });
+  const priceId = getPlanPriceId(plan);
+  if (!priceId) return res.status(500).json({ error: `Stripe Price not configured (${plan.priceEnv})` });
+
+  try {
+    const customer = await stripeService.findOrCreateCustomer({
+      clinikoId, name, email,
+      metadata: {
+        agreement_tier: tier,
+        agreement_path: path,
+        ...(startDate ? { agreement_start_date: startDate } : {}),
+      },
+    });
+    const session = await stripeService.createSetupCheckoutSession({
+      customerId: customer.id,
+      successUrl,
+      cancelUrl,
+      metadata: { cliniko_id: String(clinikoId), agreement_tier: tier, agreement_path: path },
+    });
+    log.info(
+      { cliniko_id: clinikoId, tier, path, customer_id: customer.id, session_id: session.id },
+      'Agreement checkout-setup session created'
+    );
+    res.json({ checkoutUrl: session.url, customerId: customer.id, sessionId: session.id });
+  } catch (err) {
+    log.error({ err: err.message, cliniko_id: clinikoId }, 'checkout-setup failed');
     res.status(500).json({ error: err.message });
   }
 });

@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import { Plus, User, Search } from 'lucide-react';
+import { Plus, User, Search, FileSignature } from 'lucide-react';
 import type { Patient } from '../types/index.ts';
 
 interface PatientsPageProps {
   patients: Patient[];
   onViewPatient: (patient: Patient) => void;
   onAddPatient: () => void;
+  // Provided only when the agreement-automation feature flag is on; renders the
+  // "Generate agreement" desk action.
+  onGenerateAgreement?: () => void;
 }
 
-export const PatientsPage = ({ patients, onViewPatient, onAddPatient }: PatientsPageProps) => {
+export const PatientsPage = ({ patients, onViewPatient, onAddPatient, onGenerateAgreement }: PatientsPageProps) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Filter patients based on search query
@@ -29,14 +32,26 @@ export const PatientsPage = ({ patients, onViewPatient, onAddPatient }: Patients
             <h2 className="text-xl md:text-2xl font-semibold font-display text-secondary-500 tracking-tight">Patients</h2>
             <p className="hidden md:block text-sm text-slate-500 mt-0.5">Manage your patients and their assigned programs</p>
           </div>
-          <button
-            onClick={onAddPatient}
-            className="flex-shrink-0 bg-primary-400 hover:bg-primary-500 text-white px-4 md:px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors text-sm shadow-sm"
-          >
-            <Plus size={16} />
-            <span className="hidden sm:inline">Add Patient</span>
-            <span className="sm:hidden">Add</span>
-          </button>
+          <div className="flex-shrink-0 flex items-center gap-2">
+            {onGenerateAgreement && (
+              <button
+                onClick={onGenerateAgreement}
+                className="bg-white border border-primary-300 text-primary-600 hover:bg-primary-50 px-4 md:px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors text-sm shadow-sm"
+              >
+                <FileSignature size={16} />
+                <span className="hidden sm:inline">Generate agreement</span>
+                <span className="sm:hidden">Agreement</span>
+              </button>
+            )}
+            <button
+              onClick={onAddPatient}
+              className="bg-primary-400 hover:bg-primary-500 text-white px-4 md:px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors text-sm shadow-sm"
+            >
+              <Plus size={16} />
+              <span className="hidden sm:inline">Add Patient</span>
+              <span className="sm:hidden">Add</span>
+            </button>
+          </div>
         </div>
 
         {/* Search Bar */}

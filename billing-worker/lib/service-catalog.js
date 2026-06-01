@@ -103,4 +103,67 @@ function lookup(appointmentTypeName) {
   return _normalisedIndex.get(normalise(appointmentTypeName)) || null;
 }
 
-module.exports = { SERVICES, lookup };
+// ─── Subscription plans (sign-up automation) ─────────────────────────────────
+//
+// Maps the operator-chosen { tier, path } to the Stripe product + the schedule
+// shape the `checkout.session.completed` handler builds. Keyed `${path}:${tier}`.
+//
+// `productName` MUST match a key in lib/rates.js `PP_FEES` verbatim — the
+// downstream P&P-fee + entitlement logic resolves the tier from the Stripe
+// product name on the paid invoice. A mismatch silently breaks P&P billing.
+// (Em dashes in the post-casual names are intentional and must match Stripe.)
+//
+// `priceEnv` names a Cloud Run env var holding the Stripe Price ID, so test and
+// live modes use different Prices without code changes. getPlanPriceId() reads it.
+//
+// shape:
+//   'block'        → Subscription Schedule, `iterations` weekly debits, end_behavior=cancel
+//   'post_casual'  → Schedule: `trialIterations` free week(s) → `iterations` debits → cancel
+//   'continuity'   → plain rolling Subscription (interval baked into the Price), no end
+const SUBSCRIPTION_PLANS = {
+  // Block standard — weekly DD, 6 debits, auto-cancel
+  'standard:T1': { productName: 'T1 Foundation',  priceEnv: 'STRIPE_PRICE_T1_STANDARD', shape: 'block', iterations: 6 },
+  'standard:T2': { productName: 'T2 Progress',    priceEnv: 'STRIPE_PRICE_T2_STANDARD', shape: 'block', iterations: 6 },
+  'standard:T3': { productName: 'T3 Performance', priceEnv: 'STRIPE_PRICE_T3_STANDARD', shape: 'block', iterations: 6 },
+
+  // Post-casual — 1 free week (trial), then 5 weekly debits, auto-cancel
+  'post_casual:T1': { productName: 'Tier 1 — Foundation Block Post-Casual',  priceEnv: 'STRIPE_PRICE_T1_POST_CASUAL', shape: 'post_casual', trialIterations: 1, iterations: 5 },
+  'post_casual:T2': { productName: 'Tier 2 — Progress Block Post-Casual',    priceEnv: 'STRIPE_PRICE_T2_POST_CASUAL', shape: 'post_casual', trialIterations: 1, iterations: 5 },
+  'post_casual:T3': { productName: 'Tier 3 — Performance Block Post-Casual', priceEnv: 'STRIPE_PRICE_T3_POST_CASUAL', shape: 'post_casual', trialIterations: 1, iterations: 5 },
+
+  // Continuity — plain rolling subscription (4-weekly interval baked into the Price)
+  'continuity:Independent':        { productName: 'Independent',        priceEnv: 'STRIPE_PRICE_INDEPENDENT',         shape: 'continuity' },
+  'continuity:Maintain':           { productName: 'Maintain',           priceEnv: 'STRIPE_PRICE_MAINTAIN',            shape: 'continuity' },
+  'continuity:Evolve':             { productName: 'Evolve',             priceEnv: 'STRIPE_PRICE_EVOLVE',              shape: 'continuity' },
+  'continuity:Elite':              { productName: 'Elite',              priceEnv: 'STRIPE_PRICE_ELITE',               shape: 'continuity' },
+  'continuity:Remote Weekly':      { productName: 'Remote Weekly',      priceEnv: 'STRIPE_PRICE_REMOTE_WEEKLY',       shape: 'continuity' },
+  'continuity:Remote Fortnightly': { productName: 'Remote Fortnightly', priceEnv: 'STRIPE_PRICE_REMOTE_FORTNIGHTLY',  shape: 'continuity' },
+  'continuity:App-Only':           { productName: 'App-Only',           priceEnv: 'STRIPE_PRICE_APP_ONLY',            shape: 'continuity' },
+};
+
+const SUBSCRIPTION_PATHS = ['standard', 'post_casual', 'continuity'];
+
+function planKey(tier, path) {
+  return `${String(path || '').trim()}:${String(tier || '').trim()}`;
+}
+
+// Resolves { tier, path } to a plan definition, or null if unknown.
+function lookupPlan(tier, path) {
+  return SUBSCRIPTION_PLANS[planKey(tier, path)] || null;
+}
+
+// Resolves a plan's Stripe Price ID from the env var it names. Returns null if
+// the env var is unset (so callers can flag a config gap rather than 500).
+function getPlanPriceId(plan) {
+  if (!plan || !plan.priceEnv) return null;
+  return process.env[plan.priceEnv] || null;
+}
+
+module.exports = {
+  SERVICES,
+  lookup,
+  SUBSCRIPTION_PLANS,
+  SUBSCRIPTION_PATHS,
+  lookupPlan,
+  getPlanPriceId,
+};

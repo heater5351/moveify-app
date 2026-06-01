@@ -66,6 +66,16 @@ Re-consenting OAuth (after scope changes / token revocation): run `node billing-
 
 The P&P invoice is auto-allocated against the just-created Xero overpayment (DD payment → contact credit → P&P consumes it). Idempotency key format: `pp:<cliniko_id>:<anchor_date>`.
 
+### Service-Agreement → Stripe Automation (sign-up flow)
+
+Replaces the manual "Cliniko form + Payment Link + hand-set Cancel-at". **Behind `AGREEMENT_AUTOMATION_ENABLED`** (worker + backend) and `VITE_AGREEMENT_AUTOMATION_ENABLED` (frontend). Flow: clinician mints a one-time tokenised link (operator sets tier/path/start-date) → patient signs Part A on `moveifyapp.com/agreement?token=…` → backend stores the signed PDF in Cliniko (`service_agreements` row) and calls the worker's `POST /admin/agreements/checkout-setup` → worker opens a Stripe **Checkout setup-mode** session (card / BECS / wallets via dynamic payment methods, no charge yet) → `checkout.session.completed` webhook sets the default payment method and creates the Stripe object per shape:
+
+- **Block standard** → Subscription **Schedule**, 6 weekly debits, `end_behavior=cancel`.
+- **Post-casual** → Schedule, 1 trial week (no charge) → 5 weekly debits → cancel.
+- **Continuity** → plain rolling **Subscription** (4-weekly Price), cancelled manually.
+
+Plan catalog: `lib/service-catalog.js` `SUBSCRIPTION_PLANS` (keyed `{path}:{tier}`). **Product names MUST match `lib/rates.js` `PP_FEES` keys** — the existing `invoice.payment_succeeded` Pattern-7 credit + P&P path is **unchanged** and resolves tier from the Stripe product name. Each plan's Price ID is read from a per-plan env var (`STRIPE_PRICE_*`) so test/live differ. Part A copy + version live in `backend/lib/agreement-template.js` (⚠ placeholder wording — confirm before live).
+
 ### Deployment
 
 - Frontend: **Vercel** (vite build → `dist/`) — live at **https://www.moveifyapp.com**
@@ -317,6 +327,8 @@ All routes are prefixed with `/api`. Routes marked with a lock require authentic
 | `education.js` | `/api/education` | `POST .../viewed`, `GET /patient/:patientId/modules` | Both roles + access check |
 | `blocks.js` | `/api/blocks` | Templates CRUD, `GET /flags` | Clinician only |
 | `blocks.js` | `/api/blocks` | Block read/prescription | Both roles + access check |
+| `agreements.js` | `/api/agreements` | `POST /generate` (mint tokenised link) | Clinician only |
+| `agreements.js` | `/api/agreements` | `GET /validate/:token`, `POST /:token/sign` | Public (token-gated, rate-limited) |
 
 ## Database Schema
 
@@ -336,6 +348,7 @@ Defined in `backend/database/init.js`. Key tables:
 | `audit_logs` | user_id, action, resource_type, resource_id, details (JSONB), ip_address | Audit trail for key operations |
 | `invitation_tokens` | ..., clinician_id | Links invitations to the clinician who created them |
 | `app_state` | key (PK), value, updated_at | Generic key/value store. Holds the Cliniko auto-sync cursor `cliniko_patient_last_sync` |
+| `service_agreements` | cliniko_patient_id, clinician_id, tier, path, status, token, signed_name/at/ip, agreement_version, stripe_customer_id, stripe_schedule_id, cliniko_attachment_id | Sign-up automation. One row per minted agreement link. See "Service-Agreement → Stripe Automation" below |
 
 ### Database patterns
 
@@ -400,6 +413,9 @@ or via `POST /api/cliniko/link/:patientId`. Linked patients are then kept fresh 
 | `CLINIKO_SUBDOMAIN` | No | — | Cliniko shard subdomain (e.g. `au1`) for the API base URL |
 | `CRON_OIDC_SA` | No (prod for auto-sync) | — | Service-account email allowed to call `/api/internal/cron/*` (Cloud Scheduler caller). Cron 503s if unset. |
 | `CRON_OIDC_AUDIENCE` | No (prod for auto-sync) | — | Expected OIDC `aud` for cron calls = this service's Cloud Run URL. Cron 503s if unset. |
+| `AGREEMENT_AUTOMATION_ENABLED` | No | `false` | Feature flag for the service-agreement → Stripe sign-up flow. `'true'` enables `POST /api/agreements/generate` + `/:token/sign`. Ships dormant. |
+| `BILLING_WORKER_URL` | No (agreement flow) | — | Base URL of `moveify-billing-worker`. Backend calls its `/admin/agreements/checkout-setup` to open the Stripe setup Checkout. |
+| `BILLING_ADMIN_TOKEN` | No (agreement flow) | — | `X-Admin-Token` for the worker admin call. Sources from the `billing_admin_token` Secret Manager secret. |
 
 ### Frontend (`frontend/.env`)
 

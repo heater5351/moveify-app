@@ -22,6 +22,40 @@ what to know now, links).
 
 ---
 
+## 2026-06-02 — Service-agreement → Stripe subscription automation (behind flag)
+
+- **What:** new sign-up flow that replaces the manual "Cliniko form + Payment Link + hand-set
+  Cancel-at". A clinician mints a one-time tokenised link (operator-set tier/path/start-date) →
+  patient signs Part A in-app → Stripe **Checkout setup mode** (card / BECS / wallets, dynamic
+  payment methods) saves a payment method → `checkout.session.completed` webhook builds a
+  **self-capping Subscription Schedule** (blocks: 6 debits; post-casual: 1 trial wk + 5; cancel)
+  or a **plain rolling Subscription** (continuity). Credit still keys off the unchanged
+  `invoice.payment_succeeded` Pattern-7 path.
+- **Ships dormant** behind `AGREEMENT_AUTOMATION_ENABLED` (worker + backend) and
+  `VITE_AGREEMENT_AUTOMATION_ENABLED` (frontend button). Verify in Stripe **test mode** before enabling.
+- **New env vars:**
+  - Worker: `AGREEMENT_AUTOMATION_ENABLED`, and one Stripe Price ID per plan —
+    `STRIPE_PRICE_{T1,T2,T3}_STANDARD`, `STRIPE_PRICE_{T1,T2,T3}_POST_CASUAL`,
+    `STRIPE_PRICE_{INDEPENDENT,MAINTAIN,EVOLVE,ELITE,REMOTE_WEEKLY,REMOTE_FORTNIGHTLY,APP_ONLY}`.
+  - Backend: `AGREEMENT_AUTOMATION_ENABLED`, `BILLING_WORKER_URL`, `BILLING_ADMIN_TOKEN`
+    (sources from the `billing_admin_token` secret — used to call the worker's new admin endpoint).
+  - Frontend: `VITE_AGREEMENT_AUTOMATION_ENABLED`.
+- **New schema:** additive `service_agreements` table (`backend/database/init.js`) — one row per
+  minted link; stores token, signed name/at/ip, agreement version, Stripe customer/schedule ids,
+  Cliniko attachment id. No destructive change.
+- **New code:** worker — `lib/service-catalog.js` (`SUBSCRIPTION_PLANS` keyed `{path}:{tier}`,
+  product names locked to `PP_FEES`), `services/stripe.js` Checkout/customer/schedule helpers,
+  `routes/admin.js` `POST /admin/agreements/checkout-setup`, `jobs/stripe-handler.js`
+  `checkout.session.completed` + `subscription_schedule.completed` + `customer.subscription.deleted`
+  handlers. Backend — `routes/agreements.js` (generate/validate/sign), `services/cliniko.js`
+  `uploadAttachment`, `services/agreement-pdf.js` (pdfkit, new dep), `lib/agreement-template.js`
+  (⚠ placeholder Part A copy — confirm canonical wording + bump `AGREEMENT_VERSION` before live).
+  Frontend — `components/AgreementPage.tsx` (public `/agreement*` routes) +
+  `modals/GenerateAgreementModal.tsx`.
+- **Deps:** backend gains `pdfkit`.
+- Plan + rationale: vault *Build Plan - Service Agreement & Stripe Subscription Automation* /
+  *Decision - Service Agreement and Stripe Automation Direction*.
+
 ## 2026-06-01 — Cliniko API-key consolidation + block-progress activated
 
 - **Key consolidation:** the standalone `CLINIKO_API_KEY` and `CLINIKO_API_KEY_STAGING`

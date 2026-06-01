@@ -25,6 +25,7 @@ const dataRequestRoutes = require('./routes/data-requests');
 const aiRoutes = require('./routes/ai-assistant');
 const feedbackRoutes = require('./routes/feedback');
 const clinikoRoutes = require('./routes/cliniko');
+const agreementRoutes = require('./routes/agreements');
 const internalCronRoutes = require('./routes/internal-cron');
 
 // Scribe routes
@@ -114,6 +115,8 @@ app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/invitations/validate', authLimiter);
 app.use('/api/invitations/set-password', authLimiter);
+// Public agreement token endpoints (validate + sign) — same brute-force guard.
+app.use('/api/agreements/validate', authLimiter);
 
 // Rate limiting — general API
 const apiLimiter = rateLimit({
@@ -145,6 +148,7 @@ app.use('/api/data-requests', dataRequestRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/cliniko', clinikoRoutes);
+app.use('/api/agreements', agreementRoutes);
 
 // Scribe routes — clinician-only, all under /api/scribe/
 app.use('/api/scribe/sessions', scribeSessionRoutes);

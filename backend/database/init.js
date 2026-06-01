@@ -939,6 +939,39 @@ Output only the four sections with their exact headings. No preamble. No comment
 
     console.log('✅ Scribe tables initialized');
 
+    // Service agreements (sign-up automation). One row per agreement link an
+    // operator mints for a patient. The token drives a public sign page; once
+    // signed, the backend renders+stores the PDF and asks the billing-worker to
+    // open a Stripe setup-Checkout. Additive/nullable columns only — no FK to
+    // users beyond patient_id so a Cliniko-only patient can be linked later.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS service_agreements (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        cliniko_patient_id TEXT,
+        clinician_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        tier TEXT NOT NULL,
+        path TEXT NOT NULL CHECK(path IN ('standard', 'post_casual', 'continuity')),
+        start_date TEXT,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'signed', 'active', 'expired', 'cancelled')),
+        token TEXT UNIQUE NOT NULL,
+        token_expires_at TIMESTAMPTZ NOT NULL,
+        agreement_version TEXT,
+        signed_name TEXT,
+        signed_at TIMESTAMPTZ,
+        signed_ip TEXT,
+        stripe_customer_id TEXT,
+        stripe_schedule_id TEXT,
+        cliniko_attachment_id TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_service_agreements_token ON service_agreements(token)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_service_agreements_cliniko ON service_agreements(cliniko_patient_id)`);
+
+    console.log('✅ Service agreements table initialized');
+
     console.log('✅ Database tables initialized');
   } catch (error) {
     console.error('❌ Database initialization error:', error);

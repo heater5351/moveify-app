@@ -12,13 +12,15 @@ function getAuthHeader() {
 
 const BASE_URL = () => `https://api.${CLINIKO_SUBDOMAIN}.cliniko.com/v1`;
 
-async function clinikoFetch(path) {
+async function clinikoFetch(path, options = {}) {
   const url = `${BASE_URL()}${path}`;
   const res = await fetch(url, {
+    ...options,
     headers: {
       Authorization: getAuthHeader(),
       Accept: 'application/json',
       'User-Agent': 'Moveify/1.0 (support@moveifyhealth.com)',
+      ...(options.headers || {}),
     },
   });
   if (!res.ok) {
@@ -29,6 +31,56 @@ async function clinikoFetch(path) {
     throw err;
   }
   return res.json();
+}
+
+/**
+ * Uploads a file to Cliniko as a patient attachment. Mirrors the billing-worker's
+ * presigned-POST flow: get presigned S3 details → POST file to S3 → register the
+ * attachment record. Writes require the admin Cliniko key (the backend's key is
+ * the full-access ADMIN key in prod/staging). Generic over content type so it can
+ * store a signed-agreement PDF (or any file). Returns the registered attachment.
+ */
+async function uploadAttachment(patientId, fileBuffer, filename, contentType, description) {
+  // Step 1: presigned POST details from Cliniko
+  const presigned = await clinikoFetch(`/patients/${patientId}/attachment_presigned_post`);
+
+  // Step 2: build multipart body manually — S3 requires the file field last
+  const boundary = `----MoveifyBoundary${Date.now().toString(36)}`;
+  const CRLF = '\r\n';
+  const fieldParts = Object.entries(presigned.fields).map(([k, v]) =>
+    `--${boundary}${CRLF}Content-Disposition: form-data; name="${k}"${CRLF}${CRLF}${v}${CRLF}`
+  );
+  const filePreamble = `--${boundary}${CRLF}Content-Disposition: form-data; name="file"; filename="${filename}"${CRLF}Content-Type: ${contentType}${CRLF}${CRLF}`;
+  const closing = `${CRLF}--${boundary}--${CRLF}`;
+  const body = Buffer.concat([
+    Buffer.from(fieldParts.join('')),
+    Buffer.from(filePreamble),
+    fileBuffer,
+    Buffer.from(closing),
+  ]);
+
+  const s3Res = await fetch(presigned.url, {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+    body,
+  });
+  if (s3Res.status !== 201) {
+    const text = await s3Res.text().catch(() => '');
+    throw new Error(`S3 upload failed: ${s3Res.status} ${text.slice(0, 200)}`);
+  }
+
+  // Step 3: extract Key from S3 XML → build upload_url
+  const xml = await s3Res.text();
+  const keyMatch = xml.match(/<Key>([\s\S]*?)<\/Key>/);
+  if (!keyMatch) throw new Error('No Key in S3 XML response');
+  const uploadUrl = presigned.url.replace(/\/$/, '') + '/' + keyMatch[1];
+
+  // Step 4: register the attachment record
+  return clinikoFetch('/patient_attachments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ patient_id: patientId, upload_url: uploadUrl, description }),
+  });
 }
 
 async function searchPatients(query) {
@@ -78,4 +130,4 @@ async function getPatientsUpdatedSince(since) {
   return all;
 }
 
-module.exports = { searchPatients, getPatient, getPatientsUpdatedSince };
+module.exports = { searchPatients, getPatient, getPatientsUpdatedSince, uploadAttachment };
