@@ -150,6 +150,16 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/cliniko', clinikoRoutes);
 app.use('/api/agreements', agreementRoutes);
 
+// Public runtime config — non-sensitive feature flags the SPA reads on load so
+// dormant features can be toggled per-environment via the server (no rebuild).
+// Staging has AGREEMENT_AUTOMATION_ENABLED=true; prod leaves it unset → the
+// agreement UI shows on the staging/preview frontend and stays hidden in prod.
+app.get('/api/config', (req, res) => {
+  res.json({
+    agreementAutomationEnabled: process.env.AGREEMENT_AUTOMATION_ENABLED === 'true',
+  });
+});
+
 // Scribe routes — clinician-only, all under /api/scribe/
 app.use('/api/scribe/sessions', scribeSessionRoutes);
 app.use('/api/scribe/sessions', scribeSoapNoteRoutes);

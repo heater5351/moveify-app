@@ -31,8 +31,11 @@ what to know now, links).
   **self-capping Subscription Schedule** (blocks: 6 debits; post-casual: 1 trial wk + 5; cancel)
   or a **plain rolling Subscription** (continuity). Credit still keys off the unchanged
   `invoice.payment_succeeded` Pattern-7 path.
-- **Ships dormant** behind `AGREEMENT_AUTOMATION_ENABLED` (worker + backend) and
-  `VITE_AGREEMENT_AUTOMATION_ENABLED` (frontend button). Verify in Stripe **test mode** before enabling.
+- **Ships dormant** behind `AGREEMENT_AUTOMATION_ENABLED` (worker + backend). The frontend
+  "Generate agreement" button is gated at **runtime** via `GET /api/config`
+  (`agreementAutomationEnabled`) — it reflects the backend flag, so the UI shows on
+  staging/preview (flag on) and stays hidden in prod (flag off) with no frontend rebuild.
+  Verify in Stripe **test mode** before enabling the worker side.
 - **New env vars:**
   - Worker: `AGREEMENT_AUTOMATION_ENABLED`, and one Stripe Price ID per plan —
     `STRIPE_PRICE_{T1,T2,T3}_STANDARD`, `STRIPE_PRICE_{T1,T2,T3}_POST_CASUAL`,

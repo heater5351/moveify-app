@@ -119,7 +119,16 @@ function App() {
   // Modal states
   const [showAddPatientModal, setShowAddPatientModal] = useState(false);
   const [showGenerateAgreementModal, setShowGenerateAgreementModal] = useState(false);
-  const agreementAutomationEnabled = import.meta.env.VITE_AGREEMENT_AUTOMATION_ENABLED === 'true';
+  // Runtime feature flag from the backend (GET /api/config) — the agreement UI
+  // shows wherever the server has AGREEMENT_AUTOMATION_ENABLED=true (staging),
+  // and stays hidden in prod, with no frontend rebuild/env needed.
+  const [agreementAutomationEnabled, setAgreementAutomationEnabled] = useState(false);
+  useEffect(() => {
+    fetch(`${API_URL}/config`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setAgreementAutomationEnabled(!!d.agreementAutomationEnabled); })
+      .catch(() => { /* leave disabled on failure */ });
+  }, []);
   const [showEditPatientModal, setShowEditPatientModal] = useState(false);
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [showProgramConfigModal, setShowProgramConfigModal] = useState(false);
