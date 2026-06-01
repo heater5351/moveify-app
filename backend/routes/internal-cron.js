@@ -47,6 +47,8 @@ router.use(requireOidc);
 router.post('/sync-cliniko-patients', async (req, res) => {
   try {
     const stats = await syncClinikoPatients();
+    // PHI-safe — counts only, no patient data. Makes the unattended cron observable.
+    console.log('cliniko auto-sync complete:', JSON.stringify(stats));
     res.json({ ok: true, ...stats });
   } catch (err) {
     console.error('sync-cliniko-patients job failed:', err.message);
