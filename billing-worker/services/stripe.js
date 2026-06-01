@@ -5,15 +5,22 @@ const { logger } = require('../lib/logger');
 
 let _stripe = null;
 
+// STRIPE_MODE selects which Stripe credentials to use. Default 'live' (prod
+// worker, unchanged). The staging worker sets STRIPE_MODE=test to read the
+// `*-test` secrets so it never touches the live Stripe account.
+function isTestMode() {
+  return process.env.STRIPE_MODE === 'test';
+}
+
 async function getStripe() {
   if (_stripe) return _stripe;
-  const key = await getSecret('stripe-secret-key');
+  const key = await getSecret(isTestMode() ? 'stripe-secret-key-test' : 'stripe-secret-key');
   _stripe = require('stripe')(key);
   return _stripe;
 }
 
 async function getWebhookSecret() {
-  return getSecret('stripe-webhook-secret');
+  return getSecret(isTestMode() ? 'stripe-webhook-secret-test' : 'stripe-webhook-secret');
 }
 
 async function constructWebhookEvent(rawBody, sig) {

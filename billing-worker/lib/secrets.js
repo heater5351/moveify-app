@@ -27,6 +27,10 @@ const SECRET_GCP_NAME_MAP = {
   // verification to succeed.
   'stripe-secret-key': 'STRIPE_API_KEY',
   'stripe-webhook-secret': 'billing-stripe-webhook-secret',
+  // Stripe TEST-mode secrets — used only by a worker with STRIPE_MODE=test (the
+  // staging worker). The live worker leaves STRIPE_MODE unset and never reads these.
+  'stripe-secret-key-test': 'STRIPE_API_KEY_TEST',
+  'stripe-webhook-secret-test': 'billing-stripe-webhook-secret-test',
   'gmail-client-id': 'billing-gmail-client-id',
   'gmail-client-secret': 'billing-gmail-client-secret',
   'gmail-refresh-token': 'billing-gmail-refresh-token',
@@ -47,6 +51,8 @@ const SECRET_NAME_MAP = {
   'cliniko-api-key-staging': 'CLINIKO_API_KEY_STAGING',
   'stripe-secret-key': 'STRIPE_SECRET_KEY',
   'stripe-webhook-secret': 'STRIPE_WEBHOOK_SECRET',
+  'stripe-secret-key-test': 'STRIPE_SECRET_KEY_TEST',
+  'stripe-webhook-secret-test': 'STRIPE_WEBHOOK_SECRET_TEST',
   'gmail-client-id': 'GMAIL_CLIENT_ID',
   'gmail-client-secret': 'GMAIL_CLIENT_SECRET',
   'gmail-refresh-token': 'GMAIL_REFRESH_TOKEN',
