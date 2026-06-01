@@ -723,6 +723,7 @@ function App() {
           email: editingPatient.email,
           phone: editingPatient.phone || '',
           address: editingPatient.address || '',
+          sex: editingPatient.sex || '',
         }),
       });
 

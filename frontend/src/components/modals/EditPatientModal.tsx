@@ -110,6 +110,22 @@ export const EditPatientModal = ({ patient, onUpdate, onSave, onDelete, onClose 
             )}
           </div>
 
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">
+              Sex
+            </label>
+            <select
+              value={patient.sex || ''}
+              onChange={(e) => onUpdate({ ...patient, sex: e.target.value })}
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 outline-none bg-white"
+            >
+              <option value="">Not specified</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+            <p className="text-[11px] text-slate-400 mt-1">Used to compare assessment results against age- and sex-matched normative data.</p>
+          </div>
 
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1.5">

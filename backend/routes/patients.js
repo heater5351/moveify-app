@@ -54,6 +54,7 @@ async function formatPatientWithPrograms(patient) {
       name: patient.name,
       email: patient.email,
       dob: patient.dob || '',
+      sex: patient.sex || '',
       age: calculateAge(patient.dob),
             phone: patient.phone || '',
       address: patient.address || '',
@@ -195,6 +196,7 @@ async function formatPatientWithPrograms(patient) {
     name: patient.name,
     email: patient.email,
     dob: patient.dob || '',
+    sex: patient.sex || '',
     age: calculateAge(patient.dob),
         phone: patient.phone || '',
     address: patient.address || '',
@@ -214,7 +216,7 @@ router.get('/', requireRole('clinician'), async (req, res) => {
 
     // 1. All patients
     const patients = await db.getAll(`
-      SELECT id, email, role, name, dob, phone, address, created_at,
+      SELECT id, email, role, name, dob, sex, phone, address, created_at,
              cliniko_patient_id, cliniko_synced_at,
              (password_hash IS NULL AND firebase_uid IS NULL) AS pending_setup
       FROM users
@@ -357,6 +359,7 @@ router.get('/', requireRole('clinician'), async (req, res) => {
       name: patient.name,
       email: patient.email,
       dob: patient.dob || '',
+      sex: patient.sex || '',
       age: calculateAge(patient.dob),
             phone: patient.phone || '',
       address: patient.address || '',
@@ -382,7 +385,7 @@ router.get('/:patientId', requirePatientAccess, async (req, res) => {
     const { patientId } = req.params;
 
     const patient = await db.getOne(`
-      SELECT id, email, role, name, dob, phone, address, created_at,
+      SELECT id, email, role, name, dob, sex, phone, address, created_at,
              cliniko_patient_id, cliniko_synced_at,
              (password_hash IS NULL AND firebase_uid IS NULL) AS pending_setup
       FROM users
@@ -408,7 +411,7 @@ router.get('/:patientId', requirePatientAccess, async (req, res) => {
 router.put('/:patientId', requireRole('clinician'), async (req, res) => {
   try {
     const { patientId } = req.params;
-    const { name, dob, email, phone, address } = req.body;
+    const { name, dob, email, phone, address, sex } = req.body;
 
     if (!name || !dob || !email) {
       return res.status(400).json({ error: 'Name, date of birth, and email are required' });
@@ -423,12 +426,13 @@ router.put('/:patientId', requireRole('clinician'), async (req, res) => {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
+    // sex omitted (undefined) → preserve existing; '' → clear; a value → set.
     await db.query(
-      `UPDATE users SET name = $1, dob = $2, email = $3, phone = $4, address = $5 WHERE id = $6`,
-      [name, dob, email, phone || null, address || null, patientId]
+      `UPDATE users SET name = $1, dob = $2, email = $3, phone = $4, address = $5, sex = COALESCE($6, sex) WHERE id = $7`,
+      [name, dob, email, phone || null, address || null, sex === undefined ? null : sex, patientId]
     );
 
-    audit.log(req, 'patient_update', 'patient', parseInt(patientId), { fields: ['name', 'dob', 'email', 'phone', 'address'] });
+    audit.log(req, 'patient_update', 'patient', parseInt(patientId), { fields: ['name', 'dob', 'email', 'phone', 'address', 'sex'] });
 
     res.json({ message: 'Patient updated' });
   } catch (error) {
