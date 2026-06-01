@@ -8,6 +8,7 @@ const { runDailySummary } = require('../jobs/daily-summary');
 const { processReferrals } = require('../jobs/process-referrals');
 const { ingestTyroFromDrive } = require('../jobs/ingest-tyro-drive');
 const { pollClinikoAppointments } = require('../jobs/poll-cliniko-appointments');
+const { syncBlockProgress } = require('../jobs/sync-block-progress');
 const { runDashboardSync } = require('../jobs/dashboard-sync');
 const { withCorrelation, logger } = require('../lib/logger');
 const { OAuth2Client } = require('google-auth-library');
@@ -98,6 +99,18 @@ router.post('/ingest-tyro-drive', async (req, res) => {
     res.json({ ok: true, ...result });
   } catch (err) {
     log.error({ err: err.message }, 'ingest-tyro-drive job failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/sync-block-progress', async (req, res) => {
+  const log = withCorrelation(req);
+  try {
+    const dryRun = req.body?.dryRun === true;
+    const stats = await syncBlockProgress(log, { dryRun });
+    res.json({ ok: true, ...stats });
+  } catch (err) {
+    log.error({ err: err.message }, 'sync-block-progress job failed');
     res.status(500).json({ error: err.message });
   }
 });

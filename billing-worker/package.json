@@ -5,7 +5,9 @@
   "main": "worker.js",
   "scripts": {
     "start": "node worker.js",
-    "dev": "nodemon worker.js"
+    "dev": "nodemon worker.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock": "^3.1042.0",
@@ -21,7 +23,8 @@
     "stripe": "^16.2.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.4"
+    "nodemon": "^3.1.4",
+    "vitest": "^4.0.18"
   },
   "engines": {
     "node": ">=20"

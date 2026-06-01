@@ -135,6 +135,36 @@ async function getAppointmentsAll(since, secretName = 'cliniko-api-key') {
   return all;
 }
 
+// A single patient's individual appointments (paginated). Used by block-progress
+// so we only pull the handful of active block patients, not the whole clinic.
+async function getPatientAppointmentsAll(patientId, secretName = 'cliniko-api-key') {
+  const all = [];
+  let path = `/patients/${patientId}/appointments?per_page=100`;
+  while (path) {
+    const data = await clinikoRequest(path, {}, secretName);
+    all.push(...(data.appointments || []));
+    const next = data.links?.next;
+    if (!next) break;
+    path = next.startsWith(BASE_URL) ? next.slice(BASE_URL.length) : next;
+  }
+  return all;
+}
+
+// A single patient's group attendances (paginated), filtered server-side by
+// patient_id. Each attendee carries an `arrived` flag + a booking/group link.
+async function getPatientAttendeesAll(patientId, secretName = 'cliniko-api-key') {
+  const all = [];
+  let path = `/attendees?q[]=patient_id:=${encodeURIComponent(patientId)}&per_page=100`;
+  while (path) {
+    const data = await clinikoRequest(path, {}, secretName);
+    all.push(...(data.attendees || []));
+    const next = data.links?.next;
+    if (!next) break;
+    path = next.startsWith(BASE_URL) ? next.slice(BASE_URL.length) : next;
+  }
+  return all;
+}
+
 async function getInvoices(since, secretName = 'cliniko-api-key') {
   const qs = since ? `?updated_at%5Bgt%5D=${encodeURIComponent(since)}&per_page=100` : '?per_page=100';
   return clinikoRequest(`/invoices${qs}`, {}, secretName);
@@ -336,6 +366,31 @@ async function addPatientNote(patientId, content) {
 }
 
 /**
+ * Writes the block-progress one-liner into the patient's `appointment_notes`
+ * field — the patient-level field Cliniko surfaces on the booking screen.
+ *
+ * Rewrites ONLY the `[BLOCK] …` delimited line, preserving any manual clinical
+ * alert the front desk has typed. GET-then-PATCH (like addPatientNote). Skips
+ * the write when the line is unchanged. Returns { changed: boolean }.
+ *
+ * `appointment_notes` is a writable Patient attribute (confirmed against the
+ * Cliniko API). This uses the admin (full-access) key — the finance key is
+ * read-only. The block line is a session-count summary, not health data.
+ */
+async function updateBlockProgressNote(patientId, blockLine) {
+  const { spliceBlockLine } = require('../lib/block-bundles');
+  const patient = await clinikoRequest(`/patients/${patientId}`);
+  const updated = spliceBlockLine(patient.appointment_notes, blockLine);
+  if (updated === null) return { changed: false };
+  await clinikoRequest(`/patients/${patientId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ appointment_notes: updated }),
+  });
+  return { changed: true };
+}
+
+/**
  * Uploads a PDF to Cliniko as a patient attachment.
  * Flow: get presigned S3 URL from Cliniko → POST file to S3 → register attachment.
  * Builds multipart/form-data manually to ensure correct Content-Type boundary for S3.
@@ -522,6 +577,7 @@ module.exports = {
     createPatient,
     updatePatientMissingFields,
     addPatientNote,
+    updateBlockProgressNote,
     uploadPatientAttachment,
     findOrCreateReferrerContact,
     setPatientReferringDoctor,
@@ -542,5 +598,7 @@ module.exports = {
     getPayments:         (since) => getPayments(since, 'cliniko-api-key-finance'),
     getAttendeesAll:     (since) => getAttendeesAll(since, 'cliniko-api-key-finance'),
     getGroupAppointment: (id) => getGroupAppointment(id, 'cliniko-api-key-finance'),
+    getPatientAppointmentsAll: (id) => getPatientAppointmentsAll(id, 'cliniko-api-key-finance'),
+    getPatientAttendeesAll:    (id) => getPatientAttendeesAll(id, 'cliniko-api-key-finance'),
   },
 };
