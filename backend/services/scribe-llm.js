@@ -210,7 +210,11 @@ function consolidatePassFail(def, grp) {
   if (failed.length === 0) interp = `Held the ${thr}-second threshold in every tested condition, a reassuring sign for standing balance.`;
   else if (passed.length === 0) interp = `Could not hold the ${thr}-second tandem threshold in any tested condition, a sign of increased fall risk on the 4-Stage Balance test.`;
   else interp = `Met the ${thr}-second threshold in the standard conditions; ${failed.join(' and ')} held under ${thr} seconds, a sign of increased fall risk on the 4-Stage Balance test.`;
-  return `${def.displayName} | ${parts.join('; ')} | ${interp}`;
+  // ' // ' is the in-cell line-break sentinel: it survives the newline-delimited
+  // row format and the editable textarea, and the docx layer (parseOaRows in
+  // scribe-handout-docx.js) converts it to a real line break so each condition
+  // sits on its own line in the Result cell instead of a cramped semicolon list.
+  return `${def.displayName} | ${parts.join(' // ')} | ${interp}`;
 }
 
 /**

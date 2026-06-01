@@ -56,6 +56,14 @@ describe('consolidateClinicalContext — pass/fail condensation', () => {
     expect(r[0][1]).toMatch(/Eyes Closed: 7 sec/);
   });
 
+  it('joins conditions with the " // " line-break sentinel for in-cell stacking', () => {
+    const out = consolidateClinicalContext(tandem, 73, 'female');
+    const r = rows(out);
+    // four conditions → three separators
+    expect((r[0][1].match(/ \/\/ /g) || []).length).toBe(3);
+    expect(r[0][1]).not.toMatch(/;/); // no cramped semicolon list in the result cell
+  });
+
   it('names the failed condition and flags fall risk', () => {
     const out = consolidateClinicalContext(tandem, 73, 'female');
     expect(out).toMatch(/Eyes Closed held under 10 seconds/);

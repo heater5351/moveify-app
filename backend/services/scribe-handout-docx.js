@@ -29,11 +29,16 @@ function toBullets(text) {
 
 function parseOaRows(raw) {
   if (!raw) return [];
+  // ' // ' is the in-cell line-break sentinel (see consolidatePassFail in
+  // scribe-llm.js). Convert it to a real newline so docxtemplater's
+  // linebreaks:true renders each item on its own line within the cell — used to
+  // stack the conditions of a multi-condition test (e.g. tandem stance).
+  const stack = s => s.replace(/\s*\/\/\s*/g, '\n');
   return raw.split('\n')
     .filter(l => l.trim() && l.includes('|'))
     .map(l => {
       const p = l.split('|').map(s => clean(s));
-      return { test: p[0] || '', result: p[1] || '', interpretation: p[2] || '' };
+      return { test: p[0] || '', result: stack(p[1] || ''), interpretation: stack(p[2] || '') };
     })
     .filter(r => r.test);
 }
