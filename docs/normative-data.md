@@ -594,9 +594,17 @@ flag.
 - **Araújo CG et al. (2022).** Successful 10-second one-legged stance performance
   predicts survival in middle-aged and older individuals. *Br J Sports Med*
   56(17):975–980. *(mortality association)*
+- **Rossiter-Fornoff JE, Wolf SL, Wolfson LI, Buchner DM (1995).** A cross-sectional
+  validation study of the FICSIT common data base static balance measures. *J Gerontol
+  A Biol Sci Med Sci* 50(6):M291–7. *(origin of the 10 s tandem/static-balance cut-off)*
+- **Joo B, Marquez JL, Osmotherly PG (2021).** Ten-Second Tandem Stance Test: a
+  potential tool to assist walking aid prescription and falls risk in balance-impaired
+  individuals. *Arch Rehabil Res Clin Transl* 4(1):100173. *(n=61, mean age 76; OR ~4–5
+  for prior falls / walking-aid need when unable to hold full tandem 10 s)*
 
 ### Source links
 - [CDC STEADI 4-Stage Balance Test (PDF)](https://www.cdc.gov/steadi/media/pdfs/STEADI-Assessment-4Stage-508.pdf)
+- [Joo 2021 — Ten-Second Tandem Stance Test (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC8904864/)
 - [Springer 2007 — unipedal stance norms (PDF)](https://geriatrictoolkit.missouri.edu/balance/Normative_Values_for_the_Unipedal_Stance_Test_Springer-JGPT.pdf)
 - [Bohannon 2006 single-limb stance meta-analysis (PDF)](https://geriatrictoolkit.missouri.edu/balance/Bohannon_Single_Limb_Stance_2006.pdf)
 - [4-Stage Balance Test — Physiopedia](https://www.physio-pedia.com/The_4-Stage_Balance_Test)

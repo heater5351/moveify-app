@@ -39,12 +39,14 @@ router.post('/link/:patientId', requireAdmin, async (req, res) => {
     const patient = await db.getOne('SELECT id FROM users WHERE id = $1 AND role = $2', [patientId, 'patient']);
     if (!patient) return res.status(404).json({ error: 'Patient not found' });
 
-    // Verify the Cliniko patient exists
-    await cliniko.getPatient(clinikoPatientId);
+    // Verify the Cliniko patient exists, and pull demographics in the same call so
+    // age/sex are populated immediately on link (needed for normative grounding).
+    // COALESCE only fills blanks — never overwrites data already entered in Moveify.
+    const cp = await cliniko.getPatient(clinikoPatientId);
 
     await db.query(
-      'UPDATE users SET cliniko_patient_id = $1, cliniko_synced_at = NOW() WHERE id = $2',
-      [clinikoPatientId, patientId]
+      'UPDATE users SET cliniko_patient_id = $1, dob = COALESCE(dob, $2), sex = COALESCE(sex, $3), cliniko_synced_at = NOW() WHERE id = $4',
+      [clinikoPatientId, cp.date_of_birth || null, cp.sex || null, patientId]
     );
 
     audit.log(req, 'cliniko_link', 'patient', parseInt(patientId), { clinikoPatientId });

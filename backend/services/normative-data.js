@@ -147,6 +147,16 @@ function classify(def, parsed, age, sex) {
   const v = parsed.value;
   if (v == null) return out;
 
+  // Pass/fail screen against a single hold-time threshold (e.g. tandem stance).
+  // No graded norm exists, so we only state whether the threshold was met.
+  if (def.type === 'pass_fail' && def.passThreshold != null) {
+    const pass = def.direction === 'lower_better' ? v <= def.passThreshold : v >= def.passThreshold;
+    out.passFail = pass ? 'pass' : 'fail';
+    out.verdict = pass ? 'within' : 'flagged';
+    out.label = pass ? (def.passMeaning || null) : (def.failMeaning || null);
+    return out;
+  }
+
   // Threshold/screen with category list (glucose).
   if (def.categories && Array.isArray(def.categories)) {
     const cat = def.categories.find(c => v <= c.max) || def.categories[def.categories.length - 1];
@@ -217,7 +227,11 @@ const CAVEAT_TEXT = {
 function buildInterpretation(res, { includeSource = false } = {}) {
   if (!res) return null;
   const parts = [];
-  if (res.verdict === 'within') parts.push('Within the expected range for age/sex.');
+  if (res.passFail) {
+    // Pass/fail tests have no age/sex range — state the threshold outcome directly.
+    if (res.label) parts.push(`${res.label[0].toUpperCase()}${res.label.slice(1)}.`);
+  }
+  else if (res.verdict === 'within') parts.push('Within the expected range for age/sex.');
   else if (res.verdict === 'below') parts.push('Below the expected range for age/sex.');
   else if (res.verdict === 'above') parts.push('Above the expected range for age/sex.');
   else if (res.verdict === 'flagged' && res.label) parts.push(`${res.label[0].toUpperCase()}${res.label.slice(1)}.`);

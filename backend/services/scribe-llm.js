@@ -18,6 +18,10 @@ Subjective
 
 Objective
 - Clinical findings mentioned: range of motion, strength assessments, functional tests, movement quality observations, vitals if mentioned, any outcome measures discussed.
+- When a test was measured multiple times under the SAME conditions, list ALL the individual recorded values, then state the single derived figure and how it was reached. How to derive it depends on the test type:
+  - Strength tests measured as repeated trials (e.g. grip strength): give the AVERAGE of the trials, e.g. "Grip Strength (Right): 28, 30, 29 kg, avg 29 kg".
+  - Balance / timed-hold tests (e.g. single-leg stance, tandem stance): give the BEST (longest) valid attempt, not the average. A value labelled "Retest" is a redo of a failed or invalid attempt and replaces the earlier one, e.g. "Single Leg Stance, Left (shoes off): 0 sec, then 9 sec on retest, best 9 sec".
+  Keep different conditions and different sides separate — never merge one side's or condition's value into another (shoes on vs shoes off, left vs right foot/leg, eyes open vs closed are each their own test). Show the working — do not drop the individual values in this note.
 
 Assessment
 - Clinical reasoning, working diagnosis/impression, progress since last session, contributing factors, prognosis.
@@ -77,6 +81,10 @@ Be exhaustive and systematic: read the transcript from start to finish and captu
 Rules:
 - ONLY include findings that have an actual numeric or graded measurement (e.g. "45°", "4/5", "45 sec", "120/80 mmHg", "Grade 2"). Never include a finding if the only evidence is a subjective patient report or a qualitative clinician observation with no number or grade.
 - The Result column must contain only the patient's actual measured value. Never put normative data, comparisons, or descriptive text in the Result column.
+- When a test was measured multiple times under the SAME conditions, report ONLY the single derived value in the Result column — never the individual trial values, and give it ONE row. How to derive that value depends on the test type:
+  - Strength tests measured as repeated trials (e.g. grip strength): use the AVERAGE of the trials.
+  - Balance / timed-hold tests (e.g. single-leg stance, tandem stance): use the BEST (longest) valid attempt. A value labelled "Retest" is a redo of a failed or invalid attempt and REPLACES the earlier one — never average a balance retest.
+  Never combine genuinely different conditions or sides into one row, and never average across them: shoes on vs shoes off, left vs right foot/leg, and eyes open vs closed are each their own test and own row. Keep bilateral sides as separate or combined rows (e.g. "Grip Strength | L 27 / R 29 kg | ..."), never merging one side's value into the other. Round to a sensible precision and keep the unit.
 - The Interpretation column should be one short, factual sentence describing the functional meaning of the finding. Do NOT state specific normative numbers, percentiles, population averages, or fall-risk cut-offs from memory — those are added separately from a verified normative database. Describe only the clinical/functional meaning (e.g. "Limited ankle dorsiflexion may affect squat depth and gait").
 - Never wrap test names in square brackets. Write the test name as plain text only (e.g. "ROM Forward Bending", not "[ROM Forward Bending]").
 - Never use asterisks (*), emojis, or markdown formatting anywhere in the output.

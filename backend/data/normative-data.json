@@ -4,7 +4,7 @@
     "sexValues": ["male", "female", "any"],
     "units": ["seconds", "reps", "kg", "mmHg", "mmol_L", "degrees", "cm", "m_s", "points", "metres", "bpm", "ratio"],
     "directions": ["higher_better", "lower_better", "target_range", "none"],
-    "types": ["norm_referenced", "threshold", "screen", "qualitative"],
+    "types": ["norm_referenced", "threshold", "screen", "qualitative", "pass_fail"],
     "caveatFlags": {
       "no_norm_under_50": "No validated norm below 50; interpret younger patients against the youngest band as a lenient bound.",
       "no_norm_under_60": "No validated norm below 60.",
@@ -182,6 +182,18 @@
       "caveats": ["symmetry_not_norm"],
       "note": "The 4-Stage Balance Test itself is pass/fail (10 s per stage; failing tandem = increased fall risk). These graded norms are for the single-leg-stance component (eyes open).",
       "sourceShort": "Springer 2007"
+    },
+    "tandem_stance": {
+      "displayName": "Tandem Stance (heel-to-toe)",
+      "aliases": ["tandem stance", "tandem stand", "tandem stance balance", "tandem balance", "tandem stance test", "full tandem stance", "heel to toe stance", "heel-to-toe stand", "tandem romberg"],
+      "unit": "seconds", "direction": "higher_better", "type": "pass_fail",
+      "passThreshold": 10,
+      "passMeaning": "held a tandem (heel-to-toe) stance for at least 10 seconds, meeting the 4-Stage Balance fall-risk threshold for this item",
+      "failMeaning": "could not hold a tandem (heel-to-toe) stance for 10 seconds, a sign of increased fall risk on the 4-Stage Balance test",
+      "cutoffs": [],
+      "caveats": ["symmetry_not_norm"],
+      "note": "Scored pass/fail against a 10-second hold per the CDC STEADI 4-Stage Balance Test (full-tandem stage). There is no validated graded population norm beyond the 10 s threshold, so longer holds are reported as a clear pass rather than ranked. Corroborated by Joo 2021 (OR ~4-5 for prior falls / walking-aid need when unable to hold 10 s).",
+      "sourceShort": "CDC STEADI 4-Stage Balance; Rossiter-Fornoff 1995 (FICSIT); Joo 2021"
     },
     "neck_flexor_endurance": {
       "displayName": "Deep Neck Flexor Endurance",

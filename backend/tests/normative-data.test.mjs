@@ -66,6 +66,26 @@ describe('classify — lower-is-better', () => {
   });
 });
 
+describe('classify — pass/fail (tandem stance)', () => {
+  it('matches tandem stance variants by alias', () => {
+    expect(matchTest('Tandem Stance Balance Right Foot Forward (shoes on)').key).toBe('tandem_stance');
+    expect(matchTest('Full tandem stance').key).toBe('tandem_stance');
+  });
+  it('hold >= 10 s passes the threshold (no age/sex range)', () => {
+    const r = interpret('tandem stance', '25 sec', 68, 'male');
+    expect(r.passFail).toBe('pass');
+    const txt = buildInterpretation(r);
+    expect(txt).toMatch(/at least 10 seconds/);
+    expect(txt).not.toMatch(/expected range for age\/sex/);
+  });
+  it('hold < 10 s fails and is flagged as increased fall risk', () => {
+    const r = interpret('tandem stance', '6 seconds', 72, 'female');
+    expect(r.passFail).toBe('fail');
+    const txt = buildInterpretation(r);
+    expect(txt).toMatch(/increased fall risk/);
+  });
+});
+
 describe('classify — screen (never diagnoses)', () => {
   it('BP grade 1 is flagged with screen caveat', () => {
     const r = interpret('blood pressure', '148/92', 55, 'male');

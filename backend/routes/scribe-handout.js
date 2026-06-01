@@ -3,6 +3,7 @@ const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { generateHandout } = require('../services/scribe-llm');
 const { generateHandoutDocx } = require('../services/scribe-handout-docx');
+const cliniko = require('../services/cliniko');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -24,9 +25,32 @@ function ageFromDob(dob) {
 async function getPatientDemographics(patientId) {
   if (!patientId) return {};
   try {
-    const r = await db.query('SELECT dob, sex FROM users WHERE id = $1', [patientId]);
+    const r = await db.query('SELECT dob, sex, cliniko_patient_id FROM users WHERE id = $1', [patientId]);
     if (r.rows.length === 0) return {};
-    return { age: ageFromDob(r.rows[0].dob), sex: r.rows[0].sex || null };
+    let { dob, sex, cliniko_patient_id } = r.rows[0];
+
+    // Auto-backfill from Cliniko when age/sex is missing, so normative grounding
+    // works without anyone running a manual sync. Sex-specific norms (grip, 30CST,
+    // gait speed, ROM) silently degrade to generic without it. Best-effort: any
+    // failure leaves the existing values untouched and never blocks the handout.
+    if ((!sex || !dob) && cliniko_patient_id) {
+      try {
+        const cp = await cliniko.getPatient(cliniko_patient_id);
+        const cSex = cp.sex || null;
+        const cDob = cp.date_of_birth || null;
+        if ((cSex && !sex) || (cDob && !dob)) {
+          // COALESCE so we only ever fill blanks, never overwrite real data.
+          await db.query(
+            'UPDATE users SET sex = COALESCE(sex, $1), dob = COALESCE(dob, $2), cliniko_synced_at = NOW() WHERE id = $3',
+            [cSex, cDob, patientId]
+          );
+          sex = sex || cSex;
+          dob = dob || cDob;
+        }
+      } catch { /* Cliniko unreachable/unlinked — fall back to what we have. */ }
+    }
+
+    return { age: ageFromDob(dob), sex: sex || null };
   } catch {
     return {};
   }
