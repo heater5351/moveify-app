@@ -4,7 +4,7 @@
  * only (no cross-region routing), so PHI never leaves Australia.
  */
 const { BedrockRuntimeClient, ConverseCommand } = require('@aws-sdk/client-bedrock-runtime');
-const { interpret, buildInterpretation } = require('./normative-data');
+const { interpret, buildInterpretation, matchTest, parseValue } = require('./normative-data');
 
 const client = new BedrockRuntimeClient({ region: 'ap-southeast-2' });
 const MODEL_ID = 'deepseek.v3.2';
@@ -117,6 +117,148 @@ function groundClinicalContext(clinicalContext, age, sex) {
   }).join('\n');
 }
 
+// Unit suffix for a value rendered in the Result column of a split row.
+function unitSuffix(unit) {
+  if (unit === 'reps') return ' reps';
+  if (unit === 'seconds') return ' sec';
+  if (unit === 'kg') return ' kg';
+  if (unit === 'degrees') return '°';
+  if (unit === 'cm') return ' cm';
+  return unit ? ` ${unit}` : '';
+}
+
+// Strip the canonical test name from a row label to leave the condition descriptor
+// (e.g. "Tandem Stance (Shoes On, Right Foot Forward)" → "Shoes On, Right Foot Forward").
+function conditionLabel(name, def) {
+  let s = String(name || '');
+  const aliases = [def.displayName, ...(def.aliases || [])].filter(Boolean).sort((a, b) => b.length - a.length);
+  for (const a of aliases) {
+    const re = new RegExp(a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    if (re.test(s)) { s = s.replace(re, ' '); break; }
+  }
+  return s.replace(/[()]/g, ' ').replace(/^[\s,:;.-]+|[\s,:;.-]+$/g, '').replace(/\s+/g, ' ').trim();
+}
+
+// Ground a single row, falling back to the model's own interpretation.
+function groundRow(row, age, sex) {
+  try {
+    const res = row.match && interpret(row.name, row.result, age, sex);
+    const g = res && buildInterpretation(res);
+    if (g) return g;
+  } catch { /* fall through */ }
+  return row.interp;
+}
+
+// Pull left/right side values from a group of rows (a combined "L/R" row, or
+// separate per-side rows where the side appears in the result or the name).
+function collectSides(grp, unit) {
+  let left = null, right = null;
+  for (const row of grp) {
+    const parsed = parseValue(row.result, unit);
+    if (!parsed) continue;
+    if (parsed.left != null && parsed.right != null) { left = parsed.left; right = parsed.right; continue; }
+    if (parsed.value == null) continue;
+    const hay = `${row.result} ${row.name}`.toLowerCase();
+    const hasL = /\bleft\b|\bl\b/.test(hay);
+    const hasR = /\bright\b|\br\b/.test(hay);
+    if (hasL && !hasR) left = parsed.value;
+    else if (hasR && !hasL) right = parsed.value;
+  }
+  return (left != null || right != null) ? { left, right } : null;
+}
+
+// Bilateral norm test (grip, single-leg, calf, ROM) → one grounded row per side,
+// with a side-to-side asymmetry note appended to the weaker side.
+function splitBilateral(def, sides, age, sex, fallback) {
+  const display = def.displayName.replace(/\s*\(.*?\)\s*$/, '').trim();
+  const suffix = unitSuffix(def.unit);
+  const built = [];
+  for (const [label, val] of [['Right', sides.right], ['Left', sides.left]]) {
+    if (val == null) continue;
+    let interp = '';
+    try { const res = interpret(def.displayName, String(val), age, sex); interp = (res && buildInterpretation(res)) || ''; } catch { /* */ }
+    if (!interp) interp = fallback || '';
+    built.push({ label, val, interp });
+  }
+  if (sides.left != null && sides.right != null) {
+    const hi = Math.max(sides.left, sides.right), lo = Math.min(sides.left, sides.right);
+    if (hi > 0 && (hi - lo) / hi >= 0.10) {
+      const pct = Math.round((hi - lo) / hi * 100);
+      const stronger = sides.right >= sides.left ? 'right' : 'left';
+      const weaker = sides.right >= sides.left ? 'Left' : 'Right';
+      const r = built.find(b => b.label === weaker);
+      if (r) r.interp = `${r.interp} ${pct}% weaker than the ${stronger} side.`.trim();
+    }
+  }
+  return built.map(b => `${display} (${b.label}) | ${b.val}${suffix} | ${b.interp || '—'}`);
+}
+
+// Pass/fail condition-variant test (tandem) → one consolidated row listing every
+// condition, with the interpretation stated once and any failed condition named.
+function consolidatePassFail(def, grp) {
+  const thr = def.passThreshold;
+  const higher = def.direction !== 'lower_better';
+  const parts = [], passed = [], failed = [];
+  for (const row of grp) {
+    const cond = conditionLabel(row.name, def) || 'Standard';
+    parts.push(`${cond}: ${row.result}`);
+    const v = (parseValue(row.result, def.unit) || {}).value;
+    if (v == null) continue;
+    ((higher ? v >= thr : v <= thr) ? passed : failed).push(cond);
+  }
+  let interp;
+  if (failed.length === 0) interp = `Held the ${thr}-second threshold in every tested condition, a reassuring sign for standing balance.`;
+  else if (passed.length === 0) interp = `Could not hold the ${thr}-second tandem threshold in any tested condition, a sign of increased fall risk on the 4-Stage Balance test.`;
+  else interp = `Met the ${thr}-second threshold in the standard conditions; ${failed.join(' and ')} held under ${thr} seconds, a sign of increased fall risk on the 4-Stage Balance test.`;
+  return `${def.displayName} | ${parts.join('; ')} | ${interp}`;
+}
+
+/**
+ * Consolidate + ground the raw "Test | Result | Interpretation" extraction so one
+ * clinical assessment reads as one logical entry rather than many near-duplicate
+ * rows. Grouped by the normative dataset's canonical test key:
+ *  - pass/fail condition tests (tandem) → a single consolidated row
+ *  - bilateral norm tests (grip, single-leg, calf, ROM) → one grounded row per side
+ *  - everything else → grounded per row (unchanged)
+ * Rows that don't match the dataset keep the model's own interpretation.
+ * No patient values are logged.
+ */
+function consolidateClinicalContext(raw, age, sex) {
+  if (!raw) return raw;
+  const rows = raw.split('\n').map(line => {
+    if (!line.includes('|')) return null;
+    const cols = line.split('|').map(s => s.trim());
+    if (!cols[0]) return null;
+    return { name: cols[0], result: cols[1] || '', interp: cols[2] || '', match: matchTest(cols[0]) };
+  }).filter(Boolean);
+
+  const order = [];
+  const groups = new Map();
+  rows.forEach((row, i) => {
+    const key = row.match ? row.match.key : `__row_${i}`;
+    if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+    groups.get(key).push(row);
+  });
+
+  const out = [];
+  for (const key of order) {
+    const grp = groups.get(key);
+    const def = grp[0].match ? grp[0].match.def : null;
+
+    if (def && def.type === 'pass_fail' && def.passThreshold != null) {
+      out.push(consolidatePassFail(def, grp));
+      continue;
+    }
+    const sides = def && (def.bands?.length || def.cutoffs?.length) ? collectSides(grp, def.unit) : null;
+    if (def && sides) {
+      out.push(...splitBilateral(def, sides, age, sex, grp[0].interp));
+      continue;
+    }
+    for (const row of grp) out.push(`${row.name} | ${row.result} | ${groundRow(row, age, sex)}`);
+  }
+  return out.join('\n');
+}
+
 const RESULTS_SUMMARY_SYSTEM_PROMPT = `You are writing the "What Your Results Mean" paragraph of a patient assessment handout for an Accredited Exercise Physiology clinic. Patients are typically injured athletes and adults aged 45-75.
 
 You are given the patient's assessment results, each with a grounded interpretation (within/below/above the expected range for their age and sex, plus any clinical flags). Write ONE warm, plain-language paragraph that ties the findings together and explains, in human terms, WHY they matter.
@@ -185,8 +327,9 @@ async function generateHandout(transcript, patientFirstName, assessmentDate, dem
         .replace(/\*+/g, '')
         .replace(/\[|\]/g, '')
         .trim();
-      // Ground the interpretation column in peer-reviewed norms (deterministic).
-      return groundClinicalContext(raw, age, sex);
+      // Ground + consolidate: one assessment reads as one entry (sides split,
+      // tandem conditions merged), interpretation grounded in peer-reviewed norms.
+      return consolidateClinicalContext(raw, age, sex);
     } catch (err) {
       console.error('Clinical context generation failed:', err.message);
       return '';
@@ -255,4 +398,4 @@ async function generateReport(soapNoteContent, systemPrompt) {
   };
 }
 
-module.exports = { generateSoapNote, generateHandout, generateReport, groundClinicalContext };
+module.exports = { generateSoapNote, generateHandout, generateReport, groundClinicalContext, consolidateClinicalContext };

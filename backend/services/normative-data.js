@@ -76,14 +76,20 @@ function parseValue(text, unit) {
     return null;
   }
 
-  // Bilateral: "L 12 / R 18", "left 12, right 18", "12/18"
-  const bilat = t.match(/(?:l(?:eft)?\D*)?(\d+(?:\.\d+)?)\D+(?:r(?:ight)?\D*)?(\d+(?:\.\d+)?)/i);
   const nums = (t.match(/\d+(?:\.\d+)?/g) || []).map(Number);
+
+  // Bilateral with explicit side labels: "L 12 / R 18", "R 29.3 / L 23".
+  // Map each value to its OWN label so order doesn't matter — the model often
+  // writes the right side first, so positional [0]=left/[1]=right is wrong.
+  const lMatch = t.match(/\b(?:l|left)\b[^0-9]*?(\d+(?:\.\d+)?)/i);
+  const rMatch = t.match(/\b(?:r|right)\b[^0-9]*?(\d+(?:\.\d+)?)/i);
+  if (lMatch && rMatch) {
+    const left = +lMatch[1], right = +rMatch[1];
+    return { left, right, value: Math.min(left, right) };
+  }
+  // Two unlabelled numbers with a stray side word — fall back to positional order.
   if (/\b(l|left|r|right)\b/i.test(t) && nums.length >= 2) {
     return { left: nums[0], right: nums[1], value: Math.min(nums[0], nums[1]) };
-  }
-  if (bilat && /\//.test(t) && nums.length === 2 && unit !== 'm_s') {
-    // ambiguous slash without L/R labels — treat as single only if one number
   }
   if (nums.length >= 1) return { value: nums[0] };
   return null;
