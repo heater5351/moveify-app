@@ -1,7 +1,7 @@
 // API utility with retry logic, error handling, and Identity Platform auth.
 // Token lives in memory only (Firebase SDK caches it via onIdTokenChanged).
 import { API_URL } from '../config';
-import { auth, getCachedToken } from '../lib/firebase';
+import { auth, getCachedToken, setCachedToken } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 
 const USER_KEY = 'moveify_user';
@@ -39,17 +39,49 @@ export function setStoredUser(user: { id: number; email: string; role: string; n
 }
 
 /**
- * Get auth headers for API calls
+ * Get auth headers for API calls.
+ *
+ * Mints the token at call time via Firebase `getIdToken()`, which returns the
+ * in-memory token instantly if still valid and only hits the network when it
+ * has expired (or is within ~5 min of expiry). This is the fix for "Token
+ * expired" bounces: the old synchronous cache only updated on
+ * `onIdTokenChanged`, which does not fire while the tab is backgrounded or the
+ * machine is asleep — so a stale, expired token was shipped on the next call.
  */
-export function getAuthHeaders(): Record<string, string> {
+export async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
   };
-  const token = getToken();
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  const user = auth.currentUser;
+  if (user) {
+    try {
+      headers['Authorization'] = `Bearer ${await user.getIdToken()}`;
+    } catch {
+      /* signed out or offline — send unauthenticated, backend will 401 */
+    }
+  } else {
+    // Brief window on cold load before currentUser is populated: fall back to
+    // whatever the auth-state observer last seeded into the cache.
+    const cached = getCachedToken();
+    if (cached) headers['Authorization'] = `Bearer ${cached}`;
   }
   return headers;
+}
+
+/**
+ * Force a token refresh (network round-trip) and update the cache. Used by the
+ * one-shot 401 retry below to recover from a token the backend rejects.
+ */
+async function forceRefreshToken(): Promise<string | null> {
+  const user = auth.currentUser;
+  if (!user) return null;
+  try {
+    const token = await user.getIdToken(true);
+    setCachedToken(token);
+    return token;
+  } catch {
+    return null;
+  }
 }
 
 interface FetchOptions extends RequestInit {
@@ -73,6 +105,7 @@ export async function fetchWithRetry(
   } = options;
 
   let lastError: Error | null = null;
+  let triedTokenRefresh = false;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -87,8 +120,22 @@ export async function fetchWithRetry(
 
       clearTimeout(timeoutId);
 
-      // Handle 401 — clear auth and redirect to login
+      // Handle 401 — try one forced token refresh before giving up. Covers the
+      // edge cases the call-time mint can't (clock skew, mid-flight expiry,
+      // revoked-then-reissued token). Only clear auth + redirect if the fresh
+      // token is also rejected.
       if (response.status === 401) {
+        if (!triedTokenRefresh) {
+          triedTokenRefresh = true;
+          const fresh = await forceRefreshToken();
+          if (fresh) {
+            fetchOptions.headers = {
+              ...(fetchOptions.headers as Record<string, string> | undefined),
+              Authorization: `Bearer ${fresh}`,
+            };
+            continue; // retry immediately with the fresh token
+          }
+        }
         clearAuth();
         window.location.href = '/';
         return response;
@@ -140,7 +187,7 @@ export async function apiCall<T = unknown>(
   const response = await fetchWithRetry(url, {
     ...options,
     headers: {
-      ...getAuthHeaders(),
+      ...(await getAuthHeaders()),
       ...options.headers,
     },
   });

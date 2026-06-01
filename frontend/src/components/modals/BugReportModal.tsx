@@ -34,7 +34,7 @@ export const BugReportModal = ({ onClose, onSuccess, currentPage }: BugReportMod
     try {
       const res = await fetch(`${API_URL}/feedback`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ category, description: description.trim(), page: currentPage || null })
       });
 

@@ -33,9 +33,9 @@ export const AssignEducationModal = ({
     try {
       setLoading(true);
       const [modulesRes, assignedRes, categoriesRes] = await Promise.all([
-        fetch(`${API_URL}/education/modules`, { headers: getAuthHeaders() }),
-        fetch(`${API_URL}/education/patient/${patientId}/modules`, { headers: getAuthHeaders() }),
-        fetch(`${API_URL}/education/categories`, { headers: getAuthHeaders() })
+        fetch(`${API_URL}/education/modules`, { headers: await getAuthHeaders() }),
+        fetch(`${API_URL}/education/patient/${patientId}/modules`, { headers: await getAuthHeaders() }),
+        fetch(`${API_URL}/education/categories`, { headers: await getAuthHeaders() })
       ]);
 
       if (modulesRes.ok) {
@@ -64,7 +64,7 @@ export const AssignEducationModal = ({
       setAssigning(true);
       const response = await fetch(
         `${API_URL}/education/patient/${patientId}/modules/${moduleId}`,
-        { method: 'POST', headers: getAuthHeaders() }
+        { method: 'POST', headers: await getAuthHeaders() }
       );
 
       if (response.ok) {
@@ -83,7 +83,7 @@ export const AssignEducationModal = ({
       setAssigning(true);
       const response = await fetch(
         `${API_URL}/education/patient/${patientId}/modules/${moduleId}`,
-        { method: 'DELETE', headers: getAuthHeaders() }
+        { method: 'DELETE', headers: await getAuthHeaders() }
       );
 
       if (response.ok) {

@@ -194,7 +194,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
     setIsLoading(true);
     try {
       const response = await fetch(`${API_URL}/exercises`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
@@ -238,7 +238,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
   const fetchFavorites = async () => {
     try {
       const response = await fetch(`${API_URL}/exercises/favorites`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
@@ -255,7 +255,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
   const fetchFilterOptions = async () => {
     try {
       const response = await fetch(`${API_URL}/exercises/filter-options`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
@@ -281,7 +281,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
       const method = isFavorite ? 'DELETE' : 'POST';
       const response = await fetch(`${API_URL}/exercises/favorites`, {
         method,
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           exerciseId,
           exerciseType
@@ -313,7 +313,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
     try {
       const response = await fetch(`${API_URL}/exercises/${dbId}`, {
         method: 'DELETE',
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
 
       if (response.ok) {

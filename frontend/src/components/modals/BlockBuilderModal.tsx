@@ -130,7 +130,7 @@ export const BlockBuilderModal = ({
   const fetchTemplates = async () => {
     try {
       const res = await fetch(`${API_URL}/blocks/templates`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (res.ok) {
         const data = await res.json();
@@ -197,7 +197,7 @@ export const BlockBuilderModal = ({
     try {
       const res = await fetch(`${API_URL}/blocks/templates/${templateId}/apply`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({})
       });
       if (!res.ok) return;

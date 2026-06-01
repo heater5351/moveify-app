@@ -41,7 +41,7 @@ export const ProgramTemplateModal = ({ onLoad, onClose }: ProgramTemplateModalPr
   const fetchTemplates = async () => {
     try {
       const res = await fetch(`${API_URL}/program-templates`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (res.ok) {
         const data = await res.json();
@@ -58,7 +58,7 @@ export const ProgramTemplateModal = ({ onLoad, onClose }: ProgramTemplateModalPr
     setLoadingDetail(true);
     try {
       const res = await fetch(`${API_URL}/program-templates/${id}`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (res.ok) {
         const data = await res.json();
@@ -75,7 +75,7 @@ export const ProgramTemplateModal = ({ onLoad, onClose }: ProgramTemplateModalPr
     try {
       const res = await fetch(`${API_URL}/program-templates/${id}`, {
         method: 'DELETE',
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (res.ok) {
         setTemplates(prev => prev.filter(t => t.id !== id));

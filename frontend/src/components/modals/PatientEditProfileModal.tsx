@@ -36,7 +36,7 @@ export const PatientEditProfileModal = ({ patient, onClose, onSave }: PatientEdi
     try {
       const res = await fetch(`${API_URL}/auth/profile`, {
         method: 'PATCH',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           name: name.trim(),
           email: email.trim(),

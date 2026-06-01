@@ -37,8 +37,8 @@ Moveify is a clinical exercise prescription and patient management platform (sim
 
 - **Express 4** (CommonJS, not ESM)
 - **PostgreSQL** via `pg` driver (no ORM)
-- **bcrypt** for password hashing
-- **jsonwebtoken** for JWT authentication
+- **firebase-admin** for GCP Identity Platform token verification (primary auth)
+- **jsonwebtoken** + **bcrypt** — legacy JWT verification / password hashing, retained only for the dual-mode fallback until Phase 4 cleanup (see `docs/identity-platform-migration.md`)
 - **express-rate-limit** for brute force protection
 - **helmet** for security headers
 - **Gmail API** for transactional emails
@@ -100,14 +100,14 @@ frontend/src/
 │   ├── ExerciseLibrary.tsx
 │   └── ...
 ├── types/index.ts       # All TypeScript interfaces
-├── utils/api.ts         # Fetch wrapper with retry logic, JWT token management, auth headers
+├── utils/api.ts         # Fetch wrapper with retry logic, Identity Platform token management, async auth headers
 ├── data/exercises.ts    # Default exercise database
 ├── config.ts            # API URL configuration
 └── main.tsx             # Entry point
 
 backend/
 ├── middleware/
-│   ├── auth.js          # JWT verify, role check, token generation
+│   ├── auth.js          # Dual-mode token verify (Identity Platform RS256 + legacy JWT), role check
 │   └── ownership.js     # Access control (requirePatientAccess, requireAdmin, requireSelf)
 ├── services/
 │   └── audit.js         # Fire-and-forget audit logging
@@ -152,11 +152,11 @@ backend/
 
 ### API Integration
 
-- All API calls use `getAuthHeaders()` from `utils/api.ts` which attaches the JWT Bearer token
-- `utils/api.ts` also provides retry logic with exponential backoff, token management (`getToken`, `setToken`, `clearAuth`), and automatic 401 handling (clears auth + redirects to login)
+- All API calls attach auth via `await getAuthHeaders()` from `utils/api.ts` — it is **async** (mints the Identity Platform ID token at call time). New call sites must `await` it.
+- `utils/api.ts` also provides retry logic with exponential backoff, token helpers (`getToken`, `clearAuth`), and 401 handling that force-refreshes the token once before clearing auth + redirecting to login
 - API base URL comes from `config.ts` — never hardcode URLs
 - Backend endpoints follow REST: `GET/POST/PUT/PATCH/DELETE /api/{resource}`
-- **Never pass `clinicianId` or `patientId` in request bodies for identity** — the backend derives these from the JWT token via `req.user.id`
+- **Never pass `clinicianId` or `patientId` in request bodies for identity** — the backend derives these from the verified token via `req.user.id`
 
 ## Exercise Naming Convention
 
@@ -240,21 +240,25 @@ When adding new state, add it to App.tsx and pass via props. Do not introduce Co
 
 ## Auth & Security
 
-### Authentication (JWT)
+### Authentication (GCP Identity Platform)
 
-1. **Login:** `POST /api/auth/login` → returns `{ user, token }` → token stored in `localStorage` (`moveify_token`), user stored in `moveify_user`
-2. **Session restoration:** On page load, App.tsx reads token from localStorage and calls `GET /api/auth/me` to validate. If valid, session is restored without re-login.
-3. **Token format:** JWT signed with `JWT_SECRET`, payload `{ id, role, email, is_admin }`, default expiry `7d`
-4. **All authenticated requests** include `Authorization: Bearer <token>` header via `getAuthHeaders()` from `utils/api.ts`
-5. **401 handling:** If any API call returns 401, `utils/api.ts` automatically clears localStorage and redirects to login
-6. **Invitation:** clinician generates invite (requires auth) → creates user row with `password_hash = NULL` → patient receives email link → sets password via `/setup-password`
-7. **Password reset:** `POST /api/auth/forgot-password` → token (1hr expiry) → email link → `POST /api/auth/reset-password`
+Auth was migrated from custom JWTs to **GCP Identity Platform** (Phases 0–3 live in prod; legacy-JWT removal is Phase 4, earliest 2026-06-02). See `docs/identity-platform-migration.md`. The PostgreSQL `users` table still holds all profile/role data; Identity Platform only holds credentials. Each user row links to its IP account via the `firebase_uid` column (`moveify-<id>`).
+
+1. **Login:** client-side `signInWithEmailAndPassword` via the Firebase SDK (`frontend/src/lib/firebase.ts`). On success the app calls `GET /api/auth/me` with the ID token to load the Postgres user. There is no `POST /api/auth/login` anymore.
+2. **Token format:** Identity Platform **ID token** (RS256, ~1 hour expiry). The Firebase SDK refreshes it automatically using a long-lived refresh token. **"Remember me"** chooses persistence: ticked → `browserLocalPersistence` (refresh token survives browser close, effectively indefinite until sign-out/revocation); unticked → `browserSessionPersistence` (dies when the tab closes). The 1-hour figure is the ID-token lifetime, not the session length.
+3. **Token storage:** the ID token lives **in memory only** (Firebase SDK + a cache in `firebase.ts`), never in `localStorage` — this closed the XSS gap that motivated the migration. `localStorage` holds only `moveify_user` (non-sensitive profile). A stale `moveify_token` key from the pre-migration era is defensively cleared on load.
+4. **Attaching auth:** `getAuthHeaders()` in `utils/api.ts` is **async** — it mints the token at call time via `user.getIdToken()`, which returns the in-memory token instantly when valid and only hits the network when expired/near-expiry. Always `await getAuthHeaders()`. (A `focus`/`visibilitychange`/`online` listener in `firebase.ts` also re-warms the cache, since the SDK only auto-refreshes while the tab is foregrounded.)
+5. **401 handling:** `fetchWithRetry` first attempts one forced token refresh (`getIdToken(true)`) and retries the request; only if the fresh token is also rejected does it `clearAuth()` (sign out + clear `moveify_user`) and redirect to login.
+6. **Session restoration:** `App.tsx` uses `onAuthStateChanged` — on load, if the SDK restores a user, it fetches `GET /api/auth/me` and rehydrates without re-login.
+7. **Invitation:** clinician generates invite → creates Postgres user row + a disabled IP account → patient sets password via `/setup-password` (Admin SDK `updateUser`, enables the account).
+8. **Password reset:** Admin SDK `generatePasswordResetLink` → emailed via the existing Gmail service.
+9. **Backend verification:** `authenticate` is **dual-mode** — it verifies IP ID tokens (RS256) via `firebase-admin`, falling back to legacy HS256 JWTs for any sessions predating the cutover. The legacy fallback (and `JWT_SECRET`) is slated for removal in Phase 4.
 
 ### Authorization (middleware)
 
 All backend routes (except public auth routes) are protected by middleware in `backend/middleware/`:
 
-- **`authenticate`** — verifies JWT token, sets `req.user = { id, role, email, is_admin }`
+- **`authenticate`** — verifies the bearer token (Identity Platform ID token first, legacy JWT fallback), sets `req.user = { id, role, email, is_admin }`
 - **`requireRole(...roles)`** — checks `req.user.role` is in allowed list
 - **`requireSelf(paramName)`** — verifies `req.params[paramName]` === `req.user.id` (patient accessing own data)
 - **`requirePatientAccess`** — any clinician can access any patient; patients can only access their own data
@@ -349,8 +353,10 @@ Defined in `backend/database/init.js`. Key tables:
 | `DATABASE_URL` | Yes (local) | — | PostgreSQL connection string (local dev) |
 | `INSTANCE_CONNECTION_NAME` | Yes (GCP) | — | Cloud SQL socket path (production) |
 | `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Yes (GCP) | — | Cloud SQL credentials (production) |
-| `JWT_SECRET` | **Yes** | — | JWT signing key (min 32 random chars). Server will not start without it. |
-| `JWT_EXPIRY` | No | `7d` | JWT token expiration |
+| `FIREBASE_PROJECT_ID` | **Yes** | — | GCP Identity Platform project (`moveify-app`). Used by `firebase-admin` to verify ID tokens. |
+| `FIREBASE_CLIENT_EMAIL` | **Yes** | — | Identity Platform service-account email |
+| `FIREBASE_PRIVATE_KEY` | **Yes** | — | Identity Platform service-account private key (`\n`-escaped; deploy via `--env-vars-file` YAML) |
+| `JWT_SECRET` | Legacy | — | HS256 signing key for the **legacy** JWT fallback only. Still required until Phase 4 removes the dual-mode path. ID-token sessions don't use it. |
 | `CORS_ORIGIN` | Yes (prod) | `http://localhost:5173` (dev) | Allowed frontend origin. **No wildcard in production.** |
 | `FRONTEND_URL` | No | `http://localhost:5173` | Used in invitation/reset email links |
 | `GOOGLE_CLIENT_ID` | No | — | Gmail API OAuth client ID (emails fail silently without it) |
@@ -363,6 +369,9 @@ Defined in `backend/database/init.js`. Key tables:
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
 | `VITE_API_URL` | No | `http://{hostname}:3000/api` | Backend API URL (dynamic hostname fallback in `config.ts`) |
+| `VITE_FIREBASE_API_KEY` | **Yes** | — | Identity Platform web API key (login fails without it) |
+| `VITE_FIREBASE_AUTH_DOMAIN` | **Yes** | — | `moveify-app.firebaseapp.com` |
+| `VITE_FIREBASE_PROJECT_ID` | **Yes** | — | `moveify-app` |
 
 ## Known Technical Debt
 
@@ -415,6 +424,20 @@ If the worktree is missing, recreate with: `git worktree add ../moveify-clinic-w
 
 ## Workflow
 
+### Keeping context fresh (avoid doc drift)
+
+`docs/worklog.md` is a dated, reverse-chronological log of **notable** changes
+(migrations, new/removed env vars, auth/security/schema changes — anything that
+makes this file or a prior assumption stale). It exists because `CLAUDE.md` once
+drifted badly (described custom-JWT auth long after the Identity Platform migration).
+
+- **At session start:** skim the top entries of `docs/worklog.md` for recent context.
+- **When a change alters how the system works** (not a plain bug fix): add a dated
+  entry to `docs/worklog.md` **and** update the affected `CLAUDE.md` section **in the
+  same commit**. Treat a contradiction between code and `CLAUDE.md` as a bug to fix,
+  not to work around.
+- Keep it lean — don't log routine fixes or anything git history already captures.
+
 ### Branches
 
 - **`dev`** — active development branch. Push here for staging. Vercel auto-deploys a preview URL; backend targets `moveify-backend-staging` + `moveify_staging` DB.
@@ -464,3 +487,22 @@ If `gcloud auth` has expired, run `gcloud auth login` first.
 cd frontend && npm run build:android
 ```
 Then rebuild the APK/AAB via Android Studio or Gradle for testing/submission.
+
+## Business & Compliance Context (vault)
+
+Strategy, pricing, billing design, and compliance docs live in the executive-assistant
+vault at `C:\Users\dilig\Documents\executive-assistant` (read-only from here; it is
+PHI-free and secret-free by rule, so safe to read). Start at the index and read on
+demand — don't bulk-load (some docs are long):
+
+  `C:\Users\dilig\Documents\executive-assistant\20-Projects\Moveify-App\Context Index for Code Sessions.md`
+
+The index maps "working on X → read Y". Consult it when touching:
+- **billing/claims** — billing-worker, Stripe/Tyro/Xero, P&P fees, pricing tiers
+- **patient-facing legal copy** — `TermsPage.tsx`, privacy, consent, cancellation/refund wording
+- **clinic-website** marketing copy
+
+The vault is authoritative for *intent/rationale*; the repo is authoritative for *code*.
+Don't copy vault content into the repo — link by path. Flag any code↔vault mismatch.
+(The vault dir is granted read access via `permissions.additionalDirectories` in
+`.claude/settings.local.json`.)

@@ -158,7 +158,7 @@ export const AddExerciseModal = ({ onClose, onSuccess }: AddExerciseModalProps) 
 
       const response = await fetch(`${API_URL}/exercises`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           name: formData.name,
           category: formData.category,

@@ -72,7 +72,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
       try {
         const localDate = toLocalDateString(new Date());
         const response = await fetch(`${API_URL}/check-ins/today/${patient.id}?date=${localDate}`, {
-          headers: getAuthHeaders()
+          headers: await getAuthHeaders()
         });
         if (response.ok) {
           setHasCheckedInToday(true);
@@ -95,7 +95,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
           try {
             await fetch(`${API_URL}/blocks/${program.config.id}/evaluate`, {
               method: 'PATCH',
-              headers: getAuthHeaders()
+              headers: await getAuthHeaders()
             });
           } catch {
             // Evaluation is best-effort — don't block the UI
@@ -117,7 +117,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
         if (!program.config?.id) continue;
         try {
           const response = await fetch(`${API_URL}/blocks/${program.config.id}`, {
-            headers: getAuthHeaders()
+            headers: await getAuthHeaders()
           });
           if (response.ok) {
             const data = await response.json();
@@ -137,7 +137,7 @@ export const PatientPortal = ({ patient, onToggleComplete }: PatientPortalProps)
     try {
       const response = await fetch(`${API_URL}/check-ins`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify(checkInData),
       });
 

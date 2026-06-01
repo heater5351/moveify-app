@@ -51,7 +51,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
 
   const fetchClinicians = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/clinicians`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/admin/clinicians`, { headers: await getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setClinicians(data.clinicians);
@@ -63,7 +63,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
 
   const fetchLocations = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/locations`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/admin/locations`, { headers: await getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setLocations(data.locations);
@@ -75,7 +75,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
 
   const fetchDataRequests = async () => {
     try {
-      const res = await fetch(`${API_URL}/data-requests`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/data-requests`, { headers: await getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setDataRequests(data.requests);
@@ -87,7 +87,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
 
   const fetchBugReports = async () => {
     try {
-      const res = await fetch(`${API_URL}/feedback`, { headers: getAuthHeaders() });
+      const res = await fetch(`${API_URL}/feedback`, { headers: await getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setBugReports(data);
@@ -101,7 +101,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
     try {
       const res = await fetch(`${API_URL}/feedback/${id}`, {
         method: 'PATCH',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ status })
       });
       if (res.ok) {
@@ -121,7 +121,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
     try {
       const res = await fetch(`${API_URL}/admin/clinicians/${clinicianId}/toggle-admin`, {
         method: 'PATCH',
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       const data = await res.json();
       if (res.ok) {
@@ -140,7 +140,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
     try {
       const res = await fetch(`${API_URL}/admin/clinicians/${id}`, {
         method: 'DELETE',
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       const data = await res.json();
       if (res.ok) {
@@ -165,7 +165,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
 
       const res = await fetch(url, {
         method,
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ name: locationName.trim(), address: locationAddress.trim() || null })
       });
 
@@ -190,7 +190,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
     try {
       const res = await fetch(`${API_URL}/admin/locations/${id}`, {
         method: 'DELETE',
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (res.ok) {
         await fetchLocations();
@@ -215,7 +215,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
     try {
       const res = await fetch(`${API_URL}/data-requests/${id}/approve`, {
         method: 'PATCH',
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       const data = await res.json();
       if (res.ok) {
@@ -233,7 +233,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
     try {
       const res = await fetch(`${API_URL}/data-requests/${id}/deny`, {
         method: 'PATCH',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({})
       });
       const data = await res.json();
@@ -253,7 +253,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
     try {
       const res = await fetch(`${API_URL}/data-requests/${id}/approve`, {
         method: 'PATCH',
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       const data = await res.json();
       if (res.ok) {
@@ -272,7 +272,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
     try {
       const res = await fetch(`${API_URL}/data-requests/${id}/execute-deletion`, {
         method: 'POST',
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       const data = await res.json();
       if (res.ok) {
@@ -289,7 +289,7 @@ export const AdminPanel = ({ currentUserId, onNotification }: AdminPanelProps) =
   const handleDownloadExport = async (id: number) => {
     try {
       const res = await fetch(`${API_URL}/data-requests/${id}/download`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (res.ok) {
         const blob = await res.blob();

@@ -5,10 +5,10 @@
 import { API_URL } from '../config';
 import { getAuthHeaders } from './api';
 
-export function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   return fetch(`${API_URL}/scribe${path}`, {
     ...options,
-    headers: { ...getAuthHeaders(), ...(options.headers as Record<string, string> ?? {}) },
+    headers: { ...(await getAuthHeaders()), ...(options.headers as Record<string, string> ?? {}) },
   });
 }
 

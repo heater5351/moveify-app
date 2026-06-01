@@ -22,7 +22,7 @@ export const PatientEducationModules = ({ patientId, isPatientView = false }: Pa
     try {
       setLoading(true);
       const response = await fetch(`${API_URL}/education/patient/${patientId}/modules`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
@@ -43,7 +43,7 @@ export const PatientEducationModules = ({ patientId, isPatientView = false }: Pa
       try {
         await fetch(`${API_URL}/education/patient/${patientId}/modules/${module.id}/viewed`, {
           method: 'POST',
-          headers: getAuthHeaders()
+          headers: await getAuthHeaders()
         });
         // Update local state
         setModules(modules.map(m =>
@@ -63,7 +63,7 @@ export const PatientEducationModules = ({ patientId, isPatientView = false }: Pa
     try {
       await fetch(`${API_URL}/education/patient/${patientId}/modules/${moduleId}`, {
         method: 'DELETE',
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       await fetchModules();
     } catch (error) {

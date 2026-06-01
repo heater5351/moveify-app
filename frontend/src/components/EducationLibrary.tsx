@@ -26,7 +26,7 @@ export const EducationLibrary = ({ onAssignToPatient }: EducationLibraryProps) =
     try {
       setLoading(true);
       const response = await fetch(`${API_URL}/education/modules`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
@@ -42,7 +42,7 @@ export const EducationLibrary = ({ onAssignToPatient }: EducationLibraryProps) =
   const fetchCategories = async () => {
     try {
       const response = await fetch(`${API_URL}/education/categories`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
@@ -57,7 +57,7 @@ export const EducationLibrary = ({ onAssignToPatient }: EducationLibraryProps) =
     try {
       const response = await fetch(`${API_URL}/education/modules`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify(moduleData)
       });
 
@@ -76,7 +76,7 @@ export const EducationLibrary = ({ onAssignToPatient }: EducationLibraryProps) =
     try {
       const response = await fetch(`${API_URL}/education/modules/${moduleId}`, {
         method: 'PUT',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify(updates)
       });
 
@@ -99,7 +99,7 @@ export const EducationLibrary = ({ onAssignToPatient }: EducationLibraryProps) =
     try {
       const response = await fetch(`${API_URL}/education/modules/${moduleId}`, {
         method: 'DELETE',
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
 
       if (response.ok) {

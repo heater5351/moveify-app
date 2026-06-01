@@ -206,14 +206,14 @@ function App() {
       if (cancelled) return;
 
       try {
-        const response = await fetch(`${API_URL}/auth/me`, { headers: getAuthHeaders() });
+        const response = await fetch(`${API_URL}/auth/me`, { headers: await getAuthHeaders() });
 
         if (response.ok) {
           const data = await response.json();
           const user = data.user;
 
           if (user.role === 'patient') {
-            const patientResponse = await fetch(`${API_URL}/patients/${user.id}`, { headers: getAuthHeaders() });
+            const patientResponse = await fetch(`${API_URL}/patients/${user.id}`, { headers: await getAuthHeaders() });
             if (patientResponse.ok) {
               const patientData = await patientResponse.json();
               if (!cancelled) setLoggedInPatient(patientData);
@@ -246,7 +246,7 @@ function App() {
   const fetchPatients = async () => {
     try {
       const response = await fetch(`${API_URL}/patients`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       const data = await response.json();
       if (response.ok) {
@@ -282,7 +282,7 @@ function App() {
       if (document.hidden) return;
       try {
         const response = await fetch(`${API_URL}/patients/${loggedInPatient.id}`, {
-          headers: getAuthHeaders()
+          headers: await getAuthHeaders()
         });
         if (response.ok) {
           const patientData = await response.json();
@@ -392,7 +392,7 @@ function App() {
 
       const res = await fetch(`${API_URL}/program-templates`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ name: name.trim(), exercises }),
       });
 
@@ -440,7 +440,7 @@ function App() {
         // Update existing program
         response = await fetch(`${API_URL}/programs/${editingProgramId}`, {
           method: 'PUT',
-          headers: getAuthHeaders(),
+          headers: await getAuthHeaders(),
           body: JSON.stringify({
             name: programName,
             exercises: programExercises,
@@ -451,7 +451,7 @@ function App() {
         // Create new program
         response = await fetch(`${API_URL}/programs/patient/${selectedPatient.id}`, {
           method: 'POST',
-          headers: getAuthHeaders(),
+          headers: await getAuthHeaders(),
           body: JSON.stringify({
             name: programName,
             exercises: programExercises,
@@ -482,7 +482,7 @@ function App() {
                 : pendingBlockData.weeks;
               await fetch(`${API_URL}/blocks/${targetProgramId}`, {
                 method: 'POST',
-                headers: getAuthHeaders(),
+                headers: await getAuthHeaders(),
                 body: JSON.stringify({
                   blockDuration: pendingBlockData.duration,
                   startDate: toLocalDateString(new Date()),
@@ -498,7 +498,7 @@ function App() {
                   .map(w => ({ ...w, programExerciseId: exerciseIds[w.programExerciseId] as number }));
                 await fetch(`${API_URL}/blocks/${targetProgramId}`, {
                   method: 'POST',
-                  headers: getAuthHeaders(),
+                  headers: await getAuthHeaders(),
                   body: JSON.stringify({
                     blockDuration: pendingBlockData.duration,
                     startDate: toLocalDateString(new Date()),
@@ -549,7 +549,7 @@ function App() {
     }
   };
 
-  const handleEditProgram = (programIndex: number) => {
+  const handleEditProgram = async (programIndex: number) => {
     if (!viewingPatient) return;
 
     const program = viewingPatient.assignedPrograms[programIndex];
@@ -572,7 +572,7 @@ function App() {
     setPendingBlockData(null);
     if (program.config.id) {
       fetch(`${API_URL}/blocks/${program.config.id}`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       })
         .then(res => res.ok ? res.json() : null)
         .then(data => {
@@ -638,7 +638,7 @@ function App() {
     try {
       const response = await fetch(`${API_URL}/programs/${programToDelete.id}`, {
         method: 'DELETE',
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
 
       if (response.ok) {
@@ -647,7 +647,7 @@ function App() {
         // Update viewing patient by fetching fresh data from API
         if (viewingPatient) {
           const patientResponse = await fetch(`${API_URL}/patients/${viewingPatient.id}`, {
-            headers: getAuthHeaders()
+            headers: await getAuthHeaders()
           });
           if (patientResponse.ok) {
             const updatedPatient = await patientResponse.json();
@@ -716,7 +716,7 @@ function App() {
     try {
       const response = await fetch(`${API_URL}/patients/${editingPatient.id}`, {
         method: 'PUT',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           name: editingPatient.name,
           dob: editingPatient.dob,
@@ -756,7 +756,7 @@ function App() {
     try {
       const response = await fetch(`${API_URL}/patients/${editingPatient.id}`, {
         method: 'DELETE',
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
 
       if (response.ok) {
@@ -810,7 +810,7 @@ function App() {
         try {
           const response = await fetch(`${API_URL}/programs/exercise/${exercise.id}/complete`, {
             method: 'PATCH',
-            headers: getAuthHeaders(),
+            headers: await getAuthHeaders(),
             body: JSON.stringify({
               completed: newCompletedStatus,
               setsPerformed: completionData?.setsPerformed,

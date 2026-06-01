@@ -68,7 +68,7 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/blocks/templates`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (res.ok) {
         const data = await res.json();
@@ -91,7 +91,7 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
   const fetchTemplateWeeks = async (templateId: number) => {
     try {
       const res = await fetch(`${API_URL}/blocks/templates/${templateId}`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (res.ok) {
         const data = await res.json();
@@ -125,7 +125,7 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
     try {
       const res = await fetch(`${API_URL}/blocks/templates/${templateId}`, {
         method: 'DELETE',
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (res.ok) {
         setTemplates(prev => prev.filter(t => t.id !== templateId));
@@ -191,7 +191,7 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
       }));
       const res = await fetch(`${API_URL}/blocks/templates/${editingId}`, {
         method: 'PUT',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           name: editForm.name.trim(),
           description: editForm.description.trim() || null,
@@ -234,7 +234,7 @@ export const TemplateManagerModal = ({ onClose }: TemplateManagerModalProps) => 
       }));
       const res = await fetch(`${API_URL}/blocks/templates`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           name: createForm.name.trim(),
           description: createForm.description.trim() || null,

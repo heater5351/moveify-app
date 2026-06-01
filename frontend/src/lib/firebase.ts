@@ -46,6 +46,29 @@ onIdTokenChanged(auth, async (user) => {
   }
 });
 
+// Keep the cached token warm. Firebase only auto-refreshes (and fires
+// onIdTokenChanged) while the tab is foregrounded and awake, so a backgrounded
+// or slept tab can come back holding an expired token. Re-mint on focus /
+// visibility / reconnect so the next request — including raw fetch() call
+// sites that read the cache synchronously — sees a valid token.
+async function warmToken(): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) return;
+  try {
+    cachedToken = await user.getIdToken();
+  } catch {
+    /* offline — keep the prior token, request path will force-refresh on 401 */
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('focus', () => { void warmToken(); });
+  window.addEventListener('online', () => { void warmToken(); });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) void warmToken();
+  });
+}
+
 export function getCachedToken(): string | null {
   return cachedToken;
 }

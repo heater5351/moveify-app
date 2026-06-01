@@ -16,7 +16,7 @@ export const PatientDataPage = ({ onBack, onNotification }: PatientDataPageProps
   const fetchMyDataRequests = async () => {
     try {
       const response = await fetch(`${API_URL}/data-requests/my`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
@@ -36,7 +36,7 @@ export const PatientDataPage = ({ onBack, onNotification }: PatientDataPageProps
     try {
       const response = await fetch(`${API_URL}/data-requests`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ requestType: type })
       });
       const data = await response.json();

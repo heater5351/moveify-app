@@ -72,7 +72,7 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
         setClinikoError('');
         try {
           const res = await fetch(`${API_URL}/cliniko/patients?q=${encodeURIComponent(clinikoSearch.trim())}`, {
-            headers: getAuthHeaders()
+            headers: await getAuthHeaders()
           });
           const data = await res.json();
           if (res.ok) {
@@ -132,7 +132,7 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
 
       const response = await fetch(`${API_URL}/invitations/generate`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify(body)
       });
 

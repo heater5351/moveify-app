@@ -49,7 +49,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
     linkDebounce.current = setTimeout(async () => {
       setLinkLoading(true);
       try {
-        const res = await fetch(`${API_URL}/cliniko/patients?q=${encodeURIComponent(linkSearch.trim())}`, { headers: getAuthHeaders() });
+        const res = await fetch(`${API_URL}/cliniko/patients?q=${encodeURIComponent(linkSearch.trim())}`, { headers: await getAuthHeaders() });
         const data = await res.json();
         setLinkResults(res.ok ? (data.patients || []) : []);
       } catch { setLinkResults([]); }
@@ -63,7 +63,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
     try {
       const res = await fetch(`${API_URL}/cliniko/link/${patient.id}`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ clinikoPatientId: cpId }),
       });
       const data = await res.json();
@@ -87,7 +87,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
     try {
       const res = await fetch(`${API_URL}/cliniko/sync/${patient.id}`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
       });
       const data = await res.json();
       if (res.ok) {
@@ -113,7 +113,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
     const fetchFlags = async () => {
       try {
         const res = await fetch(`${API_URL}/blocks/flags`, {
-          headers: getAuthHeaders()
+          headers: await getAuthHeaders()
         });
         if (res.ok) {
           const data = await res.json();
@@ -140,7 +140,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
           if (!pid) return;
           try {
             const res = await fetch(`${API_URL}/blocks/${pid}`, {
-              headers: getAuthHeaders()
+              headers: await getAuthHeaders()
             });
             if (res.ok) {
               const data = await res.json();
@@ -170,7 +170,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
     try {
       const res = await fetch(`${API_URL}/invitations/generate`, {
         method: 'POST',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        headers: { ...await getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: patient.email,
           name: patient.name,
@@ -196,7 +196,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
     try {
       await fetch(`${API_URL}/blocks/flags/${flagId}/resolve`, {
         method: 'PATCH',
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       setFlags(prev => prev.filter(f => f.id !== flagId));
     } catch {

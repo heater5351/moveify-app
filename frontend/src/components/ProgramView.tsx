@@ -78,7 +78,7 @@ export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, on
     if (!pid) return;
     try {
       const res = await fetch(`${API_URL}/blocks/${pid}`, {
-        headers: getAuthHeaders()
+        headers: await getAuthHeaders()
       });
       if (!res.ok) return;
       const data = await res.json();
@@ -120,7 +120,7 @@ export const ProgramView = ({ program, patientName, onBack, onEdit, onDelete, on
     try {
       await fetch(`${API_URL}/blocks/${pid}/override`, {
         method: 'PATCH',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ action }),
       });
       await fetchBlockData();

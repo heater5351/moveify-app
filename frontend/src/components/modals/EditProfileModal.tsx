@@ -35,7 +35,7 @@ export const EditProfileModal = ({ user, onClose, onSave }: EditProfileModalProp
     try {
       const res = await fetch(`${API_URL}/auth/profile`, {
         method: 'PATCH',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ name: name.trim(), email: email.trim(), phone: phone.trim() || null })
       });
 

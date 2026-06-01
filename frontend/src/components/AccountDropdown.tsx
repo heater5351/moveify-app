@@ -34,12 +34,13 @@ export const AccountDropdown = ({ user, onLogout, onEditProfile, onChangePasswor
   // Fetch locations when dropdown opens (clinician only)
   useEffect(() => {
     if (isOpen && user.role === 'clinician' && user.isAdmin) {
-      fetch(`${API_URL}/admin/locations`, { headers: getAuthHeaders() })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
+      void (async () => {
+        try {
+          const res = await fetch(`${API_URL}/admin/locations`, { headers: await getAuthHeaders() });
+          const data = res.ok ? await res.json() : null;
           if (data?.locations) setLocations(data.locations);
-        })
-        .catch(() => {});
+        } catch { /* ignore */ }
+      })();
     }
   }, [isOpen, user.role, user.isAdmin]);
 
@@ -48,7 +49,7 @@ export const AccountDropdown = ({ user, onLogout, onEditProfile, onChangePasswor
     try {
       const res = await fetch(`${API_URL}/auth/default-location`, {
         method: 'PATCH',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ locationId })
       });
       if (res.ok) {

@@ -136,8 +136,8 @@ export const DailyActivityView = ({ patientId, assignedPrograms }: DailyActivity
       setLoading(true);
       try {
         const [completionsRes, checkInsRes] = await Promise.all([
-          fetch(`${API_URL}/programs/exercise-completions/patient/${patientId}?days=30`, { headers: getAuthHeaders() }),
-          fetch(`${API_URL}/check-ins/patient/${patientId}?days=30`, { headers: getAuthHeaders() }),
+          fetch(`${API_URL}/programs/exercise-completions/patient/${patientId}?days=30`, { headers: await getAuthHeaders() }),
+          fetch(`${API_URL}/check-ins/patient/${patientId}?days=30`, { headers: await getAuthHeaders() }),
         ]);
 
         if (completionsRes.ok) {

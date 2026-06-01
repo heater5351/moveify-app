@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 vi.mock('../lib/firebase', () => ({
   auth: {},
   getCachedToken: vi.fn(),
+  setCachedToken: vi.fn(),
 }));
 
 vi.mock('firebase/auth', () => ({
@@ -52,21 +53,23 @@ describe('getAuthHeaders', () => {
     vi.clearAllMocks();
   });
 
-  it('includes Content-Type header', () => {
+  // auth.currentUser is undefined in the mock, so getAuthHeaders falls back to
+  // the cached token — which is what these assertions exercise.
+  it('includes Content-Type header', async () => {
     vi.mocked(getCachedToken).mockReturnValue(null);
-    const headers = getAuthHeaders();
+    const headers = await getAuthHeaders();
     expect(headers['Content-Type']).toBe('application/json');
   });
 
-  it('includes Authorization when a token is cached', () => {
+  it('includes Authorization when a token is cached', async () => {
     vi.mocked(getCachedToken).mockReturnValue('my-ip-token');
-    const headers = getAuthHeaders();
+    const headers = await getAuthHeaders();
     expect(headers['Authorization']).toBe('Bearer my-ip-token');
   });
 
-  it('omits Authorization when no token', () => {
+  it('omits Authorization when no token', async () => {
     vi.mocked(getCachedToken).mockReturnValue(null);
-    const headers = getAuthHeaders();
+    const headers = await getAuthHeaders();
     expect(headers['Authorization']).toBeUndefined();
   });
 });

@@ -25,7 +25,7 @@ export default function BlockProgressBanner({ programId, refreshKey }: Props) {
     const fetchBlock = async () => {
       try {
         const response = await fetch(`${API_URL}/blocks/${programId}`, {
-          headers: getAuthHeaders()
+          headers: await getAuthHeaders()
         });
         if (response.ok) {
           const data = await response.json();

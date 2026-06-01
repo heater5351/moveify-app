@@ -29,7 +29,7 @@ export const InviteClinicianModal = ({ onClose, onSuccess }: InviteClinicianModa
     try {
       const res = await fetch(`${API_URL}/admin/clinicians/invite`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ name: name.trim(), email: email.trim() })
       });
 

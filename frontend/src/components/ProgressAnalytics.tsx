@@ -99,8 +99,8 @@ export const ProgressAnalytics = ({ patientId, apiUrl, isPatientView = false, as
 
       try {
         const [overviewRes, logsRes] = await Promise.all([
-          fetch(`${apiUrl}/programs/analytics/patient/${patientId}?days=${timeRange}`, { headers: getAuthHeaders() }),
-          fetch(`${apiUrl}/programs/progression-logs/patient/${patientId}?limit=50`, { headers: getAuthHeaders() }),
+          fetch(`${apiUrl}/programs/analytics/patient/${patientId}?days=${timeRange}`, { headers: await getAuthHeaders() }),
+          fetch(`${apiUrl}/programs/progression-logs/patient/${patientId}?limit=50`, { headers: await getAuthHeaders() }),
         ]);
 
         if (!overviewRes.ok) throw new Error(`Failed to fetch analytics: ${overviewRes.status}`);

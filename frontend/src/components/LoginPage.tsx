@@ -33,7 +33,7 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
       setCachedToken(idToken);
 
       // Fetch user row from backend (role, id, is_admin, etc.)
-      const meResponse = await fetch(`${API_URL}/auth/me`, { headers: getAuthHeaders() });
+      const meResponse = await fetch(`${API_URL}/auth/me`, { headers: await getAuthHeaders() });
       if (!meResponse.ok) {
         throw new Error('Failed to load user profile');
       }
@@ -41,7 +41,7 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
 
       if (user.role === 'patient') {
         try {
-          const patientResponse = await fetch(`${API_URL}/patients/${user.id}`, { headers: getAuthHeaders() });
+          const patientResponse = await fetch(`${API_URL}/patients/${user.id}`, { headers: await getAuthHeaders() });
           if (patientResponse.ok) {
             const patientWithProgram = await patientResponse.json();
             onLogin('patient', patientWithProgram);
