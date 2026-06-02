@@ -294,6 +294,22 @@ router.post('/reprocess-appointments', express.json(), async (req, res) => {
   }
 });
 
+// Self-heal sweep for the agreement sign-up flow: recreates any schedule that
+// was lost because the worker crashed after acking the checkout webhook 200.
+// Scheduled run heals (dryRun:false default here); idempotent + safe to re-run.
+router.post('/reconcile-agreements', express.json(), async (req, res) => {
+  const log = withCorrelation(req);
+  const { sinceHours = 48, dryRun = false } = req.body || {};
+  try {
+    const { reconcileAgreementSchedules } = require('../jobs/reconcile-agreements');
+    const summary = await reconcileAgreementSchedules({ sinceHours, dryRun }, log);
+    res.json({ ok: true, dryRun, ...summary });
+  } catch (err) {
+    log.error({ err: err.message }, 'reconcile-agreements job failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/poll-cliniko-appointments', async (req, res) => {
   const log = withCorrelation(req);
   try {

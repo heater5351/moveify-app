@@ -318,7 +318,7 @@ async function setDefaultPaymentMethod(customerId, paymentMethodId) {
 //                       then a paid phase of `iterations` debits, then cancel.
 // `default_settings.default_payment_method` is set explicitly so the first
 // invoice can auto-charge even if the customer-level default isn't picked up.
-async function createSubscriptionSchedule({ customerId, priceId, iterations, trialIterations = 0, paymentMethodId, startDate, idempotencyKey }) {
+async function createSubscriptionSchedule({ customerId, priceId, iterations, trialIterations = 0, paymentMethodId, startDate, idempotencyKey, metadata }) {
   const stripe = await getStripe();
   const phases = [];
   if (trialIterations > 0) {
@@ -329,6 +329,8 @@ async function createSubscriptionSchedule({ customerId, priceId, iterations, tri
   // idempotencyKey (keyed on the checkout session) makes the create itself safe
   // to repeat: if the handler reruns for the same session, Stripe returns the
   // same schedule instead of creating a second one (no double billing).
+  // `metadata.agreement_session` links the schedule back to its checkout so the
+  // reconcile sweep can detect a completed setup that never got provisioned.
   const opts = idempotencyKey ? { idempotencyKey } : {};
   return stripe.subscriptionSchedules.create({
     customer: customerId,
@@ -336,6 +338,7 @@ async function createSubscriptionSchedule({ customerId, priceId, iterations, tri
     end_behavior: 'cancel',
     default_settings: { default_payment_method: paymentMethodId },
     phases,
+    ...(metadata ? { metadata } : {}),
   }, opts);
 }
 
@@ -343,7 +346,7 @@ async function createSubscriptionSchedule({ customerId, priceId, iterations, tri
 // into the Price). No end — cancelled manually on notice. A future startDate is
 // expressed as `trial_end` so the first charge lands on that date with no
 // proration; a past/empty startDate bills immediately.
-async function createSubscription({ customerId, priceId, paymentMethodId, startDate, idempotencyKey }) {
+async function createSubscription({ customerId, priceId, paymentMethodId, startDate, idempotencyKey, metadata }) {
   const stripe = await getStripe();
   const startSec = startDate ? Math.floor(new Date(startDate).getTime() / 1000) : 0;
   const inFuture = startSec > Math.floor(Date.now() / 1000) + 60;
@@ -353,7 +356,35 @@ async function createSubscription({ customerId, priceId, paymentMethodId, startD
     items: [{ price: priceId }],
     default_payment_method: paymentMethodId,
     ...(inFuture ? { trial_end: startSec } : {}),
+    ...(metadata ? { metadata } : {}),
   }, opts);
+}
+
+// ─── Reconcile sweep helpers (lost-schedule detector) ────────────────────────
+
+// Lists COMPLETED setup-mode Checkout Sessions created since `sinceSec` (unix).
+// These are the agreement mandate captures; the sweep checks each one got a
+// schedule/subscription.
+async function listRecentSetupCheckouts(sinceSec) {
+  const stripe = await getStripe();
+  const out = [];
+  for await (const s of stripe.checkout.sessions.list({ created: { gte: sinceSec }, limit: 100 })) {
+    if (s.mode === 'setup' && s.status === 'complete') out.push(s);
+  }
+  return out;
+}
+
+// True if a schedule OR subscription already exists for this customer that is
+// linked (via metadata.agreement_session) to the given checkout session. This is
+// the precise "was this setup checkout provisioned?" test — it does NOT confuse a
+// patient's earlier (completed) plan with a brand-new, not-yet-provisioned one.
+async function sessionProvisioned(customerId, sessionId) {
+  const stripe = await getStripe();
+  const scheds = await stripe.subscriptionSchedules.list({ customer: customerId, limit: 100 });
+  if (scheds.data.some((s) => s.metadata?.agreement_session === sessionId)) return true;
+  const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 100 });
+  if (subs.data.some((s) => s.metadata?.agreement_session === sessionId)) return true;
+  return false;
 }
 
 // Returns the Stripe product name for a subscription (e.g. "T2 Progress")
@@ -455,4 +486,6 @@ module.exports = {
   setDefaultPaymentMethod,
   createSubscriptionSchedule,
   createSubscription,
+  listRecentSetupCheckouts,
+  sessionProvisioned,
 };

@@ -157,6 +157,22 @@ router.post('/agreements/checkout-setup', async (req, res) => {
   }
 });
 
+// Manual run of the agreement reconcile sweep (lost-schedule self-heal).
+// Dry-run by default — reports what it WOULD recover without writing. Set
+// dryRun:false to actually recreate missing schedules. Idempotent.
+router.post('/agreements/reconcile', express.json(), async (req, res) => {
+  const log = withCorrelation(req);
+  const { sinceHours = 48, dryRun = true } = req.body || {};
+  try {
+    const { reconcileAgreementSchedules } = require('../jobs/reconcile-agreements');
+    const summary = await reconcileAgreementSchedules({ sinceHours, dryRun }, log);
+    res.json({ ok: true, dryRun, ...summary });
+  } catch (err) {
+    log.error({ err: err.message }, 'agreements/reconcile failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/seed-bank-rules', async (req, res) => {
   const { DEFAULT_BANK_RULES } = require('../lib/bank-rules');
   await billingDb.replaceBankRules(DEFAULT_BANK_RULES);
