@@ -76,6 +76,8 @@ Replaces the manual "Cliniko form + Payment Link + hand-set Cancel-at". **Behind
 
 Plan catalog: `lib/service-catalog.js` `SUBSCRIPTION_PLANS` (keyed `{path}:{tier}`). **Product names MUST match `lib/rates.js` `PP_FEES` keys** — the existing `invoice.payment_succeeded` Pattern-7 credit + P&P path is **unchanged** and resolves tier from the Stripe product name. Each plan's Price ID is read from a per-plan env var (`STRIPE_PRICE_*`) so test/live differ. Part A copy + version live in `backend/lib/agreement-template.js` (⚠ placeholder wording — confirm before live).
 
+**Reliability:** the webhook acks 200 before processing, so failures can't rely on Stripe retries — `handleCheckoutCompleted`/`provisionFromSetupSession` flags **every** failure (`agreement_setup_failed`), creation uses a Stripe `idempotencyKey` keyed on the session, and objects are stamped with `metadata.agreement_session`. A **reconcile sweep** (`jobs/reconcile-agreements.js`, `POST /cron/reconcile-agreements` OIDC + `POST /admin/agreements/reconcile` dry-run) self-heals any completed setup checkout that never got a schedule (worker crash window). Staging runs it every 6h (`moveify-staging-reconcile-agreements`); add a prod scheduler at go-live. A **test-mode worker** (`moveify-billing-worker-staging`, `STRIPE_MODE=test`) runs the whole flow against test Stripe with no Xero env so its invoice path no-ops.
+
 ### Deployment
 
 - Frontend: **Vercel** (vite build → `dist/`) — live at **https://www.moveifyapp.com**

@@ -56,6 +56,15 @@ what to know now, links).
   Frontend — `components/AgreementPage.tsx` (public `/agreement*` routes) +
   `modals/GenerateAgreementModal.tsx`.
 - **Deps:** backend gains `pdfkit`.
+- **Reconcile self-heal (same day):** closes the "worker crashes after acking the webhook 200,
+  before creating the schedule" gap. Schedules/subscriptions are stamped with
+  `metadata.agreement_session`; `jobs/reconcile-agreements.js` lists recent COMPLETED setup
+  checkouts and recreates any with no linked object (idempotent — DB key + Stripe idempotencyKey
+  + metadata link; recovered cases raise an `agreement_schedule_recovered` flag). Endpoints:
+  `POST /cron/reconcile-agreements` (OIDC, scheduled) + `POST /admin/agreements/reconcile`
+  (X-Admin-Token, dry-run default). **Staging** runs it every 6h via Cloud Scheduler
+  `moveify-staging-reconcile-agreements` (worker needs `OIDC_EXPECTED_AUDIENCE` = its own URL).
+  **Prod go-live:** create the equivalent scheduler against the prod worker when the flag is enabled.
 - **Going live:** run `billing-worker/scripts/create-agreement-prices.js` (TEST key first:
   `STRIPE_SECRET_KEY=sk_test_… node scripts/create-agreement-prices.js`) to create the
   Products/Prices and print the `STRIPE_PRICE_*` env lines; `--dry-run` lists the catalog with
