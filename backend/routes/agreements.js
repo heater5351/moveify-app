@@ -23,6 +23,7 @@ const {
   PART_A_PARAGRAPHS,
   VALID_PATHS,
   tierLabel,
+  billingTerms,
 } = require('../lib/agreement-template');
 
 const router = express.Router();
@@ -117,6 +118,7 @@ router.get('/validate/:token', async (req, res) => {
       agreementVersion: a.agreement_version,
       title: PART_A_TITLE,
       paragraphs: PART_A_PARAGRAPHS,
+      billing: billingTerms(a.tier, a.path, a.start_date),
     });
   } catch (err) {
     console.error('Agreement validate error:', err);

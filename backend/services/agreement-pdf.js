@@ -6,6 +6,7 @@ const {
   PART_A_TITLE,
   PART_A_PARAGRAPHS,
   tierLabel,
+  billingTerms,
 } = require('../lib/agreement-template');
 
 /**
@@ -38,6 +39,8 @@ function renderAgreementPdf({ patientName, tier, path, startDate, signedName, si
       doc.fontSize(10).font('Helvetica');
       doc.text(`Client: ${patientName || '—'}`);
       doc.text(`Program: ${tierLabel(tier, path) || `${tier} (${path})`}`);
+      const billing = billingTerms(tier, path, startDate);
+      if (billing) doc.text(`Fees: ${billing.summary}`);
       if (startDate) doc.text(`Start date: ${startDate}`);
       doc.moveDown(1);
 
@@ -50,6 +53,20 @@ function renderAgreementPdf({ patientName, tier, path, startDate, signedName, si
         doc.moveDown(0.6);
       }
       doc.moveDown(0.6);
+
+      // Payment Authorisation + When Charges Occur (plan-specific, accurate to the
+      // Stripe schedule the worker builds). This is the financial authorisation the
+      // client signs, alongside the separate Stripe Direct Debit mandate (Part B).
+      if (billing) {
+        doc.fontSize(12).font('Helvetica-Bold').text('Payment Authorisation');
+        doc.moveDown(0.3);
+        doc.fontSize(10).font('Helvetica').text(billing.authorisation, { align: 'left' });
+        doc.moveDown(0.6);
+        doc.fontSize(11).font('Helvetica-Bold').text(billing.whenChargesTitle);
+        doc.moveDown(0.2);
+        doc.fontSize(10).font('Helvetica').text(billing.whenCharges, { align: 'left' });
+        doc.moveDown(0.8);
+      }
 
       // Signature block
       doc.fontSize(12).font('Helvetica-Bold').text('Electronic Signature');

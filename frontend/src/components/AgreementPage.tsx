@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react';
 import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { API_URL } from '../config';
 
+interface BillingTerms {
+  summary: string;
+  authorisation: string;
+  whenChargesTitle: string;
+  whenCharges: string;
+}
+
 interface AgreementDetails {
   patientName: string;
   tier: string;
@@ -11,6 +18,7 @@ interface AgreementDetails {
   agreementVersion: string;
   title: string;
   paragraphs: string[];
+  billing: BillingTerms | null;
 }
 
 // Public service-agreement sign page. Reached via an operator-minted tokenised
@@ -105,6 +113,9 @@ export const AgreementPage = () => {
                 <div className="flex justify-between"><dt className="text-slate-400">Client</dt><dd className="font-medium text-slate-800">{details.patientName}</dd></div>
               )}
               <div className="flex justify-between"><dt className="text-slate-400">Program</dt><dd className="font-medium text-slate-800">{details.tierLabel || `${details.tier} (${details.path})`}</dd></div>
+              {details.billing && (
+                <div className="flex justify-between gap-4"><dt className="text-slate-400">Fees</dt><dd className="font-medium text-slate-800 text-right">{details.billing.summary}</dd></div>
+              )}
               {details.startDate && (
                 <div className="flex justify-between"><dt className="text-slate-400">Start date</dt><dd className="font-medium text-slate-800">{details.startDate}</dd></div>
               )}
@@ -115,6 +126,16 @@ export const AgreementPage = () => {
           <div className="mt-6 space-y-3 text-sm text-slate-600 leading-relaxed">
             {details.paragraphs.map((p, i) => <p key={i}>{p}</p>)}
           </div>
+
+          {/* Payment Authorisation (plan-specific) */}
+          {details.billing && (
+            <div className="mt-6 border border-slate-200 rounded-lg p-4 bg-slate-50">
+              <h2 className="text-sm font-semibold text-secondary-500 mb-2">Payment Authorisation</h2>
+              <p className="text-sm text-slate-600 leading-relaxed">{details.billing.authorisation}</p>
+              <h3 className="text-sm font-semibold text-secondary-500 mt-4 mb-1">{details.billing.whenChargesTitle}</h3>
+              <p className="text-sm text-slate-600 leading-relaxed">{details.billing.whenCharges}</p>
+            </div>
+          )}
 
           {/* Signature */}
           <div className="mt-8 border-t border-slate-100 pt-6">
