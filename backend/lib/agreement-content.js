@@ -49,7 +49,7 @@ const TIER_CONTENT = {
     family: 'block', hasGym: true,
     docTitle: 'Foundation Treatment Block Service Agreement',
     tierName: 'Tier 1 — Foundation Block',
-    intro: 'The Foundation block is a six-week program for stable presentations and general deconditioning, combining a weekly supervised group session with independent gym training.',
+    intro: 'The Foundation block is a six-week program combining a weekly supervised group session with independent gym training.',
     included: [
       'Week 1 — 60-minute 1:1 program design',
       'Weeks 2–5 — 1× supervised group session per week (4 total)',
@@ -66,7 +66,7 @@ const TIER_CONTENT = {
     family: 'block', hasGym: true,
     docTitle: 'Progress Treatment Block Service Agreement',
     tierName: 'Tier 2 — Progress Block',
-    intro: 'The Progress block is a six-week program for most musculoskeletal and chronic-disease presentations, with weekly individual clinical oversight alongside independent gym training.',
+    intro: 'The Progress block is a six-week program with weekly individual clinical oversight alongside independent gym training.',
     included: [
       'Week 1 — 60-minute 1:1 program design',
       'Weeks 2–5 — weekly 30-minute 1:1 program progression',
@@ -83,7 +83,7 @@ const TIER_CONTENT = {
     family: 'block', hasGym: true,
     docTitle: 'Performance Treatment Block Service Agreement',
     tierName: 'Tier 3 — Performance Block',
-    intro: 'The Performance block is a six-week program for complex presentations — neurological, cardiac, post-surgical, or multi-morbidity — with longer weekly 1:1 sessions for deeper clinical work.',
+    intro: 'The Performance block is a six-week program with longer weekly 1:1 sessions for deeper clinical work.',
     included: [
       'Week 1 — 60-minute 1:1 program design',
       'Weeks 2–5 — weekly 45-minute 1:1 program progression',
@@ -102,7 +102,7 @@ const TIER_CONTENT = {
     family: 'block', hasGym: true, postCasual: true,
     docTitle: 'Foundation Treatment Block Service Agreement',
     tierName: 'Tier 1 — Foundation Block (Post-Casual)',
-    intro: 'The Foundation block is a six-week program for stable presentations and general deconditioning, combining a weekly supervised group session with independent gym training.',
+    intro: 'The Foundation block is a six-week program combining a weekly supervised group session with independent gym training.',
     included: [
       'Week 1 — 60-minute 1:1 program design',
       'Weeks 2–5 — 1× supervised group session per week (4 total)',
@@ -119,7 +119,7 @@ const TIER_CONTENT = {
     family: 'block', hasGym: true, postCasual: true,
     docTitle: 'Progress Treatment Block Service Agreement',
     tierName: 'Tier 2 — Progress Block (Post-Casual)',
-    intro: 'The Progress block is a six-week program for most musculoskeletal and chronic-disease presentations, with weekly individual clinical oversight alongside independent gym training.',
+    intro: 'The Progress block is a six-week program with weekly individual clinical oversight alongside independent gym training.',
     included: [
       'Week 1 — 60-minute 1:1 program design',
       'Weeks 2–5 — weekly 30-minute 1:1 program progression',
@@ -136,7 +136,7 @@ const TIER_CONTENT = {
     family: 'block', hasGym: true, postCasual: true,
     docTitle: 'Performance Treatment Block Service Agreement',
     tierName: 'Tier 3 — Performance Block (Post-Casual)',
-    intro: 'The Performance block is a six-week program for complex presentations, with longer weekly 1:1 sessions for deeper clinical work.',
+    intro: 'The Performance block is a six-week program with longer weekly 1:1 sessions for deeper clinical work.',
     included: [
       'Week 1 — 60-minute 1:1 program design',
       'Weeks 2–5 — weekly 45-minute 1:1 program progression',
@@ -155,7 +155,7 @@ const TIER_CONTENT = {
     family: 'continuity', hasGym: true,
     docTitle: 'Independent Continuity Service Agreement',
     tierName: 'Independent Tier',
-    intro: 'The Independent Tier is designed for patients who have completed a treatment block and are ready to train largely independently, with periodic clinical oversight to keep progressing safely.',
+    intro: 'The Independent Tier provides unlimited gym access and a monthly 30-minute 1:1 clinical review, supporting largely independent training with periodic oversight.',
     included: [
       'Unlimited gym access — any day the partner facility is open',
       'Monthly 30-minute 1:1 review — program update, load progression, and clinical check-in (1 per 4-week billing cycle)',
@@ -173,7 +173,7 @@ const TIER_CONTENT = {
     family: 'continuity', hasGym: true,
     docTitle: 'Maintain Continuity Service Agreement',
     tierName: 'Maintain Tier',
-    intro: 'The Maintain Tier suits stable patients who want one supervised group touchpoint each week plus unlimited independent gym access for training volume.',
+    intro: 'The Maintain Tier provides one supervised group session each week plus unlimited gym access, with an 8-weekly 1:1 reassessment.',
     included: [
       '1× supervised group session per week (Monday or Tuesday)',
       'Unlimited gym access — any day the partner facility is open',
@@ -191,7 +191,7 @@ const TIER_CONTENT = {
     family: 'continuity', hasGym: true,
     docTitle: 'Evolve Continuity Service Agreement',
     tierName: 'Evolve Tier',
-    intro: 'The Evolve Tier suits patients with ongoing clinical complexity who benefit from regular individual input alongside supervised and independent training.',
+    intro: 'The Evolve Tier alternates weekly group and 30-minute 1:1 sessions (two of each per 4-week cycle) alongside unlimited gym access, with the fortnightly 1:1 serving as your ongoing reassessment.',
     included: [
       'Alternating weekly — 1× group session one week, 1× 30-minute 1:1 the next (2 group + 2 1:1 per 4-week cycle)',
       'Unlimited gym access — any day the partner facility is open',
@@ -209,7 +209,7 @@ const TIER_CONTENT = {
     family: 'continuity', hasGym: true,
     docTitle: 'Elite Continuity Service Agreement',
     tierName: 'Elite Tier',
-    intro: 'The Elite Tier provides weekly individual clinical oversight for complex ongoing patients — the continuity version of a Tier 3 block.',
+    intro: 'The Elite Tier provides a weekly 45-minute 1:1 session with unlimited gym access and between-session program adjustments in the Moveify app.',
     included: [
       'Weekly 45-minute 1:1 session',
       'Unlimited gym access — any day the partner facility is open',
@@ -228,7 +228,7 @@ const TIER_CONTENT = {
     family: 'continuity', hasGym: false,
     docTitle: 'Remote Weekly Continuity Service Agreement',
     tierName: 'Remote Weekly Tier',
-    intro: 'Remote Weekly suits patients who cannot attend in clinic regularly or are geographically distant, with a weekly phone touchpoint and app-based programming.',
+    intro: 'Remote Weekly provides a weekly 10-minute phone check-in with app-based programming, delivered entirely remotely (no gym access).',
     included: [
       'Weekly 10-minute phone check-in',
       'Moveify app with program updates as needed',
@@ -243,7 +243,7 @@ const TIER_CONTENT = {
     family: 'continuity', hasGym: false,
     docTitle: 'Remote Fortnightly Continuity Service Agreement',
     tierName: 'Remote Fortnightly Tier',
-    intro: 'Remote Fortnightly suits patients training independently who want a regular but lighter phone touchpoint and app-based programming.',
+    intro: 'Remote Fortnightly provides a fortnightly 10-minute phone check-in with app-based programming, delivered entirely remotely (no gym access).',
     included: [
       'Fortnightly 10-minute phone check-in',
       'Moveify app with program updates as needed',
