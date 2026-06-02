@@ -101,24 +101,14 @@ async function handleCheckoutCompleted(event, log) {
     return;
   }
 
+  // Context captured as we go so the catch-all flag (below) has it even when an
+  // error fires mid-way. The webhook acks 200 BEFORE this runs (no Stripe retry),
+  // so EVERY failure must surface a reconciliation flag — a silent failure here
+  // means the patient saved a mandate but has no billing set up and no alert.
+  let clinikoId = '';
+  let tier;
+  let path;
   const sessionKey = `checkout:${session.id}`;
-  if (await check(sessionKey)) {
-    log.info({ session_id: session.id }, 'Checkout session already processed — skipping');
-    return;
-  }
-
-  const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
-  if (!customerId) {
-    log.warn({ session_id: session.id }, 'Checkout session has no customer — cannot create schedule');
-    return;
-  }
-
-  const customer = await getCustomer(customerId);
-  const tier = session.metadata?.agreement_tier || customer.metadata?.agreement_tier;
-  const path = session.metadata?.agreement_path || customer.metadata?.agreement_path;
-  const startDate = customer.metadata?.agreement_start_date || null;
-  const clinikoId = session.metadata?.cliniko_id || customer.metadata?.cliniko_id || '';
-
   const flag = async (diff, notes) => appendReconciliationFlag({
     id: `agreement-setup-fail:${session.id}`,
     type: 'agreement_setup_failed',
@@ -130,44 +120,62 @@ async function handleCheckoutCompleted(event, log) {
     resolution: '',
     notes: notes || '',
     created_at: new Date().toISOString(),
-  });
+  }).catch((e) => log.error({ session_id: session.id, err: e.message }, 'Failed to write agreement_setup_failed flag'));
 
-  const plan = lookupPlan(tier, path);
-  if (!plan) {
-    log.warn({ session_id: session.id, tier, path }, 'No subscription plan for tier/path — cannot create schedule');
-    await flag(`No plan for tier='${tier}' path='${path}'`, 'Check customer metadata / service-catalog');
-    return;
-  }
-  const priceId = getPlanPriceId(plan);
-  if (!priceId) {
-    log.error({ session_id: session.id, price_env: plan.priceEnv }, 'Stripe Price not configured for plan');
-    await flag(`Price env ${plan.priceEnv} not set`, 'Set the Stripe Price ID env var on the worker');
-    return;
-  }
-
-  // Resolve the saved payment method from the setup intent and make it the default.
-  let pmId;
   try {
+    if (await check(sessionKey)) {
+      log.info({ session_id: session.id }, 'Checkout session already processed — skipping');
+      return;
+    }
+
+    const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+    if (!customerId) {
+      log.warn({ session_id: session.id }, 'Checkout session has no customer — cannot create schedule');
+      await flag('Checkout session had no customer', 'Cannot create schedule without a Stripe customer');
+      return;
+    }
+
+    const customer = await getCustomer(customerId);
+    // Read tier/path/start_date from the SESSION metadata first (immutable per
+    // checkout), falling back to the customer. The customer's metadata is
+    // overwritten when a later agreement is minted for the same patient, so the
+    // session is the source of truth for this specific checkout.
+    tier = session.metadata?.agreement_tier || customer.metadata?.agreement_tier;
+    path = session.metadata?.agreement_path || customer.metadata?.agreement_path;
+    const startDate = session.metadata?.agreement_start_date || customer.metadata?.agreement_start_date || null;
+    clinikoId = session.metadata?.cliniko_id || customer.metadata?.cliniko_id || '';
+
+    const plan = lookupPlan(tier, path);
+    if (!plan) {
+      log.warn({ session_id: session.id, tier, path }, 'No subscription plan for tier/path — cannot create schedule');
+      await flag(`No plan for tier='${tier}' path='${path}'`, 'Check session/customer metadata / service-catalog');
+      return;
+    }
+    const priceId = getPlanPriceId(plan);
+    if (!priceId) {
+      log.error({ session_id: session.id, price_env: plan.priceEnv }, 'Stripe Price not configured for plan');
+      await flag(`Price env ${plan.priceEnv} not set`, 'Set the Stripe Price ID env var on the worker');
+      return;
+    }
+
+    // Resolve the saved payment method from the setup intent and make it the default.
     const fullSession = await retrieveCheckoutSession(session.id);
-    pmId = await getSetupIntentPaymentMethod(fullSession.setup_intent);
-  } catch (err) {
-    log.error({ session_id: session.id, err: err.message }, 'Failed to resolve saved payment method');
-    await flag(`Could not resolve payment method: ${err.message}`, '');
-    return;
-  }
-  if (!pmId) {
-    log.error({ session_id: session.id }, 'Setup intent yielded no payment method');
-    await flag('Setup intent had no payment_method', 'Patient may not have completed mandate setup');
-    return;
-  }
-  await setDefaultPaymentMethod(customerId, pmId).catch((err) =>
-    log.warn({ customer_id: customerId, err: err.message }, 'Failed to set default payment method — schedule sets it explicitly anyway')
-  );
+    const pmId = await getSetupIntentPaymentMethod(fullSession.setup_intent);
+    if (!pmId) {
+      log.error({ session_id: session.id }, 'Setup intent yielded no payment method');
+      await flag('Setup intent had no payment_method', 'Patient may not have completed mandate setup');
+      return;
+    }
+    await setDefaultPaymentMethod(customerId, pmId).catch((err) =>
+      log.warn({ customer_id: customerId, err: err.message }, 'Failed to set default payment method — schedule sets it explicitly anyway')
+    );
 
-  const action = planToStripeAction(plan);
-  try {
+    // Idempotency key keyed on the session so a reprocess of the SAME checkout
+    // can never create a second schedule/subscription (Stripe returns the first).
+    const idempotencyKey = `agreement-create:${session.id}`;
+    const action = planToStripeAction(plan);
     if (action.kind === 'subscription') {
-      const sub = await createSubscription({ customerId, priceId, paymentMethodId: pmId, startDate });
+      const sub = await createSubscription({ customerId, priceId, paymentMethodId: pmId, startDate, idempotencyKey });
       log.info({ cliniko_id: clinikoId, tier, path, customer_id: customerId, subscription_id: sub.id }, 'Continuity subscription created');
     } else {
       const schedule = await createSubscriptionSchedule({
@@ -177,6 +185,7 @@ async function handleCheckoutCompleted(event, log) {
         trialIterations: action.trialIterations,
         paymentMethodId: pmId,
         startDate: scheduleStartFrom(startDate),
+        idempotencyKey,
       });
       log.info(
         { cliniko_id: clinikoId, tier, path, shape: plan.shape, customer_id: customerId, schedule_id: schedule.id, iterations: action.iterations },
@@ -185,8 +194,10 @@ async function handleCheckoutCompleted(event, log) {
     }
     await mark(sessionKey);
   } catch (err) {
-    log.error({ session_id: session.id, tier, path, err: err.message }, 'Schedule/subscription creation failed');
-    await flag(`Create ${plan.shape} failed: ${err.message}`, 'Payment method saved; retry creation manually');
+    // Catch-all: any unexpected error (Stripe API blip, getCustomer, etc.) must
+    // raise a flag — there is no Stripe retry to fall back on.
+    log.error({ session_id: session.id, tier, path, err: err.message }, 'Agreement setup failed (unexpected)');
+    await flag(`Unexpected failure: ${err.message}`, 'Payment method may be saved; review and create the schedule manually');
   }
 }
 

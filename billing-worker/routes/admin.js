@@ -110,6 +110,11 @@ router.post('/agreements/checkout-setup', async (req, res) => {
   if (!clinikoId || !tier || !path) {
     return res.status(400).json({ error: 'clinikoId, tier and path are required' });
   }
+  // Cliniko ids are numeric — reject anything else before it reaches the Stripe
+  // customer search (defence-in-depth against search-query injection / mis-link).
+  if (!/^\d+$/.test(String(clinikoId))) {
+    return res.status(400).json({ error: 'clinikoId must be numeric' });
+  }
   if (!successUrl || !cancelUrl) {
     return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
   }
@@ -131,7 +136,15 @@ router.post('/agreements/checkout-setup', async (req, res) => {
       customerId: customer.id,
       successUrl,
       cancelUrl,
-      metadata: { cliniko_id: String(clinikoId), agreement_tier: tier, agreement_path: path },
+      // Carry tier/path/start_date on the SESSION (immutable per checkout) so the
+      // webhook never relies on the mutable customer metadata, which a later
+      // agreement for the same patient would overwrite.
+      metadata: {
+        cliniko_id: String(clinikoId),
+        agreement_tier: tier,
+        agreement_path: path,
+        ...(startDate ? { agreement_start_date: startDate } : {}),
+      },
     });
     log.info(
       { cliniko_id: clinikoId, tier, path, customer_id: customer.id, session_id: session.id },

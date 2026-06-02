@@ -51,6 +51,15 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
   if (!clinikoPatientId || !tier || !path) {
     return res.status(400).json({ error: 'clinikoPatientId, tier and path are required' });
   }
+  // Cliniko ids are numeric — reject anything else. This value flows through to a
+  // Stripe customer-search query in the worker; validating here is the first line
+  // of defence against search-query injection / mis-linking a payment method.
+  if (!/^\d+$/.test(String(clinikoPatientId))) {
+    return res.status(400).json({ error: 'clinikoPatientId must be numeric' });
+  }
+  if (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(String(startDate))) {
+    return res.status(400).json({ error: 'startDate must be YYYY-MM-DD' });
+  }
   if (!VALID_PATHS.includes(path)) return res.status(400).json({ error: 'Invalid path' });
   if (!tierLabel(tier, path)) return res.status(400).json({ error: 'Unknown tier/path combination' });
 
@@ -60,6 +69,16 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
 
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Invalidate any earlier UNSIGNED agreement links for this patient, so only
+    // the latest link is signable. Prevents two pending links both being signed
+    // and creating two schedules (double billing). Already-signed/active rows are
+    // left untouched. Mirrors the invitation-token reissue pattern.
+    await db.query(
+      `UPDATE service_agreements SET status = 'expired', updated_at = NOW()
+       WHERE cliniko_patient_id = $1 AND status = 'pending'`,
+      [String(clinikoPatientId)]
+    );
 
     const row = await db.getOne(`
       INSERT INTO service_agreements
@@ -127,30 +146,41 @@ router.post('/:token/sign', async (req, res) => {
 
     const { name: patientName, email } = await clinikoNameEmail(a.cliniko_patient_id);
 
-    // Render + store the signed PDF in Cliniko. Best-effort: a failure must not
-    // block the patient from reaching payment — log and continue.
-    try {
-      const pdf = await renderAgreementPdf({
-        patientName,
-        tier: a.tier,
-        path: a.path,
-        startDate: a.start_date,
-        signedName: a.signed_name,
-        signedAt: new Date(a.signed_at).toISOString(),
-        signedIp: a.signed_ip,
-      });
-      const att = await cliniko.uploadAttachment(
-        a.cliniko_patient_id,
-        pdf,
-        `Service Agreement ${new Date().toISOString().slice(0, 10)}.pdf`,
-        'application/pdf',
-        'Signed service agreement (Moveify)'
-      );
-      if (att?.id) {
-        await db.query('UPDATE service_agreements SET cliniko_attachment_id = $1, updated_at = NOW() WHERE id = $2', [String(att.id), a.id]);
+    // If the worker call (below) fails, revert to 'pending' so the SAME link can
+    // be retried by the patient rather than dead-ending as 'signed' with no
+    // checkout. Only reverts if still 'signed' (don't clobber a later state).
+    const revertToPending = () => db.query(
+      `UPDATE service_agreements SET status = 'pending', updated_at = NOW() WHERE id = $1 AND status = 'signed'`,
+      [a.id]
+    ).catch((e) => console.error('Failed to revert agreement to pending:', e.message));
+
+    // Render + store the signed PDF in Cliniko — but only once (guard against a
+    // retry re-uploading a duplicate). Best-effort: a failure must not block the
+    // patient from reaching payment.
+    if (!a.cliniko_attachment_id) {
+      try {
+        const pdf = await renderAgreementPdf({
+          patientName,
+          tier: a.tier,
+          path: a.path,
+          startDate: a.start_date,
+          signedName: a.signed_name,
+          signedAt: new Date(a.signed_at).toISOString(),
+          signedIp: a.signed_ip,
+        });
+        const att = await cliniko.uploadAttachment(
+          a.cliniko_patient_id,
+          pdf,
+          `Service Agreement ${new Date().toISOString().slice(0, 10)}.pdf`,
+          'application/pdf',
+          'Signed service agreement (Moveify)'
+        );
+        if (att?.id) {
+          await db.query('UPDATE service_agreements SET cliniko_attachment_id = $1, updated_at = NOW() WHERE id = $2', [String(att.id), a.id]);
+        }
+      } catch (pdfErr) {
+        console.error('Agreement PDF upload failed (continuing to checkout):', pdfErr.message);
       }
-    } catch (pdfErr) {
-      console.error('Agreement PDF upload failed (continuing to checkout):', pdfErr.message);
     }
 
     // Ask the billing-worker to open a setup-mode Checkout session.
@@ -158,6 +188,7 @@ router.post('/:token/sign', async (req, res) => {
     const adminToken = process.env.BILLING_ADMIN_TOKEN;
     if (!workerUrl || !adminToken) {
       console.error('BILLING_WORKER_URL / BILLING_ADMIN_TOKEN not configured');
+      await revertToPending();
       return res.status(500).json({ error: 'Payment setup is temporarily unavailable' });
     }
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -188,7 +219,8 @@ router.post('/:token/sign', async (req, res) => {
       customerId = data.customerId;
     } catch (workerErr) {
       console.error('checkout-setup call failed:', workerErr.message);
-      return res.status(502).json({ error: 'Could not start payment setup. Please contact the clinic.' });
+      await revertToPending();
+      return res.status(502).json({ error: 'Could not start payment setup. Please try again or contact the clinic.' });
     }
 
     if (customerId) {

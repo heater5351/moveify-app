@@ -237,11 +237,20 @@ async function findSubscriptionsCoveringDate(clinikoId, patientEmail, patientNam
 // handler can read tier/path/start_date back off the customer. Returns the
 // customer object.
 async function findOrCreateCustomer({ clinikoId, name, email, metadata = {} }) {
+  // Cliniko patient IDs are numeric. Hard-reject anything else BEFORE we touch
+  // Stripe — a crafted value (quotes, query operators) could otherwise alter the
+  // search-query interpolation below and mis-link the customer, i.e. attach a
+  // payment method to the wrong patient. Defence-in-depth with the backend's own
+  // numeric validation. Validated first so it's cheap and unit-testable.
+  const safeId = String(clinikoId);
+  if (!/^\d+$/.test(safeId)) {
+    throw new Error('Invalid clinikoId — expected a numeric Cliniko patient id');
+  }
   const stripe = await getStripe();
-  const merged = { cliniko_id: String(clinikoId), ...metadata };
+  const merged = { cliniko_id: safeId, ...metadata };
 
   const found = await stripe.customers.search({
-    query: `metadata['cliniko_id']:'${clinikoId}'`,
+    query: `metadata['cliniko_id']:'${safeId}'`,
     limit: 1,
   });
   if (found.data[0]) {
@@ -309,7 +318,7 @@ async function setDefaultPaymentMethod(customerId, paymentMethodId) {
 //                       then a paid phase of `iterations` debits, then cancel.
 // `default_settings.default_payment_method` is set explicitly so the first
 // invoice can auto-charge even if the customer-level default isn't picked up.
-async function createSubscriptionSchedule({ customerId, priceId, iterations, trialIterations = 0, paymentMethodId, startDate }) {
+async function createSubscriptionSchedule({ customerId, priceId, iterations, trialIterations = 0, paymentMethodId, startDate, idempotencyKey }) {
   const stripe = await getStripe();
   const phases = [];
   if (trialIterations > 0) {
@@ -317,29 +326,34 @@ async function createSubscriptionSchedule({ customerId, priceId, iterations, tri
   }
   phases.push({ items: [{ price: priceId, quantity: 1 }], iterations });
 
+  // idempotencyKey (keyed on the checkout session) makes the create itself safe
+  // to repeat: if the handler reruns for the same session, Stripe returns the
+  // same schedule instead of creating a second one (no double billing).
+  const opts = idempotencyKey ? { idempotencyKey } : {};
   return stripe.subscriptionSchedules.create({
     customer: customerId,
     start_date: startDate || 'now',
     end_behavior: 'cancel',
     default_settings: { default_payment_method: paymentMethodId },
     phases,
-  });
+  }, opts);
 }
 
 // Creates a plain rolling subscription for continuity tiers (interval baked
 // into the Price). No end — cancelled manually on notice. A future startDate is
 // expressed as `trial_end` so the first charge lands on that date with no
 // proration; a past/empty startDate bills immediately.
-async function createSubscription({ customerId, priceId, paymentMethodId, startDate }) {
+async function createSubscription({ customerId, priceId, paymentMethodId, startDate, idempotencyKey }) {
   const stripe = await getStripe();
   const startSec = startDate ? Math.floor(new Date(startDate).getTime() / 1000) : 0;
   const inFuture = startSec > Math.floor(Date.now() / 1000) + 60;
+  const opts = idempotencyKey ? { idempotencyKey } : {};
   return stripe.subscriptions.create({
     customer: customerId,
     items: [{ price: priceId }],
     default_payment_method: paymentMethodId,
     ...(inFuture ? { trial_end: startSec } : {}),
-  });
+  }, opts);
 }
 
 // Returns the Stripe product name for a subscription (e.g. "T2 Progress")
