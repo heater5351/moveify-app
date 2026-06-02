@@ -22,6 +22,26 @@ what to know now, links).
 
 ---
 
+## 2026-06-02 — Agreement copy mapped to the Cliniko service agreements + brand redesign
+
+- **What:** the automated sign-up agreement now mirrors the full Cliniko service agreements
+  (provider header, Part A clinical services, Part B Direct Debit Request Service Agreement)
+  instead of the earlier placeholder Part A. New `backend/lib/agreement-content.js`
+  `buildAgreement({tier,path,startDate})` returns a structured doc (parts → sections with
+  body/bullets/note/subsections) consumed identically by the PDF renderer, `GET
+  /api/agreements/validate/:token` (now returns `agreement`, not `paragraphs`), and the sign
+  page. Tier-specific inclusions/fees come from Part-Time Pricing Scheme v3.1; generic legal
+  copy (DDRSA, privacy, failed payments, disputes) reproduced from the Cliniko agreement.
+- **Design:** `AgreementPage.tsx` restyled to the handout brand language (navy masthead/banner,
+  teal accents, structured sections). The signed PDF (`services/agreement-pdf.js`) rebuilt to
+  match.
+- **Per-plan billing copy:** `billingTerms()` in `agreement-template.js` generates accurate
+  "Payment Authorisation" + "When Charges Occur" text per shape; amounts in `PLAN_BILLING`
+  MUST match the worker's Stripe Prices (`scripts/create-agreement-prices.js` `PLAN_PRICING`).
+- **Version** bumped to `v2.0-2026-06-02`. ⚠ Clinical/legal copy still needs Ryan's final read
+  before the flag goes live. Open: provider postcode shows 5351 here vs 5352 in Cliniko; no
+  `Independent-Discounted` plan exists in the catalog yet.
+
 ## 2026-06-02 — Service-agreement → Stripe subscription automation (behind flag)
 
 - **What:** new sign-up flow that replaces the manual "Cliniko form + Payment Link + hand-set

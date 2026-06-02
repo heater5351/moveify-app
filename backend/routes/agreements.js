@@ -19,12 +19,10 @@ const cliniko = require('../services/cliniko');
 const { renderAgreementPdf } = require('../services/agreement-pdf');
 const {
   AGREEMENT_VERSION,
-  PART_A_TITLE,
-  PART_A_PARAGRAPHS,
   VALID_PATHS,
   tierLabel,
-  billingTerms,
 } = require('../lib/agreement-template');
+const { buildAgreement } = require('../lib/agreement-content');
 
 const router = express.Router();
 
@@ -116,9 +114,9 @@ router.get('/validate/:token', async (req, res) => {
       tierLabel: tierLabel(a.tier, a.path),
       startDate: a.start_date,
       agreementVersion: a.agreement_version,
-      title: PART_A_TITLE,
-      paragraphs: PART_A_PARAGRAPHS,
-      billing: billingTerms(a.tier, a.path, a.start_date),
+      // Full structured agreement (provider header, Part A clinical, Part B DDRSA)
+      // — mirrors the Cliniko service agreements. The sign page renders this.
+      agreement: buildAgreement({ tier: a.tier, path: a.path, startDate: a.start_date }),
     });
   } catch (err) {
     console.error('Agreement validate error:', err);

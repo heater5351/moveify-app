@@ -10,7 +10,7 @@
 // When the canonical Part A text lands, bump AGREEMENT_VERSION so previously-signed
 // agreements stay attributable to the exact wording the patient saw. The version
 // is stored on each signed row.
-const AGREEMENT_VERSION = 'partA-2026-06-02';
+const AGREEMENT_VERSION = 'v2.0-2026-06-02';
 
 const PART_A_TITLE = 'Moveify Health Solutions — Service Agreement';
 
