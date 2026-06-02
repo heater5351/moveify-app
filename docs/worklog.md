@@ -22,6 +22,28 @@ what to know now, links).
 
 ---
 
+## 2026-06-02 — Service-agreement automation: LIVE in production
+
+- **What:** flipped `AGREEMENT_AUTOMATION_ENABLED=true` on prod backend + worker — the sign-up flow
+  is now live. The Generate-agreement button shows for clinicians; sign/checkout/provision run
+  against live Stripe.
+- **Go-live ops performed:**
+  - Created the 13 live Stripe Products/Prices via a one-off Cloud Run Job (built from the worker
+    image, live key bound by Secret Manager — never handled locally). Amounts per `create-agreement-prices.js`.
+  - Prod worker (`moveify-billing-worker`) deployed with all `STRIPE_PRICE_*` + `AGREEMENT_AUTOMATION_ENABLED=true`
+    + `OIDC_EXPECTED_AUDIENCE`. Prod backend deployed with `BILLING_WORKER_URL` + `BILLING_ADMIN_TOKEN`
+    (secret ref); `service_agreements` table auto-migrated.
+  - Prod reconcile scheduler **`moveify-reconcile-agreements`** (every 6h, OIDC SA
+    `billing-worker@`, audience = worker URL). Verified 200.
+- **Runtime Stripe key:** the prod runtime key (`STRIPE_API_KEY` secret) was a restricted key
+  missing the agreement-flow scopes. Replaced with a new restricted key (new secret version) whose
+  scopes were verified by a throwaway probe job (all reads + Customers/Subscriptions/Checkout
+  writes PASS). Needs: Customers/Subscriptions/Checkout **write**; Charges, PaymentIntents,
+  Invoices, Balance, SetupIntents, Products, Prices **read**. Worker cold-started to load it.
+- **Dockerfile:** `billing-worker/Dockerfile` now also `COPY scripts/` (so admin scripts can run
+  as Cloud Run Jobs with secrets bound the platform way).
+- **Note:** Cliniko provider postcode still shows 5352 vs the correct 5351 (fix in Cliniko).
+
 ## 2026-06-02 — Agreement signing: drawn signature + Direct Debit authorisation
 
 - **What:** the service-agreement sign page now captures a **drawn signature** (finger/mouse

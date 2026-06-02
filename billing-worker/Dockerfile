@@ -18,6 +18,9 @@ COPY services/ ./services/
 COPY jobs/ ./jobs/
 COPY routes/ ./routes/
 COPY db/ ./db/
+# Admin/one-off maintenance scripts (e.g. create-agreement-prices.js). Not run by
+# the CMD — invoked on demand as a Cloud Run Job with the relevant secret bound.
+COPY scripts/ ./scripts/
 
 USER nodejs
 
