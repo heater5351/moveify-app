@@ -60,6 +60,16 @@ what to know now, links).
   `STRIPE_SECRET_KEY=sk_test_… node scripts/create-agreement-prices.js`) to create the
   Products/Prices and print the `STRIPE_PRICE_*` env lines; `--dry-run` lists the catalog with
   no key. Idempotent (find-or-reuse). Amounts in that script must be re-confirmed before live.
+- **Payment-safety hardening (same day):** the worker acks the Stripe webhook 200 *before*
+  processing, so there is **no Stripe retry** — every `checkout.session.completed` failure path
+  now raises an `agreement_setup_failed` reconciliation flag (the whole handler is wrapped).
+  tier/path/start_date are read from the **session** metadata (immutable per checkout), not the
+  mutable customer metadata. Schedule/subscription creation passes a Stripe **idempotencyKey**
+  keyed on the session (no same-session double-create), and the backend **invalidates prior
+  pending agreements** per patient on mint (no two-links-both-create). `clinikoId` is validated
+  numeric in both the backend and the worker before the Stripe customer-search interpolation
+  (injection / mis-link guard). Sign reverts to `pending` on worker failure so the same link
+  retries; the Cliniko PDF upload is guarded against duplicates.
 - Plan + rationale: vault *Build Plan - Service Agreement & Stripe Subscription Automation* /
   *Decision - Service Agreement and Stripe Automation Direction*.
 
