@@ -5,15 +5,22 @@ const { logger } = require('../lib/logger');
 
 let _stripe = null;
 
+// STRIPE_MODE selects which Stripe credentials to use. Default 'live' (prod
+// worker, unchanged). The staging worker sets STRIPE_MODE=test to read the
+// `*-test` secrets so it never touches the live Stripe account.
+function isTestMode() {
+  return process.env.STRIPE_MODE === 'test';
+}
+
 async function getStripe() {
   if (_stripe) return _stripe;
-  const key = await getSecret('stripe-secret-key');
+  const key = await getSecret(isTestMode() ? 'stripe-secret-key-test' : 'stripe-secret-key');
   _stripe = require('stripe')(key);
   return _stripe;
 }
 
 async function getWebhookSecret() {
-  return getSecret('stripe-webhook-secret');
+  return getSecret(isTestMode() ? 'stripe-webhook-secret-test' : 'stripe-webhook-secret');
 }
 
 async function constructWebhookEvent(rawBody, sig) {
@@ -223,6 +230,163 @@ async function findSubscriptionsCoveringDate(clinikoId, patientEmail, patientNam
   return { covering, reason: covering.length ? 'ok' : 'outside_window' };
 }
 
+// ─── Sign-up automation (agreement → setup Checkout → schedule) ──────────────
+
+// Finds an existing Stripe customer by metadata.cliniko_id, else creates one.
+// Always (re)writes the agreement metadata so the checkout.session.completed
+// handler can read tier/path/start_date back off the customer. Returns the
+// customer object.
+async function findOrCreateCustomer({ clinikoId, name, email, metadata = {} }) {
+  // Cliniko patient IDs are numeric. Hard-reject anything else BEFORE we touch
+  // Stripe — a crafted value (quotes, query operators) could otherwise alter the
+  // search-query interpolation below and mis-link the customer, i.e. attach a
+  // payment method to the wrong patient. Defence-in-depth with the backend's own
+  // numeric validation. Validated first so it's cheap and unit-testable.
+  const safeId = String(clinikoId);
+  if (!/^\d+$/.test(safeId)) {
+    throw new Error('Invalid clinikoId — expected a numeric Cliniko patient id');
+  }
+  const stripe = await getStripe();
+  const merged = { cliniko_id: safeId, ...metadata };
+
+  const found = await stripe.customers.search({
+    query: `metadata['cliniko_id']:'${safeId}'`,
+    limit: 1,
+  });
+  if (found.data[0]) {
+    return stripe.customers.update(found.data[0].id, {
+      metadata: merged,
+      ...(name ? { name } : {}),
+      ...(email ? { email } : {}),
+    });
+  }
+
+  return stripe.customers.create({
+    ...(name ? { name } : {}),
+    ...(email ? { email } : {}),
+    metadata: merged,
+  });
+}
+
+// Creates a Checkout Session in SETUP mode — collects + saves a payment method
+// (card, BECS, wallets, Link) without charging. payment_method_types is omitted
+// so Stripe's dashboard-configured dynamic payment methods drive what's shown.
+// `currency: 'aud'` so AU methods (incl. au_becs_debit) are eligible.
+async function createSetupCheckoutSession({ customerId, successUrl, cancelUrl, metadata = {} }) {
+  const stripe = await getStripe();
+  return stripe.checkout.sessions.create({
+    mode: 'setup',
+    customer: customerId,
+    currency: 'aud',
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    metadata,
+  });
+}
+
+// Retrieves a Checkout Session with the setup_intent expanded so the resulting
+// payment_method can be read without a second round-trip.
+async function retrieveCheckoutSession(sessionId) {
+  const stripe = await getStripe();
+  return stripe.checkout.sessions.retrieve(sessionId, { expand: ['setup_intent'] });
+}
+
+// Resolves the saved payment method id from a (possibly expanded) setup_intent.
+async function getSetupIntentPaymentMethod(setupIntent) {
+  const stripe = await getStripe();
+  const si = typeof setupIntent === 'string'
+    ? await stripe.setupIntents.retrieve(setupIntent)
+    : setupIntent;
+  if (!si) return null;
+  return typeof si.payment_method === 'string'
+    ? si.payment_method
+    : si.payment_method?.id || null;
+}
+
+// Sets the customer's default payment method for invoices. Required before any
+// schedule/subscription can auto-charge.
+async function setDefaultPaymentMethod(customerId, paymentMethodId) {
+  const stripe = await getStripe();
+  return stripe.customers.update(customerId, {
+    invoice_settings: { default_payment_method: paymentMethodId },
+  });
+}
+
+// Creates a self-capping Subscription Schedule for a block.
+//   - standard block:  one phase, `iterations` weekly debits, end_behavior=cancel.
+//   - post-casual:      a trial phase (`trialIterations` free week(s), no charge)
+//                       then a paid phase of `iterations` debits, then cancel.
+// `default_settings.default_payment_method` is set explicitly so the first
+// invoice can auto-charge even if the customer-level default isn't picked up.
+async function createSubscriptionSchedule({ customerId, priceId, iterations, trialIterations = 0, paymentMethodId, startDate, idempotencyKey, metadata }) {
+  const stripe = await getStripe();
+  const phases = [];
+  if (trialIterations > 0) {
+    phases.push({ items: [{ price: priceId, quantity: 1 }], iterations: trialIterations, trial: true });
+  }
+  phases.push({ items: [{ price: priceId, quantity: 1 }], iterations });
+
+  // idempotencyKey (keyed on the checkout session) makes the create itself safe
+  // to repeat: if the handler reruns for the same session, Stripe returns the
+  // same schedule instead of creating a second one (no double billing).
+  // `metadata.agreement_session` links the schedule back to its checkout so the
+  // reconcile sweep can detect a completed setup that never got provisioned.
+  const opts = idempotencyKey ? { idempotencyKey } : {};
+  return stripe.subscriptionSchedules.create({
+    customer: customerId,
+    start_date: startDate || 'now',
+    end_behavior: 'cancel',
+    default_settings: { default_payment_method: paymentMethodId },
+    phases,
+    ...(metadata ? { metadata } : {}),
+  }, opts);
+}
+
+// Creates a plain rolling subscription for continuity tiers (interval baked
+// into the Price). No end — cancelled manually on notice. A future startDate is
+// expressed as `trial_end` so the first charge lands on that date with no
+// proration; a past/empty startDate bills immediately.
+async function createSubscription({ customerId, priceId, paymentMethodId, startDate, idempotencyKey, metadata }) {
+  const stripe = await getStripe();
+  const startSec = startDate ? Math.floor(new Date(startDate).getTime() / 1000) : 0;
+  const inFuture = startSec > Math.floor(Date.now() / 1000) + 60;
+  const opts = idempotencyKey ? { idempotencyKey } : {};
+  return stripe.subscriptions.create({
+    customer: customerId,
+    items: [{ price: priceId }],
+    default_payment_method: paymentMethodId,
+    ...(inFuture ? { trial_end: startSec } : {}),
+    ...(metadata ? { metadata } : {}),
+  }, opts);
+}
+
+// ─── Reconcile sweep helpers (lost-schedule detector) ────────────────────────
+
+// Lists COMPLETED setup-mode Checkout Sessions created since `sinceSec` (unix).
+// These are the agreement mandate captures; the sweep checks each one got a
+// schedule/subscription.
+async function listRecentSetupCheckouts(sinceSec) {
+  const stripe = await getStripe();
+  const out = [];
+  for await (const s of stripe.checkout.sessions.list({ created: { gte: sinceSec }, limit: 100 })) {
+    if (s.mode === 'setup' && s.status === 'complete') out.push(s);
+  }
+  return out;
+}
+
+// True if a schedule OR subscription already exists for this customer that is
+// linked (via metadata.agreement_session) to the given checkout session. This is
+// the precise "was this setup checkout provisioned?" test — it does NOT confuse a
+// patient's earlier (completed) plan with a brand-new, not-yet-provisioned one.
+async function sessionProvisioned(customerId, sessionId) {
+  const stripe = await getStripe();
+  const scheds = await stripe.subscriptionSchedules.list({ customer: customerId, limit: 100 });
+  if (scheds.data.some((s) => s.metadata?.agreement_session === sessionId)) return true;
+  const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 100 });
+  if (subs.data.some((s) => s.metadata?.agreement_session === sessionId)) return true;
+  return false;
+}
+
 // Returns the Stripe product name for a subscription (e.g. "T2 Progress")
 async function getSubscriptionProductName(subscription) {
   const stripe = await getStripe();
@@ -315,4 +479,13 @@ module.exports = {
   findSubscriptionsCoveringDate,
   getSubscriptionProductName,
   getProductNameFromInvoice,
+  findOrCreateCustomer,
+  createSetupCheckoutSession,
+  retrieveCheckoutSession,
+  getSetupIntentPaymentMethod,
+  setDefaultPaymentMethod,
+  createSubscriptionSchedule,
+  createSubscription,
+  listRecentSetupCheckouts,
+  sessionProvisioned,
 };

@@ -7,7 +7,13 @@ const {
   getSubscriptionProductName,
   getProductNameFromInvoice,
   getInvoiceFee,
+  retrieveCheckoutSession,
+  getSetupIntentPaymentMethod,
+  setDefaultPaymentMethod,
+  createSubscriptionSchedule,
+  createSubscription,
 } = require('../services/stripe');
+const { lookupPlan, getPlanPriceId } = require('../lib/service-catalog');
 const {
   getTab,
   appendStripePayment,
@@ -39,9 +45,205 @@ async function handleStripeEvent(event, log = logger) {
     case 'charge.dispute.created':
       await handleDisputeCreated(event.data.object, log);
       break;
+    case 'checkout.session.completed':
+      await handleCheckoutCompleted(event, log);
+      break;
+    case 'subscription_schedule.completed':
+      await handleScheduleCompleted(event, log);
+      break;
+    case 'customer.subscription.deleted':
+      await handleSubscriptionDeleted(event, log);
+      break;
     default:
       log.debug({ event_type: event.type }, 'Unhandled Stripe event type');
   }
+}
+
+// ─── Agreement automation: setup Checkout → schedule/subscription ────────────
+
+// Converts an agreement start-date (ISO 'YYYY-MM-DD', or null) to the value
+// Stripe Schedules' `start_date` expects: a future Unix timestamp, or 'now'
+// when the date is missing/today/past.
+function scheduleStartFrom(startDate) {
+  if (!startDate) return 'now';
+  const sec = Math.floor(new Date(startDate).getTime() / 1000);
+  if (!Number.isFinite(sec)) return 'now';
+  return sec > Math.floor(Date.now() / 1000) + 60 ? sec : 'now';
+}
+
+// Pure mapping from a resolved plan to the Stripe object the handler should
+// create. Continuity tiers → a plain rolling subscription; everything else →
+// a self-capping schedule with the plan's iteration/trial counts. Exported so
+// the branch is unit-tested without mocking Stripe.
+function planToStripeAction(plan) {
+  if (!plan) return null;
+  if (plan.shape === 'continuity') return { kind: 'subscription' };
+  return { kind: 'schedule', iterations: plan.iterations, trialIterations: plan.trialIterations || 0 };
+}
+
+/**
+ * Handles a completed SETUP-mode Checkout (the patient saved a payment method
+ * after signing the service agreement). Sets the saved method as the customer
+ * default, then builds the Stripe object for the chosen plan:
+ *   - block       → self-capping Subscription Schedule (N weekly debits, cancel)
+ *   - post_casual → trial phase (free week) → 5 debits → cancel
+ *   - continuity  → plain rolling Subscription
+ *
+ * Tier/path/start_date come from the session metadata (set by the worker's
+ * /admin/agreements/checkout-setup), falling back to the customer metadata.
+ * The first weekly DD's `invoice.payment_succeeded` then flows through the
+ * UNCHANGED Pattern-7 credit path. PHI-safe: only IDs and tier/path are logged.
+ */
+async function handleCheckoutCompleted(event, log) {
+  const session = event.data.object;
+  if (session.mode !== 'setup') {
+    log.debug({ session_id: session.id, mode: session.mode }, 'Checkout completed (not setup mode) — skipping');
+    return;
+  }
+  await provisionFromSetupSession(session, log, { source: 'webhook' });
+}
+
+/**
+ * Creates the schedule/subscription for a completed setup Checkout session.
+ * Shared by the live webhook and the reconcile sweep (the lost-schedule
+ * self-heal). Idempotent: a DB session key + a Stripe idempotencyKey + the
+ * schedule/sub's `agreement_session` metadata each prevent a duplicate.
+ * Returns one of: 'created' | 'duplicate' | 'skipped' | 'failed'.
+ */
+async function provisionFromSetupSession(session, log, { source = 'webhook' } = {}) {
+  // Context captured as we go so the catch-all flag (below) has it even when an
+  // error fires mid-way. The webhook acks 200 BEFORE this runs (no Stripe retry),
+  // so EVERY failure must surface a reconciliation flag — a silent failure here
+  // means the patient saved a mandate but has no billing set up and no alert.
+  let clinikoId = '';
+  let tier;
+  let path;
+  const sessionKey = `checkout:${session.id}`;
+  const flag = async (diff, notes) => appendReconciliationFlag({
+    id: `agreement-setup-fail:${session.id}`,
+    type: 'agreement_setup_failed',
+    entity_id: session.id,
+    cliniko_state: clinikoId,
+    ledger_state: `${tier || '?'}/${path || '?'}`,
+    diff,
+    resolved_at: '',
+    resolution: '',
+    notes: notes || '',
+    created_at: new Date().toISOString(),
+  }).catch((e) => log.error({ session_id: session.id, err: e.message }, 'Failed to write agreement_setup_failed flag'));
+
+  try {
+    if (await check(sessionKey)) {
+      log.info({ session_id: session.id }, 'Checkout session already processed — skipping');
+      return 'duplicate';
+    }
+
+    const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+    if (!customerId) {
+      log.warn({ session_id: session.id }, 'Checkout session has no customer — cannot create schedule');
+      await flag('Checkout session had no customer', 'Cannot create schedule without a Stripe customer');
+      return 'failed';
+    }
+
+    const customer = await getCustomer(customerId);
+    // Read tier/path/start_date from the SESSION metadata first (immutable per
+    // checkout), falling back to the customer. The customer's metadata is
+    // overwritten when a later agreement is minted for the same patient, so the
+    // session is the source of truth for this specific checkout.
+    tier = session.metadata?.agreement_tier || customer.metadata?.agreement_tier;
+    path = session.metadata?.agreement_path || customer.metadata?.agreement_path;
+    const startDate = session.metadata?.agreement_start_date || customer.metadata?.agreement_start_date || null;
+    clinikoId = session.metadata?.cliniko_id || customer.metadata?.cliniko_id || '';
+
+    const plan = lookupPlan(tier, path);
+    if (!plan) {
+      log.warn({ session_id: session.id, tier, path }, 'No subscription plan for tier/path — cannot create schedule');
+      await flag(`No plan for tier='${tier}' path='${path}'`, 'Check session/customer metadata / service-catalog');
+      return 'failed';
+    }
+    const priceId = getPlanPriceId(plan);
+    if (!priceId) {
+      log.error({ session_id: session.id, price_env: plan.priceEnv }, 'Stripe Price not configured for plan');
+      await flag(`Price env ${plan.priceEnv} not set`, 'Set the Stripe Price ID env var on the worker');
+      return 'failed';
+    }
+
+    // Resolve the saved payment method from the setup intent and make it the default.
+    const fullSession = await retrieveCheckoutSession(session.id);
+    const pmId = await getSetupIntentPaymentMethod(fullSession.setup_intent);
+    if (!pmId) {
+      log.error({ session_id: session.id }, 'Setup intent yielded no payment method');
+      await flag('Setup intent had no payment_method', 'Patient may not have completed mandate setup');
+      return 'failed';
+    }
+    await setDefaultPaymentMethod(customerId, pmId).catch((err) =>
+      log.warn({ customer_id: customerId, err: err.message }, 'Failed to set default payment method — schedule sets it explicitly anyway')
+    );
+
+    // Idempotency key keyed on the session so a reprocess of the SAME checkout
+    // can never create a second schedule/subscription (Stripe returns the first).
+    // metadata.agreement_session links the object back to this checkout so the
+    // reconcile sweep can tell a provisioned session from a lost one.
+    const idempotencyKey = `agreement-create:${session.id}`;
+    const metadata = { agreement_session: session.id, cliniko_id: String(clinikoId) };
+    const action = planToStripeAction(plan);
+    if (action.kind === 'subscription') {
+      const sub = await createSubscription({ customerId, priceId, paymentMethodId: pmId, startDate, idempotencyKey, metadata });
+      log.info({ cliniko_id: clinikoId, tier, path, customer_id: customerId, subscription_id: sub.id, source }, 'Continuity subscription created');
+    } else {
+      const schedule = await createSubscriptionSchedule({
+        customerId,
+        priceId,
+        iterations: action.iterations,
+        trialIterations: action.trialIterations,
+        paymentMethodId: pmId,
+        startDate: scheduleStartFrom(startDate),
+        idempotencyKey,
+        metadata,
+      });
+      log.info(
+        { cliniko_id: clinikoId, tier, path, shape: plan.shape, customer_id: customerId, schedule_id: schedule.id, iterations: action.iterations, source },
+        'Subscription schedule created'
+      );
+    }
+    await mark(sessionKey);
+    return 'created';
+  } catch (err) {
+    // Catch-all: any unexpected error (Stripe API blip, getCustomer, etc.) must
+    // raise a flag — there is no Stripe retry to fall back on.
+    log.error({ session_id: session.id, tier, path, err: err.message }, 'Agreement setup failed (unexpected)');
+    await flag(`Unexpected failure: ${err.message}`, 'Payment method may be saved; review and create the schedule manually');
+    return 'failed';
+  }
+}
+
+// A block schedule ran to completion (all debits taken). Surface it so the
+// operator can close the matching Cliniko case (auto case-close is deferred —
+// see project_cliniko_invoices_unreliable). PHI-safe.
+async function handleScheduleCompleted(event, log) {
+  const schedule = event.data.object;
+  const customerId = typeof schedule.customer === 'string' ? schedule.customer : schedule.customer?.id;
+  log.info({ schedule_id: schedule.id, customer_id: customerId }, 'Subscription schedule completed — block finished');
+  await appendReconciliationFlag({
+    id: `block-completed:${schedule.id}`,
+    type: 'block_completed',
+    entity_id: schedule.id,
+    cliniko_state: '',
+    ledger_state: 'schedule_completed',
+    diff: 'Block schedule completed all debits',
+    resolved_at: '',
+    resolution: '',
+    notes: 'Close the matching Cliniko case if no follow-on block',
+    created_at: new Date().toISOString(),
+  }).catch((err) => log.warn({ err: err.message }, 'block_completed flag append failed (non-fatal)'));
+}
+
+// A subscription ended (continuity cancelled, or a schedule auto-cancelled).
+// Informational — logged for visibility; no financial action.
+async function handleSubscriptionDeleted(event, log) {
+  const sub = event.data.object;
+  const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
+  log.info({ subscription_id: sub.id, customer_id: customerId }, 'Stripe subscription ended');
 }
 
 /**
@@ -814,4 +1016,4 @@ async function backfillInvoice(invoice, log = logger) {
   return { status: 'processed', invoice_id: invoice.id };
 }
 
-module.exports = { handleStripeEvent, backfillInvoice, backfillStripeFees };
+module.exports = { handleStripeEvent, backfillInvoice, backfillStripeFees, scheduleStartFrom, planToStripeAction, provisionFromSetupSession };

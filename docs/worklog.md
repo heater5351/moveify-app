@@ -22,6 +22,26 @@ what to know now, links).
 
 ---
 
+## 2026-06-02 — Agreement signing: drawn signature + Direct Debit authorisation
+
+- **What:** the service-agreement sign page now captures a **drawn signature** (finger/mouse
+  canvas, dependency-free `SignaturePad` in `AgreementPage.tsx`) alongside the typed full name,
+  an auto-stamped date, and a **separate "I authorise the Direct Debit" checkbox** (distinct from
+  the existing read-&-understood/privacy consent). The drawn mark is rendered into the signed PDF
+  (`services/agreement-pdf.js`) for stronger dispute/chargeback evidence.
+- **Why:** the agreement authorises a recurring direct debit — a drawn mark + explicit DD
+  authorisation is more defensible than a typed name alone. The bank-level mandate is still
+  captured by Stripe; the in-app capture records intent.
+- **Schema (additive):** `service_agreements.signed_signature TEXT` (base64 PNG data URL) +
+  `dd_authorised BOOLEAN` — added to the CREATE and as `ADD COLUMN IF NOT EXISTS` for the existing
+  staging table. No destructive change.
+- **API:** `POST /api/agreements/:token/sign` now requires `signature` (validated `data:image/png`
+  base64, ≤90 KB to stay under express.json's 100 KB limit) and `ddAuthorised: true`.
+- **Go-live status:** clinical/legal copy signed off; postcode 5351 confirmed correct (fix the
+  Cliniko record, which shows 5352); Independent-Discounted intentionally excluded; prices
+  confirmed; full flow validated in Stripe sandbox. Remaining = ops only (LIVE Prices + prod env
+  vars + worker deploy + prod reconcile scheduler) before flipping `AGREEMENT_AUTOMATION_ENABLED`.
+
 ## 2026-06-02 — Patient handout: non-diagnostic comparative phrasing + no auto-referral + missing-demographics flag
 
 - **What:** the scribe handout's clinical interpretations no longer use diagnostic labels or
@@ -46,6 +66,86 @@ what to know now, links).
 - **Files:** `backend/services/normative-data.js`, `backend/data/normative-data.json`,
   `backend/services/scribe-llm.js`, `backend/routes/scribe-handout.js`, frontend
   `HandoutPreview.tsx` / `ScribeReportsPage.tsx` / `scribe-api.ts` / `types/index.ts`.
+
+## 2026-06-02 — Agreement copy mapped to the Cliniko service agreements + brand redesign
+
+- **What:** the automated sign-up agreement now mirrors the full Cliniko service agreements
+  (provider header, Part A clinical services, Part B Direct Debit Request Service Agreement)
+  instead of the earlier placeholder Part A. New `backend/lib/agreement-content.js`
+  `buildAgreement({tier,path,startDate})` returns a structured doc (parts → sections with
+  body/bullets/note/subsections) consumed identically by the PDF renderer, `GET
+  /api/agreements/validate/:token` (now returns `agreement`, not `paragraphs`), and the sign
+  page. Tier-specific inclusions/fees come from Part-Time Pricing Scheme v3.1; generic legal
+  copy (DDRSA, privacy, failed payments, disputes) reproduced from the Cliniko agreement.
+- **Design:** `AgreementPage.tsx` restyled to the handout brand language (navy masthead/banner,
+  teal accents, structured sections). The signed PDF (`services/agreement-pdf.js`) rebuilt to
+  match.
+- **Per-plan billing copy:** `billingTerms()` in `agreement-template.js` generates accurate
+  "Payment Authorisation" + "When Charges Occur" text per shape; amounts in `PLAN_BILLING`
+  MUST match the worker's Stripe Prices (`scripts/create-agreement-prices.js` `PLAN_PRICING`).
+- **Version** bumped to `v2.0-2026-06-02`. ⚠ Clinical/legal copy still needs Ryan's final read
+  before the flag goes live. Open: provider postcode shows 5351 here vs 5352 in Cliniko; no
+  `Independent-Discounted` plan exists in the catalog yet.
+
+## 2026-06-02 — Service-agreement → Stripe subscription automation (behind flag)
+
+- **What:** new sign-up flow that replaces the manual "Cliniko form + Payment Link + hand-set
+  Cancel-at". A clinician mints a one-time tokenised link (operator-set tier/path/start-date) →
+  patient signs Part A in-app → Stripe **Checkout setup mode** (card / BECS / wallets, dynamic
+  payment methods) saves a payment method → `checkout.session.completed` webhook builds a
+  **self-capping Subscription Schedule** (blocks: 6 debits; post-casual: 1 trial wk + 5; cancel)
+  or a **plain rolling Subscription** (continuity). Credit still keys off the unchanged
+  `invoice.payment_succeeded` Pattern-7 path.
+- **Ships dormant** behind `AGREEMENT_AUTOMATION_ENABLED` (worker + backend). The frontend
+  "Generate agreement" button is gated at **runtime** via `GET /api/config`
+  (`agreementAutomationEnabled`) — it reflects the backend flag, so the UI shows on
+  staging/preview (flag on) and stays hidden in prod (flag off) with no frontend rebuild.
+  Verify in Stripe **test mode** before enabling the worker side.
+- **New env vars:**
+  - Worker: `AGREEMENT_AUTOMATION_ENABLED`, and one Stripe Price ID per plan —
+    `STRIPE_PRICE_{T1,T2,T3}_STANDARD`, `STRIPE_PRICE_{T1,T2,T3}_POST_CASUAL`,
+    `STRIPE_PRICE_{INDEPENDENT,MAINTAIN,EVOLVE,ELITE,REMOTE_WEEKLY,REMOTE_FORTNIGHTLY,APP_ONLY}`.
+  - Backend: `AGREEMENT_AUTOMATION_ENABLED`, `BILLING_WORKER_URL`, `BILLING_ADMIN_TOKEN`
+    (sources from the `billing_admin_token` secret — used to call the worker's new admin endpoint).
+  - Frontend: `VITE_AGREEMENT_AUTOMATION_ENABLED`.
+- **New schema:** additive `service_agreements` table (`backend/database/init.js`) — one row per
+  minted link; stores token, signed name/at/ip, agreement version, Stripe customer/schedule ids,
+  Cliniko attachment id. No destructive change.
+- **New code:** worker — `lib/service-catalog.js` (`SUBSCRIPTION_PLANS` keyed `{path}:{tier}`,
+  product names locked to `PP_FEES`), `services/stripe.js` Checkout/customer/schedule helpers,
+  `routes/admin.js` `POST /admin/agreements/checkout-setup`, `jobs/stripe-handler.js`
+  `checkout.session.completed` + `subscription_schedule.completed` + `customer.subscription.deleted`
+  handlers. Backend — `routes/agreements.js` (generate/validate/sign), `services/cliniko.js`
+  `uploadAttachment`, `services/agreement-pdf.js` (pdfkit, new dep), `lib/agreement-template.js`
+  (⚠ placeholder Part A copy — confirm canonical wording + bump `AGREEMENT_VERSION` before live).
+  Frontend — `components/AgreementPage.tsx` (public `/agreement*` routes) +
+  `modals/GenerateAgreementModal.tsx`.
+- **Deps:** backend gains `pdfkit`.
+- **Reconcile self-heal (same day):** closes the "worker crashes after acking the webhook 200,
+  before creating the schedule" gap. Schedules/subscriptions are stamped with
+  `metadata.agreement_session`; `jobs/reconcile-agreements.js` lists recent COMPLETED setup
+  checkouts and recreates any with no linked object (idempotent — DB key + Stripe idempotencyKey
+  + metadata link; recovered cases raise an `agreement_schedule_recovered` flag). Endpoints:
+  `POST /cron/reconcile-agreements` (OIDC, scheduled) + `POST /admin/agreements/reconcile`
+  (X-Admin-Token, dry-run default). **Staging** runs it every 6h via Cloud Scheduler
+  `moveify-staging-reconcile-agreements` (worker needs `OIDC_EXPECTED_AUDIENCE` = its own URL).
+  **Prod go-live:** create the equivalent scheduler against the prod worker when the flag is enabled.
+- **Going live:** run `billing-worker/scripts/create-agreement-prices.js` (TEST key first:
+  `STRIPE_SECRET_KEY=sk_test_… node scripts/create-agreement-prices.js`) to create the
+  Products/Prices and print the `STRIPE_PRICE_*` env lines; `--dry-run` lists the catalog with
+  no key. Idempotent (find-or-reuse). Amounts in that script must be re-confirmed before live.
+- **Payment-safety hardening (same day):** the worker acks the Stripe webhook 200 *before*
+  processing, so there is **no Stripe retry** — every `checkout.session.completed` failure path
+  now raises an `agreement_setup_failed` reconciliation flag (the whole handler is wrapped).
+  tier/path/start_date are read from the **session** metadata (immutable per checkout), not the
+  mutable customer metadata. Schedule/subscription creation passes a Stripe **idempotencyKey**
+  keyed on the session (no same-session double-create), and the backend **invalidates prior
+  pending agreements** per patient on mint (no two-links-both-create). `clinikoId` is validated
+  numeric in both the backend and the worker before the Stripe customer-search interpolation
+  (injection / mis-link guard). Sign reverts to `pending` on worker failure so the same link
+  retries; the Cliniko PDF upload is guarded against duplicates.
+- Plan + rationale: vault *Build Plan - Service Agreement & Stripe Subscription Automation* /
+  *Decision - Service Agreement and Stripe Automation Direction*.
 
 ## 2026-06-01 — Cliniko API-key consolidation + block-progress activated
 
