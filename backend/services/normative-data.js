@@ -131,7 +131,7 @@ function applicableCutoffs(def, sex) {
  */
 function classify(def, parsed, age, sex) {
   const caveats = (def.caveats || []).slice();
-  const out = { verdict: 'na', label: null, normContext: null, flags: [], caveats, source: def.sourceShort, displayName: def.displayName };
+  const out = { verdict: 'na', label: null, normContext: null, flags: [], caveats, source: def.sourceShort, displayName: def.displayName, banded: !!(def.bands && def.bands.length) };
 
   if (!parsed) return out;
 
@@ -142,11 +142,11 @@ function classify(def, parsed, age, sex) {
     const cat = (def.categories || []).find(c => systolic <= c.systolicMax && diastolic <= c.diastolicMax)
       || def.categories[def.categories.length - 1];
     out.label = cat ? cat.label : null;
-    out.verdict = /hypertension/.test(out.label || '') ? 'flagged' : 'within';
+    out.verdict = cat && cat.flag ? 'flagged' : 'within';
     for (const c of (def.cutoffs || [])) {
       if (c.component === 'systolic' && systolic != null && cmp(c.op, systolic, c.value)) out.flags.push(c.meaning);
     }
-    out.normContext = `BP category: ${out.label}`;
+    out.normContext = 'Typical resting reading is below 120/80 mmHg';
     return out;
   }
 
@@ -167,12 +167,16 @@ function classify(def, parsed, age, sex) {
   if (def.categories && Array.isArray(def.categories)) {
     const cat = def.categories.find(c => v <= c.max) || def.categories[def.categories.length - 1];
     out.label = cat ? cat.label : null;
-    out.verdict = /normal/.test(out.label || '') ? 'within' : 'flagged';
+    out.verdict = cat && cat.flag ? 'flagged' : 'within';
   }
 
   // Sex/value cut-offs (waist, grip EWGSOP2, fall-risk thresholds, etc.).
+  // A cutoff with `supersededBy` is skipped when the higher band it points to has
+  // also fired, so waist reports "well above" only, not "above" + "well above".
   for (const c of applicableCutoffs(def, sex)) {
-    if (cmp(c.op, v, c.value)) out.flags.push(c.meaning);
+    if (!cmp(c.op, v, c.value)) continue;
+    if (c.supersededBy != null && cmp(c.op, v, c.supersededBy)) continue;
+    out.flags.push(c.meaning);
   }
 
   // Band-based norm comparison.
@@ -218,7 +222,7 @@ function classify(def, parsed, age, sex) {
 }
 
 const CAVEAT_TEXT = {
-  screen_not_diagnose: 'Screening only — recommend GP review, not a diagnosis.',
+  screen_not_diagnose: 'Screening measure only, not a diagnosis.',
   symmetry_not_norm: 'Compare with the other side and your own baseline.',
   course_length_bias: 'Distance depends on track length — track change on the same course.',
   wide_sd: 'Wide normal range — weight change over time.',
@@ -237,9 +241,14 @@ function buildInterpretation(res, { includeSource = false } = {}) {
     // Pass/fail tests have no age/sex range — state the threshold outcome directly.
     if (res.label) parts.push(`${res.label[0].toUpperCase()}${res.label.slice(1)}.`);
   }
-  else if (res.verdict === 'within') parts.push('Within the expected range for age/sex.');
-  else if (res.verdict === 'below') parts.push('Below the expected range for age/sex.');
-  else if (res.verdict === 'above') parts.push('Above the expected range for age/sex.');
+  else if (res.verdict === 'within' || res.verdict === 'below' || res.verdict === 'above') {
+    // Banded tests compare to an age/sex norm; screens (BP, glucose, waist) just
+    // compare to a normal/recommended range — say so plainly rather than implying
+    // an age/sex norm that doesn't exist.
+    const range = res.banded ? 'the expected range for your age and sex' : 'the normal range';
+    const verb = res.verdict === 'within' ? 'Within' : res.verdict === 'below' ? 'Below' : 'Above';
+    parts.push(`${verb} ${range}.`);
+  }
   else if (res.verdict === 'flagged' && res.label) parts.push(`${res.label[0].toUpperCase()}${res.label.slice(1)}.`);
 
   if (res.normContext) parts.push(`${res.normContext}.`.replace(/\.\.$/, '.'));

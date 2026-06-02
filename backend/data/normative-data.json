@@ -9,7 +9,7 @@
       "no_norm_under_50": "No validated norm below 50; interpret younger patients against the youngest band as a lenient bound.",
       "no_norm_under_60": "No validated norm below 60.",
       "symmetry_not_norm": "Interpret side-to-side symmetry and own baseline, not a population norm.",
-      "screen_not_diagnose": "Screening only — an abnormal value flags a GP referral, never a diagnosis.",
+      "screen_not_diagnose": "Screening measure only, never a diagnosis. Referral is the clinician's decision, not stated by the tool.",
       "course_length_bias": "Distance/score depends on course length; a 10 m track reads ~30-50 m lower than the 30 m standard. Prefer serial change on the same track.",
       "wide_sd": "Wide population SD — weight change/symmetry over a single absolute value.",
       "method_dependent": "Value depends heavily on measurement method/instrument; report the method.",
@@ -237,16 +237,14 @@
       "unit": "mmHg", "direction": "target_range", "type": "screen",
       "compound": "systolic_diastolic",
       "categories": [
-        { "label": "optimal", "systolicMax": 119, "diastolicMax": 79 },
-        { "label": "normal", "systolicMax": 129, "diastolicMax": 84 },
-        { "label": "high-normal", "systolicMax": 139, "diastolicMax": 89 },
-        { "label": "grade 1 (mild) hypertension", "systolicMax": 159, "diastolicMax": 99 },
-        { "label": "grade 2 (moderate) hypertension", "systolicMax": 179, "diastolicMax": 109 },
-        { "label": "grade 3 (severe) hypertension", "systolicMax": 999, "diastolicMax": 999 }
+        { "label": "within the normal range", "systolicMax": 129, "diastolicMax": 84 },
+        { "label": "at the upper end of the normal range", "systolicMax": 139, "diastolicMax": 89, "flag": true },
+        { "label": "elevated", "systolicMax": 159, "diastolicMax": 99, "flag": true },
+        { "label": "elevated", "systolicMax": 179, "diastolicMax": 109, "flag": true },
+        { "label": "well above the normal range", "systolicMax": 999, "diastolicMax": 999, "flag": true }
       ],
       "cutoffs": [
-        { "op": ">=", "value": 140, "meaning": "hypertension (systolic)", "component": "systolic" },
-        { "op": ">=", "value": 180, "meaning": "do not commence vigorous exercise; recheck/refer", "component": "systolic" }
+        { "op": ">=", "value": 180, "meaning": "very high reading; do not commence vigorous exercise today", "component": "systolic" }
       ],
       "caveats": ["screen_not_diagnose"],
       "sourceShort": "Heart Foundation (Australia)"
@@ -256,13 +254,12 @@
       "aliases": ["fasting blood glucose", "fasting glucose", "fasting bgl", "fbg", "fpg", "fasting blood sugar"],
       "unit": "mmol_L", "direction": "target_range", "type": "screen",
       "categories": [
-        { "label": "normal", "max": 6.0 },
-        { "label": "impaired fasting glucose (pre-diabetes)", "max": 6.9 },
-        { "label": "diabetes range", "max": 999 }
+        { "label": "within the normal range", "max": 6.0 },
+        { "label": "above the normal range", "max": 6.9, "flag": true },
+        { "label": "well above the normal range", "max": 999, "flag": true }
       ],
       "cutoffs": [
-        { "op": ">=", "value": 7.0, "meaning": "diabetes range (confirm with GP)" },
-        { "op": "<", "value": 4.0, "meaning": "hypoglycaemia; treat before exercise" }
+        { "op": "<", "value": 4.0, "meaning": "below the normal range; treat before exercise" }
       ],
       "caveats": ["screen_not_diagnose"],
       "sourceShort": "WHO / Diabetes Australia"
@@ -272,14 +269,13 @@
       "aliases": ["random blood glucose", "random glucose", "non fasting glucose", "casual glucose", "random bgl", "non-fasting bgl", "rbg"],
       "unit": "mmol_L", "direction": "target_range", "type": "screen",
       "categories": [
-        { "label": "normal", "max": 7.7 },
-        { "label": "elevated (confirm)", "max": 11.0 },
-        { "label": "diabetes range (with symptoms)", "max": 999 }
+        { "label": "within the normal range", "max": 7.7 },
+        { "label": "above the normal range", "max": 11.0, "flag": true },
+        { "label": "well above the normal range", "max": 999, "flag": true }
       ],
       "cutoffs": [
-        { "op": ">=", "value": 11.1, "meaning": "diabetes range with symptoms (confirm with GP)" },
         { "op": ">=", "value": 14, "meaning": "delay vigorous exercise (check ketones)" },
-        { "op": "<", "value": 4.0, "meaning": "hypoglycaemia; treat before exercise" }
+        { "op": "<", "value": 4.0, "meaning": "below the normal range; treat before exercise" }
       ],
       "caveats": ["screen_not_diagnose"],
       "sourceShort": "WHO / Diabetes Australia"
@@ -302,10 +298,10 @@
       "aliases": ["waist circumference", "waist", "wc", "waist measurement"],
       "unit": "cm", "direction": "lower_better", "type": "threshold",
       "cutoffs": [
-        { "op": ">=", "value": 94, "meaning": "increased cardiometabolic risk", "sex": "male" },
-        { "op": ">=", "value": 102, "meaning": "substantially increased cardiometabolic risk", "sex": "male" },
-        { "op": ">=", "value": 80, "meaning": "increased cardiometabolic risk", "sex": "female" },
-        { "op": ">=", "value": 88, "meaning": "substantially increased cardiometabolic risk", "sex": "female" }
+        { "op": ">=", "value": 102, "meaning": "well above the recommended waist range", "sex": "male" },
+        { "op": ">=", "value": 94, "meaning": "above the recommended waist range", "sex": "male", "supersededBy": 102 },
+        { "op": ">=", "value": 88, "meaning": "well above the recommended waist range", "sex": "female" },
+        { "op": ">=", "value": 80, "meaning": "above the recommended waist range", "sex": "female", "supersededBy": 88 }
       ],
       "caveats": ["screen_not_diagnose"],
       "note": "Europid/Australian cut-offs; lower thresholds apply for Asian populations.",

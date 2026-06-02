@@ -87,15 +87,18 @@ describe('classify — pass/fail (tandem stance)', () => {
 });
 
 describe('classify — screen (never diagnoses)', () => {
-  it('BP grade 1 is flagged with screen caveat', () => {
+  it('elevated BP is flagged with comparative (non-diagnostic) label + screen caveat', () => {
     const r = interpret('blood pressure', '148/92', 55, 'male');
     expect(r.verdict).toBe('flagged');
-    expect(r.label).toMatch(/grade 1/);
+    expect(r.label).toMatch(/elevated/i);
+    expect(r.label).not.toMatch(/hypertension/i); // comparative, never a diagnosis
     expect(r.caveats).toContain('screen_not_diagnose');
   });
-  it('fasting glucose in diabetes range is flagged, not diagnosed', () => {
+  it('high fasting glucose is flagged comparatively, not diagnosed', () => {
     const r = interpret('fasting glucose', '7.4 mmol/L', 60, 'female');
     expect(r.verdict).toBe('flagged');
+    expect(r.label).toMatch(/above the normal range/i);
+    expect(r.label).not.toMatch(/diabetes/i);
     expect(r.caveats).toContain('screen_not_diagnose');
   });
 });
@@ -118,10 +121,12 @@ describe('classify — qualitative & fallback', () => {
 });
 
 describe('buildInterpretation', () => {
-  it('produces grounded text for a flagged screen with referral language', () => {
+  it('produces grounded text for a flagged screen without recommending referral', () => {
     const txt = buildInterpretation(interpret('blood pressure', '148/92', 55, 'male'));
-    expect(txt).toMatch(/grade 1/i);
-    expect(txt).toMatch(/GP review/);
+    expect(txt).toMatch(/elevated/i);
+    expect(txt).toMatch(/below 120\/80/); // states the comparison, not a diagnosis
+    expect(txt).toMatch(/Screening measure only/);
+    expect(txt).not.toMatch(/GP|refer|hypertension/i); // referral + diagnosis are the clinician's call
   });
   it('produces grounded text with reference range for grip', () => {
     const txt = buildInterpretation(interpret('grip strength', '22 kg', 62, 'male'));

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FileText, Users, Loader2, Search, ChevronRight } from 'lucide-react';
 import { apiFetch, generateReport, generateHandout, downloadReportDocx } from '../../utils/scribe-api';
-import type { HandoutSections } from '../../types';
+import type { HandoutSections, HandoutGrounding } from '../../types';
 import HandoutPreview from './HandoutPreview';
 
 type TemplateType = 'cdmp' | 'handout';
@@ -45,7 +45,7 @@ export default function ScribeReportsPage() {
   const [selectedSession, setSelectedSession] = useState<SessionItem | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState('');
-  const [activeHandout, setActiveHandout] = useState<{ sections: HandoutSections; session: SessionItem; source: 'transcript' | 'note' } | null>(null);
+  const [activeHandout, setActiveHandout] = useState<{ sections: HandoutSections; session: SessionItem; source: 'transcript' | 'note'; grounding?: HandoutGrounding } | null>(null);
 
   useEffect(() => { loadSessions(); }, []);
 
@@ -116,7 +116,7 @@ export default function ScribeReportsPage() {
         });
 
         const result = await generateHandout(selectedSession.id, sourceText, firstName, assessmentDate);
-        setActiveHandout({ sections: result.sections, session: selectedSession, source: usedSource });
+        setActiveHandout({ sections: result.sections, session: selectedSession, source: usedSource, grounding: result.grounding });
       }
     } catch (err) {
       setGenError(err instanceof Error ? err.message : 'Generation failed');
@@ -249,6 +249,7 @@ export default function ScribeReportsPage() {
           })}
           sessionId={activeHandout.session.id}
           source={activeHandout.source}
+          grounding={activeHandout.grounding}
           onClose={() => setActiveHandout(null)}
           onRegenerate={handleGenerate}
         />

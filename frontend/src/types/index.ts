@@ -347,6 +347,14 @@ export type HandoutSections = {
   resultsSummary?: string;
 }
 
+// Whether age/sex norm grounding was applied. When age/sex is missing the
+// assessment table falls back to neutral baselines instead of graded results.
+export type HandoutGrounding = {
+  missingSex: boolean;
+  missingAge: boolean;
+  hasFindings: boolean;
+}
+
 export type ReportSections = {
   executiveSummary: string;
   objectiveAssessment: string;

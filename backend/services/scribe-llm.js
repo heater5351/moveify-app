@@ -68,6 +68,7 @@ Rules:
 - ALWAYS second person ("you", "your") for the patient — never use their name or the third person.
 - ALWAYS first person plural ("we", "our") for the clinic.
 - No clinical jargon without an immediate plain-language explanation.
+- Do not assert a specific pathological mechanism (for example "inflammation", "degeneration", "a tear", "arthritis") unless the clinician explicitly named it in the transcript. Prefer plain, non-diagnostic language such as "irritated" or "sensitised" tissue.
 - No em dashes. No asterisks, emojis, or markdown formatting. Use plain "- " hyphen bullets only, one point per line.
 - Do not fabricate anything not supported by the transcript.
 - Output only the four sections in plain text with the exact headings above. No preamble or text outside them.`;
@@ -117,6 +118,12 @@ function groundClinicalContext(clinicalContext, age, sex) {
   }).join('\n');
 }
 
+// Fallback for a test that IS in the normative dataset but can't be graded for
+// this patient (e.g. grip with no recorded sex). We deliberately do NOT reuse the
+// model's recalled interpretation here — that is where ungrounded qualitative
+// claims ("a good foundation of strength") leak in. State a neutral baseline only.
+const NEUTRAL_BASELINE = 'Recorded as a baseline; we track your change at reassessment.';
+
 // Unit suffix for a value rendered in the Result column of a split row.
 function unitSuffix(unit) {
   if (unit === 'reps') return ' reps';
@@ -139,12 +146,15 @@ function conditionLabel(name, def) {
   return s.replace(/[()]/g, ' ').replace(/^[\s,:;.-]+|[\s,:;.-]+$/g, '').replace(/\s+/g, ' ').trim();
 }
 
-// Ground a single row, falling back to the model's own interpretation.
+// Ground a single row. If the test is a known norm test but can't be graded for
+// this patient, use the neutral baseline (never the model's recalled claim). Only
+// genuinely unrecognised tests keep the model's functional description.
 function groundRow(row, age, sex) {
   try {
     const res = row.match && interpret(row.name, row.result, age, sex);
     const g = res && buildInterpretation(res);
     if (g) return g;
+    if (row.match) return NEUTRAL_BASELINE;
   } catch { /* fall through */ }
   return row.interp;
 }
@@ -169,7 +179,7 @@ function collectSides(grp, unit) {
 
 // Bilateral norm test (grip, single-leg, calf, ROM) → one grounded row per side,
 // with a side-to-side asymmetry note appended to the weaker side.
-function splitBilateral(def, sides, age, sex, fallback) {
+function splitBilateral(def, sides, age, sex) {
   const display = def.displayName.replace(/\s*\(.*?\)\s*$/, '').trim();
   const suffix = unitSuffix(def.unit);
   const built = [];
@@ -177,7 +187,7 @@ function splitBilateral(def, sides, age, sex, fallback) {
     if (val == null) continue;
     let interp = '';
     try { const res = interpret(def.displayName, String(val), age, sex); interp = (res && buildInterpretation(res)) || ''; } catch { /* */ }
-    if (!interp) interp = fallback || '';
+    if (!interp) interp = NEUTRAL_BASELINE;
     built.push({ label, val, interp });
   }
   if (sides.left != null && sides.right != null) {
@@ -255,7 +265,7 @@ function consolidateClinicalContext(raw, age, sex) {
     }
     const sides = def && (def.bands?.length || def.cutoffs?.length) ? collectSides(grp, def.unit) : null;
     if (def && sides) {
-      out.push(...splitBilateral(def, sides, age, sex, grp[0].interp));
+      out.push(...splitBilateral(def, sides, age, sex));
       continue;
     }
     for (const row of grp) out.push(`${row.name} | ${row.result} | ${groundRow(row, age, sex)}`);
@@ -276,13 +286,14 @@ Requirements:
   - reduced range of motion → movements like reaching, squatting, or stairs become harder and other areas compensate
   - reduced strength or muscle endurance → everyday tasks (stairs, carrying, getting off a low chair) tire you sooner and independence is harder to maintain
   - reduced walking speed or aerobic capacity → less endurance for daily activity and a known marker of general health
-  - elevated blood pressure or blood glucose → a screening flag to review with your GP, important for long-term heart and metabolic health (never state or imply a diagnosis)
+  - elevated blood pressure or blood glucose → a screening measure worth keeping an eye on over time, relevant to long-term heart and metabolic health (never state or imply a diagnosis)
 - Frame below-range findings as a starting point that shapes your program, not a verdict.
 - End reassuringly: we re-measure the same tests at reassessment so progress is objective.
 
 Rules:
 - Only discuss findings actually present in the data. Do not invent results.
-- For blood pressure or glucose, describe them as screening flags to discuss with a GP — never diagnose.
+- Only describe a finding with a quality judgement (good, strong, healthy, reduced, low, weak, etc.) when its interpretation EXPLICITLY says it is within, above, or below the expected range. If a finding has no such grounded verdict (for example the interpretation only says what the test measures, or calls it a baseline), present it neutrally as a baseline we will track and do NOT praise or criticise it. Never call strength or fitness "good", "solid", or "a good foundation" without an explicit within/above-range verdict.
+- For blood pressure or glucose, describe them as screening measures to keep an eye on over time, never a diagnosis. Do NOT tell the patient to see, consult, review with, or be referred to a GP or any other provider — referral is the clinician's decision, not yours to state.
 - No specific numbers or percentiles are needed in this paragraph.
 - No em dashes, asterisks, emojis, or markdown. Output only the paragraph.`;
 
