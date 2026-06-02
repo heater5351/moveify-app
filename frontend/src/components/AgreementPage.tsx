@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CheckCircle, AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
 import { API_URL } from '../config';
 
@@ -80,10 +80,80 @@ const Section = ({ section }: { section: AgreementSection }) => (
   </div>
 );
 
+// Dependency-free signature pad. Draws with pointer events (mouse + touch),
+// exports a PNG data URL via onChange (null when cleared/empty).
+const SignaturePad = ({ onChange }: { onChange: (dataUrl: string | null) => void }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawing = useRef(false);
+  const dirty = useRef(false);
+
+  const point = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const c = canvasRef.current!;
+    const r = c.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (c.width / r.width), y: (e.clientY - r.top) * (c.height / r.height) };
+  };
+
+  const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const ctx = canvasRef.current!.getContext('2d')!;
+    ctx.strokeStyle = '#132232';
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const p = point(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    drawing.current = true;
+    canvasRef.current!.setPointerCapture(e.pointerId);
+  };
+
+  const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawing.current) return;
+    e.preventDefault();
+    const ctx = canvasRef.current!.getContext('2d')!;
+    const p = point(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    dirty.current = true;
+  };
+
+  const end = () => {
+    if (!drawing.current) return;
+    drawing.current = false;
+    onChange(dirty.current ? canvasRef.current!.toDataURL('image/png') : null);
+  };
+
+  const clear = () => {
+    const c = canvasRef.current!;
+    c.getContext('2d')!.clearRect(0, 0, c.width, c.height);
+    dirty.current = false;
+    onChange(null);
+  };
+
+  return (
+    <div>
+      <canvas
+        ref={canvasRef}
+        width={560}
+        height={160}
+        onPointerDown={start}
+        onPointerMove={move}
+        onPointerUp={end}
+        onPointerLeave={end}
+        className="w-full h-40 rounded-lg border border-slate-300 bg-white touch-none cursor-crosshair"
+      />
+      <button type="button" onClick={clear} className="mt-1 text-xs text-slate-400 hover:text-slate-600">
+        Clear signature
+      </button>
+    </div>
+  );
+};
+
 // Public service-agreement sign page. Reached via an operator-minted tokenised
 // link (?token=…). Validates the token, shows the full structured agreement
 // (provider header, Part A clinical services, Part B Direct Debit terms), captures
-// a typed-name e-signature + consent, then redirects to the Stripe setup-Checkout.
+// a drawn signature + typed name + consent + Direct Debit authorisation, then
+// redirects to the Stripe setup-Checkout.
 export const AgreementPage = () => {
   const token = new URLSearchParams(window.location.search).get('token') || '';
 
@@ -92,9 +162,13 @@ export const AgreementPage = () => {
   const [loadError, setLoadError] = useState('');
 
   const [signedName, setSignedName] = useState('');
+  const [signature, setSignature] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
+  const [ddAuthorised, setDdAuthorised] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+
+  const signedDate = new Date().toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   useEffect(() => {
     if (!token) { setLoadError('No agreement token provided.'); setLoading(false); return; }
@@ -115,13 +189,15 @@ export const AgreementPage = () => {
   const handleSign = async () => {
     setSubmitError('');
     if (!signedName.trim()) { setSubmitError('Please type your full name to sign.'); return; }
-    if (!consent) { setSubmitError('Please tick the box to confirm you agree.'); return; }
+    if (!signature) { setSubmitError('Please draw your signature in the box.'); return; }
+    if (!consent) { setSubmitError('Please tick the box to confirm you have read the agreement.'); return; }
+    if (!ddAuthorised) { setSubmitError('Please confirm the Direct Debit authorisation.'); return; }
     setSubmitting(true);
     try {
       const res = await fetch(`${API_URL}/agreements/${encodeURIComponent(token)}/sign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signedName: signedName.trim(), consent: true }),
+        body: JSON.stringify({ signedName: signedName.trim(), consent: true, signature, ddAuthorised: true }),
       });
       const data = await res.json();
       if (res.ok && data.checkoutUrl) {
@@ -224,7 +300,7 @@ export const AgreementPage = () => {
           <div className="mt-9 border-t border-slate-200 pt-6">
             <h2 className="text-lg font-bold font-display text-secondary-500">Signatures</h2>
             {a && <p className="mt-2 text-sm text-slate-500 leading-relaxed">{a.signatureNote}</p>}
-            <label className="block text-sm font-medium text-slate-700 mt-5 mb-2">Type your full name to sign</label>
+            <label className="block text-sm font-medium text-slate-700 mt-5 mb-2">Full name</label>
             <input
               type="text"
               value={signedName}
@@ -232,7 +308,14 @@ export const AgreementPage = () => {
               placeholder="Full name"
               className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-400 focus:border-transparent"
             />
-            <label className="flex items-start gap-3 mt-4 cursor-pointer">
+
+            <div className="flex items-center justify-between mt-4 mb-2">
+              <label className="block text-sm font-medium text-slate-700">Signature</label>
+              <span className="text-xs text-slate-400">Date: {signedDate}</span>
+            </div>
+            <SignaturePad onChange={setSignature} />
+
+            <label className="flex items-start gap-3 mt-5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={consent}
@@ -245,6 +328,18 @@ export const AgreementPage = () => {
                 Moveify Privacy Policy.
               </span>
             </label>
+            <label className="flex items-start gap-3 mt-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={ddAuthorised}
+                onChange={(e) => setDdAuthorised(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-400 focus:ring-primary-400"
+              />
+              <span className="text-sm text-slate-600">
+                I authorise Moveify Health Solutions to debit my nominated account for the fees set out in this
+                agreement, and confirm I am an account holder or authorised signatory on that account.
+              </span>
+            </label>
 
             {submitError && (
               <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{submitError}</div>
@@ -252,7 +347,7 @@ export const AgreementPage = () => {
 
             <button
               onClick={handleSign}
-              disabled={submitting || !signedName.trim() || !consent}
+              disabled={submitting || !signedName.trim() || !signature || !consent || !ddAuthorised}
               className="mt-6 w-full px-4 py-3 bg-primary-400 text-white rounded-lg hover:bg-primary-500 font-medium disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {submitting ? <><Loader2 className="animate-spin" size={18} /> Setting up…</> : 'Agree & continue to payment setup'}

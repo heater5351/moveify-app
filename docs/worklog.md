@@ -22,6 +22,26 @@ what to know now, links).
 
 ---
 
+## 2026-06-02 — Agreement signing: drawn signature + Direct Debit authorisation
+
+- **What:** the service-agreement sign page now captures a **drawn signature** (finger/mouse
+  canvas, dependency-free `SignaturePad` in `AgreementPage.tsx`) alongside the typed full name,
+  an auto-stamped date, and a **separate "I authorise the Direct Debit" checkbox** (distinct from
+  the existing read-&-understood/privacy consent). The drawn mark is rendered into the signed PDF
+  (`services/agreement-pdf.js`) for stronger dispute/chargeback evidence.
+- **Why:** the agreement authorises a recurring direct debit — a drawn mark + explicit DD
+  authorisation is more defensible than a typed name alone. The bank-level mandate is still
+  captured by Stripe; the in-app capture records intent.
+- **Schema (additive):** `service_agreements.signed_signature TEXT` (base64 PNG data URL) +
+  `dd_authorised BOOLEAN` — added to the CREATE and as `ADD COLUMN IF NOT EXISTS` for the existing
+  staging table. No destructive change.
+- **API:** `POST /api/agreements/:token/sign` now requires `signature` (validated `data:image/png`
+  base64, ≤90 KB to stay under express.json's 100 KB limit) and `ddAuthorised: true`.
+- **Go-live status:** clinical/legal copy signed off; postcode 5351 confirmed correct (fix the
+  Cliniko record, which shows 5352); Independent-Discounted intentionally excluded; prices
+  confirmed; full flow validated in Stripe sandbox. Remaining = ops only (LIVE Prices + prod env
+  vars + worker deploy + prod reconcile scheduler) before flipping `AGREEMENT_AUTOMATION_ENABLED`.
+
 ## 2026-06-02 — Patient handout: non-diagnostic comparative phrasing + no auto-referral + missing-demographics flag
 
 - **What:** the scribe handout's clinical interpretations no longer use diagnostic labels or

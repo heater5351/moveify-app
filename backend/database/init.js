@@ -960,6 +960,8 @@ Output only the four sections with their exact headings. No preamble. No comment
         signed_name TEXT,
         signed_at TIMESTAMPTZ,
         signed_ip TEXT,
+        signed_signature TEXT,
+        dd_authorised BOOLEAN DEFAULT false,
         stripe_customer_id TEXT,
         stripe_schedule_id TEXT,
         cliniko_attachment_id TEXT,
@@ -969,6 +971,11 @@ Output only the four sections with their exact headings. No preamble. No comment
     `);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_service_agreements_token ON service_agreements(token)`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_service_agreements_cliniko ON service_agreements(cliniko_patient_id)`);
+    // Drawn-signature capture (added after the table first shipped) — additive,
+    // nullable. signed_signature holds a base64 PNG data URL of the drawn mark;
+    // dd_authorised records the explicit Direct Debit authorisation tick.
+    await db.query(`ALTER TABLE service_agreements ADD COLUMN IF NOT EXISTS signed_signature TEXT`);
+    await db.query(`ALTER TABLE service_agreements ADD COLUMN IF NOT EXISTS dd_authorised BOOLEAN DEFAULT false`);
 
     console.log('✅ Service agreements table initialized');
 

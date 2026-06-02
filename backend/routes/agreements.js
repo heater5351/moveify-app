@@ -129,19 +129,32 @@ router.get('/validate/:token', async (req, res) => {
 router.post('/:token/sign', async (req, res) => {
   if (!automationEnabled()) return res.status(503).json({ error: 'Agreement automation is disabled' });
 
-  const { signedName, consent } = req.body || {};
+  const { signedName, consent, signature, ddAuthorised } = req.body || {};
   if (!signedName || consent !== true) {
     return res.status(400).json({ error: 'A typed name and consent are required' });
+  }
+  if (ddAuthorised !== true) {
+    return res.status(400).json({ error: 'The Direct Debit authorisation must be confirmed' });
+  }
+  // The drawn signature is a base64 PNG data URL. Require it, sanity-check the
+  // shape, and cap the size (a thin-line signature is well under this — the cap
+  // just stops an oversized payload slipping past express.json's 100kb limit).
+  if (typeof signature !== 'string' || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signature)) {
+    return res.status(400).json({ error: 'A drawn signature is required' });
+  }
+  if (signature.length > 90_000) {
+    return res.status(400).json({ error: 'Signature image is too large' });
   }
 
   try {
     // Atomically claim the pending agreement — defends against double-sign races.
     const a = await db.getOne(`
       UPDATE service_agreements
-      SET status = 'signed', signed_name = $2, signed_at = NOW(), signed_ip = $3, updated_at = NOW()
+      SET status = 'signed', signed_name = $2, signed_at = NOW(), signed_ip = $3,
+          signed_signature = $4, dd_authorised = true, updated_at = NOW()
       WHERE token = $1 AND status = 'pending' AND token_expires_at > NOW()
       RETURNING *
-    `, [req.params.token, String(signedName).slice(0, 200), req.ip]);
+    `, [req.params.token, String(signedName).slice(0, 200), req.ip, signature]);
     if (!a) return res.status(410).json({ error: 'This link is invalid, expired, or already used' });
 
     const { name: patientName, email } = await clinikoNameEmail(a.cliniko_patient_id);
@@ -167,6 +180,7 @@ router.post('/:token/sign', async (req, res) => {
           signedName: a.signed_name,
           signedAt: new Date(a.signed_at).toISOString(),
           signedIp: a.signed_ip,
+          signature: a.signed_signature,
         });
         const att = await cliniko.uploadAttachment(
           a.cliniko_patient_id,
