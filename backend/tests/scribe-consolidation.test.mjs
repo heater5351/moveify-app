@@ -21,10 +21,13 @@ describe('consolidateClinicalContext — bilateral split', () => {
     expect(r[1][2]).toMatch(/22% weaker than the right side/); // left (weaker)
   });
 
-  it('falls back to the model interpretation when sex is missing', () => {
+  it('falls back to a neutral baseline (not the model claim) when sex is missing', () => {
     const out = consolidateClinicalContext('Grip Strength | R 29.3 kg / L 23.0 kg | reduced hand strength', 73, null);
     const r = rows(out);
-    expect(r[0][2]).toBe('reduced hand strength'); // no norm without sex → model text
+    // Known norm test that can't be graded without sex → neutral baseline, never the
+    // model's recalled qualitative claim ("reduced hand strength").
+    expect(r[0][2]).toBe('Recorded as a baseline; we track your change at reassessment.');
+    expect(r[0][2]).not.toMatch(/reduced/);
   });
 
   it('groups two per-side single-leg rows into split rows', () => {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { X, Download, RefreshCw, Loader2 } from 'lucide-react';
-import type { HandoutSections } from '../../types';
+import type { HandoutSections, HandoutGrounding } from '../../types';
 import { fetchHandoutDocx, saveBlob } from '../../utils/scribe-api';
 
 interface HandoutPreviewProps {
@@ -9,6 +9,7 @@ interface HandoutPreviewProps {
   assessmentDate: string;
   sessionId: number;
   source?: 'transcript' | 'note';
+  grounding?: HandoutGrounding;
   onClose: () => void;
   onRegenerate: () => void;
 }
@@ -34,9 +35,17 @@ export default function HandoutPreview({
   assessmentDate,
   sessionId,
   source = 'transcript',
+  grounding,
   onClose,
   onRegenerate,
 }: HandoutPreviewProps) {
+  // Norms (grip, sit-to-stand, gait, ROM, waist) need age + sex. When either is
+  // missing the table shows neutral baselines, not graded results — flag it so the
+  // clinician can fix the record and regenerate rather than be quietly misled.
+  const normsSkipped = !!grounding && grounding.hasFindings && (grounding.missingSex || grounding.missingAge);
+  const missingFields = grounding
+    ? [grounding.missingSex && 'sex', grounding.missingAge && 'date of birth'].filter(Boolean).join(' and ')
+    : '';
   const [goingOn, setGoingOn] = useState(() => cleanText(sections.whatsGoingOn));
   const [aims, setAims] = useState(() => cleanText(sections.ourAims));
   const [approach, setApproach] = useState(() => cleanText(sections.howWeGetThere));
@@ -137,6 +146,18 @@ export default function HandoutPreview({
           </button>
         </div>
       </div>
+
+      {/* Norm-grounding warning: age/sex missing → results show baselines, not graded norms */}
+      {normsSkipped && (
+        <div className="shrink-0 px-5 py-2.5 bg-amber-50 border-b border-amber-200 text-[13px] text-amber-800 flex items-start gap-2">
+          <span className="font-semibold shrink-0">Norms not applied:</span>
+          <span>
+            This patient's {missingFields} {grounding && grounding.missingSex && grounding.missingAge ? 'are' : 'is'} missing,
+            so the assessment results show neutral baselines instead of age/sex-graded results. Add it in Cliniko (or Moveify) and
+            click <span className="font-semibold">Regenerate AI</span> for graded interpretations.
+          </span>
+        </div>
+      )}
 
       {/* Body: editor + live docx preview */}
       <div className="flex flex-1 min-h-0">

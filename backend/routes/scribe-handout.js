@@ -79,7 +79,18 @@ router.post('/:sessionId/handout/generate', async (req, res) => {
     const wordCount = transcript.split(/\s+/).length;
     audit.log(req, 'handout_generated', 'scribe_session', parseInt(req.params.sessionId), { wordCount, model });
 
-    res.json({ sections, model });
+    // Surface when age/sex was missing so the clinician knows the norm grounding was
+    // skipped (the table falls back to neutral baselines rather than graded results).
+    // Only matters when there were measured findings to ground.
+    res.json({
+      sections,
+      model,
+      grounding: {
+        missingSex: !demographics.sex,
+        missingAge: demographics.age == null,
+        hasFindings: !!sections.clinicalContext,
+      },
+    });
   } catch (err) {
     console.error('Generate handout error:', err.message);
     res.status(500).json({ error: 'Failed to generate handout' });

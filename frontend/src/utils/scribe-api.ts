@@ -33,7 +33,7 @@ export async function generateHandout(
   transcript: string,
   patientFirstName: string,
   assessmentDate: string
-): Promise<{ sections: { whatsGoingOn: string; ourAims: string; howWeGetThere: string; whatToExpect: string; clinicalContext?: string }; model: string }> {
+): Promise<{ sections: { whatsGoingOn: string; ourAims: string; howWeGetThere: string; whatToExpect: string; clinicalContext?: string }; model: string; grounding?: { missingSex: boolean; missingAge: boolean; hasFindings: boolean } }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60_000);
   try {

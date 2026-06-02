@@ -22,6 +22,31 @@ what to know now, links).
 
 ---
 
+## 2026-06-02 — Patient handout: non-diagnostic comparative phrasing + no auto-referral + missing-demographics flag
+
+- **What:** the scribe handout's clinical interpretations no longer use diagnostic labels or
+  recommend referral. Blood pressure now reads "Elevated. Typical resting reading is below
+  120/80 mmHg." (not "grade 1 hypertension"); glucose reads "Above the normal range" (not
+  "diabetes range"); waist reads "Above the recommended waist range". The verdict is driven by
+  an explicit `flag` on each category and a `supersededBy` field so waist reports a single band.
+  `screen_not_diagnose` caveat dropped "recommend GP review" → "Screening measure only, not a
+  diagnosis." Genuine exercise-safety flags (hypoglycaemia, very-high-BP) kept.
+- **Why:** stating findings is the tool's job; diagnosis and referral are the clinician's call.
+  See memory `feedback_handout_no_clinical_decisions`.
+- **No ungrounded claims:** when a known norm test can't be graded (missing age/sex), the table
+  now falls back to a neutral baseline line — never the LLM's recalled qualitative claim (this
+  is what produced the bad "good foundation of upper body strength"). The "What Your Results
+  Mean" prompt is also barred from praising/criticising a finding without a within/above/below
+  verdict.
+- **Missing-demographics flag:** `POST /api/scribe/.../handout/generate` now returns a
+  `grounding: { missingSex, missingAge, hasFindings }` object; `HandoutPreview` shows an amber
+  "Norms not applied" banner so the clinician fixes the Cliniko/Moveify record (sex + DOB) and
+  regenerates. Norm grounding needs **sex** (grip, sit-to-stand, gait, ROM, waist) + **DOB** for
+  age bands — capture both before the assessment.
+- **Files:** `backend/services/normative-data.js`, `backend/data/normative-data.json`,
+  `backend/services/scribe-llm.js`, `backend/routes/scribe-handout.js`, frontend
+  `HandoutPreview.tsx` / `ScribeReportsPage.tsx` / `scribe-api.ts` / `types/index.ts`.
+
 ## 2026-06-02 — Agreement copy mapped to the Cliniko service agreements + brand redesign
 
 - **What:** the automated sign-up agreement now mirrors the full Cliniko service agreements
