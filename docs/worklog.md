@@ -22,6 +22,25 @@ what to know now, links).
 
 ---
 
+## 2026-06-04 — Billing daily-summary email: actionable-only + flag-noise cleanup
+
+- **What:** the `billing-daily-summary` cron (`jobs/daily-summary.js`, daily 1:30am AEST → emails
+  `ryan@moveifyhealth.com`) previously sent **every day unconditionally** and listed **all** open
+  reconciliation flags — including informational ones that never get `resolved_at`, so they piled up
+  and reappeared daily. Now: it emails **only when there's something actionable** (silent on clean
+  days) and lists **only actionable flag types** (`ACTIONABLE_FLAG_TYPES` set in the file).
+  Informational flags (`block_completed`, `agreement_schedule_recovered`, `unknown_service_type`,
+  `stripe_metadata_missing`, …) are still written for audit but never emailed.
+- **Bug fixed:** the "FAILED STRIPE DDs" section filtered `f.type === 'failed_stripe_dd'`, but the
+  real type is `stripe_payment_failed` — so failed DDs had **never** shown in the email. Corrected.
+- **Poller flags:** stopped raising the benign `appointment_unresolved_subscription` flag (fired every
+  poll for genuinely non-Stripe patients = pure noise; the appt is still left unmarked for retry).
+  Added an **actionable** `appointment_ledger_write_failed` flag for when a Xero invoice is created but
+  the `appointment_invoices` ledger row fails to write (closes the one narrow dup-guard gap — see the
+  poller dup-guard review).
+- **Why:** operator asked to quiet the email; many flags were redundant. Files:
+  `billing-worker/jobs/daily-summary.js`, `billing-worker/jobs/poll-cliniko-appointments.js`.
+
 ## 2026-06-02 — Service-agreement automation: LIVE in production
 
 - **What:** flipped `AGREEMENT_AUTOMATION_ENABLED=true` on prod backend + worker — the sign-up flow

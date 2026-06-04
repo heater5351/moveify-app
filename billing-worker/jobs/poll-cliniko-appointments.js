@@ -267,16 +267,11 @@ async function processAppointment({ appt, patientCache, log, stats }) {
     // reason === 'no_customer' (or 'error'/'bad_date'): no Stripe customer
     // resolved yet. The patient may subscribe shortly after attending (link
     // written by a later DD), so DO NOT mark — leaving it unmarked lets a later
-    // poll invoice it once the link exists. Flag (id keyed by appt id, so
-    // ON CONFLICT DO NOTHING dedupes) for visibility.
-    await flag(
-      'appointment_unresolved_subscription',
-      appt.id,
-      clinikoPatientId,
-      `Arrived appointment ${appt.id} on ${apptStartsAtIso.slice(0, 10)} — no Stripe customer resolved at poll time. Will retry on later polls; reprocess if the patient later subscribes.`,
-      log,
-      'Left unmarked for retry — see poller no_subscription handling',
-    );
+    // poll invoice it once the link exists. We deliberately do NOT raise a
+    // reconciliation flag here: for a genuinely non-Stripe patient this would
+    // fire on every poll and is pure inbox noise (the appointment simply ages out
+    // of the poll window). The `skip_no_subscription` stat above retains visibility.
+    log.debug({ appt_id: appt.id, cliniko_patient_id: clinikoPatientId }, 'No Stripe customer resolved — left unmarked for retry (no flag)');
     return 'skipped';
   }
   if (covering.length > 1) {
@@ -418,6 +413,18 @@ async function processAppointment({ appt, patientCache, log, stats }) {
         err: err.message,
       },
       'AppointmentInvoices ledger append failed — Xero records intact, backfill from log',
+    );
+    // The ledger row is the poller's duplicate guard. If the Xero invoice exists
+    // but this row didn't write, a later idempotency-key clear could re-invoice
+    // this appointment (a Xero duplicate). Raise an ACTIONABLE flag so the missing
+    // row is visibly backfilled rather than silently lost.
+    await flag(
+      'appointment_ledger_write_failed',
+      appt.id,
+      clinikoPatientId,
+      `Xero invoice ${invoice.invoiceNumber} created but its appointment_invoices ledger row failed to write (${err.message}). The duplicate guard has no row for this appt — backfill it before any idempotency-key clear.`,
+      log,
+      'Backfill the appointment_invoices row (from this log) to restore the duplicate guard',
     );
   }
 
