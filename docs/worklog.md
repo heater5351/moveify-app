@@ -42,6 +42,18 @@ what to know now, links).
   Invoices, Balance, SetupIntents, Products, Prices **read**. Worker cold-started to load it.
 - **Dockerfile:** `billing-worker/Dockerfile` now also `COPY scripts/` (so admin scripts can run
   as Cloud Run Jobs with secrets bound the platform way).
+- **Live Stripe webhook (fixed 2026-06-04):** the prod live webhook endpoint must subscribe to
+  `checkout.session.completed`, `subscription_schedule.completed`, `customer.subscription.deleted`
+  on top of the pre-existing `invoice.payment_succeeded`/`invoice.payment_failed`/`charge.dispute.created`.
+  These were missing at go-live, so completed checkouts only got a schedule via the 6-hourly reconcile
+  sweep (up to 6h delay) instead of provisioning in seconds. Same endpoint = same signing secret, so
+  adding events needs no secret/redeploy.
+- **⚠ Worker cron OIDC-audience gotcha:** the worker's `OIDC_EXPECTED_AUDIENCE` must equal the
+  audience the existing Cloud Scheduler jobs send — the **`…-1097567971198.australia-southeast1.run.app`**
+  URL form, NOT the `…-{hash}-ts.a.run.app` form returned by `gcloud run services describe … status.url`.
+  Setting it to the latter on 06-02 made the worker reject **every** existing cron (OIDC "Wrong
+  recipient, payload audience != requiredAudience") for ~2 days. Any new scheduler hitting the worker
+  must use the 1097 audience to match.
 - **Note:** Cliniko provider postcode still shows 5352 vs the correct 5351 (fix in Cliniko).
 
 ## 2026-06-02 — Agreement signing: drawn signature + Direct Debit authorisation
