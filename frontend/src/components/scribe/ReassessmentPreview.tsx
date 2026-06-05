@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { X, Download, RefreshCw, Loader2 } from 'lucide-react';
+import { X, Download, RefreshCw, PenLine, Loader2 } from 'lucide-react';
 import type { ReassessmentData, HandoutGrounding } from '../../types';
-import { fetchReassessmentDocx, saveBlob } from '../../utils/scribe-api';
+import { fetchReassessmentDocx, regenerateReassessmentNarrative, saveBlob } from '../../utils/scribe-api';
 
 interface ReassessmentPreviewProps {
   data: ReassessmentData;
@@ -64,6 +64,7 @@ export default function ReassessmentPreview({
 
   const [blob, setBlob] = useState<Blob | null>(null);
   const [rendering, setRendering] = useState(false);
+  const [rewriting, setRewriting] = useState(false);
   const [error, setError] = useState('');
 
   const previewRef = useRef<HTMLDivElement>(null);
@@ -113,6 +114,23 @@ export default function ReassessmentPreview({
     return () => clearTimeout(t);
   }, [generateAndRender]);
 
+  // Re-write the narrative from the EDITED comparison table (keeps your table
+  // edits; does not re-read the notes). Goals/pain context rides along unchanged.
+  async function handleRewriteFromResults() {
+    setRewriting(true);
+    setError('');
+    try {
+      const out = await regenerateReassessmentNarrative(sessionId, comparison, data.subjectiveContext || '');
+      setProgress(cleanText(out.progress));
+      setNextSteps(cleanText(out.nextSteps));
+      setResultsSummary(cleanText(out.resultsSummary));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Rewrite failed');
+    } finally {
+      setRewriting(false);
+    }
+  }
+
   function handleDownload() {
     if (blob) saveBlob(blob, `Reassessment_${patientFirstName || 'Patient'}.docx`);
   }
@@ -131,10 +149,19 @@ export default function ReassessmentPreview({
         <div className="flex items-center gap-2">
           {error && <span className="text-xs text-red-500">{error}</span>}
           <button
+            onClick={handleRewriteFromResults}
+            disabled={rewriting}
+            title="Re-write the summary to match your edited results table (keeps your edits)"
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-primary-300 text-primary-600 hover:bg-primary-50 transition disabled:opacity-50"
+          >
+            {rewriting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PenLine className="w-3.5 h-3.5" />} Rewrite summary from results
+          </button>
+          <button
             onClick={onRegenerate}
+            title="Start over from the session notes (re-extracts results — discards table edits)"
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition"
           >
-            <RefreshCw className="w-3.5 h-3.5" /> Regenerate AI
+            <RefreshCw className="w-3.5 h-3.5" /> Regenerate from notes
           </button>
           <button
             onClick={handleDownload}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pairFindings, parseSubjective, painComparison } from '../services/scribe-reassessment.js';
+import { pairFindings, parseSubjective, painComparison, comparisonToNarrativeInput } from '../services/scribe-reassessment.js';
 
 describe('pairFindings', () => {
   it('grounds matched tests and lists current-only as new findings', () => {
@@ -58,5 +58,18 @@ describe('parseSubjective + painComparison', () => {
     expect(back.change).toBe('Improved');   // 6 → 4 = down 2
     expect(knee.change).toBe('Steady');     // 5 → 5
     expect(shoulder).toBeUndefined();       // ns → 3: no two-point comparison, not a row
+  });
+});
+
+describe('comparisonToNarrativeInput (rewrite-from-edited-results)', () => {
+  it('turns edited table rows into graded narrative lines', () => {
+    const edited = [
+      'Grip Strength (Right) | 29 kg | 36 kg | Improved | Improved (up 7 kg).',
+      'Single-Leg Stance (Right) | — | 9 sec | New | Below the expected range.',
+    ].join('\n');
+    const out = comparisonToNarrativeInput(edited);
+    expect(out).toMatch(/Grip Strength \(Right\): 29 kg → 36 kg — Improved/);
+    // No-baseline row is flagged so the model still won't claim a change on it.
+    expect(out).toMatch(/no baseline — do NOT describe as improved or declined/);
   });
 });

@@ -211,6 +211,40 @@ function findingsToText(rows) {
   return rows.map(r => `${r.test} | ${r.result} | ${r.interpretation || ''}`).join('\n');
 }
 
+// Turn the clinician's EDITED comparison table ("Test | Baseline | Latest | Change
+// | What it means" lines) back into graded narrative input, so the prose can be
+// re-written to match their corrections without re-reading the notes. A row with
+// no baseline ("—") is flagged so the model still won't claim a change on it.
+function comparisonToNarrativeInput(comparisonText) {
+  const noBase = v => !v || v === '—' || v === '-' || /^n\/?a$/i.test(v);
+  return (comparisonText || '')
+    .split('\n')
+    .filter(l => l.includes('|'))
+    .map(line => {
+      const p = line.split('|').map(s => s.trim());
+      const [test, base, latest, change, interp] = p;
+      if (!test) return null;
+      const tag = noBase(base) ? ' (new this visit, no baseline — do NOT describe as improved or declined)' : '';
+      return `${test}: ${base || '—'} → ${latest || ''} — ${change ? change + '. ' : ''}${interp || ''}${tag}`.trim();
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * Re-write ONLY the narrative from an edited comparison table (+ the original
+ * goals/pain/issues context), without re-extracting from the notes. Lets a
+ * clinician correct the objective results and regenerate the prose to match.
+ */
+async function regenerateNarrative(comparisonText, subjectiveContext = '') {
+  const narrativeInput = comparisonToNarrativeInput(comparisonText);
+  if (!narrativeInput && !subjectiveContext) {
+    return { progress: '', nextSteps: '', resultsSummary: '' };
+  }
+  const out = await generateReassessmentNarrative(narrativeInput, subjectiveContext);
+  return { progress: out.progress, nextSteps: out.nextSteps, resultsSummary: out.resultsSummary };
+}
+
 /**
  * Full reassessment generation: extract findings from both sources, pair + grade
  * deterministically, then phrase the narrative. demographics = { age, sex }.
@@ -258,6 +292,7 @@ async function generateReassessment(prevText, currText, demographics = {}) {
     newFindings: findingsToText(newFindings),
     notRepeated, // structured — surfaced as a hint in the UI, not the patient doc
     goals: subjective.goals, // structured — surfaced in the UI editor
+    subjectiveContext, // returned so "rewrite from results" keeps goals/pain context
     progress,
     nextSteps,
     resultsSummary,
@@ -265,4 +300,4 @@ async function generateReassessment(prevText, currText, demographics = {}) {
   };
 }
 
-module.exports = { generateReassessment, pairFindings, parseRows, parseSubjective, painComparison };
+module.exports = { generateReassessment, regenerateNarrative, comparisonToNarrativeInput, pairFindings, parseRows, parseSubjective, painComparison };

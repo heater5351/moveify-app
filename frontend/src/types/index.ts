@@ -361,6 +361,7 @@ export type ReassessmentData = {
   newFindings: string;   // "Test | Result | Interpretation" lines (measured this visit only)
   notRepeated: { test: string; result: string }[]; // measured at baseline only
   goals: { goal: string; status: string; basis: string }[]; // baseline goals + progress status
+  subjectiveContext: string; // goals/pain/issues context, resent on "rewrite from results"
   progress: string;      // bullets
   nextSteps: string;     // bullets
   resultsSummary: string;

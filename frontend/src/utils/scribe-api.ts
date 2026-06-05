@@ -113,6 +113,30 @@ export async function generateReassessment(
   }
 }
 
+export async function regenerateReassessmentNarrative(
+  sessionId: number,
+  comparison: string,
+  subjectiveContext: string,
+): Promise<{ progress: string; nextSteps: string; resultsSummary: string }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+  try {
+    const res = await apiFetch(`/sessions/${sessionId}/reassessment/narrative`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comparison, subjectiveContext }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { error?: string }).error || 'Narrative regeneration failed');
+    }
+    return res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function fetchReassessmentDocx(sessionId: number, data: Record<string, string>): Promise<Blob> {
   const res = await apiFetch(`/sessions/${sessionId}/reassessment/docx`, {
     method: 'POST',

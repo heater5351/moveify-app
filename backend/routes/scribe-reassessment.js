@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { decrypt } = require('../services/scribe-encryption');
-const { generateReassessment } = require('../services/scribe-reassessment');
+const { generateReassessment, regenerateNarrative } = require('../services/scribe-reassessment');
 const { generateReassessmentDocx } = require('../services/scribe-reassessment-docx');
 const { getPatientDemographics } = require('../services/scribe-demographics');
 const audit = require('../services/audit');
@@ -82,6 +82,29 @@ router.post('/:sessionId/reassessment/generate', async (req, res) => {
   } catch (err) {
     console.error('Generate reassessment error:', err.message);
     res.status(500).json({ error: 'Failed to generate reassessment' });
+  }
+});
+
+// POST /api/scribe/sessions/:sessionId/reassessment/narrative
+// Re-write only the narrative from an EDITED comparison table (+ the original
+// goals/pain context), without re-reading the notes. Ephemeral — audit log only.
+router.post('/:sessionId/reassessment/narrative', async (req, res) => {
+  try {
+    const { comparison, subjectiveContext } = req.body;
+    if (!comparison) return res.status(400).json({ error: 'comparison required' });
+
+    const session = await db.query(
+      'SELECT id, clinician_id FROM scribe_sessions WHERE id = $1', [req.params.sessionId]
+    );
+    if (session.rows.length === 0) return res.status(404).json({ error: 'Session not found' });
+    if (session.rows[0].clinician_id !== req.user.id) return res.status(403).json({ error: 'Access denied' });
+
+    const out = await regenerateNarrative(comparison, subjectiveContext || '');
+    audit.log(req, 'reassessment_narrative_regenerated', 'scribe_session', parseInt(req.params.sessionId), {});
+    res.json(out);
+  } catch (err) {
+    console.error('Regenerate reassessment narrative error:', err.message);
+    res.status(500).json({ error: 'Failed to regenerate narrative' });
   }
 });
 
