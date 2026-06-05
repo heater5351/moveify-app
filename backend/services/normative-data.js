@@ -274,4 +274,152 @@ function interpret(testName, rawResult, age, sex) {
   return { key: match.key, ...result };
 }
 
-module.exports = { load, matchTest, parseValue, classify, interpret, buildInterpretation, normalizeSex, _DATA_PATH: DATA_PATH };
+// ── Reassessment comparison ──────────────────────────────────────────────────
+// Word for the unit in change phrasing ("up 3 reps"). Mirrors scribe-llm's
+// unitSuffix but returns a trailing-space-free word for inline prose.
+const UNIT_WORD = { reps: 'reps', seconds: 'sec', kg: 'kg', degrees: '°', cm: 'cm', metres: 'm', points: 'points', bpm: 'bpm' };
+function unitWord(u) { return UNIT_WORD[u] || ''; }
+
+// Pick the single comparable scalar from a parsed value. Bilateral falls back to
+// the weaker side (parseValue already sets `value` to min); BP uses systolic.
+function scalarOf(parsed, def) {
+  if (!parsed) return null;
+  if (def.compound === 'systolic_diastolic') return parsed.systolic != null ? parsed.systolic : null;
+  return parsed.value != null ? parsed.value : null;
+}
+
+// Rank a verdict by how close it is to "normal" so target-range / screen tests
+// (BP, glucose) can be compared without a numeric direction. Higher = better.
+const VERDICT_SCORE = { within: 2, below: 1, above: 1, borderline: 1, flagged: 0 };
+function verdictScore(v) { return VERDICT_SCORE[v] != null ? VERDICT_SCORE[v] : null; }
+
+// Deadband: a change smaller than this (relative) reads as "maintained" rather
+// than noise. 5% covers measurement jitter on most norm tests.
+const MAINTAIN_PCT = 0.05;
+
+/**
+ * Compare a baseline vs latest measurement of the SAME test. Deterministic — the
+ * direction and the verdict transition are computed here; the LLM/phrasing layer
+ * only renders them. Returns null if the test isn't in the dataset.
+ * No patient values are logged.
+ */
+function compareValues(testName, prevRaw, currRaw, age, sex) {
+  const match = matchTest(testName);
+  if (!match) return null;
+  const def = match.def;
+
+  const prevParsed = parseValue(prevRaw, def.unit);
+  const currParsed = parseValue(currRaw, def.unit);
+  const prevClass = classify(def, prevParsed, age, sex);
+  const currClass = classify(def, currParsed, age, sex);
+
+  const prevVal = scalarOf(prevParsed, def);
+  const currVal = scalarOf(currParsed, def);
+
+  let absChange = null, pctChange = null;
+  if (prevVal != null && currVal != null) {
+    absChange = Math.round((currVal - prevVal) * 100) / 100;
+    if (prevVal !== 0) pctChange = (currVal - prevVal) / Math.abs(prevVal);
+  }
+
+  // Direction relative to what "better" means for this test.
+  let direction = null;
+  const within = (pctChange != null && Math.abs(pctChange) < MAINTAIN_PCT) || absChange === 0;
+  if (def.direction === 'higher_better' || def.direction === 'lower_better') {
+    if (absChange == null) direction = null;
+    else if (within) direction = 'maintained';
+    else {
+      const rose = absChange > 0;
+      const better = def.direction === 'higher_better' ? rose : !rose;
+      direction = better ? 'improved' : 'declined';
+    }
+  } else if (def.direction === 'target_range' || def.compound === 'systolic_diastolic') {
+    // Closer to the normal band is better — judge by the verdict transition.
+    const ps = verdictScore(prevClass.verdict), cs = verdictScore(currClass.verdict);
+    if (ps == null || cs == null) direction = null;
+    else if (cs > ps) direction = 'improved';
+    else if (cs < ps) direction = 'declined';
+    else direction = 'maintained';
+  } // 'none'/qualitative → direction stays null
+
+  const crossedThreshold =
+    prevClass.verdict !== currClass.verdict &&
+    prevClass.verdict !== 'na' && currClass.verdict !== 'na';
+
+  return {
+    key: match.key,
+    displayName: def.displayName,
+    def,
+    unit: def.unit,
+    prev: { raw: prevRaw, value: prevVal, parsed: prevParsed, verdict: prevClass.verdict },
+    curr: { raw: currRaw, value: currVal, parsed: currParsed, verdict: currClass.verdict },
+    absChange,
+    pctChange,
+    direction,
+    prevVerdict: prevClass.verdict,
+    currVerdict: currClass.verdict,
+    crossedThreshold,
+    currInterpretation: buildInterpretation({ key: match.key, ...currClass }),
+  };
+}
+
+// Range phrasing: banded norm tests compare to an age/sex range; screens (BP,
+// glucose, waist) just compare to a normal/recommended range.
+function rangePhrase(verdict, banded) {
+  const where = banded ? 'the expected range for your age and sex' : 'the normal range';
+  if (verdict === 'within') return `within ${where}`;
+  if (verdict === 'below') return `below ${where}`;
+  if (verdict === 'above') return `above ${where}`;
+  if (verdict === 'flagged') return 'outside the normal range';
+  return null;
+}
+
+/**
+ * Render a compareValues() result into a short, factual change sentence for the
+ * reassessment table's "What it means" column. Deterministic. Patient-facing
+ * second person, consistent with buildInterpretation().
+ */
+function buildComparisonInterpretation(res) {
+  if (!res) return null;
+  const parts = [];
+  const u = unitWord(res.unit);
+  const uSuffix = u ? (u === '°' ? '°' : ` ${u}`) : '';
+  const banded = !!(res.def && res.def.bands && res.def.bands.length);
+  // Compound BP reports systolic-only as its scalar — don't render a bare
+  // magnitude that reads as the whole reading; lean on the verdict transition.
+  const compound = !!(res.def && res.def.compound);
+
+  if (res.direction === 'improved' || res.direction === 'declined') {
+    const verb = res.direction === 'improved' ? 'Improved' : 'Declined';
+    let line = verb;
+    if (res.absChange != null && !compound) {
+      const mag = Math.abs(res.absChange);
+      const arrow = res.absChange > 0 ? 'up' : 'down';
+      line += ` (${arrow} ${mag}${uSuffix}`;
+      if (res.pctChange != null && Math.abs(res.pctChange) >= MAINTAIN_PCT) {
+        line += `, ${Math.round(Math.abs(res.pctChange) * 100)}%`;
+      }
+      line += ')';
+    }
+    parts.push(`${line}.`);
+  } else if (res.direction === 'maintained') {
+    parts.push('Held steady.');
+  } else {
+    // No numeric direction (qualitative / ungraded) — state the change neutrally.
+    if (res.prev.value != null && res.curr.value != null && res.absChange !== 0) {
+      parts.push(`Changed from ${res.prev.value} to ${res.curr.value}${uSuffix}.`);
+    } else {
+      parts.push('Recorded for comparison.');
+    }
+  }
+
+  // Verdict transition — only when it meaningfully crossed a band.
+  if (res.crossedThreshold) {
+    const to = rangePhrase(res.currVerdict, banded);
+    if (to) parts.push(`Now ${to}, from ${res.prevVerdict} before.`);
+  }
+
+  return parts.join(' ').replace(/\s+/g, ' ').trim() || null;
+}
+
+module.exports = { load, matchTest, parseValue, classify, interpret, buildInterpretation, compareValues, buildComparisonInterpretation, normalizeSex, _DATA_PATH: DATA_PATH };

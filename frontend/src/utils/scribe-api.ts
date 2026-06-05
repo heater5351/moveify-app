@@ -4,6 +4,7 @@
  */
 import { API_URL } from '../config';
 import { getAuthHeaders } from './api';
+import type { ReassessmentData } from '../types';
 
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   return fetch(`${API_URL}/scribe${path}`, {
@@ -76,6 +77,44 @@ export async function downloadReportDocx(sessionId: number, data: Record<string,
 
 export async function fetchHandoutDocx(sessionId: number, data: Record<string, string>): Promise<Blob> {
   const res = await apiFetch(`/sessions/${sessionId}/handout/docx`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'DOCX generation failed');
+  }
+  return res.blob();
+}
+
+export async function generateReassessment(
+  sessionId: number,
+  baselineSessionId: number,
+  currentSourceText: string,
+): Promise<ReassessmentData> {
+  const controller = new AbortController();
+  // Two findings extractions + the narrative — give it more headroom than the handout.
+  const timer = setTimeout(() => controller.abort(), 90_000);
+  try {
+    const res = await apiFetch(`/sessions/${sessionId}/reassessment/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baselineSessionId, currentSourceText }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { error?: string }).error || 'Reassessment generation failed');
+    }
+    return res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function fetchReassessmentDocx(sessionId: number, data: Record<string, string>): Promise<Blob> {
+  const res = await apiFetch(`/sessions/${sessionId}/reassessment/docx`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),

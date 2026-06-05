@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { FileText, Users, Loader2, Search, ChevronRight } from 'lucide-react';
-import { apiFetch, generateReport, generateHandout, downloadReportDocx } from '../../utils/scribe-api';
-import type { HandoutSections, HandoutGrounding } from '../../types';
+import { FileText, Users, TrendingUp, Loader2, Search, ChevronRight } from 'lucide-react';
+import { apiFetch, generateReport, generateHandout, generateReassessment, downloadReportDocx } from '../../utils/scribe-api';
+import type { HandoutSections, HandoutGrounding, ReassessmentData } from '../../types';
 import HandoutPreview from './HandoutPreview';
+import ReassessmentPreview from './ReassessmentPreview';
 
-type TemplateType = 'cdmp' | 'handout';
+type TemplateType = 'cdmp' | 'handout' | 'reassessment';
 
 interface SessionItem {
   id: number;
@@ -34,7 +35,27 @@ const TEMPLATES: {
     description: 'Plain-language assessment summary to hand to the patient',
     requiresNote: false,
   },
+  {
+    type: 'reassessment',
+    title: 'Reassessment Summary',
+    description: "Before/after comparison of a patient's latest results vs an earlier baseline session",
+    requiresNote: false,
+  },
 ];
+
+// Resolve a session's source text: live transcript first, then the saved SOAP
+// note (transcripts are purged 48h after recording). `source` reflects which was
+// used. Returns text '' if neither is available.
+async function resolveSessionSource(sessionId: number): Promise<{ text: string; source: 'transcript' | 'note' }> {
+  const transcriptRes = await apiFetch(`/sessions/${sessionId}/transcript`);
+  if (transcriptRes.ok) return { text: (await transcriptRes.json()).content || '', source: 'transcript' };
+  if (transcriptRes.status === 410 || transcriptRes.status === 404) {
+    const noteRes = await apiFetch(`/sessions/${sessionId}/soap-note`);
+    if (noteRes.ok) return { text: (await noteRes.json()).content || '', source: 'note' };
+    return { text: '', source: 'note' };
+  }
+  throw new Error('Could not load this session — please try again.');
+}
 
 export default function ScribeReportsPage() {
   const [sessions, setSessions] = useState<SessionItem[]>([]);
@@ -43,9 +64,11 @@ export default function ScribeReportsPage() {
   const [search, setSearch] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType | null>(null);
   const [selectedSession, setSelectedSession] = useState<SessionItem | null>(null);
+  const [selectedBaseline, setSelectedBaseline] = useState<SessionItem | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState('');
   const [activeHandout, setActiveHandout] = useState<{ sections: HandoutSections; session: SessionItem; source: 'transcript' | 'note'; grounding?: HandoutGrounding } | null>(null);
+  const [activeReassessment, setActiveReassessment] = useState<{ data: ReassessmentData; session: SessionItem; baseline: SessionItem } | null>(null);
 
   useEffect(() => { loadSessions(); }, []);
 
@@ -73,6 +96,20 @@ export default function ScribeReportsPage() {
     .filter(s => !template?.requiresNote || s.hasNote)
     .filter(s => !search || s.patientName.toLowerCase().includes(search.toLowerCase()));
 
+  // Baseline candidates for a reassessment: the same patient's OTHER completed
+  // sessions that have a saved note (the transcript is long purged), on or before
+  // the selected session's date. Prefer patientId; fall back to name.
+  const baselineCandidates = selectedSession
+    ? sessions.filter(s =>
+        s.id !== selectedSession.id &&
+        s.hasNote &&
+        (selectedSession.patientId != null
+          ? s.patientId === selectedSession.patientId
+          : s.patientName === selectedSession.patientName) &&
+        new Date(s.sessionDate).getTime() <= new Date(selectedSession.sessionDate).getTime()
+      )
+    : [];
+
   async function handleGenerate() {
     if (!selectedTemplate || !selectedSession) return;
     setGenerating(true);
@@ -89,23 +126,19 @@ export default function ScribeReportsPage() {
           goals:               result.sections.goals               || '',
           recommendations:     result.sections.managementPlan      || '',
         });
+      } else if (selectedTemplate === 'reassessment') {
+        if (!selectedBaseline) {
+          throw new Error('Select a baseline session to compare against.');
+        }
+        // Resolve the current session's source; the backend resolves the baseline
+        // (its transcript is long purged) from the saved note itself.
+        const { text: sourceText } = await resolveSessionSource(selectedSession.id);
+        const result = await generateReassessment(selectedSession.id, selectedBaseline.id, sourceText);
+        setActiveReassessment({ data: result, session: selectedSession, baseline: selectedBaseline });
       } else {
         // Prefer the live transcript; fall back to the saved SOAP note if the
         // transcript has expired (deleted 48h after recording) or is missing.
-        let sourceText = '';
-        let usedSource: 'transcript' | 'note' = 'transcript';
-        const transcriptRes = await apiFetch(`/sessions/${selectedSession.id}/transcript`);
-        if (transcriptRes.ok) {
-          sourceText = (await transcriptRes.json()).content || '';
-        } else if (transcriptRes.status === 410 || transcriptRes.status === 404) {
-          const noteRes = await apiFetch(`/sessions/${selectedSession.id}/soap-note`);
-          if (noteRes.ok) {
-            sourceText = (await noteRes.json()).content || '';
-            usedSource = 'note';
-          }
-        } else {
-          throw new Error('Could not load this session — please try again.');
-        }
+        const { text: sourceText, source: usedSource } = await resolveSessionSource(selectedSession.id);
         if (!sourceText) {
           throw new Error('No transcript or saved note for this session. The transcript is deleted 48 hours after recording — generate the handout within 48 hours, or save a SOAP note first.');
         }
@@ -144,7 +177,7 @@ export default function ScribeReportsPage() {
             {TEMPLATES.map(t => (
               <button
                 key={t.type}
-                onClick={() => { setSelectedTemplate(t.type); setSelectedSession(null); setGenError(''); }}
+                onClick={() => { setSelectedTemplate(t.type); setSelectedSession(null); setSelectedBaseline(null); setGenError(''); }}
                 className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition ${
                   selectedTemplate === t.type
                     ? 'border-primary-400 bg-primary-50'
@@ -152,7 +185,7 @@ export default function ScribeReportsPage() {
                 }`}
               >
                 <div className={`p-2 rounded-lg shrink-0 ${selectedTemplate === t.type ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-500'}`}>
-                  {t.type === 'cdmp' ? <FileText className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+                  {t.type === 'cdmp' ? <FileText className="w-5 h-5" /> : t.type === 'reassessment' ? <TrendingUp className="w-5 h-5" /> : <Users className="w-5 h-5" />}
                 </div>
                 <div>
                   <p className={`text-sm font-semibold ${selectedTemplate === t.type ? 'text-primary-700' : 'text-secondary-700'}`}>{t.title}</p>
@@ -199,7 +232,7 @@ export default function ScribeReportsPage() {
                   {filteredSessions.map(s => (
                     <button
                       key={s.id}
-                      onClick={() => { setSelectedSession(s); setGenError(''); }}
+                      onClick={() => { setSelectedSession(s); setSelectedBaseline(null); setGenError(''); }}
                       className={`w-full flex items-center justify-between px-4 py-3 text-left transition ${
                         selectedSession?.id === s.id ? 'bg-primary-50' : 'hover:bg-gray-50'
                       }`}
@@ -221,13 +254,49 @@ export default function ScribeReportsPage() {
           </div>
         )}
 
+        {/* Step 3: Baseline session (reassessment only) */}
+        {selectedTemplate === 'reassessment' && selectedSession && (
+          <div className="mb-6">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">3. Baseline to compare against</p>
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              {baselineCandidates.length === 0 ? (
+                <div className="py-8 px-4 text-center text-sm text-gray-400">
+                  No earlier session with a saved note for {selectedSession.patientName.split(' ')[0]}. A reassessment needs a baseline session that has a SOAP note saved (the transcript is deleted 48 hours after recording).
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100 max-h-60 overflow-y-auto">
+                  {baselineCandidates.map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => { setSelectedBaseline(s); setGenError(''); }}
+                      className={`w-full flex items-center justify-between px-4 py-3 text-left transition ${
+                        selectedBaseline?.id === s.id ? 'bg-primary-50' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className={`text-sm font-medium truncate ${selectedBaseline?.id === s.id ? 'text-primary-700' : 'text-secondary-700'}`}>
+                          {s.patientName}
+                        </p>
+                        <p className="text-xs text-gray-400">{formatDate(s.sessionDate)}</p>
+                      </div>
+                      {selectedBaseline?.id === s.id && (
+                        <ChevronRight className="w-4 h-4 text-primary-400 shrink-0 ml-2" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Generate */}
         {selectedTemplate && selectedSession && (
           <div className="flex flex-col gap-3">
             {genError && <p className="text-sm text-red-500">{genError}</p>}
             <button
               onClick={handleGenerate}
-              disabled={generating}
+              disabled={generating || (selectedTemplate === 'reassessment' && !selectedBaseline)}
               className="flex items-center justify-center gap-2 bg-primary-400 hover:bg-primary-500 disabled:opacity-50 text-white px-6 py-3 rounded-xl text-sm font-semibold transition active:scale-[0.98]"
             >
               {generating ? (
@@ -251,6 +320,23 @@ export default function ScribeReportsPage() {
           source={activeHandout.source}
           grounding={activeHandout.grounding}
           onClose={() => setActiveHandout(null)}
+          onRegenerate={handleGenerate}
+        />
+      )}
+
+      {activeReassessment && (
+        <ReassessmentPreview
+          data={activeReassessment.data}
+          patientFirstName={activeReassessment.session.patientName.split(' ')[0]}
+          baselineDate={new Date(activeReassessment.baseline.sessionDate).toLocaleDateString('en-AU', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+          })}
+          latestDate={new Date(activeReassessment.session.sessionDate).toLocaleDateString('en-AU', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+          })}
+          sessionId={activeReassessment.session.id}
+          grounding={activeReassessment.data.grounding}
+          onClose={() => setActiveReassessment(null)}
           onRegenerate={handleGenerate}
         />
       )}

@@ -22,6 +22,28 @@ what to know now, links).
 
 ---
 
+## 2026-06-04 — Scribe: Reassessment Summary report (baseline vs latest)
+
+- **What:** new third report type in Scribe → Reports, alongside the CDMP GP report and the patient
+  handout. It compares a patient's **baseline** assessment with their **latest** reassessment of the
+  same tests: a before/after results table with a grounded change column, plus a progress narrative.
+- **How:** reuses the handout's findings extraction + normative grounding. The findings block was
+  refactored out of `generateHandout` into `scribe-llm.extractFindings` (no behaviour change). New
+  deterministic compare layer `normative-data.compareValues` / `buildComparisonInterpretation` (the
+  engine computes direction improved/declined/maintained + verdict transition; the LLM only phrases
+  it). New `services/scribe-reassessment.js` pairs findings by canonical test key (+ side) via
+  `matchTest`. New `services/scribe-demographics.js` holds the shared age/sex+Cliniko-backfill helper
+  (extracted from `scribe-handout.js`).
+- **Routes (new):** `POST /api/scribe/sessions/:id/reassessment/generate` and `…/reassessment/docx`
+  (`routes/scribe-reassessment.js`, clinician-only, ephemeral, audit-log only — mirrors the handout).
+  Mounted in `server.js`.
+- **Template:** `backend/assets/Reassessment_Template.docx` built by `scripts/build-reassessment-template.js`
+  (shares `handout-kit.js`); rendered by `services/scribe-reassessment-docx.js`.
+- **What to know:** the baseline session must have a **saved SOAP note** (its transcript is purged 48h
+  after recording) — the UI baseline picker enforces `hasNote`. Tests outside the normative dataset
+  can't be auto-paired; they surface as editable rows / "new this visit" rather than being dropped.
+  No schema changes, no new env vars, nothing persisted.
+
 ## 2026-06-04 — Billing daily-summary email: actionable-only + flag-noise cleanup
 
 - **What:** the `billing-daily-summary` cron (`jobs/daily-summary.js`, daily 1:30am AEST → emails

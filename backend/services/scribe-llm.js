@@ -273,6 +273,36 @@ function consolidateClinicalContext(raw, age, sex) {
   return out.join('\n');
 }
 
+/**
+ * Extract + ground the measured clinical findings from a transcript (or a saved
+ * SOAP note) into the consolidated "Test | Result | Interpretation" block. Shared
+ * by the handout (generateHandout) and the reassessment report so both derive
+ * findings identically. Best-effort: returns '' on failure. No patient values logged.
+ */
+async function extractFindings(sourceText, age, sex) {
+  try {
+    const ctxCmd = new ConverseCommand({
+      modelId: MODEL_ID,
+      messages: [{ role: 'user', content: [{ text: `Extract and interpret clinical findings from this transcript:\n\n${sourceText}` }] }],
+      system: [{ text: CLINICAL_CONTEXT_SYSTEM_PROMPT }],
+      // temperature 0 → deterministic extraction so the same source yields the
+      // same set of findings every run (fixes 3-vs-6 inconsistency).
+      inferenceConfig: { maxTokens: 1200, temperature: 0 },
+    });
+    const ctxRes = await client.send(ctxCmd);
+    const raw = ctxRes.output.message.content[0].text
+      .replace(/\*+/g, '')
+      .replace(/\[|\]/g, '')
+      .trim();
+    // Ground + consolidate: one assessment reads as one entry (sides split,
+    // tandem conditions merged), interpretation grounded in peer-reviewed norms.
+    return consolidateClinicalContext(raw, age, sex);
+  } catch (err) {
+    console.error('Clinical context generation failed:', err.message);
+    return '';
+  }
+}
+
 const RESULTS_SUMMARY_SYSTEM_PROMPT = `You are writing the "What Your Results Mean" paragraph of a patient assessment handout for an Accredited Exercise Physiology clinic. Patients are typically injured athletes and adults aged 45-75.
 
 You are given the patient's assessment results, each with a grounded interpretation (within/below/above the expected range for their age and sex, plus any clinical flags). Write ONE warm, plain-language paragraph that ties the findings together and explains, in human terms, WHY they matter.
@@ -327,29 +357,7 @@ async function generateHandout(transcript, patientFirstName, assessmentDate, dem
     };
   })();
 
-  const contextPromise = (async () => {
-    try {
-      const ctxCmd = new ConverseCommand({
-        modelId: MODEL_ID,
-        messages: [{ role: 'user', content: [{ text: `Extract and interpret clinical findings from this transcript:\n\n${transcript}` }] }],
-        system: [{ text: CLINICAL_CONTEXT_SYSTEM_PROMPT }],
-        // temperature 0 → deterministic extraction so the same transcript yields
-        // the same set of findings every run (fixes 3-vs-6 inconsistency).
-        inferenceConfig: { maxTokens: 1200, temperature: 0 },
-      });
-      const ctxRes = await client.send(ctxCmd);
-      const raw = ctxRes.output.message.content[0].text
-        .replace(/\*+/g, '')
-        .replace(/\[|\]/g, '')
-        .trim();
-      // Ground + consolidate: one assessment reads as one entry (sides split,
-      // tandem conditions merged), interpretation grounded in peer-reviewed norms.
-      return consolidateClinicalContext(raw, age, sex);
-    } catch (err) {
-      console.error('Clinical context generation failed:', err.message);
-      return '';
-    }
-  })();
+  const contextPromise = extractFindings(transcript, age, sex);
 
   const [sections, clinicalContext] = await Promise.all([sectionsPromise, contextPromise]);
 
@@ -384,6 +392,83 @@ async function generateHandout(transcript, patientFirstName, assessmentDate, dem
   };
 }
 
+const REASSESSMENT_SYSTEM_PROMPT = `You are a clinical documentation assistant for Moveify Health Solutions, an Accredited Exercise Physiology practice. You are writing the narrative of a REASSESSMENT summary that compares a patient's baseline assessment with their latest reassessment of the SAME tests.
+
+You are given the paired results, each already graded deterministically with a direction (improved / declined / maintained) and, where available, a verdict transition (e.g. "now within the expected range, from below before"). Treat those gradings as ground truth — do not re-judge the numbers yourself.
+
+Produce TWO sections. Each is a short list of 3 to 5 warm, plain-language bullet points. Start every bullet on its own line with "- " and keep each bullet to a single sentence. Use the EXACT headings shown:
+
+YOUR PROGRESS
+What has changed since baseline, in plain language tied to daily life. Lead with the genuine improvements. Acknowledge anything that has not yet changed or has slipped, honestly but encouragingly, as the focus for the next phase.
+
+WHERE WE GO NEXT
+The clinical focus for the coming phase given the results — what we keep building, what we shift attention to, and that we will reassess again to keep progress objective. Describe the APPROACH only. Do NOT mention session counts, frequency, tiers, or pricing.
+
+Rules:
+- Plain, warm, capable language. Treat the reader as intelligent.
+- ALWAYS second person ("you", "your") for the patient — never use their name or the third person.
+- ALWAYS first person plural ("we", "our") for the clinic.
+- Only describe a result as improved, better, stronger, declined, or similar when its grading EXPLICITLY says so. If a result is marked "maintained" or has no graded direction, present it neutrally as held steady or as a baseline we keep tracking — never invent a gain or a loss.
+- Do NOT state or imply a diagnosis, and do NOT tell the patient to see, consult, review with, or be referred to a GP or any other provider — referral is the clinician's decision.
+- Do not assert a specific pathological mechanism unless it appears in the data.
+- No em dashes. No asterisks, emojis, or markdown. Use plain "- " hyphen bullets only, one point per line.
+- Do not fabricate anything not supported by the provided results.
+- Output only the two sections in plain text with the exact headings above. No preamble or text outside them.`;
+
+const REASSESSMENT_SUMMARY_SYSTEM_PROMPT = `You are writing the "What Your Progress Means" paragraph of a patient reassessment summary for an Accredited Exercise Physiology clinic.
+
+You are given the paired baseline-vs-latest results, each graded with a direction (improved / declined / maintained) and any verdict transition. Write ONE warm, plain-language paragraph that ties the changes together and explains, in human terms, what the progress means for the patient.
+
+Requirements:
+- 4 to 6 sentences, flowing prose (no bullet points, no headings, no lists).
+- Second person throughout ("you", "your"). Never use the patient's name. First person plural for the clinic.
+- Lead with the genuine improvements, then note honestly what is still developing, framed as the focus we keep working on.
+- End reassuringly: we re-measure the same tests at each reassessment so progress stays objective.
+
+Rules:
+- Only describe a result with a quality judgement (improved, stronger, better, declined, reduced, etc.) when its grading EXPLICITLY supports it. Anything marked maintained or ungraded is presented neutrally as held steady or a baseline we track. Never invent a gain or a loss.
+- Do NOT state or imply a diagnosis, and do NOT tell the patient to see, consult, or be referred to a GP or any other provider.
+- No specific numbers or percentiles are needed. No em dashes, asterisks, emojis, or markdown. Output only the paragraph.`;
+
+/**
+ * Generate the reassessment narrative (two bulleted sections + a prose summary)
+ * from the deterministically-graded comparison text. The comparison verdicts are
+ * computed upstream (normative-data.compareValues) — the model only phrases them.
+ * Patient name/dates are not sent. No patient values logged.
+ */
+async function generateReassessmentNarrative(comparisonText) {
+  const userMessage = `The following are this patient's paired baseline-vs-latest assessment results, already graded:\n\n${comparisonText}\n\nGenerate the two narrative sections — YOUR PROGRESS and WHERE WE GO NEXT — using the exact headings.`;
+
+  const sectionsCmd = new ConverseCommand({
+    modelId: MODEL_ID,
+    messages: [{ role: 'user', content: [{ text: userMessage }] }],
+    system: [{ text: REASSESSMENT_SYSTEM_PROMPT }],
+    inferenceConfig: { maxTokens: 1200 },
+  });
+
+  const summaryCmd = new ConverseCommand({
+    modelId: MODEL_ID,
+    messages: [{ role: 'user', content: [{ text: `Paired reassessment results (graded):\n\n${comparisonText}\n\nWrite the "What Your Progress Means" paragraph.` }] }],
+    system: [{ text: REASSESSMENT_SUMMARY_SYSTEM_PROMPT }],
+    inferenceConfig: { maxTokens: 600 },
+  });
+
+  const [sectionsRes, summaryRes] = await Promise.all([
+    client.send(sectionsCmd),
+    client.send(summaryCmd).catch(err => { console.error('Reassessment summary failed:', err.message); return null; }),
+  ]);
+
+  const cleaned = sectionsRes.output.message.content[0].text.replace(/\*\*/g, '').replace(/\*/g, '');
+  const grab = (re) => { const m = cleaned.match(re); return m ? m[1].trim() : ''; };
+  const progress = grab(/YOUR PROGRESS\s*\n([\s\S]*?)(?=WHERE WE GO NEXT|$)/i);
+  const nextSteps = grab(/WHERE WE GO NEXT\s*\n([\s\S]*?)$/i);
+  const resultsSummary = summaryRes
+    ? summaryRes.output.message.content[0].text.replace(/\*+/g, '').replace(/^#+\s*/gm, '').trim()
+    : '';
+
+  return { progress, nextSteps, resultsSummary, model: MODEL_ID };
+}
+
 async function generateReport(soapNoteContent, systemPrompt) {
   if (!soapNoteContent || soapNoteContent.trim().length < 20) {
     throw new Error('SOAP note too short to generate a report');
@@ -413,4 +498,4 @@ async function generateReport(soapNoteContent, systemPrompt) {
   };
 }
 
-module.exports = { generateSoapNote, generateHandout, generateReport, groundClinicalContext, consolidateClinicalContext };
+module.exports = { generateSoapNote, generateHandout, generateReport, groundClinicalContext, consolidateClinicalContext, extractFindings, generateReassessmentNarrative };

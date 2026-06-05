@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchTest, parseValue, classify, interpret, buildInterpretation } from '../services/normative-data.js';
+import { matchTest, parseValue, classify, interpret, buildInterpretation, compareValues, buildComparisonInterpretation } from '../services/normative-data.js';
 
 describe('matchTest', () => {
   it('matches by alias', () => {
@@ -141,5 +141,62 @@ describe('buildInterpretation', () => {
   it('qualitative test → symmetry guidance', () => {
     const txt = buildInterpretation(interpret('lat length', 'tight', 50, 'male'));
     expect(txt).toMatch(/other side|baseline/);
+  });
+});
+
+describe('compareValues — direction', () => {
+  it('higher-is-better gain → improved, crossing below → within', () => {
+    const r = compareValues('grip strength', '22 kg', '48 kg', 62, 'male');
+    expect(r.direction).toBe('improved');
+    expect(r.absChange).toBe(26);
+    expect(r.prevVerdict).toBe('below');
+    expect(r.currVerdict).toBe('within');
+    expect(r.crossedThreshold).toBe(true);
+  });
+  it('lower-is-better drop → improved (timed test)', () => {
+    const r = compareValues('5x sit to stand', '16 s', '11 s', 65, 'any');
+    expect(r.direction).toBe('improved');
+    expect(r.absChange).toBe(-5);
+  });
+  it('higher-is-better but slower TUG → declined', () => {
+    const r = compareValues('TUG', '8 s', '12 s', 65, 'any');
+    expect(r.direction).toBe('declined');
+  });
+  it('sub-deadband change → maintained', () => {
+    const r = compareValues('grip strength', '45 kg', '46 kg', 62, 'male');
+    expect(r.direction).toBe('maintained');
+  });
+  it('target-range BP improving by verdict transition → improved', () => {
+    const r = compareValues('blood pressure', '148/92', '118/78', 55, 'male');
+    expect(r.direction).toBe('improved');
+    expect(r.prevVerdict).toBe('flagged');
+    expect(r.currVerdict).toBe('within');
+  });
+  it('bilateral calf raise compares the weaker side', () => {
+    const r = compareValues('calf raise', 'L 8 / R 10', 'L 14 / R 15', 40, 'male');
+    expect(r.prev.value).toBe(8);
+    expect(r.curr.value).toBe(14);
+    expect(r.direction).toBe('improved');
+  });
+  it('returns null for a test outside the dataset', () => {
+    expect(compareValues('star excursion balance', '5', '7', 40, 'male')).toBeNull();
+  });
+});
+
+describe('buildComparisonInterpretation', () => {
+  it('states magnitude + verdict transition for a banded gain', () => {
+    const txt = buildComparisonInterpretation(compareValues('grip strength', '22 kg', '48 kg', 62, 'male'));
+    expect(txt).toMatch(/Improved \(up 26 kg/);
+    expect(txt).toMatch(/within the expected range for your age and sex/);
+  });
+  it('uses "normal range" (not age/sex) and suppresses the bare magnitude for BP', () => {
+    const txt = buildComparisonInterpretation(compareValues('blood pressure', '148/92', '118/78', 55, 'male'));
+    expect(txt).toMatch(/Improved\./); // no "(up/down N)" for compound BP
+    expect(txt).toMatch(/within the normal range/);
+    expect(txt).not.toMatch(/age and sex/);
+  });
+  it('reads "Held steady" when maintained', () => {
+    const txt = buildComparisonInterpretation(compareValues('grip strength', '45 kg', '46 kg', 62, 'male'));
+    expect(txt).toMatch(/Held steady/);
   });
 });

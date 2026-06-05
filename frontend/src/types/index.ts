@@ -355,6 +355,18 @@ export type HandoutGrounding = {
   hasFindings: boolean;
 }
 
+// Reassessment summary: baseline vs latest comparison + progress narrative.
+export type ReassessmentData = {
+  comparison: string;    // "Test | Baseline | Latest | Change | What it means" lines (matched tests)
+  newFindings: string;   // "Test | Result | Interpretation" lines (measured this visit only)
+  notRepeated: { test: string; result: string }[]; // measured at baseline only
+  progress: string;      // bullets
+  nextSteps: string;     // bullets
+  resultsSummary: string;
+  counts: { matched: number; new: number; notRepeated: number };
+  grounding?: HandoutGrounding;
+}
+
 export type ReportSections = {
   executiveSummary: string;
   objectiveAssessment: string;
