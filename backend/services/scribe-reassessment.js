@@ -159,37 +159,41 @@ function parseSubjective(raw) {
 const PAIN_DEADBAND = 2; // points on a 0-10 scale before a change counts (pain is lower-better)
 const numOrNull = s => { const m = String(s).match(/\d+(?:\.\d+)?/); return m ? Number(m[0]) : null; };
 
-// Pain → before/after comparison rows (lower-better, no population norm) + graded
-// lines for the narrative. Rows where neither visit has a number are skipped (the
-// qualitative pain is still surfaced to the narrative via the ISSUES context).
+// Numeric pain → before/after comparison rows (lower-better, no population norm).
+// ONLY pain rated 0-10 at BOTH visits becomes a row — a "— / — " row carries no
+// before/after meaning and reads as clutter. Pain without two scores stays in the
+// narrative context instead (see subjectiveNarrativeContext).
 function painComparison(pain) {
-  const rows = [], gradedLines = [];
+  const rows = [];
   for (const p of pain) {
     const b = numOrNull(p.base), l = numOrNull(p.latest);
-    const test = `Pain — ${p.site}`;
-    const baseCol = b != null ? `${b}/10` : '—';
-    const latestCol = l != null ? `${l}/10` : '—';
-    let change = '—', interp;
-    if (b != null && l != null) {
-      const d = l - b;
-      if (Math.abs(d) < PAIN_DEADBAND) { change = 'Steady'; interp = `Pain about the same (${b}/10 to ${l}/10).`; }
-      else if (d < 0) { change = 'Improved'; interp = `Pain down ${b - l} points (${b}/10 to ${l}/10).`; }
-      else { change = 'Declined'; interp = `Pain up ${l - b} points (${b}/10 to ${l}/10).`; }
-    } else {
-      interp = p.note || 'Reported; not rated 0-10 at both visits.';
-    }
-    rows.push({ test, baseline: baseCol, latest: latestCol, change, interpretation: interp });
-    gradedLines.push(`${test}: ${baseCol} → ${latestCol} — ${interp}`);
+    if (b == null || l == null) continue; // qualitative / one-sided → narrative only
+    const d = l - b;
+    let change, interp;
+    if (Math.abs(d) < PAIN_DEADBAND) { change = 'Steady'; interp = `Pain about the same (${b}/10 to ${l}/10).`; }
+    else if (d < 0) { change = 'Improved'; interp = `Pain down ${b - l} points (${b}/10 to ${l}/10).`; }
+    else { change = 'Declined'; interp = `Pain up ${l - b} points (${b}/10 to ${l}/10).`; }
+    rows.push({ test: `Pain — ${p.site}`, baseline: `${b}/10`, latest: `${l}/10`, change, interpretation: interp });
   }
-  return { rows, gradedLines };
+  return { rows };
 }
 
-// Goals + issues → a context block for the narrative LLM (not the table).
+// Goals + pain + issues → a context block for the narrative LLM (not the table).
+// ALL pain is surfaced here (with scores where available) so the prose can speak
+// to symptom change even when there is no two-point numeric comparison.
 function subjectiveNarrativeContext(parsed) {
   const lines = [];
   if (parsed.goals.length) {
     lines.push('PATIENT GOALS (comment on progress only where the results support it):');
     for (const g of parsed.goals) lines.push(`- ${g.goal} — ${g.status}${g.basis ? ` (${g.basis})` : ''}`);
+  }
+  if (parsed.pain.length) {
+    lines.push('PAIN (describe a change only as far as the note/score supports — do not overstate):');
+    for (const p of parsed.pain) {
+      const b = numOrNull(p.base), l = numOrNull(p.latest);
+      const scores = (b != null || l != null) ? ` [${b != null ? b + '/10' : 'ns'} -> ${l != null ? l + '/10' : 'ns'}]` : '';
+      lines.push(`- ${p.site}${scores}${p.note ? ` — ${p.note}` : ''}`);
+    }
   }
   if (parsed.issues.length) {
     lines.push('FUNCTIONAL ISSUES / SYMPTOMS:');
@@ -223,14 +227,15 @@ async function generateReassessment(prevText, currText, demographics = {}) {
 
   const { matched, newFindings, notRepeated, gradedLines } = pairFindings(prevBlock, currBlock, age, sex);
 
-  // Goals / pain / issues. Numeric pain becomes comparison rows (lower-better);
-  // goals + issues + qualitative pain feed the narrative.
+  // Goals / pain / issues. Pain rated 0-10 at both visits becomes comparison rows
+  // (lower-better); goals + issues + all pain feed the narrative context.
   const subjective = parseSubjective(subjectiveRaw);
-  const { rows: painRows, gradedLines: painLines } = painComparison(subjective.pain);
+  const { rows: painRows } = painComparison(subjective.pain);
   const comparisonRows = [...matched, ...painRows];
 
-  // Narrative input: graded comparison + pain + what wasn't repeated + goals/issues.
-  let narrativeInput = [...gradedLines, ...painLines].join('\n');
+  // Narrative input: the graded objective comparison + what wasn't repeated.
+  // (Pain/goals/issues ride in via subjectiveContext below.)
+  let narrativeInput = gradedLines.join('\n');
   if (notRepeated.length) {
     narrativeInput += `\n\nMeasured at baseline but not repeated this visit (do not claim progress on these): ${notRepeated.map(r => r.test).join(', ')}.`;
   }

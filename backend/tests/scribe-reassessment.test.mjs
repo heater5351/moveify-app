@@ -50,13 +50,13 @@ describe('parseSubjective + painComparison', () => {
     expect(s.issues[0].issue).toBe('Stairs');
   });
 
-  it('grades numeric pain (lower-better) with a 2-point deadband', () => {
+  it('grades numeric pain (lower-better) with a 2-point deadband; drops score-less pain', () => {
     const { rows } = painComparison(parseSubjective(raw).pain);
     const back = rows.find(r => r.test.includes('Lower back'));
     const knee = rows.find(r => r.test.includes('Knee'));
     const shoulder = rows.find(r => r.test.includes('Shoulder'));
     expect(back.change).toBe('Improved');   // 6 → 4 = down 2
     expect(knee.change).toBe('Steady');     // 5 → 5
-    expect(shoulder.change).toBe('—');      // ns → 3, can't grade
+    expect(shoulder).toBeUndefined();       // ns → 3: no two-point comparison, not a row
   });
 });

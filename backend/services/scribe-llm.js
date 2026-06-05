@@ -411,6 +411,7 @@ Rules:
 - Only describe a result as improved, better, stronger, declined, or similar when its grading EXPLICITLY says so. If a result is marked "maintained" or has no graded direction, present it neutrally as held steady or as a baseline we keep tracking — never invent a gain or a loss.
 - For blood pressure, blood glucose, or other screening measures, never call the reading "good", "healthy", "fine", or at "good levels" unless its grading EXPLICITLY says it is within the normal range. If it improved but is still elevated or flagged, describe it as moving in the right direction but still worth keeping an eye on — never as being at good levels.
 - A finding marked "measured this visit, no baseline" has nothing to compare against — present it only as a new baseline we will track, and never describe it as improved, declined, better, or worse.
+- Refer ONLY to the specific tests, body areas, pains, goals, and issues given to you. Do NOT introduce any measure, body region, or capability that is not in the input — for example, do not mention "core strength", "walking tolerance", "flexibility", or any test that is not in the provided results.
 - Do NOT state or imply a diagnosis, and do NOT tell the patient to see, consult, review with, or be referred to a GP or any other provider — referral is the clinician's decision.
 - Do not assert a specific pathological mechanism unless it appears in the data.
 - No em dashes. No asterisks, emojis, or markdown. Use plain "- " hyphen bullets only, one point per line.
@@ -430,6 +431,7 @@ Requirements:
 Rules:
 - Only describe a result with a quality judgement (improved, stronger, better, declined, reduced, etc.) when its grading EXPLICITLY supports it. Anything marked maintained or ungraded is presented neutrally as held steady or a baseline we track. Never invent a gain or a loss.
 - For blood pressure, blood glucose, or other screening measures, never call the reading "good", "healthy", or at "good levels" unless its grading EXPLICITLY says it is within the normal range; if it improved but is still elevated, say so plainly as still worth monitoring.
+- Refer ONLY to the tests, body areas, pains, goals, and issues actually present in the input. Do NOT introduce any measure or body region that is not there (e.g. do not mention "core strength" or "walking tolerance" unless they appear in the provided data).
 - Do NOT state or imply a diagnosis, and do NOT tell the patient to see, consult, or be referred to a GP or any other provider.
 - No specific numbers or percentiles are needed. No em dashes, asterisks, emojis, or markdown. Output only the paragraph.`;
 
