@@ -79,14 +79,20 @@ const doc = buildDoc([
   // ───────── PAGE 2 — Reassessment report ─────────
   new Paragraph({ pageBreakBefore: true, children: [] }),
   masthead(),
-  new Paragraph({ spacing: { before: 160, after: 40 }, children: [
-    t('Exercise Physiology ', { bold: true, color: NAVY, size: 34 }), t('Reassessment Report', { bold: true, color: TEAL, size: 34 }),
-  ] }),
-  new Paragraph({ spacing: { after: 200 }, border: { bottom: edge(RULE, 4) }, children: [
-    t('{{patient_full_name}}', { color: NAVY, bold: true, size: 22 }),
-    t('   ·   Baseline ', { color: SUB, size: 20 }), t('{{baseline_date}}', { color: NAVY, bold: true, size: 20 }),
-    t('  →  ', { color: TEAL, bold: true, size: 20 }),
-    t('Reassessed ', { color: SUB, size: 20 }), t('{{latest_date}}', { color: NAVY, bold: true, size: 20 }),
+  // Clean header line — mirrors the cover's RE: styling (teal underline, navy name).
+  new Paragraph({
+    spacing: { before: 200, after: 60 }, border: { bottom: edge(TEAL, 12) },
+    children: [
+      t('Exercise Physiology Reassessment', { bold: true, color: NAVY, size: 24 }),
+      t('   —   ', { color: TEAL, bold: true, size: 22 }),
+      t('{{patient_full_name}}', { color: NAVY, bold: true, size: 22 }),
+      t('  (DOB {{patient_dob}})', { color: SUB, size: 19 }),
+    ],
+  }),
+  new Paragraph({ spacing: { after: 200 }, children: [
+    t('Baseline ', { color: SUB, size: 19 }), t('{{baseline_date}}', { color: NAVY, bold: true, size: 19 }),
+    t('   →   ', { color: TEAL, bold: true, size: 19 }),
+    t('Reassessed ', { color: SUB, size: 19 }), t('{{latest_date}}', { color: NAVY, bold: true, size: 19 }),
   ] }),
 
   subHeading('Executive Summary'),
@@ -100,6 +106,9 @@ const doc = buildDoc([
 
   subHeading('Recommendations'),
   para('recommendations'),
+
+  // Sign-off at the foot of the report itself.
+  ...signOff(),
   footerRule(),
 ]);
 
