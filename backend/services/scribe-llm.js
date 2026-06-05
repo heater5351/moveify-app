@@ -399,16 +399,18 @@ You are given the paired results, each already graded deterministically with a d
 Produce TWO sections. Each is a short list of 3 to 5 warm, plain-language bullet points. Start every bullet on its own line with "- " and keep each bullet to a single sentence. Use the EXACT headings shown:
 
 YOUR PROGRESS
-What has changed since baseline, in plain language tied to daily life. Lead with the genuine improvements. Acknowledge anything that has not yet changed or has slipped, honestly but encouragingly, as the focus for the next phase.
+What has changed since baseline, in plain language tied to daily life. Lead with the genuine improvements. If the patient's goals are provided, open by acknowledging progress toward the goals the results actually support. If pain or functional issues are provided, mention meaningful changes (e.g. reduced pain, easier stairs) honestly — only as far as the notes/results support. Acknowledge anything that has not yet changed or has slipped, honestly but encouragingly, as the focus for the next phase.
 
 WHERE WE GO NEXT
-The clinical focus for the coming phase given the results — what we keep building, what we shift attention to, and that we will reassess again to keep progress objective. Describe the APPROACH only. Do NOT mention session counts, frequency, tiers, or pricing.
+The clinical focus for the coming phase given the results and the patient's goals — what we keep building, what we shift attention to, and that we will reassess again to keep progress objective. Where goals remain, frame the next phase around them. Describe the APPROACH only. Do NOT mention session counts, frequency, tiers, or pricing.
 
 Rules:
 - Plain, warm, capable language. Treat the reader as intelligent.
 - ALWAYS second person ("you", "your") for the patient — never use their name or the third person.
 - ALWAYS first person plural ("we", "our") for the clinic.
 - Only describe a result as improved, better, stronger, declined, or similar when its grading EXPLICITLY says so. If a result is marked "maintained" or has no graded direction, present it neutrally as held steady or as a baseline we keep tracking — never invent a gain or a loss.
+- For blood pressure, blood glucose, or other screening measures, never call the reading "good", "healthy", "fine", or at "good levels" unless its grading EXPLICITLY says it is within the normal range. If it improved but is still elevated or flagged, describe it as moving in the right direction but still worth keeping an eye on — never as being at good levels.
+- A finding marked "measured this visit, no baseline" has nothing to compare against — present it only as a new baseline we will track, and never describe it as improved, declined, better, or worse.
 - Do NOT state or imply a diagnosis, and do NOT tell the patient to see, consult, review with, or be referred to a GP or any other provider — referral is the clinician's decision.
 - Do not assert a specific pathological mechanism unless it appears in the data.
 - No em dashes. No asterisks, emojis, or markdown. Use plain "- " hyphen bullets only, one point per line.
@@ -427,17 +429,69 @@ Requirements:
 
 Rules:
 - Only describe a result with a quality judgement (improved, stronger, better, declined, reduced, etc.) when its grading EXPLICITLY supports it. Anything marked maintained or ungraded is presented neutrally as held steady or a baseline we track. Never invent a gain or a loss.
+- For blood pressure, blood glucose, or other screening measures, never call the reading "good", "healthy", or at "good levels" unless its grading EXPLICITLY says it is within the normal range; if it improved but is still elevated, say so plainly as still worth monitoring.
 - Do NOT state or imply a diagnosis, and do NOT tell the patient to see, consult, or be referred to a GP or any other provider.
 - No specific numbers or percentiles are needed. No em dashes, asterisks, emojis, or markdown. Output only the paragraph.`;
+
+const SUBJECTIVE_COMPARISON_SYSTEM_PROMPT = `You are a clinical exercise physiologist comparing a patient's BASELINE consultation note with their LATEST reassessment note. Extract and compare the three things the objective test table does NOT capture: the patient's goals, their pain, and their functional issues.
+
+You are given both notes. Compare them.
+
+Output EXACTLY these three sections, with these headings, each as pipe-separated bullet lines. If a section has nothing supported by the notes, output the heading with no bullets under it.
+
+GOALS
+One bullet per goal the patient stated (prefer goals from the baseline note). Format:
+- <goal in the patient's own terms> | <status: achieved / progressing / not yet / unclear> | <brief basis from the notes or measured results>
+Judge the status ONLY from what the notes and results support. If unsure, use "unclear".
+
+PAIN
+One bullet per distinct pain the patient reported at EITHER visit. Format:
+- <site or description> | <baseline severity 0-10, or ns if not stated> | <latest severity 0-10, or ns if not stated> | <brief note>
+Use a numeric 0-10 rating only if the note actually gives one; otherwise write ns.
+
+ISSUES
+One bullet per functional difficulty or limitation (e.g. stairs, sleep, gripping, walking distance, returning to a sport). Format:
+- <issue in plain terms> | <how it has changed since baseline: improved / unchanged / worse / new>
+
+Rules:
+- Only include items actually supported by the notes. Do not invent goals, pain, or issues.
+- Do not state or imply a diagnosis, and do not recommend seeing or being referred to any provider.
+- No asterisks, emojis, markdown, or em dashes. Output only the three sections with their headings.`;
+
+/**
+ * Compare the SUBJECTIVE side of two notes — goals, pain, functional issues —
+ * which the objective findings table doesn't capture. Returns the raw three-section
+ * block (GOALS / PAIN / ISSUES) for the caller to parse. Best-effort: '' on failure.
+ * Patient name not sent. No patient values logged.
+ */
+async function extractSubjectiveComparison(prevText, currText) {
+  try {
+    const cmd = new ConverseCommand({
+      modelId: MODEL_ID,
+      messages: [{ role: 'user', content: [{ text: `BASELINE note:\n${prevText}\n\n---\n\nLATEST note:\n${currText}\n\nCompare the patient's goals, pain, and functional issues across the two notes.` }] }],
+      system: [{ text: SUBJECTIVE_COMPARISON_SYSTEM_PROMPT }],
+      inferenceConfig: { maxTokens: 900, temperature: 0 },
+    });
+    const res = await client.send(cmd);
+    return res.output.message.content[0].text.replace(/\*+/g, '').replace(/\[|\]/g, '').trim();
+  } catch (err) {
+    console.error('Subjective comparison failed:', err.message);
+    return '';
+  }
+}
 
 /**
  * Generate the reassessment narrative (two bulleted sections + a prose summary)
  * from the deterministically-graded comparison text. The comparison verdicts are
  * computed upstream (normative-data.compareValues) — the model only phrases them.
- * Patient name/dates are not sent. No patient values logged.
+ * `subjectiveContext` (optional) adds goals/pain/issues so the prose can speak to
+ * goal progress and symptom change. Patient name/dates are not sent. No values logged.
  */
-async function generateReassessmentNarrative(comparisonText) {
-  const userMessage = `The following are this patient's paired baseline-vs-latest assessment results, already graded:\n\n${comparisonText}\n\nGenerate the two narrative sections — YOUR PROGRESS and WHERE WE GO NEXT — using the exact headings.`;
+async function generateReassessmentNarrative(comparisonText, subjectiveContext = '') {
+  const subjectiveBlock = subjectiveContext
+    ? `\n\nThe patient's goals, pain, and functional issues across the two visits (comment on goal progress and meaningful symptom changes where the results support it; never claim a change a result does not support):\n\n${subjectiveContext}`
+    : '';
+  const userMessage = `The following are this patient's paired baseline-vs-latest assessment results, already graded:\n\n${comparisonText}${subjectiveBlock}\n\nGenerate the two narrative sections — YOUR PROGRESS and WHERE WE GO NEXT — using the exact headings.`;
 
   const sectionsCmd = new ConverseCommand({
     modelId: MODEL_ID,
@@ -448,7 +502,7 @@ async function generateReassessmentNarrative(comparisonText) {
 
   const summaryCmd = new ConverseCommand({
     modelId: MODEL_ID,
-    messages: [{ role: 'user', content: [{ text: `Paired reassessment results (graded):\n\n${comparisonText}\n\nWrite the "What Your Progress Means" paragraph.` }] }],
+    messages: [{ role: 'user', content: [{ text: `Paired reassessment results (graded):\n\n${comparisonText}${subjectiveBlock}\n\nWrite the "What Your Progress Means" paragraph.` }] }],
     system: [{ text: REASSESSMENT_SUMMARY_SYSTEM_PROMPT }],
     inferenceConfig: { maxTokens: 600 },
   });
@@ -498,4 +552,4 @@ async function generateReport(soapNoteContent, systemPrompt) {
   };
 }
 
-module.exports = { generateSoapNote, generateHandout, generateReport, groundClinicalContext, consolidateClinicalContext, extractFindings, generateReassessmentNarrative };
+module.exports = { generateSoapNote, generateHandout, generateReport, groundClinicalContext, consolidateClinicalContext, extractFindings, generateReassessmentNarrative, extractSubjectiveComparison };

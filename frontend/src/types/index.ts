@@ -357,13 +357,14 @@ export type HandoutGrounding = {
 
 // Reassessment summary: baseline vs latest comparison + progress narrative.
 export type ReassessmentData = {
-  comparison: string;    // "Test | Baseline | Latest | Change | What it means" lines (matched tests)
+  comparison: string;    // "Test | Baseline | Latest | Change | What it means" lines (matched + pain)
   newFindings: string;   // "Test | Result | Interpretation" lines (measured this visit only)
   notRepeated: { test: string; result: string }[]; // measured at baseline only
+  goals: { goal: string; status: string; basis: string }[]; // baseline goals + progress status
   progress: string;      // bullets
   nextSteps: string;     // bullets
   resultsSummary: string;
-  counts: { matched: number; new: number; notRepeated: number };
+  counts: { matched: number; new: number; notRepeated: number; pain: number; goals: number };
   grounding?: HandoutGrounding;
 }
 

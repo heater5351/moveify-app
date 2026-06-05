@@ -188,6 +188,19 @@ export default function ReassessmentPreview({
             <p className={fieldLabel}>What Your Progress Means</p>
             <textarea value={resultsSummary} onChange={e => setResultsSummary(e.target.value)} rows={6} className={textarea} />
           </div>
+          {data.goals.length > 0 && (
+            <div className="border-t border-gray-100 pt-3">
+              <p className={fieldLabel}>Goals &amp; Progress <span className="normal-case font-normal text-gray-400">(from the baseline note — woven into the narrative above)</span></p>
+              <ul className="space-y-1">
+                {data.goals.map((g, i) => (
+                  <li key={i} className="text-[12px] text-secondary-700 flex gap-1.5">
+                    <span className="font-semibold text-primary-600 capitalize shrink-0">{g.status}:</span>
+                    <span>{g.goal}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {data.notRepeated.length > 0 && (
             <div className="text-[11px] text-gray-400 border-t border-gray-100 pt-3">
               <span className="font-semibold text-gray-500">Measured at baseline but not repeated this visit:</span>{' '}

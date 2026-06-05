@@ -189,14 +189,42 @@ describe('buildComparisonInterpretation', () => {
     expect(txt).toMatch(/Improved \(up 26 kg/);
     expect(txt).toMatch(/within the expected range for your age and sex/);
   });
-  it('uses "normal range" (not age/sex) and suppresses the bare magnitude for BP', () => {
+  it('shows the full BP reading + label transition, never "age and sex"', () => {
     const txt = buildComparisonInterpretation(compareValues('blood pressure', '148/92', '118/78', 55, 'male'));
-    expect(txt).toMatch(/Improved\./); // no "(up/down N)" for compound BP
+    expect(txt).toMatch(/Improved \(118\/78/); // full reading, not a systolic-only magnitude
     expect(txt).toMatch(/within the normal range/);
     expect(txt).not.toMatch(/age and sex/);
   });
   it('reads "Held steady" when maintained', () => {
     const txt = buildComparisonInterpretation(compareValues('grip strength', '45 kg', '46 kg', 62, 'male'));
     expect(txt).toMatch(/Held steady/);
+  });
+});
+
+// Regression cases from the first real reassessment trial (2026-06-05).
+describe('compareValues — trial-bug fixes', () => {
+  it('noise-level grip change is NOT called an improvement or a band crossing', () => {
+    // 29.2 → 30.8 kg = +1.6 kg, under the 3 kg grip deadband; previously over-claimed
+    // "Improved … now above the expected range, from within before".
+    const r = compareValues('Grip Strength (Right)', '29.2 kg', '30.8 kg', 68, 'female');
+    expect(r.direction).toBe('maintained');
+    const txt = buildComparisonInterpretation(r);
+    expect(txt).toMatch(/Held steady/);
+    expect(txt).not.toMatch(/above the expected range/);
+  });
+  it('BP improving WITHIN the flagged zone reads as improved with the numbers shown', () => {
+    // 140/80 → 132/75: both still elevated, but clearly closer to normal.
+    const r = compareValues('Blood Pressure', '140/80', '132/75', 68, 'female');
+    expect(r.direction).toBe('improved');
+    const txt = buildComparisonInterpretation(r);
+    expect(txt).toMatch(/132\/75/);
+    expect(txt).not.toMatch(/good/i);
+  });
+  it('matches the "30-sec" sit-to-stand abbreviation', () => {
+    expect(matchTest('30-sec Sit-to-Stand').key).toBe('thirty_second_sit_to_stand');
+  });
+  it('single-leg low-hold wording is non-alarming (no "mortality")', () => {
+    const txt = buildInterpretation(interpret('single leg stance', '9 sec', 68, 'female'));
+    expect(txt).not.toMatch(/mortality/i);
   });
 });

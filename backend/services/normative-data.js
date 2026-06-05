@@ -277,7 +277,7 @@ function interpret(testName, rawResult, age, sex) {
 // ── Reassessment comparison ──────────────────────────────────────────────────
 // Word for the unit in change phrasing ("up 3 reps"). Mirrors scribe-llm's
 // unitSuffix but returns a trailing-space-free word for inline prose.
-const UNIT_WORD = { reps: 'reps', seconds: 'sec', kg: 'kg', degrees: '°', cm: 'cm', metres: 'm', points: 'points', bpm: 'bpm' };
+const UNIT_WORD = { reps: 'reps', seconds: 'sec', kg: 'kg', degrees: '°', cm: 'cm', metres: 'm', points: 'points', bpm: 'bpm', mmol_L: 'mmol/L', mmHg: 'mmHg', m_s: 'm/s' };
 function unitWord(u) { return UNIT_WORD[u] || ''; }
 
 // Pick the single comparable scalar from a parsed value. Bilateral falls back to
@@ -293,9 +293,43 @@ function scalarOf(parsed, def) {
 const VERDICT_SCORE = { within: 2, below: 1, above: 1, borderline: 1, flagged: 0 };
 function verdictScore(v) { return VERDICT_SCORE[v] != null ? VERDICT_SCORE[v] : null; }
 
-// Deadband: a change smaller than this (relative) reads as "maintained" rather
-// than noise. 5% covers measurement jitter on most norm tests.
+// Relative deadband for tests without a known unit floor.
 const MAINTAIN_PCT = 0.05;
+
+// Minimum meaningful absolute change per unit — a change smaller than this reads
+// as "maintained" rather than noise. Roughly the day-to-day measurement error /
+// MDC for each test type, so e.g. a 1.6 kg grip wobble isn't called an
+// improvement. Used for higher_better / lower_better tests.
+const MIN_ABS_CHANGE = { kg: 3, reps: 2, seconds: 2, degrees: 5, cm: 1.5, m_s: 0.1, metres: 30, points: 2, bpm: 5, mmol_L: 0.4 };
+
+// Minimum movement (in distance-outside-normal) for a target-range test to count
+// as a direction change rather than steady.
+const TARGET_FLOOR = { mmHg: 5, mmol_L: 0.3, bpm: 5 };
+
+// The ceiling of the "normal" band for a screen/threshold test (first
+// non-flagged category). Compound BP returns {sys, dia}; others a single number.
+function normalCeiling(def) {
+  const cats = def.categories || [];
+  const normal = cats.find(c => !c.flag);
+  if (def.compound === 'systolic_diastolic') {
+    return normal ? { sys: normal.systolicMax, dia: normal.diastolicMax } : null;
+  }
+  return normal && normal.max != null ? normal.max : null;
+}
+
+// How far a reading sits OUTSIDE the normal range (0 = within). Lets target-range
+// tests detect improvement that moves toward normal even within the flagged zone
+// (e.g. BP 140/80 → 132/75, both elevated but clearly closer to normal).
+function outsideNormalDistance(def, parsed) {
+  if (!parsed) return null;
+  const ceil = normalCeiling(def);
+  if (def.compound === 'systolic_diastolic') {
+    if (!ceil || parsed.systolic == null) return null;
+    return Math.max(0, parsed.systolic - ceil.sys) + Math.max(0, (parsed.diastolic || 0) - ceil.dia);
+  }
+  if (ceil == null || parsed.value == null) return null;
+  return Math.max(0, parsed.value - ceil); // high-is-bad screens (glucose)
+}
 
 /**
  * Compare a baseline vs latest measurement of the SAME test. Deterministic — the
@@ -324,22 +358,36 @@ function compareValues(testName, prevRaw, currRaw, age, sex) {
 
   // Direction relative to what "better" means for this test.
   let direction = null;
-  const within = (pctChange != null && Math.abs(pctChange) < MAINTAIN_PCT) || absChange === 0;
   if (def.direction === 'higher_better' || def.direction === 'lower_better') {
     if (absChange == null) direction = null;
-    else if (within) direction = 'maintained';
     else {
-      const rose = absChange > 0;
-      const better = def.direction === 'higher_better' ? rose : !rose;
-      direction = better ? 'improved' : 'declined';
+      // Unit-aware deadband: real measurement error before a change counts.
+      const floor = MIN_ABS_CHANGE[def.unit];
+      const maintained = absChange === 0 ||
+        (floor != null ? Math.abs(absChange) < floor : (pctChange != null && Math.abs(pctChange) < MAINTAIN_PCT));
+      if (maintained) direction = 'maintained';
+      else {
+        const better = def.direction === 'higher_better' ? absChange > 0 : absChange < 0;
+        direction = better ? 'improved' : 'declined';
+      }
     }
   } else if (def.direction === 'target_range' || def.compound === 'systolic_diastolic') {
-    // Closer to the normal band is better — judge by the verdict transition.
-    const ps = verdictScore(prevClass.verdict), cs = verdictScore(currClass.verdict);
-    if (ps == null || cs == null) direction = null;
-    else if (cs > ps) direction = 'improved';
-    else if (cs < ps) direction = 'declined';
-    else direction = 'maintained';
+    // Closer to the normal range is better — measure distance-outside-normal so an
+    // improvement within the flagged zone still registers. Fall back to the
+    // verdict transition when we can't compute a distance.
+    const dPrev = outsideNormalDistance(def, prevParsed);
+    const dCurr = outsideNormalDistance(def, currParsed);
+    if (dPrev != null && dCurr != null) {
+      const floor = TARGET_FLOOR[def.unit] != null ? TARGET_FLOOR[def.unit] : 0.001;
+      if (Math.abs(dPrev - dCurr) < floor) direction = 'maintained';
+      else direction = dCurr < dPrev ? 'improved' : 'declined';
+    } else {
+      const ps = verdictScore(prevClass.verdict), cs = verdictScore(currClass.verdict);
+      if (ps == null || cs == null) direction = null;
+      else if (cs > ps) direction = 'improved';
+      else if (cs < ps) direction = 'declined';
+      else direction = 'maintained';
+    }
   } // 'none'/qualitative → direction stays null
 
   const crossedThreshold =
@@ -351,13 +399,15 @@ function compareValues(testName, prevRaw, currRaw, age, sex) {
     displayName: def.displayName,
     def,
     unit: def.unit,
-    prev: { raw: prevRaw, value: prevVal, parsed: prevParsed, verdict: prevClass.verdict },
-    curr: { raw: currRaw, value: currVal, parsed: currParsed, verdict: currClass.verdict },
+    prev: { raw: prevRaw, value: prevVal, parsed: prevParsed, verdict: prevClass.verdict, label: prevClass.label },
+    curr: { raw: currRaw, value: currVal, parsed: currParsed, verdict: currClass.verdict, label: currClass.label },
     absChange,
     pctChange,
     direction,
     prevVerdict: prevClass.verdict,
     currVerdict: currClass.verdict,
+    prevLabel: prevClass.label,
+    currLabel: currClass.label,
     crossedThreshold,
     currInterpretation: buildInterpretation({ key: match.key, ...currClass }),
   };
@@ -374,6 +424,12 @@ function rangePhrase(verdict, banded) {
   return null;
 }
 
+// Reading string for a compound (BP) parsed value, e.g. "132/75".
+function readingOf(parsed) {
+  if (!parsed || parsed.systolic == null) return null;
+  return `${parsed.systolic}/${parsed.diastolic}`;
+}
+
 /**
  * Render a compareValues() result into a short, factual change sentence for the
  * reassessment table's "What it means" column. Deterministic. Patient-facing
@@ -385,18 +441,24 @@ function buildComparisonInterpretation(res) {
   const u = unitWord(res.unit);
   const uSuffix = u ? (u === '°' ? '°' : ` ${u}`) : '';
   const banded = !!(res.def && res.def.bands && res.def.bands.length);
-  // Compound BP reports systolic-only as its scalar — don't render a bare
-  // magnitude that reads as the whole reading; lean on the verdict transition.
   const compound = !!(res.def && res.def.compound);
+  const moved = res.direction === 'improved' || res.direction === 'declined';
 
-  if (res.direction === 'improved' || res.direction === 'declined') {
+  if (moved) {
     const verb = res.direction === 'improved' ? 'Improved' : 'Declined';
     let line = verb;
-    if (res.absChange != null && !compound) {
-      const mag = Math.abs(res.absChange);
+    if (compound) {
+      // Show the full reading change rather than a systolic-only magnitude.
+      const cr = readingOf(res.curr.parsed), pr = readingOf(res.prev.parsed);
+      if (cr && pr) {
+        const arrow = res.curr.parsed.systolic < res.prev.parsed.systolic ? 'down' : 'up';
+        line += ` (${cr} ${u}, ${arrow} from ${pr})`;
+      }
+    } else if (res.absChange != null) {
       const arrow = res.absChange > 0 ? 'up' : 'down';
-      line += ` (${arrow} ${mag}${uSuffix}`;
-      if (res.pctChange != null && Math.abs(res.pctChange) >= MAINTAIN_PCT) {
+      line += ` (${arrow} ${Math.abs(res.absChange)}${uSuffix}`;
+      // Percent only for banded norm tests, where it's a meaningful gain measure.
+      if (banded && res.pctChange != null && Math.abs(res.pctChange) >= MAINTAIN_PCT) {
         line += `, ${Math.round(Math.abs(res.pctChange) * 100)}%`;
       }
       line += ')';
@@ -413,10 +475,21 @@ function buildComparisonInterpretation(res) {
     }
   }
 
-  // Verdict transition — only when it meaningfully crossed a band.
-  if (res.crossedThreshold) {
-    const to = rangePhrase(res.currVerdict, banded);
-    if (to) parts.push(`Now ${to}, from ${res.prevVerdict} before.`);
+  // Range/label transition — ONLY narrate when the change was meaningful enough to
+  // count as a direction (suppress on "maintained" so a noise-level value that
+  // happens to nudge across a band edge doesn't read as a dramatic shift).
+  if (moved) {
+    if (compound && res.currLabel) {
+      // Use the screen's own label, which conveys "elevated"/"upper end of normal".
+      if (res.prevLabel && res.currLabel !== res.prevLabel) {
+        parts.push(`Now ${res.currLabel}, from ${res.prevLabel}.`);
+      } else {
+        parts.push(`Now ${res.currLabel}.`);
+      }
+    } else if (res.crossedThreshold) {
+      const to = rangePhrase(res.currVerdict, banded);
+      if (to) parts.push(`Now ${to}, from ${res.prevVerdict} before.`);
+    }
   }
 
   return parts.join(' ').replace(/\s+/g, ' ').trim() || null;

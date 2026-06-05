@@ -9,7 +9,7 @@
  *
  * No patient values are logged.
  */
-const { extractFindings, generateReassessmentNarrative } = require('./scribe-llm');
+const { extractFindings, generateReassessmentNarrative, extractSubjectiveComparison } = require('./scribe-llm');
 const { matchTest, compareValues, buildComparisonInterpretation } = require('./normative-data');
 
 // Parse a consolidated "Test | Result | Interpretation" block into rows, tagging
@@ -35,6 +35,27 @@ function parseRows(block) {
 
 const CHANGE_LABEL = { improved: 'Improved', declined: 'Declined', maintained: 'Steady' };
 
+// Neutral statement for a finding measured this visit with no baseline to compare
+// (e.g. a PROM the initial note didn't capture). Never claims a change/improvement.
+const NEW_BASELINE_NOTE = 'Recorded this visit; no baseline value yet to compare against.';
+
+// Pass/fail tests (tandem stance) carry no graded population norm — their
+// multi-condition result strings can also differ in shape between visits, so a
+// numeric delta is meaningless. Compare pass/fail status instead (verdict
+// within = pass, flagged = fail), and leave it neutral when unparseable.
+function comparePassFail(res, prevRow, currRow) {
+  const pass = v => v === 'within';
+  const fail = v => v === 'flagged';
+  const pv = res.prevVerdict, cv = res.currVerdict;
+  if ((pv !== 'within' && pv !== 'flagged') || (cv !== 'within' && cv !== 'flagged')) {
+    return { change: '—', interpretation: 'Compared at both visits; see the recorded conditions.' };
+  }
+  if (fail(pv) && pass(cv)) return { change: 'Improved', interpretation: 'Now holds the heel-to-toe balance threshold (did not at baseline).' };
+  if (pass(pv) && fail(cv)) return { change: 'Declined', interpretation: 'No longer holds the heel-to-toe balance threshold.' };
+  if (pass(pv) && pass(cv)) return { change: 'Steady', interpretation: 'Held the heel-to-toe balance threshold at both visits.' };
+  return { change: 'Steady', interpretation: 'Still below the heel-to-toe balance threshold at both visits.' };
+}
+
 // Build one before/after comparison row + a graded line for the narrative input.
 function compareRow(prevRow, currRow, age, sex) {
   const test = currRow.name;
@@ -45,9 +66,15 @@ function compareRow(prevRow, currRow, age, sex) {
   if (currRow.matched) {
     const res = compareValues(currRow.name, prevRow.result, currRow.result, age, sex);
     if (res) {
-      change = CHANGE_LABEL[res.direction] || '—';
-      interpretation = buildComparisonInterpretation(res) || currRow.interp;
-      gradedLine = `${test}: ${prevRow.result} → ${currRow.result} — ${res.direction || 'no graded direction'}. ${interpretation}`;
+      if (res.def && res.def.type === 'pass_fail') {
+        const pf = comparePassFail(res, prevRow, currRow);
+        change = pf.change;
+        interpretation = pf.interpretation;
+      } else {
+        change = CHANGE_LABEL[res.direction] || '—';
+        interpretation = buildComparisonInterpretation(res) || currRow.interp;
+      }
+      gradedLine = `${test}: ${prevRow.result} → ${currRow.result} — ${interpretation}`;
     }
   }
   if (!interpretation) {
@@ -88,8 +115,15 @@ function pairFindings(prevBlock, currBlock, age, sex) {
       matched.push(row);
       gradedLines.push(gradedLine);
     } else {
-      newFindings.push({ test: c.name, result: c.result, interpretation: c.interp });
-      gradedLines.push(`${c.name}: ${c.result} (new this visit, no baseline). ${c.interp}`);
+      // No baseline to compare. For a recognised norm test the extraction
+      // interpretation is grounded (a current-state verdict, safe to keep). For
+      // anything ungrounded (PROMs like UEFI/PROMIS) the model's text can claim
+      // "improved" with nothing to compare against — replace it with a neutral
+      // baseline note so we never fabricate a change. (Once the clinician adds the
+      // baseline value it pairs and reads "Changed from X to Y.")
+      const interpretation = c.matched ? c.interp : NEW_BASELINE_NOTE;
+      newFindings.push({ test: c.name, result: c.result, interpretation });
+      gradedLines.push(`${c.name}: ${c.result} (measured this visit, no baseline — do NOT describe as improved or declined). ${c.matched ? c.interp : ''}`.trim());
     }
   }
 
@@ -98,6 +132,70 @@ function pairFindings(prevBlock, currBlock, age, sex) {
     .map(p => ({ test: p.name, result: p.result }));
 
   return { matched, newFindings, notRepeated, gradedLines };
+}
+
+// ── Subjective comparison (goals / pain / issues) ────────────────────────────
+// Parse the three-section GOALS / PAIN / ISSUES block from extractSubjectiveComparison.
+function parseSubjective(raw) {
+  const out = { goals: [], pain: [], issues: [] };
+  if (!raw) return out;
+  let section = null;
+  for (const line of raw.split('\n')) {
+    const h = line.trim().toUpperCase();
+    if (h === 'GOALS') { section = 'goals'; continue; }
+    if (h === 'PAIN') { section = 'pain'; continue; }
+    if (h === 'ISSUES') { section = 'issues'; continue; }
+    if (!section) continue;
+    const body = line.replace(/^\s*[-•·*]\s*/, '').trim();
+    if (!body) continue;
+    const cols = body.split('|').map(s => s.trim());
+    if (section === 'goals' && cols[0]) out.goals.push({ goal: cols[0], status: cols[1] || 'unclear', basis: cols[2] || '' });
+    else if (section === 'pain' && cols[0]) out.pain.push({ site: cols[0], base: cols[1] || 'ns', latest: cols[2] || 'ns', note: cols[3] || '' });
+    else if (section === 'issues' && cols[0]) out.issues.push({ issue: cols[0], change: cols[1] || '' });
+  }
+  return out;
+}
+
+const PAIN_DEADBAND = 2; // points on a 0-10 scale before a change counts (pain is lower-better)
+const numOrNull = s => { const m = String(s).match(/\d+(?:\.\d+)?/); return m ? Number(m[0]) : null; };
+
+// Pain → before/after comparison rows (lower-better, no population norm) + graded
+// lines for the narrative. Rows where neither visit has a number are skipped (the
+// qualitative pain is still surfaced to the narrative via the ISSUES context).
+function painComparison(pain) {
+  const rows = [], gradedLines = [];
+  for (const p of pain) {
+    const b = numOrNull(p.base), l = numOrNull(p.latest);
+    const test = `Pain — ${p.site}`;
+    const baseCol = b != null ? `${b}/10` : '—';
+    const latestCol = l != null ? `${l}/10` : '—';
+    let change = '—', interp;
+    if (b != null && l != null) {
+      const d = l - b;
+      if (Math.abs(d) < PAIN_DEADBAND) { change = 'Steady'; interp = `Pain about the same (${b}/10 to ${l}/10).`; }
+      else if (d < 0) { change = 'Improved'; interp = `Pain down ${b - l} points (${b}/10 to ${l}/10).`; }
+      else { change = 'Declined'; interp = `Pain up ${l - b} points (${b}/10 to ${l}/10).`; }
+    } else {
+      interp = p.note || 'Reported; not rated 0-10 at both visits.';
+    }
+    rows.push({ test, baseline: baseCol, latest: latestCol, change, interpretation: interp });
+    gradedLines.push(`${test}: ${baseCol} → ${latestCol} — ${interp}`);
+  }
+  return { rows, gradedLines };
+}
+
+// Goals + issues → a context block for the narrative LLM (not the table).
+function subjectiveNarrativeContext(parsed) {
+  const lines = [];
+  if (parsed.goals.length) {
+    lines.push('PATIENT GOALS (comment on progress only where the results support it):');
+    for (const g of parsed.goals) lines.push(`- ${g.goal} — ${g.status}${g.basis ? ` (${g.basis})` : ''}`);
+  }
+  if (parsed.issues.length) {
+    lines.push('FUNCTIONAL ISSUES / SYMPTOMS:');
+    for (const i of parsed.issues) lines.push(`- ${i.issue} — ${i.change}`);
+  }
+  return lines.join('\n');
 }
 
 // Render the matched + new rows back into the editable pipe format the docx
@@ -116,23 +214,32 @@ function findingsToText(rows) {
 async function generateReassessment(prevText, currText, demographics = {}) {
   const { age = null, sex = null } = demographics;
 
-  const [prevBlock, currBlock] = await Promise.all([
+  // Objective findings (both notes) + the subjective comparison run in parallel.
+  const [prevBlock, currBlock, subjectiveRaw] = await Promise.all([
     extractFindings(prevText, age, sex),
     extractFindings(currText, age, sex),
+    extractSubjectiveComparison(prevText, currText),
   ]);
 
   const { matched, newFindings, notRepeated, gradedLines } = pairFindings(prevBlock, currBlock, age, sex);
 
-  // Narrative input: the graded comparison plus a note on what wasn't repeated.
-  let narrativeInput = gradedLines.join('\n');
+  // Goals / pain / issues. Numeric pain becomes comparison rows (lower-better);
+  // goals + issues + qualitative pain feed the narrative.
+  const subjective = parseSubjective(subjectiveRaw);
+  const { rows: painRows, gradedLines: painLines } = painComparison(subjective.pain);
+  const comparisonRows = [...matched, ...painRows];
+
+  // Narrative input: graded comparison + pain + what wasn't repeated + goals/issues.
+  let narrativeInput = [...gradedLines, ...painLines].join('\n');
   if (notRepeated.length) {
     narrativeInput += `\n\nMeasured at baseline but not repeated this visit (do not claim progress on these): ${notRepeated.map(r => r.test).join(', ')}.`;
   }
+  const subjectiveContext = subjectiveNarrativeContext(subjective);
 
   let progress = '', nextSteps = '', resultsSummary = '';
-  if (matched.length || newFindings.length) {
+  if (comparisonRows.length || newFindings.length || subjectiveContext) {
     try {
-      const out = await generateReassessmentNarrative(narrativeInput);
+      const out = await generateReassessmentNarrative(narrativeInput, subjectiveContext);
       progress = out.progress;
       nextSteps = out.nextSteps;
       resultsSummary = out.resultsSummary;
@@ -142,14 +249,15 @@ async function generateReassessment(prevText, currText, demographics = {}) {
   }
 
   return {
-    comparison: comparisonToText(matched),
+    comparison: comparisonToText(comparisonRows),
     newFindings: findingsToText(newFindings),
     notRepeated, // structured — surfaced as a hint in the UI, not the patient doc
+    goals: subjective.goals, // structured — surfaced in the UI editor
     progress,
     nextSteps,
     resultsSummary,
-    counts: { matched: matched.length, new: newFindings.length, notRepeated: notRepeated.length },
+    counts: { matched: matched.length, new: newFindings.length, notRepeated: notRepeated.length, pain: painRows.length, goals: subjective.goals.length },
   };
 }
 
-module.exports = { generateReassessment, pairFindings, parseRows };
+module.exports = { generateReassessment, pairFindings, parseRows, parseSubjective, painComparison };

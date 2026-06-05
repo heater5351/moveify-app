@@ -39,7 +39,7 @@ describe('consolidateClinicalContext — bilateral split', () => {
     const r = rows(out);
     expect(r.length).toBe(2);
     expect(r.map(x => x[0])).toEqual(['Single-Leg Stance (Right)', 'Single-Leg Stance (Left)']);
-    expect(r[1][2]).toMatch(/mortality/); // L 9s trips the <10s cutoff
+    expect(r[1][2]).toMatch(/typical for healthy adults over 50/); // L 9s trips the <10s cutoff (non-alarming wording)
   });
 });
 

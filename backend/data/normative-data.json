@@ -19,7 +19,7 @@
   "tests": {
     "thirty_second_sit_to_stand": {
       "displayName": "30-Second Sit-to-Stand",
-      "aliases": ["30cst", "30 second sit to stand", "30s sit to stand", "30 second chair stand", "sit to stand 30", "chair stand test", "30 sec sts"],
+      "aliases": ["30cst", "30 second sit to stand", "30s sit to stand", "30 second chair stand", "sit to stand 30", "chair stand test", "30 sec sts", "30 sec sit to stand", "30-sec sit-to-stand", "sit to stand 30 sec", "30 sec chair stand"],
       "unit": "reps", "direction": "higher_better", "type": "norm_referenced",
       "bands": [
         { "ageMin": 60, "ageMax": 64, "sex": "male", "low": 14, "high": 19 },
@@ -176,8 +176,8 @@
         { "ageMin": 80, "ageMax": 99, "sex": "any", "mean": 9.4 }
       ],
       "cutoffs": [
-        { "op": "<", "value": 5, "meaning": "strongly associated with falls" },
-        { "op": "<", "value": 10, "meaning": "(age >= 50) higher mortality association" }
+        { "op": "<", "value": 5, "meaning": "well below the single-leg hold linked with steady balance (a recognised fall-risk marker)" },
+        { "op": "<", "value": 10, "meaning": "shorter than the single-leg hold typical for healthy adults over 50" }
       ],
       "caveats": ["symmetry_not_norm"],
       "note": "The 4-Stage Balance Test itself is pass/fail (10 s per stage; failing tandem = increased fall risk). These graded norms are for the single-leg-stance component (eyes open).",
