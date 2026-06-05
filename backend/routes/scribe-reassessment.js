@@ -53,31 +53,43 @@ async function getSessionSource(sessionId) {
 // saved. Audit log only. Body: { baselineSessionId, currentSourceText? }.
 router.post('/:sessionId/reassessment/generate', async (req, res) => {
   try {
-    const { baselineSessionId, audience = 'patient' } = req.body;
+    const { baselineSessionId, audience = 'patient', previousReportText } = req.body;
     let { currentSourceText } = req.body;
-    if (!baselineSessionId) return res.status(400).json({ error: 'baselineSessionId required' });
-
-    const both = await db.query(
-      'SELECT id, clinician_id, patient_id FROM scribe_sessions WHERE id = ANY($1::int[])',
-      [[parseInt(req.params.sessionId), parseInt(baselineSessionId)]]
-    );
-    const current = both.rows.find(s => s.id === parseInt(req.params.sessionId));
-    const baseline = both.rows.find(s => s.id === parseInt(baselineSessionId));
-    if (!current || !baseline) return res.status(404).json({ error: 'Session not found' });
-    if (current.clinician_id !== req.user.id || baseline.clinician_id !== req.user.id) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    if (current.patient_id !== baseline.patient_id) {
-      return res.status(400).json({ error: 'Both sessions must belong to the same patient' });
+    const hasReport = !!(previousReportText && previousReportText.trim());
+    if (!baselineSessionId && !hasReport) {
+      return res.status(400).json({ error: 'Select a baseline session or provide a previous report.' });
     }
 
-    // Current source: prefer the caller-supplied text (the client already resolves
-    // transcript→note); otherwise resolve it server-side. Baseline is always
-    // resolved server-side (its transcript is long purged → saved note).
+    // Current session (this :sessionId) is always required.
+    const current = (await db.query(
+      'SELECT id, clinician_id, patient_id FROM scribe_sessions WHERE id = $1', [req.params.sessionId]
+    )).rows[0];
+    if (!current) return res.status(404).json({ error: 'Session not found' });
+    if (current.clinician_id !== req.user.id) return res.status(403).json({ error: 'Access denied' });
+
+    // Build the baseline source: a prior session's note and/or an uploaded report.
+    let baselineSourceText = '';
+    if (baselineSessionId) {
+      const baseline = (await db.query(
+        'SELECT id, clinician_id, patient_id FROM scribe_sessions WHERE id = $1', [parseInt(baselineSessionId)]
+      )).rows[0];
+      if (!baseline) return res.status(404).json({ error: 'Baseline session not found' });
+      if (baseline.clinician_id !== req.user.id) return res.status(403).json({ error: 'Access denied' });
+      if (baseline.patient_id !== current.patient_id) {
+        return res.status(400).json({ error: 'Both sessions must belong to the same patient' });
+      }
+      baselineSourceText = await getSessionSource(baseline.id);
+    }
+    if (hasReport) {
+      const report = previousReportText.trim();
+      baselineSourceText = baselineSourceText
+        ? `${baselineSourceText}\n\n--- Additional previous report supplied by the clinician ---\n${report}`
+        : report;
+    }
+
     if (!currentSourceText) currentSourceText = await getSessionSource(current.id);
-    const baselineSourceText = await getSessionSource(baseline.id);
     if (!baselineSourceText) {
-      return res.status(422).json({ error: 'The baseline session has no saved note to compare against. Save a SOAP note on that session first.' });
+      return res.status(422).json({ error: 'No baseline to compare against — the baseline session has no saved note. Select a session with a note, or upload/paste the previous report.' });
     }
     if (!currentSourceText) {
       return res.status(422).json({ error: 'No transcript or saved note for the current session.' });
@@ -93,7 +105,7 @@ router.post('/:sessionId/reassessment/generate', async (req, res) => {
     }
 
     audit.log(req, 'reassessment_generated', 'scribe_session', parseInt(req.params.sessionId), {
-      audience, baselineSessionId: parseInt(baselineSessionId), ...result.counts,
+      audience, baselineSessionId: baselineSessionId ? parseInt(baselineSessionId) : null, usedReport: hasReport, ...result.counts,
     });
 
     res.json({

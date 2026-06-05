@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { FileText, Users, TrendingUp, Stethoscope, Loader2, Search, ChevronRight } from 'lucide-react';
-import { apiFetch, generateReport, generateHandout, generateReassessment, downloadReportDocx } from '../../utils/scribe-api';
+import { FileText, Users, TrendingUp, Stethoscope, Loader2, Search, ChevronRight, Upload, FileUp, X } from 'lucide-react';
+import { apiFetch, generateReport, generateHandout, generateReassessment, extractDocumentText, downloadReportDocx } from '../../utils/scribe-api';
 import type { HandoutSections, HandoutGrounding, ReassessmentData } from '../../types';
 import HandoutPreview from './HandoutPreview';
 import ReassessmentPreview from './ReassessmentPreview';
@@ -72,11 +72,14 @@ export default function ScribeReportsPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType | null>(null);
   const [selectedSession, setSelectedSession] = useState<SessionItem | null>(null);
   const [selectedBaseline, setSelectedBaseline] = useState<SessionItem | null>(null);
+  const [previousReport, setPreviousReport] = useState('');   // extra baseline context (pasted/uploaded)
+  const [uploadName, setUploadName] = useState('');
+  const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState('');
   const [activeHandout, setActiveHandout] = useState<{ sections: HandoutSections; session: SessionItem; source: 'transcript' | 'note'; grounding?: HandoutGrounding } | null>(null);
-  const [activeReassessment, setActiveReassessment] = useState<{ data: ReassessmentData; session: SessionItem; baseline: SessionItem } | null>(null);
-  const [activeGPReassessment, setActiveGPReassessment] = useState<{ data: ReassessmentData; session: SessionItem; baseline: SessionItem } | null>(null);
+  const [activeReassessment, setActiveReassessment] = useState<{ data: ReassessmentData; session: SessionItem; baseline: SessionItem | null } | null>(null);
+  const [activeGPReassessment, setActiveGPReassessment] = useState<{ data: ReassessmentData; session: SessionItem; baseline: SessionItem | null } | null>(null);
 
   // Reassessment variants need a baseline session selected before generating.
   const isReassessment = selectedTemplate === 'reassessment' || selectedTemplate === 'gp-reassessment';
@@ -138,14 +141,16 @@ export default function ScribeReportsPage() {
           recommendations:     result.sections.managementPlan      || '',
         });
       } else if (selectedTemplate === 'reassessment' || selectedTemplate === 'gp-reassessment') {
-        if (!selectedBaseline) {
-          throw new Error('Select a baseline session to compare against.');
+        if (!selectedBaseline && !previousReport.trim()) {
+          throw new Error('Select a baseline session, or upload/paste a previous report to compare against.');
         }
         // Resolve the current session's source; the backend resolves the baseline
-        // (its transcript is long purged) from the saved note itself.
+        // (its transcript is long purged) from the saved note + any uploaded report.
         const { text: sourceText } = await resolveSessionSource(selectedSession.id);
         const audience = selectedTemplate === 'gp-reassessment' ? 'gp' : 'patient';
-        const result = await generateReassessment(selectedSession.id, selectedBaseline.id, sourceText, audience);
+        const result = await generateReassessment(
+          selectedSession.id, selectedBaseline ? selectedBaseline.id : null, sourceText, audience, previousReport.trim(),
+        );
         if (selectedTemplate === 'gp-reassessment') {
           setActiveGPReassessment({ data: result, session: selectedSession, baseline: selectedBaseline });
         } else {
@@ -178,6 +183,20 @@ export default function ScribeReportsPage() {
     return new Date(dateStr).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
+  async function handleUploadReport(file: File) {
+    setUploading(true);
+    setGenError('');
+    try {
+      const text = await extractDocumentText(file);
+      setPreviousReport(prev => (prev.trim() ? `${prev.trim()}\n\n${text}` : text));
+      setUploadName(file.name);
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : 'Could not read the document');
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <>
       <div className="max-w-4xl mx-auto">
@@ -193,7 +212,7 @@ export default function ScribeReportsPage() {
             {TEMPLATES.map(t => (
               <button
                 key={t.type}
-                onClick={() => { setSelectedTemplate(t.type); setSelectedSession(null); setSelectedBaseline(null); setGenError(''); }}
+                onClick={() => { setSelectedTemplate(t.type); setSelectedSession(null); setSelectedBaseline(null); setPreviousReport(''); setUploadName(''); setGenError(''); }}
                 className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition ${
                   selectedTemplate === t.type
                     ? 'border-primary-400 bg-primary-50'
@@ -273,11 +292,11 @@ export default function ScribeReportsPage() {
         {/* Step 3: Baseline session (reassessment variants only) */}
         {isReassessment && selectedSession && (
           <div className="mb-6">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">3. Baseline to compare against</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">3. Baseline to compare against <span className="normal-case font-normal text-gray-300">(pick a session, and/or add a previous report below)</span></p>
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               {baselineCandidates.length === 0 ? (
                 <div className="py-8 px-4 text-center text-sm text-gray-400">
-                  No earlier session with a saved note for {selectedSession.patientName.split(' ')[0]}. A reassessment needs a baseline session that has a SOAP note saved (the transcript is deleted 48 hours after recording).
+                  No earlier session with a saved note for {selectedSession.patientName.split(' ')[0]}. Either save a SOAP note on an earlier session, or upload/paste the previous report below to use as the baseline.
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100 max-h-60 overflow-y-auto">
@@ -306,13 +325,53 @@ export default function ScribeReportsPage() {
           </div>
         )}
 
+        {/* Previous report (optional) — extra baseline context, or a stand-in baseline */}
+        {isReassessment && selectedSession && (
+          <div className="mb-6">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+              Previous report <span className="normal-case font-normal text-gray-300">(optional — adds baseline context, or use instead of a session)</span>
+            </p>
+            <div className="bg-white border border-gray-200 rounded-xl p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition cursor-pointer">
+                  {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Upload PDF / Word
+                  <input
+                    type="file"
+                    accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadReport(f); e.target.value = ''; }}
+                  />
+                </label>
+                {uploadName && (
+                  <span className="flex items-center gap-1 text-xs text-primary-600">
+                    <FileUp className="w-3.5 h-3.5" /> {uploadName}
+                  </span>
+                )}
+                {previousReport.trim() && (
+                  <button onClick={() => { setPreviousReport(''); setUploadName(''); }} className="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
+                    <X className="w-3.5 h-3.5" /> Clear
+                  </button>
+                )}
+              </div>
+              <textarea
+                value={previousReport}
+                onChange={e => setPreviousReport(e.target.value)}
+                rows={previousReport ? 6 : 2}
+                placeholder="…or paste the previous report text here. It's used as extra baseline context (PDF/Word is extracted to text — nothing is stored)."
+                className="w-full border border-gray-200 rounded-lg p-2.5 text-xs text-secondary-700 leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-primary-300"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Generate */}
         {selectedTemplate && selectedSession && (
           <div className="flex flex-col gap-3">
             {genError && <p className="text-sm text-red-500">{genError}</p>}
             <button
               onClick={handleGenerate}
-              disabled={generating || (isReassessment && !selectedBaseline)}
+              disabled={generating || (isReassessment && !selectedBaseline && !previousReport.trim())}
               className="flex items-center justify-center gap-2 bg-primary-400 hover:bg-primary-500 disabled:opacity-50 text-white px-6 py-3 rounded-xl text-sm font-semibold transition active:scale-[0.98]"
             >
               {generating ? (
@@ -344,9 +403,9 @@ export default function ScribeReportsPage() {
         <ReassessmentPreview
           data={activeReassessment.data}
           patientFirstName={activeReassessment.session.patientName.split(' ')[0]}
-          baselineDate={new Date(activeReassessment.baseline.sessionDate).toLocaleDateString('en-AU', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-          })}
+          baselineDate={activeReassessment.baseline
+            ? new Date(activeReassessment.baseline.sessionDate).toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            : 'previous report'}
           latestDate={new Date(activeReassessment.session.sessionDate).toLocaleDateString('en-AU', {
             day: '2-digit', month: '2-digit', year: 'numeric',
           })}
@@ -361,9 +420,9 @@ export default function ScribeReportsPage() {
         <GPReassessmentPreview
           data={activeGPReassessment.data}
           patientName={activeGPReassessment.session.patientName}
-          baselineDate={new Date(activeGPReassessment.baseline.sessionDate).toLocaleDateString('en-AU', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-          })}
+          baselineDate={activeGPReassessment.baseline
+            ? new Date(activeGPReassessment.baseline.sessionDate).toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            : 'previous report'}
           latestDate={new Date(activeGPReassessment.session.sessionDate).toLocaleDateString('en-AU', {
             day: '2-digit', month: '2-digit', year: 'numeric',
           })}

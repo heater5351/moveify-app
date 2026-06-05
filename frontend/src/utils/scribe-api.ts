@@ -88,11 +88,26 @@ export async function fetchHandoutDocx(sessionId: number, data: Record<string, s
   return res.blob();
 }
 
+// Extract plain text from an uploaded previous report (PDF/DOCX/TXT) for use as
+// extra reassessment baseline context. Returns the extracted text.
+export async function extractDocumentText(file: File): Promise<string> {
+  const form = new FormData();
+  form.append('file', file);
+  // Note: no Content-Type header — the browser sets the multipart boundary.
+  const res = await apiFetch('/documents/extract', { method: 'POST', body: form });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Could not read the document');
+  }
+  return (await res.json()).text as string;
+}
+
 export async function generateReassessment(
   sessionId: number,
-  baselineSessionId: number,
+  baselineSessionId: number | null,
   currentSourceText: string,
   audience: 'patient' | 'gp' = 'patient',
+  previousReportText = '',
 ): Promise<ReassessmentData> {
   const controller = new AbortController();
   // Two findings extractions + the narrative — give it more headroom than the handout.
@@ -101,7 +116,7 @@ export async function generateReassessment(
     const res = await apiFetch(`/sessions/${sessionId}/reassessment/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ baselineSessionId, currentSourceText, audience }),
+      body: JSON.stringify({ baselineSessionId, currentSourceText, audience, previousReportText }),
       signal: controller.signal,
     });
     if (!res.ok) {

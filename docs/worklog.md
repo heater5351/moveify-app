@@ -22,6 +22,20 @@ what to know now, links).
 
 ---
 
+## 2026-06-05 — Scribe: upload a previous report as reassessment baseline context
+
+- **What:** the reassessment (patient + GP) can now take a **previous report** (PDF / DOCX / TXT
+  upload, or pasted text) as extra baseline context — and it can **stand in as the baseline** when
+  there's no prior scribe session (so patients whose baseline predates the scribe can be reassessed).
+- **How:** new `services/document-extract.js` (DOCX via pizzip, PDF via `pdf-parse`, TXT) +
+  `routes/scribe-documents.js` `POST /api/scribe/documents/extract` (multer **memory** storage —
+  the file is never written to disk; extracted text is never logged; it's PHI, sent only to the
+  in-region extraction LLM like transcripts). The reassessment `generate` route now accepts
+  `previousReportText` and makes `baselineSessionId` **optional** when a report is supplied (baseline
+  source = session note and/or report). Frontend: a "Previous report (optional)" panel (upload +
+  paste) in `ScribeReportsPage`.
+- **New deps:** `multer`, `pdf-parse` (backend). Nothing persisted; no schema changes.
+
 ## 2026-06-05 — Scribe: GP Reassessment Report (clinician-to-GP variant)
 
 - **What:** a fourth report type — a GP-facing version of the reassessment. Same deterministic
