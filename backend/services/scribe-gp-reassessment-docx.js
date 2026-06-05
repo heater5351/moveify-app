@@ -49,6 +49,14 @@ async function generateGPReassessmentDocx(data) {
     nullGetter() { return ''; },
   });
 
+  const patient = clean(data.patientName) || 'the patient';
+  const defaultCoverLetter =
+    `Thank you for your ongoing care of ${patient}. Please find enclosed an Exercise Physiology reassessment report following their review` +
+    `${data.latestDate ? ` on ${data.latestDate}` : ''}.\n\n` +
+    `This report compares ${patient}'s current objective measures against their baseline assessment` +
+    `${data.baselineDate ? ` of ${data.baselineDate}` : ''}, and summarises their progress, the clinical interpretation of those changes, and recommendations for the next phase of care.\n\n` +
+    `I would be glad to discuss any aspect of this report. Thank you for the opportunity to be involved in ${patient}'s care.`;
+
   doc.render({
     report_date:       data.reportDate || new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }),
     gp_name:           clean(data.gpName) || '[GP name]',
@@ -58,6 +66,7 @@ async function generateGPReassessmentDocx(data) {
     patient_dob:       clean(data.dob),
     baseline_date:     data.baselineDate || '',
     latest_date:       data.latestDate || '',
+    cover_letter:      clean(data.coverLetter) || defaultCoverLetter,
     executive_summary:       clean(data.executiveSummary),
     clinical_interpretation: clean(data.clinicalInterpretation),
     recommendations:         clean(data.recommendations),

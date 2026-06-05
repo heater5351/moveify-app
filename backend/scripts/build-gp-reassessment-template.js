@@ -44,17 +44,26 @@ function comparisonTable() {
 
 const para = (token) => new Paragraph({ keepLines: true, spacing: { after: 160 }, children: [t(`{{${token}}}`, { color: INK, size: 22 })] });
 
+// Sign-off block (used to close the cover letter).
+const signOff = () => [
+  new Paragraph({ spacing: { before: 280, after: 40 }, children: [t('Kind regards,', { color: INK, size: 22 })] }),
+  SPACER(120),
+  new Paragraph({ spacing: { after: 10 }, children: [t('Ryan Heath', { color: NAVY, bold: true, size: 24 })] }),
+  new Paragraph({ spacing: { after: 4 }, children: [t('BClinExPhys (Hons)  ·  Accredited Exercise Physiologist', { color: SUB, size: 20 })] }),
+  new Paragraph({ children: [t('Moveify Health Solutions', { color: NAVY, bold: true, size: 20 }), t('  ·  ', { color: TEAL, bold: true, size: 20 }), t('0435 524 991', { color: SUB, size: 20 }), t('  ·  ', { color: TEAL, bold: true, size: 20 }), t('ryan@moveifyhealth.com', { color: SUB, size: 20 })] }),
+];
+
 const doc = buildDoc([
+  // ───────── PAGE 1 — Cover letter ─────────
   masthead(),
-  // Letter meta + recipient
-  new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 120, after: 200 }, children: [t('{{report_date}}', { color: SUB, size: 20 })] }),
+  new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 120, after: 240 }, children: [t('{{report_date}}', { color: SUB, size: 20 })] }),
   new Paragraph({ spacing: { after: 20 }, children: [t('{{gp_name}}', { color: NAVY, bold: true, size: 22 })] }),
   new Paragraph({ spacing: { after: 20 }, children: [t('{{practice_name}}', { color: INK, size: 21 })] }),
-  new Paragraph({ spacing: { after: 200 }, children: [t('{{practice_address}}', { color: SUB, size: 20 })] }),
-  new Paragraph({ spacing: { after: 160 }, children: [t('Dear Dr {{gp_name}},', { color: INK, size: 22 })] }),
+  new Paragraph({ spacing: { after: 260 }, children: [t('{{practice_address}}', { color: SUB, size: 20 })] }),
+  new Paragraph({ spacing: { after: 200 }, children: [t('Dear Dr {{gp_name}},', { color: INK, size: 22 })] }),
   // Re: line — teal-accented, brand touch
   new Paragraph({
-    spacing: { after: 240 }, border: { bottom: edge(TEAL, 12) },
+    spacing: { after: 280 }, border: { bottom: edge(TEAL, 12) },
     children: [
       t('RE: ', { color: TEAL, bold: true, size: 22 }),
       t('{{patient_full_name}}', { color: NAVY, bold: true, size: 22 }),
@@ -62,9 +71,21 @@ const doc = buildDoc([
       t('— Exercise Physiology Reassessment', { color: NAVY, bold: true, size: 22 }),
     ],
   }),
-  new Paragraph({ spacing: { after: 200 }, children: [
-    t('Baseline ', { color: SUB, size: 20 }), t('{{baseline_date}}', { color: NAVY, bold: true, size: 20 }),
-    t('   →   ', { color: TEAL, bold: true, size: 20 }),
+  // Cover letter body (editable; newlines become paragraph breaks via linebreaks:true)
+  new Paragraph({ keepLines: true, spacing: { after: 200, line: 300 }, children: [t('{{cover_letter}}', { color: INK, size: 22 })] }),
+  ...signOff(),
+  footerRule(),
+
+  // ───────── PAGE 2 — Reassessment report ─────────
+  new Paragraph({ pageBreakBefore: true, children: [] }),
+  masthead(),
+  new Paragraph({ spacing: { before: 160, after: 40 }, children: [
+    t('Exercise Physiology ', { bold: true, color: NAVY, size: 34 }), t('Reassessment Report', { bold: true, color: TEAL, size: 34 }),
+  ] }),
+  new Paragraph({ spacing: { after: 200 }, border: { bottom: edge(RULE, 4) }, children: [
+    t('{{patient_full_name}}', { color: NAVY, bold: true, size: 22 }),
+    t('   ·   Baseline ', { color: SUB, size: 20 }), t('{{baseline_date}}', { color: NAVY, bold: true, size: 20 }),
+    t('  →  ', { color: TEAL, bold: true, size: 20 }),
     t('Reassessed ', { color: SUB, size: 20 }), t('{{latest_date}}', { color: NAVY, bold: true, size: 20 }),
   ] }),
 
@@ -79,13 +100,6 @@ const doc = buildDoc([
 
   subHeading('Recommendations'),
   para('recommendations'),
-
-  // Sign-off
-  new Paragraph({ spacing: { before: 280, after: 40 }, children: [t('Kind regards,', { color: INK, size: 22 })] }),
-  SPACER(120),
-  new Paragraph({ spacing: { after: 10 }, children: [t('Ryan Heath', { color: NAVY, bold: true, size: 24 })] }),
-  new Paragraph({ spacing: { after: 4 }, children: [t('BClinExPhys (Hons)  ·  Accredited Exercise Physiologist', { color: SUB, size: 20 })] }),
-  new Paragraph({ children: [t('Moveify Health Solutions', { color: NAVY, bold: true, size: 20 }), t('  ·  ', { color: TEAL, bold: true, size: 20 }), t('0435 524 991', { color: SUB, size: 20 }), t('  ·  ', { color: TEAL, bold: true, size: 20 }), t('ryan@moveifyhealth.com', { color: SUB, size: 20 })] }),
   footerRule(),
 ]);
 
