@@ -92,6 +92,7 @@ export async function generateReassessment(
   sessionId: number,
   baselineSessionId: number,
   currentSourceText: string,
+  audience: 'patient' | 'gp' = 'patient',
 ): Promise<ReassessmentData> {
   const controller = new AbortController();
   // Two findings extractions + the narrative — give it more headroom than the handout.
@@ -100,7 +101,7 @@ export async function generateReassessment(
     const res = await apiFetch(`/sessions/${sessionId}/reassessment/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ baselineSessionId, currentSourceText }),
+      body: JSON.stringify({ baselineSessionId, currentSourceText, audience }),
       signal: controller.signal,
     });
     if (!res.ok) {
@@ -116,11 +117,12 @@ export async function generateReassessment(
 export async function regradeReassessment(
   sessionId: number,
   comparison: string,
+  audience: 'patient' | 'gp' = 'patient',
 ): Promise<{ comparison: string; grounding?: { missingSex: boolean; missingAge: boolean; hasFindings: boolean } }> {
   const res = await apiFetch(`/sessions/${sessionId}/reassessment/regrade`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ comparison }),
+    body: JSON.stringify({ comparison, audience }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -133,14 +135,15 @@ export async function regenerateReassessmentNarrative(
   sessionId: number,
   comparison: string,
   subjectiveContext: string,
-): Promise<{ progress: string; nextSteps: string; resultsSummary: string }> {
+  audience: 'patient' | 'gp' = 'patient',
+): Promise<{ progress?: string; nextSteps?: string; resultsSummary?: string; executiveSummary?: string; clinicalInterpretation?: string; recommendations?: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60_000);
   try {
     const res = await apiFetch(`/sessions/${sessionId}/reassessment/narrative`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ comparison, subjectiveContext }),
+      body: JSON.stringify({ comparison, subjectiveContext, audience }),
       signal: controller.signal,
     });
     if (!res.ok) {

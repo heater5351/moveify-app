@@ -336,7 +336,7 @@ All routes are prefixed with `/api`. Routes marked with a lock require authentic
 | `agreements.js` | `/api/agreements` | `POST /generate` (mint tokenised link) | Clinician only |
 | `agreements.js` | `/api/agreements` | `GET /validate/:token`, `POST /:token/sign` | Public (token-gated, rate-limited) |
 | `scribe-handout.js` | `/api/scribe/sessions` | `POST /:id/handout/generate`, `POST /:id/handout/docx` | Clinician only (ephemeral, audit only) |
-| `scribe-reassessment.js` | `/api/scribe/sessions` | `POST /:id/reassessment/generate`, `POST /:id/reassessment/docx` | Clinician only (baseline vs latest comparison; ephemeral, audit only) |
+| `scribe-reassessment.js` | `/api/scribe/sessions` | `POST /:id/reassessment/{generate,regrade,narrative,docx}` | Clinician only (baseline vs latest comparison; `audience` 'patient'\|'gp' + docx `variant`; ephemeral, audit only) |
 
 ## Database Schema
 

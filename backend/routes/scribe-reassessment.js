@@ -4,7 +4,25 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const { decrypt } = require('../services/scribe-encryption');
 const { generateReassessment, regenerateNarrative, regradeComparison } = require('../services/scribe-reassessment');
 const { generateReassessmentDocx } = require('../services/scribe-reassessment-docx');
+const { generateGPReassessmentDocx } = require('../services/scribe-gp-reassessment-docx');
 const { getPatientDemographics } = require('../services/scribe-demographics');
+
+// Substitute the [PATIENT_NAME] placeholder used by the GP narrative (kept off the
+// wire to AWS) with the real name, server-side. Applies to the GP narrative fields.
+function fillName(obj, name) {
+  const sub = s => (s || '').replace(/\[PATIENT_NAME\]/g, name || '');
+  return {
+    executiveSummary: sub(obj.executiveSummary),
+    clinicalInterpretation: sub(obj.clinicalInterpretation),
+    recommendations: sub(obj.recommendations),
+  };
+}
+async function patientName(patientId) {
+  try {
+    const r = await db.query('SELECT name FROM users WHERE id = $1', [patientId]);
+    return r.rows[0] ? r.rows[0].name : '';
+  } catch { return ''; }
+}
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -35,7 +53,7 @@ async function getSessionSource(sessionId) {
 // saved. Audit log only. Body: { baselineSessionId, currentSourceText? }.
 router.post('/:sessionId/reassessment/generate', async (req, res) => {
   try {
-    const { baselineSessionId } = req.body;
+    const { baselineSessionId, audience = 'patient' } = req.body;
     let { currentSourceText } = req.body;
     if (!baselineSessionId) return res.status(400).json({ error: 'baselineSessionId required' });
 
@@ -66,9 +84,16 @@ router.post('/:sessionId/reassessment/generate', async (req, res) => {
     }
 
     const demographics = await getPatientDemographics(current.patient_id);
-    const result = await generateReassessment(baselineSourceText, currentSourceText, demographics);
+    const result = await generateReassessment(baselineSourceText, currentSourceText, demographics, { audience });
+
+    // GP narrative names the patient via a placeholder kept off the wire — fill it here.
+    if (audience === 'gp') {
+      const name = await patientName(current.patient_id);
+      Object.assign(result, fillName(result, name));
+    }
+
     audit.log(req, 'reassessment_generated', 'scribe_session', parseInt(req.params.sessionId), {
-      baselineSessionId: parseInt(baselineSessionId), ...result.counts,
+      audience, baselineSessionId: parseInt(baselineSessionId), ...result.counts,
     });
 
     res.json({
@@ -91,7 +116,7 @@ router.post('/:sessionId/reassessment/generate', async (req, res) => {
 // Deterministic, no LLM. Ephemeral — audit log only.
 router.post('/:sessionId/reassessment/regrade', async (req, res) => {
   try {
-    const { comparison } = req.body;
+    const { comparison, audience = 'patient' } = req.body;
     if (!comparison) return res.status(400).json({ error: 'comparison required' });
 
     const session = await db.query(
@@ -101,7 +126,7 @@ router.post('/:sessionId/reassessment/regrade', async (req, res) => {
     if (session.rows[0].clinician_id !== req.user.id) return res.status(403).json({ error: 'Access denied' });
 
     const demographics = await getPatientDemographics(session.rows[0].patient_id);
-    const regraded = regradeComparison(comparison, demographics.age ?? null, demographics.sex ?? null);
+    const regraded = regradeComparison(comparison, demographics.age ?? null, demographics.sex ?? null, audience);
     audit.log(req, 'reassessment_regraded', 'scribe_session', parseInt(req.params.sessionId), {});
     res.json({
       comparison: regraded,
@@ -118,17 +143,18 @@ router.post('/:sessionId/reassessment/regrade', async (req, res) => {
 // goals/pain context), without re-reading the notes. Ephemeral — audit log only.
 router.post('/:sessionId/reassessment/narrative', async (req, res) => {
   try {
-    const { comparison, subjectiveContext } = req.body;
+    const { comparison, subjectiveContext, audience = 'patient' } = req.body;
     if (!comparison) return res.status(400).json({ error: 'comparison required' });
 
     const session = await db.query(
-      'SELECT id, clinician_id FROM scribe_sessions WHERE id = $1', [req.params.sessionId]
+      'SELECT id, clinician_id, patient_id FROM scribe_sessions WHERE id = $1', [req.params.sessionId]
     );
     if (session.rows.length === 0) return res.status(404).json({ error: 'Session not found' });
     if (session.rows[0].clinician_id !== req.user.id) return res.status(403).json({ error: 'Access denied' });
 
-    const out = await regenerateNarrative(comparison, subjectiveContext || '');
-    audit.log(req, 'reassessment_narrative_regenerated', 'scribe_session', parseInt(req.params.sessionId), {});
+    let out = await regenerateNarrative(comparison, subjectiveContext || '', audience);
+    if (audience === 'gp') out = fillName(out, await patientName(session.rows[0].patient_id));
+    audit.log(req, 'reassessment_narrative_regenerated', 'scribe_session', parseInt(req.params.sessionId), { audience });
     res.json(out);
   } catch (err) {
     console.error('Regenerate reassessment narrative error:', err.message);
@@ -146,12 +172,13 @@ router.post('/:sessionId/reassessment/docx', async (req, res) => {
     if (session.rows.length === 0) return res.status(404).json({ error: 'Session not found' });
     if (session.rows[0].clinician_id !== req.user.id) return res.status(403).json({ error: 'Access denied' });
 
-    const buffer = await generateReassessmentDocx(req.body);
-    const safeName = (req.body.patientFirstName || 'Patient').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
-    audit.log(req, 'reassessment_docx_generated', 'scribe_session', parseInt(req.params.sessionId), {});
+    const isGp = req.body.variant === 'gp';
+    const buffer = isGp ? await generateGPReassessmentDocx(req.body) : await generateReassessmentDocx(req.body);
+    const safeName = (req.body.patientName || req.body.patientFirstName || 'Patient').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
+    audit.log(req, 'reassessment_docx_generated', 'scribe_session', parseInt(req.params.sessionId), { variant: req.body.variant || 'patient' });
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'Content-Disposition': `attachment; filename="Reassessment_${safeName}.docx"`,
+      'Content-Disposition': `attachment; filename="${isGp ? 'GP_Reassessment' : 'Reassessment'}_${safeName}.docx"`,
     });
     res.send(buffer);
   } catch (err) {

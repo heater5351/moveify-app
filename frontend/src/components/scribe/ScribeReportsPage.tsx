@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { FileText, Users, TrendingUp, Loader2, Search, ChevronRight } from 'lucide-react';
+import { FileText, Users, TrendingUp, Stethoscope, Loader2, Search, ChevronRight } from 'lucide-react';
 import { apiFetch, generateReport, generateHandout, generateReassessment, downloadReportDocx } from '../../utils/scribe-api';
 import type { HandoutSections, HandoutGrounding, ReassessmentData } from '../../types';
 import HandoutPreview from './HandoutPreview';
 import ReassessmentPreview from './ReassessmentPreview';
+import GPReassessmentPreview from './GPReassessmentPreview';
 
-type TemplateType = 'cdmp' | 'handout' | 'reassessment';
+type TemplateType = 'cdmp' | 'handout' | 'reassessment' | 'gp-reassessment';
 
 interface SessionItem {
   id: number;
@@ -41,6 +42,12 @@ const TEMPLATES: {
     description: "Before/after comparison of a patient's latest results vs an earlier baseline session",
     requiresNote: false,
   },
+  {
+    type: 'gp-reassessment',
+    title: 'GP Reassessment Report',
+    description: 'Clinician-to-GP progress letter comparing baseline vs latest results',
+    requiresNote: false,
+  },
 ];
 
 // Resolve a session's source text: live transcript first, then the saved SOAP
@@ -69,6 +76,10 @@ export default function ScribeReportsPage() {
   const [genError, setGenError] = useState('');
   const [activeHandout, setActiveHandout] = useState<{ sections: HandoutSections; session: SessionItem; source: 'transcript' | 'note'; grounding?: HandoutGrounding } | null>(null);
   const [activeReassessment, setActiveReassessment] = useState<{ data: ReassessmentData; session: SessionItem; baseline: SessionItem } | null>(null);
+  const [activeGPReassessment, setActiveGPReassessment] = useState<{ data: ReassessmentData; session: SessionItem; baseline: SessionItem } | null>(null);
+
+  // Reassessment variants need a baseline session selected before generating.
+  const isReassessment = selectedTemplate === 'reassessment' || selectedTemplate === 'gp-reassessment';
 
   useEffect(() => { loadSessions(); }, []);
 
@@ -126,15 +137,20 @@ export default function ScribeReportsPage() {
           goals:               result.sections.goals               || '',
           recommendations:     result.sections.managementPlan      || '',
         });
-      } else if (selectedTemplate === 'reassessment') {
+      } else if (selectedTemplate === 'reassessment' || selectedTemplate === 'gp-reassessment') {
         if (!selectedBaseline) {
           throw new Error('Select a baseline session to compare against.');
         }
         // Resolve the current session's source; the backend resolves the baseline
         // (its transcript is long purged) from the saved note itself.
         const { text: sourceText } = await resolveSessionSource(selectedSession.id);
-        const result = await generateReassessment(selectedSession.id, selectedBaseline.id, sourceText);
-        setActiveReassessment({ data: result, session: selectedSession, baseline: selectedBaseline });
+        const audience = selectedTemplate === 'gp-reassessment' ? 'gp' : 'patient';
+        const result = await generateReassessment(selectedSession.id, selectedBaseline.id, sourceText, audience);
+        if (selectedTemplate === 'gp-reassessment') {
+          setActiveGPReassessment({ data: result, session: selectedSession, baseline: selectedBaseline });
+        } else {
+          setActiveReassessment({ data: result, session: selectedSession, baseline: selectedBaseline });
+        }
       } else {
         // Prefer the live transcript; fall back to the saved SOAP note if the
         // transcript has expired (deleted 48h after recording) or is missing.
@@ -185,7 +201,7 @@ export default function ScribeReportsPage() {
                 }`}
               >
                 <div className={`p-2 rounded-lg shrink-0 ${selectedTemplate === t.type ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-500'}`}>
-                  {t.type === 'cdmp' ? <FileText className="w-5 h-5" /> : t.type === 'reassessment' ? <TrendingUp className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+                  {t.type === 'cdmp' ? <FileText className="w-5 h-5" /> : t.type === 'reassessment' ? <TrendingUp className="w-5 h-5" /> : t.type === 'gp-reassessment' ? <Stethoscope className="w-5 h-5" /> : <Users className="w-5 h-5" />}
                 </div>
                 <div>
                   <p className={`text-sm font-semibold ${selectedTemplate === t.type ? 'text-primary-700' : 'text-secondary-700'}`}>{t.title}</p>
@@ -254,8 +270,8 @@ export default function ScribeReportsPage() {
           </div>
         )}
 
-        {/* Step 3: Baseline session (reassessment only) */}
-        {selectedTemplate === 'reassessment' && selectedSession && (
+        {/* Step 3: Baseline session (reassessment variants only) */}
+        {isReassessment && selectedSession && (
           <div className="mb-6">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">3. Baseline to compare against</p>
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -296,7 +312,7 @@ export default function ScribeReportsPage() {
             {genError && <p className="text-sm text-red-500">{genError}</p>}
             <button
               onClick={handleGenerate}
-              disabled={generating || (selectedTemplate === 'reassessment' && !selectedBaseline)}
+              disabled={generating || (isReassessment && !selectedBaseline)}
               className="flex items-center justify-center gap-2 bg-primary-400 hover:bg-primary-500 disabled:opacity-50 text-white px-6 py-3 rounded-xl text-sm font-semibold transition active:scale-[0.98]"
             >
               {generating ? (
@@ -337,6 +353,23 @@ export default function ScribeReportsPage() {
           sessionId={activeReassessment.session.id}
           grounding={activeReassessment.data.grounding}
           onClose={() => setActiveReassessment(null)}
+          onRegenerate={handleGenerate}
+        />
+      )}
+
+      {activeGPReassessment && (
+        <GPReassessmentPreview
+          data={activeGPReassessment.data}
+          patientName={activeGPReassessment.session.patientName}
+          baselineDate={new Date(activeGPReassessment.baseline.sessionDate).toLocaleDateString('en-AU', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+          })}
+          latestDate={new Date(activeGPReassessment.session.sessionDate).toLocaleDateString('en-AU', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+          })}
+          sessionId={activeGPReassessment.session.id}
+          grounding={activeGPReassessment.data.grounding}
+          onClose={() => setActiveGPReassessment(null)}
           onRegenerate={handleGenerate}
         />
       )}

@@ -137,9 +137,9 @@ export default function ReassessmentPreview({
     setError('');
     try {
       const out = await regenerateReassessmentNarrative(sessionId, comparison, data.subjectiveContext || '');
-      setProgress(cleanText(out.progress));
-      setNextSteps(cleanText(out.nextSteps));
-      setResultsSummary(cleanText(out.resultsSummary));
+      setProgress(cleanText(out.progress || ''));
+      setNextSteps(cleanText(out.nextSteps || ''));
+      setResultsSummary(cleanText(out.resultsSummary || ''));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Rewrite failed');
     } finally {

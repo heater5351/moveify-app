@@ -9,7 +9,7 @@
  *
  * No patient values are logged.
  */
-const { extractFindings, generateReassessmentNarrative, extractSubjectiveComparison } = require('./scribe-llm');
+const { extractFindings, generateReassessmentNarrative, generateGPReassessmentNarrative, extractSubjectiveComparison } = require('./scribe-llm');
 const { matchTest, compareValues, buildComparisonInterpretation, interpret, buildInterpretation } = require('./normative-data');
 
 // Parse a consolidated "Test | Result | Interpretation" block into rows, tagging
@@ -57,7 +57,7 @@ function comparePassFail(res, prevRow, currRow) {
 }
 
 // Build one before/after comparison row + a graded line for the narrative input.
-function compareRow(prevRow, currRow, age, sex) {
+function compareRow(prevRow, currRow, age, sex, audience = 'patient') {
   const test = currRow.name;
   let change = '—';
   let interpretation;
@@ -72,7 +72,7 @@ function compareRow(prevRow, currRow, age, sex) {
         interpretation = pf.interpretation;
       } else {
         change = CHANGE_LABEL[res.direction] || '—';
-        interpretation = buildComparisonInterpretation(res) || currRow.interp;
+        interpretation = buildComparisonInterpretation(res, { audience }) || currRow.interp;
       }
       gradedLine = `${test}: ${prevRow.result} → ${currRow.result} — ${interpretation}`;
     }
@@ -98,7 +98,7 @@ function compareRow(prevRow, currRow, age, sex) {
  *   notRepeated  — measured at baseline only (not repeated this visit)
  *   gradedLines  — human-readable graded summary fed to the narrative LLM
  */
-function pairFindings(prevBlock, currBlock, age, sex) {
+function pairFindings(prevBlock, currBlock, age, sex, audience = 'patient') {
   const prev = parseRows(prevBlock);
   const curr = parseRows(currBlock);
   const prevByKey = new Map(prev.map(r => [r.key, r]));
@@ -111,7 +111,7 @@ function pairFindings(prevBlock, currBlock, age, sex) {
   for (const c of curr) {
     const p = prevByKey.get(c.key);
     if (p) {
-      const { row, gradedLine } = compareRow(p, c, age, sex);
+      const { row, gradedLine } = compareRow(p, c, age, sex, audience);
       matched.push(row);
       gradedLines.push(gradedLine);
     } else {
@@ -256,7 +256,7 @@ const FLOOR_ZERO_RE = /could ?n.?t|cannot|unable|^cnt$|^nil$|^none$|did ?n.?t/i;
 
 // Re-grade ONE edited row from its (possibly newly-filled) baseline/latest values.
 // Returns { change, interpretation } or null if it can't be graded (leave as-is).
-function regradeRow(test, base, latest, age, sex) {
+function regradeRow(test, base, latest, age, sex, audience = 'patient') {
   const bNum = numOrNull(base), lNum = numOrNull(latest);
 
   // 1. A recognised norm test (grip, single-leg, sit-to-stand, BP, …).
@@ -267,7 +267,13 @@ function regradeRow(test, base, latest, age, sex) {
     if (bNum == null && timed && FLOOR_ZERO_RE.test(String(base).trim())) baseForCompare = '0';
     if (numOrNull(baseForCompare) != null && lNum != null) {
       const res = compareValues(test, baseForCompare, latest, age, sex);
-      if (res) return { change: CHANGE_LABEL[res.direction] || '—', interpretation: buildComparisonInterpretation(res) };
+      if (res) {
+        if (res.def && res.def.type === 'pass_fail') {
+          const pf = comparePassFail(res, { result: base }, { result: latest });
+          return { change: pf.change, interpretation: pf.interpretation };
+        }
+        return { change: CHANGE_LABEL[res.direction] || '—', interpretation: buildComparisonInterpretation(res, { audience }) };
+      }
     }
     // No usable baseline → grounded current standing, still marked New.
     const cur = lNum != null ? interpret(test, latest, age, sex) : null;
@@ -302,7 +308,7 @@ function regradeRow(test, base, latest, age, sex) {
  * themselves. Lets a clinician add the baselines the initial note missed and have
  * the rows grade rather than stay "New". Deterministic. No patient values logged.
  */
-function regradeComparison(comparisonText, age, sex) {
+function regradeComparison(comparisonText, age, sex, audience = 'patient') {
   return (comparisonText || '')
     .split('\n')
     .map(line => {
@@ -310,7 +316,7 @@ function regradeComparison(comparisonText, age, sex) {
       const p = line.split('|').map(s => s.trim());
       const [test, base, latest, change, interp] = p;
       if (!test) return line;
-      const g = regradeRow(test, base || '', latest || '', age, sex);
+      const g = regradeRow(test, base || '', latest || '', age, sex, audience);
       if (!g) return `${test} | ${base || ''} | ${latest || ''} | ${change || ''} | ${interp || ''}`;
       return `${test} | ${base || ''} | ${latest || ''} | ${g.change} | ${g.interpretation}`;
     })
@@ -322,10 +328,16 @@ function regradeComparison(comparisonText, age, sex) {
  * goals/pain/issues context), without re-extracting from the notes. Lets a
  * clinician correct the objective results and regenerate the prose to match.
  */
-async function regenerateNarrative(comparisonText, subjectiveContext = '') {
+async function regenerateNarrative(comparisonText, subjectiveContext = '', audience = 'patient') {
   const narrativeInput = comparisonToNarrativeInput(comparisonText);
-  if (!narrativeInput && !subjectiveContext) {
-    return { progress: '', nextSteps: '', resultsSummary: '' };
+  const empty = audience === 'gp'
+    ? { executiveSummary: '', clinicalInterpretation: '', recommendations: '' }
+    : { progress: '', nextSteps: '', resultsSummary: '' };
+  if (!narrativeInput && !subjectiveContext) return empty;
+
+  if (audience === 'gp') {
+    const out = await generateGPReassessmentNarrative(narrativeInput, subjectiveContext);
+    return { executiveSummary: out.executiveSummary, clinicalInterpretation: out.clinicalInterpretation, recommendations: out.recommendations };
   }
   const out = await generateReassessmentNarrative(narrativeInput, subjectiveContext);
   return { progress: out.progress, nextSteps: out.nextSteps, resultsSummary: out.resultsSummary };
@@ -334,8 +346,9 @@ async function regenerateNarrative(comparisonText, subjectiveContext = '') {
 /**
  * Full reassessment generation: extract findings from both sources, pair + grade
  * deterministically, then phrase the narrative. demographics = { age, sex }.
+ * opts.audience 'patient' (default) | 'gp' switches phrasing + narrative shape.
  */
-async function generateReassessment(prevText, currText, demographics = {}) {
+async function generateReassessment(prevText, currText, demographics = {}, { audience = 'patient' } = {}) {
   const { age = null, sex = null } = demographics;
 
   // Objective findings (both notes) + the subjective comparison run in parallel.
@@ -345,7 +358,7 @@ async function generateReassessment(prevText, currText, demographics = {}) {
     extractSubjectiveComparison(prevText, currText),
   ]);
 
-  const { matched, newFindings, notRepeated, gradedLines } = pairFindings(prevBlock, currBlock, age, sex);
+  const { matched, newFindings, notRepeated, gradedLines } = pairFindings(prevBlock, currBlock, age, sex, audience);
 
   // Goals / pain / issues. Pain rated 0-10 at both visits becomes comparison rows
   // (lower-better); goals + issues + all pain feed the narrative context.
@@ -361,13 +374,14 @@ async function generateReassessment(prevText, currText, demographics = {}) {
   }
   const subjectiveContext = subjectiveNarrativeContext(subjective);
 
-  let progress = '', nextSteps = '', resultsSummary = '';
+  let narrative = audience === 'gp'
+    ? { executiveSummary: '', clinicalInterpretation: '', recommendations: '' }
+    : { progress: '', nextSteps: '', resultsSummary: '' };
   if (comparisonRows.length || newFindings.length || subjectiveContext) {
     try {
-      const out = await generateReassessmentNarrative(narrativeInput, subjectiveContext);
-      progress = out.progress;
-      nextSteps = out.nextSteps;
-      resultsSummary = out.resultsSummary;
+      narrative = audience === 'gp'
+        ? await generateGPReassessmentNarrative(narrativeInput, subjectiveContext)
+        : await generateReassessmentNarrative(narrativeInput, subjectiveContext);
     } catch (err) {
       console.error('Reassessment narrative failed:', err.message);
     }
@@ -379,9 +393,14 @@ async function generateReassessment(prevText, currText, demographics = {}) {
     notRepeated, // structured — surfaced as a hint in the UI, not the patient doc
     goals: subjective.goals, // structured — surfaced in the UI editor
     subjectiveContext, // returned so "rewrite from results" keeps goals/pain context
-    progress,
-    nextSteps,
-    resultsSummary,
+    // Narrative fields are audience-specific (patient: progress/nextSteps/resultsSummary;
+    // gp: executiveSummary/clinicalInterpretation/recommendations).
+    executiveSummary: narrative.executiveSummary,
+    clinicalInterpretation: narrative.clinicalInterpretation,
+    recommendations: narrative.recommendations,
+    progress: narrative.progress,
+    nextSteps: narrative.nextSteps,
+    resultsSummary: narrative.resultsSummary,
     counts: { matched: matched.length, new: newFindings.length, notRepeated: notRepeated.length, pain: painRows.length, goals: subjective.goals.length },
   };
 }

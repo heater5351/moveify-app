@@ -22,6 +22,28 @@ what to know now, links).
 
 ---
 
+## 2026-06-05 — Scribe: GP Reassessment Report (clinician-to-GP variant)
+
+- **What:** a fourth report type — a GP-facing version of the reassessment. Same deterministic
+  before/after comparison engine, but written clinician-to-GP and laid out as a formal referral
+  letter (recipient block, Re: line, Executive Summary / Objective Findings table / Clinical
+  Interpretation / Recommendations, sign-off). Blends the reassessment handout's brand styling
+  (`handout-kit.js`) with the GP report's letter structure.
+- **How:** an `audience` param ('patient' | 'gp') threads through the reassessment service +
+  routes. `normative-data.buildComparisonInterpretation(res, { audience })` swaps patient wording
+  ("the expected range for your age and sex", "Held steady") for clinician wording ("the age/sex
+  reference range", "No significant change"). New `scribe-llm.generateGPReassessmentNarrative`
+  (Executive Summary / Clinical Interpretation / Recommendations; uses the `[PATIENT_NAME]`
+  placeholder kept off the AWS wire, substituted server-side; may flag screening findings for GP
+  review). New `GP_Reassessment_Template.docx` (built by `scripts/build-gp-reassessment-template.js`)
+  + `services/scribe-gp-reassessment-docx.js` renderer.
+- **Routes:** the existing `/reassessment/{generate,regrade,narrative}` now accept `audience`;
+  `/reassessment/docx` accepts `variant: 'gp'` → GP renderer. Frontend: `GPReassessmentPreview.tsx`
+  (GP sections + editable GP/referral header fields + re-grade + rewrite + GP docx) and a new
+  template card in `ScribeReportsPage`.
+- **Unchanged:** the patient reassessment + handout paths (audience defaults to 'patient').
+  No schema changes, no env vars, nothing persisted.
+
 ## 2026-06-04 — Scribe: Reassessment Summary report (baseline vs latest)
 
 - **What:** new third report type in Scribe → Reports, alongside the CDMP GP report and the patient

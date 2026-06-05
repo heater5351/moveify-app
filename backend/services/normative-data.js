@@ -414,9 +414,12 @@ function compareValues(testName, prevRaw, currRaw, age, sex) {
 }
 
 // Range phrasing: banded norm tests compare to an age/sex range; screens (BP,
-// glucose, waist) just compare to a normal/recommended range.
-function rangePhrase(verdict, banded) {
-  const where = banded ? 'the expected range for your age and sex' : 'the normal range';
+// glucose, waist) just compare to a normal/recommended range. `audience` swaps
+// patient-facing wording for clinician wording in the GP report.
+function rangePhrase(verdict, banded, audience = 'patient') {
+  const where = banded
+    ? (audience === 'gp' ? 'the age/sex reference range' : 'the expected range for your age and sex')
+    : 'the normal range';
   if (verdict === 'within') return `within ${where}`;
   if (verdict === 'below') return `below ${where}`;
   if (verdict === 'above') return `above ${where}`;
@@ -433,9 +436,9 @@ function readingOf(parsed) {
 /**
  * Render a compareValues() result into a short, factual change sentence for the
  * reassessment table's "What it means" column. Deterministic. Patient-facing
- * second person, consistent with buildInterpretation().
+ * by default; `{ audience: 'gp' }` swaps in clinician wording for the GP report.
  */
-function buildComparisonInterpretation(res) {
+function buildComparisonInterpretation(res, { audience = 'patient' } = {}) {
   if (!res) return null;
   const parts = [];
   const u = unitWord(res.unit);
@@ -465,7 +468,7 @@ function buildComparisonInterpretation(res) {
     }
     parts.push(`${line}.`);
   } else if (res.direction === 'maintained') {
-    parts.push('Held steady.');
+    parts.push(audience === 'gp' ? 'No significant change.' : 'Held steady.');
   } else {
     // No numeric direction (qualitative / ungraded) — state the change neutrally.
     if (res.prev.value != null && res.curr.value != null && res.absChange !== 0) {
@@ -487,12 +490,12 @@ function buildComparisonInterpretation(res) {
         parts.push(`Now ${res.currLabel}.`);
       }
     } else if (res.crossedThreshold) {
-      const to = rangePhrase(res.currVerdict, banded);
+      const to = rangePhrase(res.currVerdict, banded, audience);
       if (to) parts.push(`Now ${to}, from ${res.prevVerdict} before.`);
     } else if (banded && (res.currVerdict === 'below' || res.currVerdict === 'above')) {
       // Improved/declined but still outside the norm band — keep the standing visible
       // so a gain off a low base doesn't read as "all sorted now".
-      parts.push(`Still ${rangePhrase(res.currVerdict, banded)}.`);
+      parts.push(`Still ${rangePhrase(res.currVerdict, banded, audience)}.`);
     }
   }
 

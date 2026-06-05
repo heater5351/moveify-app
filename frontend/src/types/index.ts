@@ -362,9 +362,14 @@ export type ReassessmentData = {
   notRepeated: { test: string; result: string }[]; // measured at baseline only
   goals: { goal: string; status: string; basis: string }[]; // baseline goals + progress status
   subjectiveContext: string; // goals/pain/issues context, resent on "rewrite from results"
+  // Patient-facing narrative (audience 'patient')
   progress: string;      // bullets
   nextSteps: string;     // bullets
   resultsSummary: string;
+  // GP-facing narrative (audience 'gp')
+  executiveSummary?: string;
+  clinicalInterpretation?: string;
+  recommendations?: string;
   counts: { matched: number; new: number; notRepeated: number; pain: number; goals: number };
   grounding?: HandoutGrounding;
 }

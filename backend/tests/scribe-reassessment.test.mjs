@@ -90,6 +90,20 @@ describe('regradeComparison (re-grade after editing baselines)', () => {
     const line = 'Mystery Test | tight | tight | — | qualitative';
     expect(regradeComparison(line, 68, 'female')).toBe(line);
   });
+
+  it('uses clinician phrasing for the GP audience', () => {
+    const line = '30-sec Sit-to-Stand | 7 | 9 reps | New | x';
+    const patient = regradeComparison(line, 66, 'female', 'patient');
+    const gp = regradeComparison(line, 66, 'female', 'gp');
+    expect(patient).toMatch(/expected range for your age and sex/);
+    expect(gp).toMatch(/age\/sex reference range/);
+    expect(gp).not.toMatch(/your age and sex/);
+  });
+
+  it('GP audience says "No significant change" instead of "Held steady"', () => {
+    const line = 'Grip Strength (Right) | 29.2 kg | 30.8 kg | Steady | x';
+    expect(regradeComparison(line, 66, 'female', 'gp')).toMatch(/No significant change/);
+  });
 });
 
 describe('comparisonToNarrativeInput (rewrite-from-edited-results)', () => {
