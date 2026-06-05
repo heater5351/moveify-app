@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { X, Download, RefreshCw, PenLine, Loader2 } from 'lucide-react';
+import { X, Download, RefreshCw, PenLine, Calculator, Loader2 } from 'lucide-react';
 import type { ReassessmentData, HandoutGrounding } from '../../types';
-import { fetchReassessmentDocx, regenerateReassessmentNarrative, saveBlob } from '../../utils/scribe-api';
+import { fetchReassessmentDocx, regenerateReassessmentNarrative, regradeReassessment, saveBlob } from '../../utils/scribe-api';
 
 interface ReassessmentPreviewProps {
   data: ReassessmentData;
@@ -65,6 +65,7 @@ export default function ReassessmentPreview({
   const [blob, setBlob] = useState<Blob | null>(null);
   const [rendering, setRendering] = useState(false);
   const [rewriting, setRewriting] = useState(false);
+  const [regrading, setRegrading] = useState(false);
   const [error, setError] = useState('');
 
   const previewRef = useRef<HTMLDivElement>(null);
@@ -113,6 +114,21 @@ export default function ReassessmentPreview({
     const t = setTimeout(generateAndRender, 700);
     return () => clearTimeout(t);
   }, [generateAndRender]);
+
+  // Re-grade the edited table: recompute Change + What-it-means from each row's
+  // values (e.g. after typing in a baseline the note missed). Deterministic, no LLM.
+  async function handleRegrade() {
+    setRegrading(true);
+    setError('');
+    try {
+      const out = await regradeReassessment(sessionId, comparison);
+      setComparison(out.comparison);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Re-grade failed');
+    } finally {
+      setRegrading(false);
+    }
+  }
 
   // Re-write the narrative from the EDITED comparison table (keeps your table
   // edits; does not re-read the notes). Goals/pain context rides along unchanged.
@@ -202,8 +218,18 @@ export default function ReassessmentPreview({
             <textarea value={nextSteps} onChange={e => setNextSteps(e.target.value)} rows={4} className={textarea} />
           </div>
           <div>
-            <p className={fieldLabel}>Before &amp; After</p>
-            <p className="text-[11px] text-gray-400 mb-1">One per line: Test | Baseline | Latest | Change | What it means</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className={`${fieldLabel} mb-0`}>Before &amp; After</p>
+              <button
+                onClick={handleRegrade}
+                disabled={regrading}
+                title="Recompute Change + meaning from the values (use after filling in a baseline)"
+                className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border border-primary-300 text-primary-600 hover:bg-primary-50 transition disabled:opacity-50"
+              >
+                {regrading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Calculator className="w-3 h-3" />} Re-grade
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-400 mb-1">One per line: Test | Baseline | Latest | Change | What it means. Fill in a missing baseline, then Re-grade.</p>
             <textarea
               value={comparison}
               onChange={e => setComparison(e.target.value)}

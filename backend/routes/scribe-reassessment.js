@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { decrypt } = require('../services/scribe-encryption');
-const { generateReassessment, regenerateNarrative } = require('../services/scribe-reassessment');
+const { generateReassessment, regenerateNarrative, regradeComparison } = require('../services/scribe-reassessment');
 const { generateReassessmentDocx } = require('../services/scribe-reassessment-docx');
 const { getPatientDemographics } = require('../services/scribe-demographics');
 const audit = require('../services/audit');
@@ -82,6 +82,34 @@ router.post('/:sessionId/reassessment/generate', async (req, res) => {
   } catch (err) {
     console.error('Generate reassessment error:', err.message);
     res.status(500).json({ error: 'Failed to generate reassessment' });
+  }
+});
+
+// POST /api/scribe/sessions/:sessionId/reassessment/regrade
+// Re-grade an EDITED comparison table — recompute Change + What-it-means from each
+// row's values (e.g. after the clinician fills in a baseline the note missed).
+// Deterministic, no LLM. Ephemeral — audit log only.
+router.post('/:sessionId/reassessment/regrade', async (req, res) => {
+  try {
+    const { comparison } = req.body;
+    if (!comparison) return res.status(400).json({ error: 'comparison required' });
+
+    const session = await db.query(
+      'SELECT id, clinician_id, patient_id FROM scribe_sessions WHERE id = $1', [req.params.sessionId]
+    );
+    if (session.rows.length === 0) return res.status(404).json({ error: 'Session not found' });
+    if (session.rows[0].clinician_id !== req.user.id) return res.status(403).json({ error: 'Access denied' });
+
+    const demographics = await getPatientDemographics(session.rows[0].patient_id);
+    const regraded = regradeComparison(comparison, demographics.age ?? null, demographics.sex ?? null);
+    audit.log(req, 'reassessment_regraded', 'scribe_session', parseInt(req.params.sessionId), {});
+    res.json({
+      comparison: regraded,
+      grounding: { missingSex: !demographics.sex, missingAge: demographics.age == null, hasFindings: true },
+    });
+  } catch (err) {
+    console.error('Regrade reassessment error:', err.message);
+    res.status(500).json({ error: 'Failed to re-grade results' });
   }
 });
 

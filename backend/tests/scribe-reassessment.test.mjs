@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pairFindings, parseSubjective, painComparison, comparisonToNarrativeInput } from '../services/scribe-reassessment.js';
+import { pairFindings, parseSubjective, painComparison, comparisonToNarrativeInput, regradeComparison } from '../services/scribe-reassessment.js';
 
 describe('pairFindings', () => {
   it('grounds matched tests and lists current-only as new findings', () => {
@@ -58,6 +58,37 @@ describe('parseSubjective + painComparison', () => {
     expect(back.change).toBe('Improved');   // 6 → 4 = down 2
     expect(knee.change).toBe('Steady');     // 5 → 5
     expect(shoulder).toBeUndefined();       // ns → 3: no two-point comparison, not a row
+  });
+});
+
+describe('regradeComparison (re-grade after editing baselines)', () => {
+  const rows = (text) => text.split('\n').map(l => l.split('|').map(s => s.trim()));
+
+  it('grades a norm test once a baseline is filled in', () => {
+    const out = regradeComparison('30-sec Sit-to-Stand | 7 | 9 reps | New | no baseline yet', 68, 'female');
+    const [, , , change, interp] = rows(out)[0];
+    expect(change).toBe('Improved');
+    expect(interp).toMatch(/up 2 reps/);
+    expect(interp).toMatch(/Still below the expected range/);
+  });
+
+  it('grades a PROM (LEFS) by point change with its MCID', () => {
+    const out = regradeComparison('LEFS | 42 | 54 | New | no baseline yet', 68, 'female');
+    const [, , , change, interp] = rows(out)[0];
+    expect(change).toBe('Improved');
+    expect(interp).toMatch(/up 12 points/);
+  });
+
+  it('treats "Could Not Complete" as a zero floor for a timed hold', () => {
+    const out = regradeComparison('Single-Leg Stance (Right) | Could Not Complete | 9 sec | New | x', 68, 'female');
+    const [, , , change, interp] = rows(out)[0];
+    expect(change).toBe('Improved');
+    expect(interp).toMatch(/up 9 sec/);
+  });
+
+  it('leaves an ungradeable row (no numbers) untouched', () => {
+    const line = 'Mystery Test | tight | tight | — | qualitative';
+    expect(regradeComparison(line, 68, 'female')).toBe(line);
   });
 });
 

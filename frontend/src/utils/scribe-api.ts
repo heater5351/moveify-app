@@ -113,6 +113,22 @@ export async function generateReassessment(
   }
 }
 
+export async function regradeReassessment(
+  sessionId: number,
+  comparison: string,
+): Promise<{ comparison: string; grounding?: { missingSex: boolean; missingAge: boolean; hasFindings: boolean } }> {
+  const res = await apiFetch(`/sessions/${sessionId}/reassessment/regrade`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ comparison }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Re-grade failed');
+  }
+  return res.json();
+}
+
 export async function regenerateReassessmentNarrative(
   sessionId: number,
   comparison: string,

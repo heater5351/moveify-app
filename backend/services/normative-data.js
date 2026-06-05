@@ -489,6 +489,10 @@ function buildComparisonInterpretation(res) {
     } else if (res.crossedThreshold) {
       const to = rangePhrase(res.currVerdict, banded);
       if (to) parts.push(`Now ${to}, from ${res.prevVerdict} before.`);
+    } else if (banded && (res.currVerdict === 'below' || res.currVerdict === 'above')) {
+      // Improved/declined but still outside the norm band — keep the standing visible
+      // so a gain off a low base doesn't read as "all sorted now".
+      parts.push(`Still ${rangePhrase(res.currVerdict, banded)}.`);
     }
   }
 

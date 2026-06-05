@@ -10,7 +10,7 @@
  * No patient values are logged.
  */
 const { extractFindings, generateReassessmentNarrative, extractSubjectiveComparison } = require('./scribe-llm');
-const { matchTest, compareValues, buildComparisonInterpretation } = require('./normative-data');
+const { matchTest, compareValues, buildComparisonInterpretation, interpret, buildInterpretation } = require('./normative-data');
 
 // Parse a consolidated "Test | Result | Interpretation" block into rows, tagging
 // each with its canonical normative key (if any) and the body side it refers to.
@@ -231,6 +231,92 @@ function comparisonToNarrativeInput(comparisonText) {
     .join('\n');
 }
 
+// Common patient-reported outcome measures that are NOT age/sex norm-referenced
+// but ARE directional with a known meaningful change (MCID). Grading them by point
+// change lets an edited LEFS/UEFI/PROMIS baseline read as Improved/Declined rather
+// than staying "New". Kept here (not in normative-data) so the handout is unaffected.
+const PROMS = [
+  { aliases: ['lefs', 'lower extremity functional scale'], dir: 'higher', min: 9 },
+  { aliases: ['uefi', 'upper extremity functional index'], dir: 'higher', min: 8 },
+  { aliases: ['promis 10', 'promis-10', 'promis global', 'promis'], dir: 'higher', min: 3 },
+  { aliases: ['oswestry', 'odi', 'oswestry disability index'], dir: 'lower', min: 10 },
+  { aliases: ['dash', 'quickdash', 'quick dash'], dir: 'lower', min: 10 },
+  { aliases: ['neck disability index', 'ndi'], dir: 'lower', min: 5 },
+];
+const normName = s => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+function matchProm(test) {
+  const h = normName(test);
+  if (!h) return null;
+  return PROMS.find(p => p.aliases.some(a => h === a || h.includes(a))) || null;
+}
+
+// "Could not complete" / "unable" on a timed-hold or rep test means a floor of 0,
+// so a later real value reads as an improvement off zero rather than "no baseline".
+const FLOOR_ZERO_RE = /could ?n.?t|cannot|unable|^cnt$|^nil$|^none$|did ?n.?t/i;
+
+// Re-grade ONE edited row from its (possibly newly-filled) baseline/latest values.
+// Returns { change, interpretation } or null if it can't be graded (leave as-is).
+function regradeRow(test, base, latest, age, sex) {
+  const bNum = numOrNull(base), lNum = numOrNull(latest);
+
+  // 1. A recognised norm test (grip, single-leg, sit-to-stand, BP, …).
+  const m = matchTest(test);
+  if (m) {
+    let baseForCompare = base;
+    const timed = m.def.direction === 'higher_better' && ['seconds', 'reps'].includes(m.def.unit);
+    if (bNum == null && timed && FLOOR_ZERO_RE.test(String(base).trim())) baseForCompare = '0';
+    if (numOrNull(baseForCompare) != null && lNum != null) {
+      const res = compareValues(test, baseForCompare, latest, age, sex);
+      if (res) return { change: CHANGE_LABEL[res.direction] || '—', interpretation: buildComparisonInterpretation(res) };
+    }
+    // No usable baseline → grounded current standing, still marked New.
+    const cur = lNum != null ? interpret(test, latest, age, sex) : null;
+    return { change: 'New', interpretation: (cur && buildInterpretation(cur)) || NEW_BASELINE_NOTE };
+  }
+
+  // 2. A recognised PROM (LEFS/UEFI/PROMIS/…) — directional point change.
+  const prom = matchProm(test);
+  if (prom) {
+    if (bNum != null && lNum != null) {
+      const d = lNum - bNum;
+      if (Math.abs(d) < prom.min) return { change: 'Steady', interpretation: `About the same (${bNum} to ${lNum}).` };
+      const better = prom.dir === 'higher' ? d > 0 : d < 0;
+      const arrow = d > 0 ? 'up' : 'down';
+      return { change: better ? 'Improved' : 'Declined', interpretation: `${better ? 'Improved' : 'Declined'} (${arrow} ${Math.abs(d)} points, ${bNum} to ${lNum}).` };
+    }
+    return { change: 'New', interpretation: NEW_BASELINE_NOTE };
+  }
+
+  // 3. Unknown test, both numeric → neutral change (no direction we can assert).
+  if (bNum != null && lNum != null) {
+    return base.trim() !== latest.trim()
+      ? { change: '—', interpretation: `Changed from ${base} to ${latest}.` }
+      : { change: 'Steady', interpretation: 'Unchanged since baseline.' };
+  }
+  return null; // can't grade — leave the row's existing Change/interpretation
+}
+
+/**
+ * Re-grade an EDITED comparison table: recompute the Change + What-it-means columns
+ * from each row's (possibly newly-filled) baseline/latest values, keeping the values
+ * themselves. Lets a clinician add the baselines the initial note missed and have
+ * the rows grade rather than stay "New". Deterministic. No patient values logged.
+ */
+function regradeComparison(comparisonText, age, sex) {
+  return (comparisonText || '')
+    .split('\n')
+    .map(line => {
+      if (!line.includes('|')) return line;
+      const p = line.split('|').map(s => s.trim());
+      const [test, base, latest, change, interp] = p;
+      if (!test) return line;
+      const g = regradeRow(test, base || '', latest || '', age, sex);
+      if (!g) return `${test} | ${base || ''} | ${latest || ''} | ${change || ''} | ${interp || ''}`;
+      return `${test} | ${base || ''} | ${latest || ''} | ${g.change} | ${g.interpretation}`;
+    })
+    .join('\n');
+}
+
 /**
  * Re-write ONLY the narrative from an edited comparison table (+ the original
  * goals/pain/issues context), without re-extracting from the notes. Lets a
@@ -300,4 +386,4 @@ async function generateReassessment(prevText, currText, demographics = {}) {
   };
 }
 
-module.exports = { generateReassessment, regenerateNarrative, comparisonToNarrativeInput, pairFindings, parseRows, parseSubjective, painComparison };
+module.exports = { generateReassessment, regenerateNarrative, regradeComparison, comparisonToNarrativeInput, pairFindings, parseRows, parseSubjective, painComparison };
