@@ -573,6 +573,53 @@ async function generateGPReassessmentNarrative(comparisonText, subjectiveContext
   };
 }
 
+const LETTER_META_SYSTEM_PROMPT = `You are extracting addressing details from a clinical report or referral letter so they can pre-fill a new letter. From the document, identify:
+- the referring / addressed GP's name (surname only, omit the title "Dr")
+- the medical practice or clinic name
+- the practice postal address (one line)
+- the patient's full name
+- the patient's date of birth
+
+Output EXACTLY these five lines with these exact labels. If a field is not present in the document, write the label with nothing after the colon. Do not guess or invent values.
+GP: <surname>
+PRACTICE: <name>
+ADDRESS: <address>
+PATIENT: <full name>
+DOB: <date of birth>
+
+Output only those five lines. No other text.`;
+
+/**
+ * Pull addressing details (referring GP, practice, address, patient, DOB) from an
+ * uploaded previous report so the GP letter's recipient block can be pre-filled.
+ * Only the top of the document is scanned (where letterhead/recipient details sit).
+ * Best-effort: returns {} on failure. No values logged.
+ */
+async function extractLetterMeta(text) {
+  if (!text || text.trim().length < 20) return {};
+  try {
+    const cmd = new ConverseCommand({
+      modelId: MODEL_ID,
+      messages: [{ role: 'user', content: [{ text: `Document:\n${text.slice(0, 6000)}\n\nExtract the addressing details.` }] }],
+      system: [{ text: LETTER_META_SYSTEM_PROMPT }],
+      inferenceConfig: { maxTokens: 300, temperature: 0 },
+    });
+    const res = await client.send(cmd);
+    const out = res.output.message.content[0].text;
+    const grab = (label) => { const m = out.match(new RegExp('^' + label + ':\\s*(.+)$', 'im')); return m ? m[1].trim() : ''; };
+    return {
+      gpName: grab('GP'),
+      practiceName: grab('PRACTICE'),
+      practiceAddress: grab('ADDRESS'),
+      patientName: grab('PATIENT'),
+      dob: grab('DOB'),
+    };
+  } catch (err) {
+    console.error('Letter meta extraction failed:', err.message);
+    return {};
+  }
+}
+
 async function generateReport(soapNoteContent, systemPrompt) {
   if (!soapNoteContent || soapNoteContent.trim().length < 20) {
     throw new Error('SOAP note too short to generate a report');
@@ -602,4 +649,4 @@ async function generateReport(soapNoteContent, systemPrompt) {
   };
 }
 
-module.exports = { generateSoapNote, generateHandout, generateReport, groundClinicalContext, consolidateClinicalContext, extractFindings, generateReassessmentNarrative, generateGPReassessmentNarrative, extractSubjectiveComparison };
+module.exports = { generateSoapNote, generateHandout, generateReport, groundClinicalContext, consolidateClinicalContext, extractFindings, generateReassessmentNarrative, generateGPReassessmentNarrative, extractSubjectiveComparison, extractLetterMeta };

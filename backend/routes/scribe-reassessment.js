@@ -5,6 +5,7 @@ const { decrypt } = require('../services/scribe-encryption');
 const { generateReassessment, regenerateNarrative, regradeComparison } = require('../services/scribe-reassessment');
 const { generateReassessmentDocx } = require('../services/scribe-reassessment-docx');
 const { generateGPReassessmentDocx } = require('../services/scribe-gp-reassessment-docx');
+const { extractLetterMeta } = require('../services/scribe-llm');
 const { getPatientDemographics } = require('../services/scribe-demographics');
 
 // Substitute the [PATIENT_NAME] placeholder used by the GP narrative (kept off the
@@ -102,6 +103,9 @@ router.post('/:sessionId/reassessment/generate', async (req, res) => {
     if (audience === 'gp') {
       const name = await patientName(current.patient_id);
       Object.assign(result, fillName(result, name));
+      // Pre-fill the GP letter's recipient block from an uploaded previous report
+      // (referring GP, practice, address, patient, DOB) so the clinician needn't retype.
+      if (hasReport) result.meta = await extractLetterMeta(previousReportText.trim());
     }
 
     audit.log(req, 'reassessment_generated', 'scribe_session', parseInt(req.params.sessionId), {

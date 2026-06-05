@@ -64,12 +64,14 @@ export default function GPReassessmentPreview({
   const [recommendations, setRecommendations] = useState(() => cleanText(data.recommendations || ''));
   const [comparison, setComparison] = useState(() => mergeComparison(data.comparison, data.newFindings));
 
-  // GP / referral details (editable; filled into the letter)
-  const [gpName, setGpName] = useState('');
-  const [practiceName, setPracticeName] = useState('');
-  const [practiceAddress, setPracticeAddress] = useState('');
-  const [patientNameField, setPatientNameField] = useState(patientName || '');
-  const [dobField, setDobField] = useState(dob || '');
+  // GP / referral details (editable; filled into the letter). Pre-filled from an
+  // uploaded previous report's recipient block where available (data.meta).
+  const m = data.meta || {};
+  const [gpName, setGpName] = useState(m.gpName || '');
+  const [practiceName, setPracticeName] = useState(m.practiceName || '');
+  const [practiceAddress, setPracticeAddress] = useState(m.practiceAddress || '');
+  const [patientNameField, setPatientNameField] = useState(patientName || m.patientName || '');
+  const [dobField, setDobField] = useState(dob || m.dob || '');
   const [coverLetter, setCoverLetter] = useState(() => defaultCover(patientName, baselineDate, latestDate));
 
   const [blob, setBlob] = useState<Blob | null>(null);

@@ -370,6 +370,9 @@ export type ReassessmentData = {
   executiveSummary?: string;
   clinicalInterpretation?: string;
   recommendations?: string;
+  // Recipient details extracted from an uploaded previous report (GP variant) —
+  // pre-fills the letter's "Addressed to" block.
+  meta?: { gpName?: string; practiceName?: string; practiceAddress?: string; patientName?: string; dob?: string };
   counts: { matched: number; new: number; notRepeated: number; pain: number; goals: number };
   grounding?: HandoutGrounding;
 }
