@@ -7,10 +7,21 @@ import { getAuthHeaders } from './api';
 import type { ReassessmentData } from '../types';
 
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  return fetch(`${API_URL}/scribe${path}`, {
-    ...options,
-    headers: { ...(await getAuthHeaders()), ...(options.headers as Record<string, string> ?? {}) },
-  });
+  const headers: Record<string, string> = { ...(await getAuthHeaders()), ...(options.headers as Record<string, string> ?? {}) };
+  // FormData must keep the browser-set multipart boundary — getAuthHeaders forces
+  // an application/json content-type, which breaks the upload (the server then
+  // can't parse it). Drop it so the browser sets multipart/form-data + boundary.
+  if (options.body instanceof FormData) delete headers['Content-Type'];
+  return fetch(`${API_URL}/scribe${path}`, { ...options, headers });
+}
+
+// The backend returns errors as either { error: "msg" } (route handlers) or
+// { error: { message } } (global error handler). Coerce both to a readable string.
+function errorMessage(body: unknown, fallback: string): string {
+  const e = (body as { error?: unknown })?.error;
+  if (typeof e === 'string') return e;
+  if (e && typeof e === 'object' && 'message' in e) return String((e as { message: unknown }).message);
+  return fallback;
 }
 
 export async function deleteSession(sessionId: number): Promise<void> {
@@ -96,8 +107,8 @@ export async function extractDocumentText(file: File): Promise<string> {
   // Note: no Content-Type header — the browser sets the multipart boundary.
   const res = await apiFetch('/documents/extract', { method: 'POST', body: form });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error || 'Could not read the document');
+    const body = await res.json().catch(() => ({}));
+    throw new Error(errorMessage(body, 'Could not read the document'));
   }
   return (await res.json()).text as string;
 }
