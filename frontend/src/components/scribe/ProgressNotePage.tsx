@@ -123,12 +123,20 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
     }
   }
 
-  const handleFinalTranscript = useCallback((rawText: string) => {
+  // Move the UI into the post-recording state (Generate / Handout / Record Again).
+  // Driven by user intent (Stop) and idle auto-stop — NOT solely by the server's
+  // final_transcript echo, which can be lost if the stream errored or the socket
+  // closed early, leaving the UI stuck on the Record button. A late final_transcript
+  // still arrives here and refreshes the text. Uses the locally-accumulated lines,
+  // falling back to the server text only when no lines were captured.
+  const finalizeRecording = useCallback((rawText = '') => {
     const labelled = linesRef.current.length > 0 ? linesRef.current.map(l => l.text).join('\n') : rawText;
-    setFullTranscript(labelled);
+    if (labelled) setFullTranscript(labelled);
     setRecordingDone(true);
     if (timerRef.current) clearInterval(timerRef.current);
   }, []);
+
+  const handleAutoStop = useCallback(() => finalizeRecording(), [finalizeRecording]);
 
   const { isRecording, isPaused, audioLevel, start, pause, resume, stop } = useAudioRecorder({
     sessionId,
@@ -145,9 +153,17 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
         setInterimSpeaker(speaker);
       }
     },
-    onFinalTranscript: handleFinalTranscript,
+    onFinalTranscript: finalizeRecording,
+    onAutoStop: handleAutoStop,
     onError(message) { console.error('Recording error:', message); },
   });
+
+  // Stop = user intent to end the recording. Finalize the UI immediately so it
+  // never falls back to the Record button waiting on the server round-trip.
+  const handleStop = useCallback(() => {
+    stop();
+    finalizeRecording();
+  }, [stop, finalizeRecording]);
 
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -433,7 +449,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
                 </button>
               )}
               {isRecording && (
-                <button onClick={stop} className="flex items-center gap-1.5 border-2 border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm font-semibold transition active:scale-95">
+                <button onClick={handleStop} className="flex items-center gap-1.5 border-2 border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm font-semibold transition active:scale-95">
                   <Square className="w-3.5 h-3.5" /> Stop
                 </button>
               )}
