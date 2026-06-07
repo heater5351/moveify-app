@@ -3,6 +3,16 @@ import { getToken } from '../utils/api';
 import { API_URL } from '../config';
 import type { Suggestion } from '../types';
 
+// --- Voice-activity-detection / cost-control tuning ---
+// AWS Transcribe streaming bills per second of audio SENT, so we suppress
+// near-silent frames instead of streaming the whole consult wall-clock. Biased
+// conservatively toward sending (clinical accuracy matters more than the cents).
+const VAD_RMS_THRESHOLD = 0.008;          // raw RMS above this = speech (noiseSuppression is on, so silence sits well below)
+const VAD_HANGOVER_MS = 1000;             // keep streaming this long after the last detected speech so word-endings aren't clipped
+const VAD_PREROLL_FRAMES = 3;             // re-send this many buffered pre-onset frames (~0.75s) so the attack isn't clipped
+const STREAM_KEEPALIVE_MS = 10000;        // during real silence, still send one frame at least this often — AWS ends a streaming session after ~15s of no audio
+const DEFAULT_IDLE_AUTOSTOP_MS = 15 * 60 * 1000; // safety net: auto-stop after this long with no speech at all (forgotten sessions)
+
 interface TranscriptFragment {
   text: string;
   isFinal: boolean;
@@ -15,9 +25,13 @@ interface UseAudioRecorderOptions {
   onError: (message: string) => void;
   onSuggestion?: (suggestion: Suggestion) => void;
   sessionId?: number | null;
+  /** Auto-stop after this many ms with no detected speech. 0 disables. Default 15 min. */
+  idleAutoStopMs?: number;
+  /** Called when the recorder auto-stops due to inactivity (for a UI toast). */
+  onAutoStop?: () => void;
 }
 
-export function useAudioRecorder({ onTranscript, onFinalTranscript, onError, onSuggestion, sessionId }: UseAudioRecorderOptions) {
+export function useAudioRecorder({ onTranscript, onFinalTranscript, onError, onSuggestion, sessionId, idleAutoStopMs = DEFAULT_IDLE_AUTOSTOP_MS, onAutoStop }: UseAudioRecorderOptions) {
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -28,6 +42,8 @@ export function useAudioRecorder({ onTranscript, onFinalTranscript, onError, onS
   const audioCtxRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const animFrameRef = useRef<number>(0);
+  const idleTimerRef = useRef<number>(0);
+  const stopRef = useRef<() => void>(() => {});
 
   const updateAudioLevel = useCallback(() => {
     if (!analyserRef.current) return;
@@ -88,19 +104,67 @@ export function useAudioRecorder({ onTranscript, onFinalTranscript, onError, onS
       const processor = audioCtx.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
 
+      // VAD state (scoped to this recording session; shared with the idle timer below)
+      let lastSpeechAt = performance.now();   // last frame whose energy crossed the speech threshold
+      let lastSentAt = 0;                      // last time we actually sent audio (for keepalive cadence)
+      let wasSending = false;                  // were we streaming on the previous frame? (for pre-roll flush)
+      const preroll: ArrayBuffer[] = [];       // recent pre-onset frames, re-sent so we don't clip the attack
+
       processor.onaudioprocess = (e) => {
         if (ws.readyState !== WebSocket.OPEN) return;
         const inputData = e.inputBuffer.getChannelData(0);
+
+        // RMS energy → voice activity
+        let sum = 0;
+        for (let i = 0; i < inputData.length; i++) { const v = inputData[i]!; sum += v * v; }
+        const rms = Math.sqrt(sum / inputData.length);
+        const now = performance.now();
+        if (rms > VAD_RMS_THRESHOLD) lastSpeechAt = now;
+        const inSpeech = now - lastSpeechAt < VAD_HANGOVER_MS;
+
+        // PCM16 encode (always — cheap; we just may not send it)
         const pcm16 = new Int16Array(inputData.length);
         for (let i = 0; i < inputData.length; i++) {
           const s = Math.max(-1, Math.min(1, inputData[i]!));
           pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
-        ws.send(pcm16.buffer);
+
+        if (inSpeech) {
+          // On speech onset, flush the buffered pre-onset frames so the first syllable isn't lost.
+          if (!wasSending && preroll.length) {
+            for (const buf of preroll) ws.send(buf);
+            preroll.length = 0;
+          }
+          ws.send(pcm16.buffer);
+          lastSentAt = now;
+          wasSending = true;
+        } else {
+          wasSending = false;
+          // Keep a short ring of recent frames as pre-roll for the next onset.
+          preroll.push(pcm16.buffer);
+          if (preroll.length > VAD_PREROLL_FRAMES) preroll.shift();
+          // Keepalive: AWS Transcribe ends a streaming session after ~15s of no audio,
+          // so during long silences send one frame periodically. Bills ~one frame
+          // per STREAM_KEEPALIVE_MS instead of the whole silence.
+          if (now - lastSentAt >= STREAM_KEEPALIVE_MS) {
+            ws.send(pcm16.buffer);
+            lastSentAt = now;
+          }
+        }
       };
 
       source.connect(processor);
       processor.connect(audioCtx.destination);
+
+      // Idle auto-stop: catch sessions left running with no speech at all.
+      if (idleAutoStopMs > 0) {
+        idleTimerRef.current = window.setInterval(() => {
+          if (performance.now() - lastSpeechAt > idleAutoStopMs) {
+            onAutoStop?.();
+            stopRef.current();
+          }
+        }, 5000);
+      }
 
       setIsRecording(true);
       setIsPaused(false);
@@ -108,7 +172,7 @@ export function useAudioRecorder({ onTranscript, onFinalTranscript, onError, onS
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Failed to start recording');
     }
-  }, [onTranscript, onFinalTranscript, onError, onSuggestion, sessionId, updateAudioLevel]);
+  }, [onTranscript, onFinalTranscript, onError, onSuggestion, sessionId, updateAudioLevel, idleAutoStopMs, onAutoStop]);
 
   const pause = useCallback(() => {
     processorRef.current?.disconnect();
@@ -126,6 +190,7 @@ export function useAudioRecorder({ onTranscript, onFinalTranscript, onError, onS
   }, []);
 
   const stop = useCallback(() => {
+    if (idleTimerRef.current) { clearInterval(idleTimerRef.current); idleTimerRef.current = 0; }
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'stop' }));
       setTimeout(() => wsRef.current?.close(), 3000);
@@ -139,8 +204,12 @@ export function useAudioRecorder({ onTranscript, onFinalTranscript, onError, onS
     setAudioLevel(0);
   }, []);
 
+  // Keep a stable ref so the idle timer (created in start) can call the latest stop().
+  useEffect(() => { stopRef.current = stop; }, [stop]);
+
   useEffect(() => {
     return () => {
+      if (idleTimerRef.current) clearInterval(idleTimerRef.current);
       wsRef.current?.close();
       processorRef.current?.disconnect();
       audioCtxRef.current?.close();
