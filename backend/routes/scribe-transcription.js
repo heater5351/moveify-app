@@ -6,7 +6,7 @@
  * Also drives live clinical suggestions via Claude.
  */
 const db = require('../database/db');
-const { verifyTokenAnyMode } = require('../middleware/auth');
+const { verifyToken } = require('../middleware/auth');
 const { createLiveTranscription } = require('../services/scribe-transcribe');
 const { getPatientSummary } = require('../services/scribe-summary');
 const { generateSuggestion } = require('../services/scribe-suggestions');
@@ -19,8 +19,8 @@ const SUGGESTION_COOLDOWN_MS = 60_000;
 
 function registerScribeTranscriptionWs(app) {
   app.ws('/ws/scribe/transcribe', async (ws, req) => {
-    // Authenticate via query param token — dual-mode (Identity Platform RS256
-    // or legacy HS256 JWT), same as HTTP routes via middleware/auth.
+    // Authenticate via query param token — Identity Platform ID token,
+    // same verification as HTTP routes via middleware/auth.
     const token = req.query.token;
     if (!token) { ws.close(4001, 'Authentication required'); return; }
 
@@ -28,7 +28,7 @@ function registerScribeTranscriptionWs(app) {
     try {
       // Skip the revocation check — WS sessions are short-lived and the
       // ~100-400ms HTTP round-trip dominates Record-button latency.
-      user = await verifyTokenAnyMode(token, { checkRevoked: false });
+      user = await verifyToken(token, { checkRevoked: false });
     } catch {
       ws.close(4001, 'Invalid token');
       return;

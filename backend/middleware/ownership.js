@@ -1,4 +1,5 @@
 // Access control middleware
+const db = require('../database/db');
 
 /**
  * Middleware: verify the authenticated user IS the resource owner (patient accessing own data)
@@ -52,7 +53,6 @@ async function requireAdmin(req, res, next) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   try {
-    const db = require('../database/db');
     const user = await db.getOne('SELECT is_admin FROM users WHERE id = $1', [req.user.id]);
     if (!user || !user.is_admin) {
       return res.status(403).json({ error: 'Admin access required' });

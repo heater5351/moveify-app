@@ -29,3 +29,13 @@ node_modules/
 *.tsx.bak
 
 .vercel
+
+# Serena MCP cache
+.serena/
+
+# Scratch / working files (not source).
+# Root-level .docx only — backend/assets/*.docx templates are real build assets.
+sql_skus*.json
+frontend/nul
+/*.docx
+~$*.docx

@@ -12,6 +12,7 @@
 const express = require('express');
 const { OAuth2Client } = require('google-auth-library');
 const { syncClinikoPatients } = require('../jobs/sync-cliniko-patients');
+const { purgeExpiredTranscripts } = require('../jobs/purge-transcripts');
 
 const router = express.Router();
 const oidcClient = new OAuth2Client();
@@ -52,6 +53,18 @@ router.post('/sync-cliniko-patients', async (req, res) => {
     res.json({ ok: true, ...stats });
   } catch (err) {
     console.error('sync-cliniko-patients job failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/purge-transcripts', async (req, res) => {
+  try {
+    const stats = await purgeExpiredTranscripts();
+    // Count only — no PHI.
+    console.log('transcript purge complete:', JSON.stringify(stats));
+    res.json({ ok: true, ...stats });
+  } catch (err) {
+    console.error('purge-transcripts job failed:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

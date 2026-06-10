@@ -1,57 +1,15 @@
-// Authentication routes
+// Authentication routes.
+// Login itself is client-side via the Firebase SDK (signInWithEmailAndPassword)
+// — there is no POST /login. These routes cover session restoration, profile,
+// and password reset (Admin SDK).
 const express = require('express');
-const bcrypt = require('bcrypt');
 const db = require('../database/db');
 const { sendPasswordResetEmail } = require('../services/email');
-const { generateToken, authenticate } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
 const identityPlatform = require('../lib/identity-platform');
 const audit = require('../services/audit');
 
 const router = express.Router();
-
-// Login route — returns JWT token
-router.post('/login', async (req, res) => {
-  try {
-    const { email, password, rememberMe } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
-    }
-
-    // Basic email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: 'Invalid email format' });
-    }
-
-    // Find user — always run bcrypt to prevent timing-based email enumeration
-    const user = await db.getOne('SELECT * FROM users WHERE email = $1', [email]);
-    const DUMMY_HASH = '$2b$10$dummyhashtopreventtimingattackenumeration00000000000';
-    const validPassword = await bcrypt.compare(password, user?.password_hash || DUMMY_HASH);
-
-    if (!user || !validPassword) {
-      audit.log(req, 'login_failure', 'user', user?.id || null, { email, reason: user ? 'invalid_password' : 'user_not_found' });
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    // Generate JWT (patient always 14d, clinician 12h or 7d with rememberMe)
-    const token = generateToken(user, { rememberMe: !!rememberMe });
-
-    // Return user data (without password)
-    const { password_hash, ...userData } = user;
-
-    audit.log(req, 'login_success', 'user', user.id);
-
-    res.json({
-      message: 'Login successful',
-      user: userData,
-      token
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
 
 // Get current user from JWT (session restoration)
 router.get('/me', authenticate, async (req, res) => {
