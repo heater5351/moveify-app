@@ -40,6 +40,12 @@ what to know now, links).
   now behind the 10/15min limiter; Android `allowBackup=false`; `npm audit fix` cleared all
   high CVEs (incl. express-rate-limit IPv6 bypass); ownership tests fixed (the 2 DB-backed
   `requireAdmin` cases were silently broken — Vitest can't mock CJS `require`, noted in test).
+- **Scribe WS protocol change:** the transcription WebSocket no longer takes `?token=` in the
+  URL (tokens were landing in Cloud Run request logs). The client now sends
+  `{type:'auth', token, sessionId}` as the **first message** and must wait for `{type:'ready'}`
+  before streaming audio. The server also verifies `scribe_sessions.clinician_id` ownership
+  **before** enabling the transcript auto-save (previously any clinician token could overwrite
+  any session's transcript). Old cached SPA bundles can't connect until refreshed.
 - **GCP findings (not yet fixed):** backend runs as the default compute SA which holds
   `run.admin` + `serviceAccountUser` (needs a dedicated minimal SA); Cloud SQL PITR is OFF
   (daily 03:00 snapshots only); worker SA can read AWS/Google-SA secrets it may not need.

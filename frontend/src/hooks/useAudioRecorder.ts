@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { getToken } from '../utils/api';
+import { auth } from '../lib/firebase';
 import { API_URL } from '../config';
 import type { Suggestion } from '../types';
 
@@ -75,17 +75,34 @@ export function useAudioRecorder({ onTranscript, onFinalTranscript, onError, onS
       source.connect(analyser);
       analyserRef.current = analyser;
 
-      // Moveify uses localStorage token (12h) — no mid-session expiry risk
-      const token = getToken();
-      const sessionParam = sessionId ? `&sessionId=${sessionId}` : '';
-      const wsUrl = API_URL.replace(/^http/, 'ws').replace('/api', '') + `/ws/scribe/transcribe?token=${token}${sessionParam}`;
+      // Mint the ID token at call time (in-memory cache; network only when
+      // expired). Sent as the FIRST WS message — never in the URL, where it
+      // would land in Cloud Run request logs.
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('Not signed in');
+      const wsUrl = API_URL.replace(/^http/, 'ws').replace('/api', '') + '/ws/scribe/transcribe';
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
+
+      // Audio frames are held back until the server acks auth with 'ready'.
+      let wsReady = false;
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'auth', token, sessionId: sessionId ?? undefined }));
+      };
+
+      ws.onclose = (event) => {
+        if (event.code === 4001 || event.code === 4003) {
+          onError(event.reason || 'Transcription authentication failed');
+        }
+      };
 
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          if (msg.type === 'transcript') {
+          if (msg.type === 'ready') {
+            wsReady = true;
+          } else if (msg.type === 'transcript') {
             onTranscript({ text: msg.text, isFinal: msg.isFinal, speaker: msg.speaker });
           } else if (msg.type === 'final_transcript') {
             onFinalTranscript(msg.text);
@@ -111,7 +128,7 @@ export function useAudioRecorder({ onTranscript, onFinalTranscript, onError, onS
       const preroll: ArrayBuffer[] = [];       // recent pre-onset frames, re-sent so we don't clip the attack
 
       processor.onaudioprocess = (e) => {
-        if (ws.readyState !== WebSocket.OPEN) return;
+        if (ws.readyState !== WebSocket.OPEN || !wsReady) return;
         const inputData = e.inputBuffer.getChannelData(0);
 
         // RMS energy → voice activity
