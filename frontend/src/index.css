@@ -1,9 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-display: 'Sora', ui-sans-serif, system-ui, sans-serif;
-  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  /* Brand font: Manrope (matches printed handout branding — see backend/scripts/handout-kit.js) */
+  --font-display: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
 
   /* Primary (teal) */
   --color-primary-50: #e6f7f7;
@@ -37,6 +38,11 @@
   --color-moveify-navy-light: #1f3548;
   --color-moveify-ocean: #045e62;
   --color-moveify-ocean-light: #056f74;
+  /* Handout palette extensions (see backend/scripts/handout-kit.js) */
+  --color-moveify-ink: #1a2230;
+  --color-moveify-sub: #56606e;
+  --color-moveify-soft: #94a3b8;
+  --color-moveify-rule: #e2e8f0;
 
   /* Animations */
   --animate-slide-in-right: slide-in-right 0.25s ease-out;
