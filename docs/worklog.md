@@ -46,9 +46,14 @@ what to know now, links).
   before streaming audio. The server also verifies `scribe_sessions.clinician_id` ownership
   **before** enabling the transcript auto-save (previously any clinician token could overwrite
   any session's transcript). Old cached SPA bundles can't connect until refreshed.
-- **GCP findings (not yet fixed):** backend runs as the default compute SA which holds
-  `run.admin` + `serviceAccountUser` (needs a dedicated minimal SA); Cloud SQL PITR is OFF
-  (daily 03:00 snapshots only); worker SA can read AWS/Google-SA secrets it may not need.
+- **GCP hardening (done same day, at release):** released to prod ~21:30 AEST. Backend (prod +
+  staging) now runs as dedicated **`moveify-backend@`** SA (`cloudsql.client` + `logging.logWriter`
+  + per-secret accessor on its 9 secrets); the default compute SA lost `run.admin`,
+  `iam.serviceAccountUser`, and the backend-only secret grants (source deploys verified still
+  working — they never needed run.admin). `JWT_SECRET`/`JWT_EXPIRY` bindings removed from both
+  backends. **Cloud SQL PITR enabled** on `moveify-db` (no restart occurred). Purge scheduler
+  resumed; first run deleted 11 expired transcripts. Compute SA keeps the shared
+  Cliniko/admin-token/AWS/Google-SA secret grants because ad-hoc Cloud Run Jobs may run as it.
 
 ## 2026-06-05 — Scribe: upload a previous report as reassessment baseline context
 
