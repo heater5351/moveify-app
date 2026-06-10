@@ -21,7 +21,14 @@ export const LazyVideoCard = ({ src, className, autoPlay }: LazyVideoCardProps) 
   const [isHovered, setIsHovered] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [thumbRetry, setThumbRetry] = useState(0);
-  const thumbFailed = thumbRetry > 2;
+  const [thumbLoaded, setThumbLoaded] = useState(false);
+  const thumbFailed = thumbRetry > 3;
+
+  // Reset thumbnail state if this card is reused for a different video
+  useEffect(() => {
+    setThumbRetry(0);
+    setThumbLoaded(false);
+  }, [src]);
 
   // Observe intersection for lazy thumbnail loading
   useEffect(() => {
@@ -73,11 +80,13 @@ export const LazyVideoCard = ({ src, className, autoPlay }: LazyVideoCardProps) 
           alt=""
           className="absolute inset-0 w-full h-full object-cover"
           style={{ opacity: isPlaying ? 0 : 1, transition: 'opacity 100ms' }}
-          loading="lazy"
+          decoding="async"
+          onLoad={() => setThumbLoaded(true)}
           onError={() => {
             const next = thumbRetry + 1;
-            if (next <= 2) {
-              setTimeout(() => setThumbRetry(next), next * 500);
+            if (next <= 3) {
+              // Exponential-ish backoff: 0.5s, 1s, 2s — survives brief network bursts
+              setTimeout(() => setThumbRetry(next), 500 * Math.pow(2, next - 1));
             } else {
               setThumbRetry(next); // mark as permanently failed
             }
@@ -85,8 +94,8 @@ export const LazyVideoCard = ({ src, className, autoPlay }: LazyVideoCardProps) 
         />
       )}
 
-      {/* Fallback skeleton if thumbnail failed all retries or not yet visible */}
-      {(!isVisible || thumbFailed) && !isPlaying && (
+      {/* Skeleton while not yet visible, still loading, or failed all retries */}
+      {(!isVisible || !thumbLoaded) && !isPlaying && (
         <div className="absolute inset-0 bg-slate-200 animate-pulse" />
       )}
 
