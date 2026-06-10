@@ -37,8 +37,7 @@ Moveify is a clinical exercise prescription and patient management platform (sim
 
 - **Express 4** (CommonJS, not ESM)
 - **PostgreSQL** via `pg` driver (no ORM)
-- **firebase-admin** for GCP Identity Platform token verification (primary auth)
-- **jsonwebtoken** + **bcrypt** — legacy JWT verification / password hashing, retained only for the dual-mode fallback until Phase 4 cleanup (see `docs/identity-platform-migration.md`)
+- **firebase-admin** for GCP Identity Platform token verification (sole auth — the legacy JWT/bcrypt path was removed in Phase 4, 2026-06-10)
 - **express-rate-limit** for brute force protection
 - **helmet** for security headers
 - **Gmail API** for transactional emails
@@ -258,7 +257,7 @@ When adding new state, add it to App.tsx and pass via props. Do not introduce Co
 
 ### Authentication (GCP Identity Platform)
 
-Auth was migrated from custom JWTs to **GCP Identity Platform** (Phases 0–3 live in prod; legacy-JWT removal is Phase 4, earliest 2026-06-02). See `docs/identity-platform-migration.md`. The PostgreSQL `users` table still holds all profile/role data; Identity Platform only holds credentials. Each user row links to its IP account via the `firebase_uid` column (`moveify-<id>`).
+Auth was migrated from custom JWTs to **GCP Identity Platform** (all phases complete — Phase 4 legacy-JWT removal landed 2026-06-10). See `docs/identity-platform-migration.md`. The PostgreSQL `users` table still holds all profile/role data; Identity Platform only holds credentials. Each user row links to its IP account via the `firebase_uid` column (`moveify-<id>`).
 
 1. **Login:** client-side `signInWithEmailAndPassword` via the Firebase SDK (`frontend/src/lib/firebase.ts`). On success the app calls `GET /api/auth/me` with the ID token to load the Postgres user. There is no `POST /api/auth/login` anymore.
 2. **Token format:** Identity Platform **ID token** (RS256, ~1 hour expiry). The Firebase SDK refreshes it automatically using a long-lived refresh token. **"Remember me"** chooses persistence: ticked → `browserLocalPersistence` (refresh token survives browser close, effectively indefinite until sign-out/revocation); unticked → `browserSessionPersistence` (dies when the tab closes). The 1-hour figure is the ID-token lifetime, not the session length.
@@ -268,7 +267,7 @@ Auth was migrated from custom JWTs to **GCP Identity Platform** (Phases 0–3 li
 6. **Session restoration:** `App.tsx` uses `onAuthStateChanged` — on load, if the SDK restores a user, it fetches `GET /api/auth/me` and rehydrates without re-login.
 7. **Invitation:** clinician generates invite → creates Postgres user row + a disabled IP account → patient sets password via `/setup-password` (Admin SDK `updateUser`, enables the account).
 8. **Password reset:** Admin SDK `generatePasswordResetLink` → emailed via the existing Gmail service.
-9. **Backend verification:** `authenticate` is **dual-mode** — it verifies IP ID tokens (RS256) via `firebase-admin`, falling back to legacy HS256 JWTs for any sessions predating the cutover. The legacy fallback (and `JWT_SECRET`) is slated for removal in Phase 4.
+9. **Backend verification:** `authenticate` verifies IP ID tokens (RS256) via `firebase-admin` only. The legacy HS256 fallback, `POST /api/auth/login`, `generateToken`, and the `JWT_SECRET` requirement were all removed in Phase 4 (2026-06-10).
 
 ### Authorization (middleware)
 
@@ -292,7 +291,9 @@ All backend routes (except public auth routes) are protected by middleware in `b
 
 ### Security Hardening
 
-- **Rate limiting:** Auth endpoints (`/api/auth/login`, `/api/auth/forgot-password`): 10 requests per 15 min per IP. General API: 100 requests per minute per IP.
+- **Rate limiting:** Sensitive public endpoints (`/api/auth/forgot-password`, invitation validate/set-password, agreement validate/sign): 10 requests per 15 min per IP. General API: 100 requests per minute per IP.
+- **SPA security headers:** set in `frontend/vercel.json` (CSP, HSTS, X-Frame-Options, Permissions-Policy — `microphone=(self)` is required for the scribe recorder). The backend's helmet CSP only covers API responses.
+- **Transcript retention:** scribe transcripts are hard-deleted 48h after recording by the hourly `moveify-purge-transcripts` Cloud Scheduler job → `POST /api/internal/cron/purge-transcripts` (plus the lazy on-read check).
 - **Security headers:** `helmet()` middleware (CSP, X-Frame-Options, etc.)
 - **CORS:** Production requires `CORS_ORIGIN` env var (no wildcard). Development defaults to `http://localhost:5173`.
 - **Input validation:** Email format validation on login/invitation, password min 8 chars on set-password
@@ -312,7 +313,7 @@ All routes are prefixed with `/api`. Routes marked with a lock require authentic
 ### Public routes (no auth required)
 | Route file | Endpoints |
 |-----------|--------|
-| `auth.js` | `POST /login`, `POST /forgot-password`, `GET /verify-reset-token/:token`, `POST /reset-password` |
+| `auth.js` | `POST /forgot-password` (login is client-side via the Firebase SDK — no `POST /login`) |
 | `invitations.js` | `GET /validate/:token`, `POST /set-password` |
 
 ### Protected routes (require JWT)
@@ -411,7 +412,7 @@ or via `POST /api/cliniko/link/:patientId`. Linked patients are then kept fresh 
 | `FIREBASE_PROJECT_ID` | **Yes** | — | GCP Identity Platform project (`moveify-app`). Used by `firebase-admin` to verify ID tokens. |
 | `FIREBASE_CLIENT_EMAIL` | **Yes** | — | Identity Platform service-account email |
 | `FIREBASE_PRIVATE_KEY` | **Yes** | — | Identity Platform service-account private key (`\n`-escaped; deploy via `--env-vars-file` YAML) |
-| `JWT_SECRET` | Legacy | — | HS256 signing key for the **legacy** JWT fallback only. Still required until Phase 4 removes the dual-mode path. ID-token sessions don't use it. |
+| `JWT_SECRET` | No (removed) | — | **No longer read** — the legacy JWT path was removed in Phase 4 (2026-06-10). Safe to drop from Cloud Run env / Secret Manager binding. |
 | `CORS_ORIGIN` | Yes (prod) | `http://localhost:5173` (dev) | Allowed frontend origin. **No wildcard in production.** |
 | `FRONTEND_URL` | No | `http://localhost:5173` | Used in invitation/reset email links |
 | `GOOGLE_CLIENT_ID` | No | — | Gmail API OAuth client ID (emails fail silently without it) |

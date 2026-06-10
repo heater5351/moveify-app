@@ -22,6 +22,34 @@ what to know now, links).
 
 ---
 
+## 2026-06-10 — Security hardening sweep + Phase 4 legacy-JWT removal
+
+- **Phase 4 done:** removed `POST /api/auth/login`, `generateToken`, the legacy HS256
+  fallback in `middleware/auth.js` (`verifyTokenAnyMode` → `verifyToken`, IP-only), and the
+  `bcrypt`/`jsonwebtoken` deps. `JWT_SECRET` is no longer read — drop the env/secret binding
+  from Cloud Run at next deploy. Login is exclusively client-side Firebase SDK now.
+- **Transcript retention fixed:** the 48h expiry was lazy (delete-on-read only) — untouched
+  transcripts persisted forever. New `jobs/purge-transcripts.js` + OIDC cron
+  `POST /api/internal/cron/purge-transcripts`; hourly Cloud Scheduler job
+  `moveify-purge-transcripts` created (**paused** until the prod backend deploys this route —
+  resume at release).
+- **SPA security headers:** `frontend/vercel.json` now sets CSP/HSTS/XFO/Permissions-Policy
+  (`microphone=(self)` needed by scribe). Verify the scribe recorder + YouTube embeds +
+  Google Fonts on the Vercel preview before promoting.
+- **Misc:** prod error handler no longer leaks `err.message`; `POST /api/agreements/:token/sign`
+  now behind the 10/15min limiter; Android `allowBackup=false`; `npm audit fix` cleared all
+  high CVEs (incl. express-rate-limit IPv6 bypass); ownership tests fixed (the 2 DB-backed
+  `requireAdmin` cases were silently broken — Vitest can't mock CJS `require`, noted in test).
+- **Scribe WS protocol change:** the transcription WebSocket no longer takes `?token=` in the
+  URL (tokens were landing in Cloud Run request logs). The client now sends
+  `{type:'auth', token, sessionId}` as the **first message** and must wait for `{type:'ready'}`
+  before streaming audio. The server also verifies `scribe_sessions.clinician_id` ownership
+  **before** enabling the transcript auto-save (previously any clinician token could overwrite
+  any session's transcript). Old cached SPA bundles can't connect until refreshed.
+- **GCP findings (not yet fixed):** backend runs as the default compute SA which holds
+  `run.admin` + `serviceAccountUser` (needs a dedicated minimal SA); Cloud SQL PITR is OFF
+  (daily 03:00 snapshots only); worker SA can read AWS/Google-SA secrets it may not need.
+
 ## 2026-06-05 — Scribe: upload a previous report as reassessment baseline context
 
 - **What:** the reassessment (patient + GP) can now take a **previous report** (PDF / DOCX / TXT

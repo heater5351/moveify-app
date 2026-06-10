@@ -1,51 +1,10 @@
-// JWT authentication and role-based authorization middleware.
-// Phase 1 of Identity Platform migration: dual-mode authenticate() accepts
-// both legacy HS256 JWTs (current behavior) and Identity Platform RS256
-// ID tokens. See docs/identity-platform-migration.md.
-const jwt = require('jsonwebtoken');
+// Authentication and role-based authorization middleware.
+// Identity Platform only (Phase 4 complete): verifies RS256 ID tokens via
+// firebase-admin and maps the IP uid to the local users row. The legacy
+// HS256 JWT path (and JWT_SECRET) was removed 2026-06-10 — see
+// docs/identity-platform-migration.md.
 const db = require('../database/db');
 const identityPlatform = require('../lib/identity-platform');
-
-const JWT_SECRET = process.env.JWT_SECRET;
-// Session durations by role (legacy JWT path only)
-const EXPIRY_PATIENT = '14d';
-const EXPIRY_CLINICIAN = '12h';
-const EXPIRY_CLINICIAN_REMEMBER = '7d';
-
-// Fail fast if JWT_SECRET is not configured
-if (!JWT_SECRET) {
-  console.error('FATAL: JWT_SECRET environment variable is required');
-  process.exit(1);
-}
-
-/**
- * Generate a legacy JWT token for a user. Retained during Phase 1–3 so the
- * existing login flow keeps working alongside Identity Platform.
- */
-function generateToken(user, options = {}) {
-  let expiresIn;
-  if (user.role === 'patient') {
-    expiresIn = EXPIRY_PATIENT;
-  } else if (options.rememberMe) {
-    expiresIn = EXPIRY_CLINICIAN_REMEMBER;
-  } else {
-    expiresIn = EXPIRY_CLINICIAN;
-  }
-
-  return jwt.sign(
-    { id: user.id, role: user.role, email: user.email, is_admin: !!user.is_admin },
-    JWT_SECRET,
-    { expiresIn }
-  );
-}
-
-function isLikelyIdentityPlatformToken(token) {
-  // ID tokens are RS256 with a kid; legacy tokens are HS256 with no kid.
-  // jwt.decode() returns null on malformed input.
-  const decoded = jwt.decode(token, { complete: true });
-  if (!decoded || !decoded.header) return false;
-  return decoded.header.alg === 'RS256' && !!decoded.header.kid;
-}
 
 async function verifyIdentityPlatformToken(token, { checkRevoked = true } = {}) {
   const ipAuth = identityPlatform.auth();
@@ -82,29 +41,21 @@ async function verifyIdentityPlatformToken(token, { checkRevoked = true } = {}) 
   return { id: u.id, role: u.role, email: u.email, is_admin: !!u.is_admin };
 }
 
-function verifyLegacyToken(token) {
-  const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
-  return { id: decoded.id, role: decoded.role, email: decoded.email, is_admin: !!decoded.is_admin };
-}
-
 /**
- * Verify a bearer token in either Identity Platform or legacy JWT mode.
- * Reusable outside Express (e.g. WebSocket handlers). Throws on failure.
+ * Verify an Identity Platform ID token. Reusable outside Express (e.g.
+ * WebSocket handlers). Throws on failure.
  *
  * `checkRevoked` defaults to true (extra HTTP roundtrip to Firebase to
  * confirm the token hasn't been revoked). Set to false for short-lived
  * contexts like WebSocket session establishment where the 100-400ms
  * cost outweighs the security gain.
  */
-async function verifyTokenAnyMode(token, { checkRevoked = true } = {}) {
-  if (isLikelyIdentityPlatformToken(token) && identityPlatform.isEnabled()) {
-    return await verifyIdentityPlatformToken(token, { checkRevoked });
-  }
-  return verifyLegacyToken(token);
+async function verifyToken(token, { checkRevoked = true } = {}) {
+  return await verifyIdentityPlatformToken(token, { checkRevoked });
 }
 
 /**
- * Middleware: verify bearer token (IP RS256 or legacy HS256), set req.user.
+ * Middleware: verify bearer token (Identity Platform ID token), set req.user.
  */
 async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -114,11 +65,7 @@ async function authenticate(req, res, next) {
   const token = authHeader.split(' ')[1];
 
   try {
-    if (isLikelyIdentityPlatformToken(token) && identityPlatform.isEnabled()) {
-      req.user = await verifyIdentityPlatformToken(token);
-      return next();
-    }
-    req.user = verifyLegacyToken(token);
+    req.user = await verifyIdentityPlatformToken(token);
     return next();
   } catch (error) {
     if (error.name === 'TokenExpiredError' || error.code === 'auth/id-token-expired') {
@@ -149,4 +96,4 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { generateToken, authenticate, requireRole, verifyTokenAnyMode };
+module.exports = { authenticate, requireRole, verifyToken };

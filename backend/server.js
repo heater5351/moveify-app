@@ -113,12 +113,13 @@ const authLimiter = rateLimit({
   message: { error: 'Too many attempts. Please try again later.' }
 });
 
-app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/invitations/validate', authLimiter);
 app.use('/api/invitations/set-password', authLimiter);
 // Public agreement token endpoints (validate + sign) — same brute-force guard.
 app.use('/api/agreements/validate', authLimiter);
+// Signing binds a legal signature + triggers Stripe provisioning — same guard.
+app.use(/^\/api\/agreements\/[^/]+\/sign$/, authLimiter);
 
 // Rate limiting — general API
 const apiLimiter = rateLimit({
@@ -191,10 +192,12 @@ app.get('/health', (req, res) => {
 // Error handling middleware - must be last
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
+  // Never leak internal error details to clients in production
+  const isDev = process.env.NODE_ENV === 'development';
   res.status(err.status || 500).json({
     error: {
-      message: err.message || 'Internal server error',
-      ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+      message: isDev ? (err.message || 'Internal server error') : 'Internal server error',
+      ...(isDev && { stack: err.stack })
     }
   });
 });
