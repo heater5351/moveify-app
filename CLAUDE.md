@@ -28,7 +28,7 @@ Moveify is a clinical exercise prescription and patient management platform (sim
 
 - **React 19** with TypeScript 5.9
 - **Vite 7** for dev server and builds
-- **Tailwind CSS 3** for styling (utility-first, no CSS modules or styled-components)
+- **Tailwind CSS 4** for styling (utility-first, `@theme` tokens in `src/index.css`, no `tailwind.config.js`, no CSS modules or styled-components)
 - **React Router DOM 7** for public routes only (login, setup-password, reset-password)
 - **@dnd-kit** for drag-and-drop (program builder exercise reordering)
 - **Lucide React** for icons
@@ -148,12 +148,12 @@ backend/
 ### Styling
 
 - **Tailwind utility classes only** — never write custom CSS unless absolutely necessary
-- **Fonts:** `font-display` = Sora (headings), `font-sans` = DM Sans (body text)
-- Use the Moveify brand color palette defined in `tailwind.config.js`:
+- **Fonts:** Manrope everywhere (`font-display` and `font-sans` both resolve to Manrope) — matches the printed handout branding in `backend/scripts/handout-kit.js`. (Sora/DM Sans were retired 2026-06-10.)
+- Use the Moveify brand color palette defined in the `@theme` block of `frontend/src/index.css` (Tailwind 4 — there is no `tailwind.config.js`):
   - Primary: `primary-400` (teal `#46c1c0`) — buttons, links, accents
   - Secondary: `secondary-500` (navy `#132232`) — headers, dark backgrounds
   - Use semantic scale (`primary-50` through `primary-900`) for variants
-- Named brand colors available as `moveify-teal`, `moveify-navy`, `moveify-ocean`
+- Named brand colors available as `moveify-teal`, `moveify-navy`, `moveify-ocean`, plus handout-palette extensions `moveify-ink`, `moveify-sub`, `moveify-soft`, `moveify-rule`
 - Responsive design using Tailwind breakpoints (`sm:`, `md:`, `lg:`)
 
 ### Component Patterns

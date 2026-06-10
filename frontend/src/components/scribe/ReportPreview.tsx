@@ -105,7 +105,7 @@ export default function ReportPreview({ sections, patientName, sessionDate, sess
     }
   }
 
-  const font: React.CSSProperties = { fontFamily: "'DM Sans', Arial, sans-serif" };
+  const font: React.CSSProperties = { fontFamily: "'Manrope', Arial, sans-serif" };
   const body: React.CSSProperties = { ...font, fontSize: '0.84rem', color: NAVY, lineHeight: '1.65' };
   const editable: React.CSSProperties = { ...body, whiteSpace: 'pre-wrap', minHeight: '40px', padding: '8px 10px', outline: 'none' };
   const inlineField: React.CSSProperties = { ...body, display: 'inline-block', borderBottom: '1px dashed #94a3b8', minWidth: '120px', outline: 'none', padding: '1px 4px' };

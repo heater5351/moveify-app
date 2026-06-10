@@ -22,6 +22,18 @@ what to know now, links).
 
 ---
 
+## 2026-06-10 — App rebrand: Manrope everywhere (matches handout branding)
+
+- `font-display`/`font-sans` both now resolve to **Manrope** (Sora + DM Sans retired),
+  aligning the app with the printed-handout brand in `backend/scripts/handout-kit.js`.
+  Google Fonts import swapped in `frontend/src/index.css`; hardcoded 'DM Sans' in
+  `ReportPreview.tsx` updated too.
+- Added handout palette tokens to the `@theme` block: `moveify-ink` `#1a2230`,
+  `moveify-sub` `#56606e`, `moveify-soft` `#94a3b8`, `moveify-rule` `#e2e8f0`.
+- Also fixed CLAUDE.md drift: the app is on **Tailwind 4** (`@theme` in `index.css`,
+  no `tailwind.config.js`) — docs said Tailwind 3.
+- `ProgramPDF.tsx` still renders with react-pdf's built-in Helvetica (unchanged).
+
 ## 2026-06-10 — Security hardening sweep + Phase 4 legacy-JWT removal
 
 - **Phase 4 done:** removed `POST /api/auth/login`, `generateToken`, the legacy HS256
