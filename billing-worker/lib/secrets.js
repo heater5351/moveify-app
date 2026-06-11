@@ -99,17 +99,38 @@ async function getSecret(name) {
 /**
  * Adds a new version to an existing Secret Manager secret. Invalidates the cache entry.
  * Requires roles/secretmanager.secretVersionAdder on the secret for the runtime SA.
+ *
+ * After adding, destroys all prior non-destroyed versions (best-effort) — without this,
+ * rotating secrets like XERO_REFRESH_TOKEN accumulate hundreds of stale versions, each
+ * billed monthly by Secret Manager. Old versions are dead anyway (Xero invalidates a
+ * refresh token the moment it rotates). Destroy requires roles/secretmanager.secretVersionManager.
  */
 async function setSecret(name, value) {
   const project = process.env.GCP_PROJECT_ID || 'moveify-app';
   const gcpName = SECRET_GCP_NAME_MAP[name] || name;
   const parent = `projects/${project}/secrets/${gcpName}`;
 
-  await client.addSecretVersion({
+  const [newVersion] = await client.addSecretVersion({
     parent,
     payload: { data: Buffer.from(value, 'utf8') },
   });
   cache.delete(name);
+
+  // Best-effort cleanup of superseded versions — never fail the rotation itself.
+  try {
+    const [versions] = await client.listSecretVersions({ parent });
+    const stale = versions.filter(
+      (v) => v.name !== newVersion.name && v.state !== 'DESTROYED'
+    );
+    for (const v of stale) {
+      await client.destroySecretVersion({ name: v.name });
+    }
+    if (stale.length > 0) {
+      logger.info({ secret: name, destroyed: stale.length }, 'Destroyed superseded secret versions');
+    }
+  } catch (err) {
+    logger.warn({ secret: name, err: err.message }, 'Failed to destroy superseded secret versions');
+  }
 }
 
 module.exports = { getSecret, setSecret };

@@ -22,6 +22,23 @@ what to know now, links).
 
 ---
 
+## 2026-06-11 — GCP cost sweep #2 (budget breach investigation)
+
+- 90%-of-$30-budget alert traced via BigQuery billing export: steady-state pace was
+  ~$73/mo gross. Drivers: backend `min-instances=1` (~$20/mo), worker cron load incl.
+  `billing-sync-cliniko` at every-15-min (~$20/mo), Secret Manager version leak
+  (~$11/mo and growing), plus one-off Xero-reconciliation CPU spikes (~$7).
+- **Secret version leak fixed:** `XERO_REFRESH_TOKEN` had accumulated 143 live versions
+  (Xero rotates the refresh token on every refresh; `setSecret` never destroyed the old
+  version). `billing-worker/lib/secrets.js` `setSecret` now destroys superseded versions
+  after adding (best-effort); worker SA granted `secretVersionManager` on
+  `XERO_REFRESH_TOKEN`. One-off cleanup destroyed 161 stale versions across 12 secrets.
+- `billing-sync-cliniko` scheduler moved 15-min → hourly. Zombie `moveify-api` service
+  (accidentally re-created 2026-06-07 by a stray source deploy) deleted again.
+  Obsolete `moveify-jwt-secret` deleted (Phase 4 removed the JWT path).
+- Pending: dropping `min-instances=1` on `moveify-backend` (~$20/mo) once the cold-start
+  feel is validated on staging.
+
 ## 2026-06-10 — App rebrand: Manrope everywhere (matches handout branding)
 
 - `font-display`/`font-sans` both now resolve to **Manrope** (Sora + DM Sans retired),
