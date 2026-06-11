@@ -447,6 +447,13 @@ function App() {
       // Check if we're editing or creating
       const isEditing = editingProgramId !== null;
 
+      // Send the server row id (stamped at edit-load) as `id`, never the library
+      // exercise id — a library id can collide with another row's id and make the
+      // backend silently overwrite that row. New exercises send no id → INSERT.
+      const exercisesPayload = programExercises.map(ex => {
+        const { programExerciseId, ...rest } = ex;
+        return { ...rest, id: programExerciseId } as Omit<ProgramExercise, 'id'> & { id?: number };
+      });
 
       let response;
       if (isEditing) {
@@ -456,7 +463,7 @@ function App() {
           headers: await getAuthHeaders(),
           body: JSON.stringify({
             name: programName,
-            exercises: programExercises,
+            exercises: exercisesPayload,
             config: programConfig
           })
         });
@@ -467,7 +474,7 @@ function App() {
           headers: await getAuthHeaders(),
           body: JSON.stringify({
             name: programName,
-            exercises: programExercises,
+            exercises: exercisesPayload,
             config: programConfig
           })
         });
@@ -570,7 +577,9 @@ function App() {
     setEditingProgramId(program.config.id || null);
     setSelectedPatient(viewingPatient);
     setProgramName(program.config.name || '');
-    setProgramExercises(program.exercises);
+    // Stamp the server row id so the update payload can distinguish existing
+    // rows from newly added library exercises (whose `id` is a library id)
+    setProgramExercises(program.exercises.map(ex => ({ ...ex, programExerciseId: ex.id })));
     setProgramConfig({
       startDate: program.config.startDate,
       customStartDate: program.config.customStartDate || '',

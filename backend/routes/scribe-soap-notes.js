@@ -4,6 +4,7 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const { encrypt, decrypt } = require('../services/scribe-encryption');
 const { generateSoapNote } = require('../services/scribe-llm');
 const { getPatientSummary } = require('../services/scribe-summary');
+const { renderProgramDiff } = require('../services/program-diff');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -12,7 +13,7 @@ router.use(authenticate, requireRole('clinician'));
 // Verify session belongs to this clinician
 async function verifySession(sessionId, clinicianId) {
   const result = await db.query(
-    'SELECT id, clinician_id, patient_id, started_at FROM scribe_sessions WHERE id = $1',
+    'SELECT id, clinician_id, patient_id, started_at, ended_at FROM scribe_sessions WHERE id = $1',
     [sessionId]
   );
   if (result.rows.length === 0) return null;
@@ -163,7 +164,27 @@ router.post('/:sessionId/soap-note/generate', async (req, res) => {
       }
     }
 
-    const { content, model } = await generateSoapNote({ transcript, priorContext }, customPrompt);
+    // Program changes made around this session (write-time link OR time-window
+    // sweep — covers edits made shortly before recording started). Best-effort.
+    let programDiff = [];
+    try {
+      const revisions = await db.query(
+        `SELECT snapshot_before, snapshot_after FROM program_revisions
+         WHERE patient_id = $1
+           AND (scribe_session_id = $2
+                OR (changed_at >= $3::timestamptz - INTERVAL '30 minutes'
+                    AND changed_at <= COALESCE($4::timestamptz + INTERVAL '60 minutes', NOW())))
+         ORDER BY changed_at ASC`,
+        [session.patient_id, session.id, session.started_at, session.ended_at]
+      );
+      for (const r of revisions.rows) {
+        programDiff.push(...renderProgramDiff(r.snapshot_before, r.snapshot_after));
+      }
+    } catch (err) {
+      console.error('Program-diff fetch failed (continuing without it):', err.message);
+    }
+
+    const { content, model } = await generateSoapNote({ transcript, priorContext, programDiff }, customPrompt);
 
     const result = await db.query(
       `INSERT INTO soap_notes (session_id, subjective_enc, generated_by, llm_model)
@@ -177,7 +198,7 @@ router.post('/:sessionId/soap-note/generate', async (req, res) => {
       [req.params.sessionId]
     );
 
-    audit.log(req, 'soap_note_generated', 'soap_note', result.rows[0].id, { model, wordCount, historyUsed: !!priorContext });
+    audit.log(req, 'soap_note_generated', 'soap_note', result.rows[0].id, { model, wordCount, historyUsed: !!priorContext, programChanges: programDiff.length });
 
     res.status(201).json({
       id: result.rows[0].id,

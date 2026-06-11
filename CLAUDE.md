@@ -322,7 +322,7 @@ All routes are prefixed with `/api`. Routes marked with a lock require authentic
 | `auth.js` | `/api/auth` | `GET /me` | Any authenticated user |
 | `invitations.js` | `/api/invitations` | `POST /generate` | Clinician only |
 | `patients.js` | `/api/patients` | `GET /` (all patients), `GET /:id`, `DELETE /:id` | Clinician (DELETE = admin only) |
-| `programs.js` | `/api/programs` | `POST /patient/:patientId`, `PUT /:programId`, `DELETE /:programId` | Clinician only |
+| `programs.js` | `/api/programs` | `POST /patient/:patientId`, `PUT /:programId`, `DELETE /:programId`, `GET /:programId/revisions` | Clinician only |
 | `programs.js` | `/api/programs` | `PATCH /exercise/:exerciseId/complete` | Patient only (uses `req.user.id`) |
 | `programs.js` | `/api/programs` | `GET /patient/:patientId`, `GET /analytics/patient/:patientId` | Both roles + access check |
 | `exercises.js` | `/api/exercises` | `GET /`, `POST /`, `PUT /:id`, `DELETE /:id`, favorites | Clinician only |
@@ -356,6 +356,7 @@ Defined in `backend/database/init.js`. Key tables:
 | `block_schedules` | program_id, block_duration (4/6/8 weeks), current_week, status | Periodization blocks |
 | `education_modules` | title, content, category, estimated_duration_minutes, created_by | Text/video education |
 | `clinician_patients` | clinician_id, patient_id | **Legacy** — still exists in schema but no longer queried. Kept for migration safety |
+| `program_revisions` | program_id, patient_id, changed_by, scribe_session_id, snapshot_before/after (JSONB), changed_at | Before/after snapshot per program create/update (`snapshot_before` NULL on create). Written in-transaction by `services/program-revisions.js`; diff rendered by `services/program-diff.js` into the SOAP prompt |
 | `audit_logs` | user_id, action, resource_type, resource_id, details (JSONB), ip_address | Audit trail for key operations |
 | `invitation_tokens` | ..., clinician_id | Links invitations to the clinician who created them |
 | `app_state` | key (PK), value, updated_at | Generic key/value store. Holds the Cliniko auto-sync cursor `cliniko_patient_last_sync` |

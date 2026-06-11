@@ -4,6 +4,7 @@ const db = require('../database/db');
 const checkInService = require('../services/check-in-service');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { requirePatientAccess, requireAdmin } = require('../middleware/ownership');
+const { captureProgramSnapshot, recordRevision } = require('../services/program-revisions');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -178,6 +179,16 @@ router.post('/patient/:patientId', requireRole('clinician'), async (req, res) =>
     );
     const exerciseIds = createdExercises.rows.map(e => e.id);
 
+    // Revision snapshot (creation: before = null)
+    const snapshotAfter = await captureProgramSnapshot(client, programId);
+    await recordRevision(client, {
+      programId,
+      patientId: parseInt(patientId),
+      changedBy: req.user.id,
+      before: null,
+      after: snapshotAfter,
+    });
+
     await client.query('COMMIT');
 
     audit.log(req, 'program_create', 'program', programId, { patientId: parseInt(patientId), exerciseCount: exercises.length });
@@ -213,6 +224,15 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
 
   try {
     await client.query('BEGIN');
+
+    // Revision: capture state before any mutation (also yields patient_id)
+    const snapshotBefore = await captureProgramSnapshot(client, programId);
+    const programRow = await client.query('SELECT patient_id FROM programs WHERE id = $1', [programId]);
+    if (programRow.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Program not found' });
+    }
+    const programPatientId = programRow.rows[0].patient_id;
 
     const actualStartDate = getActualStartDate(config?.startDate, config?.customStartDate);
 
@@ -253,10 +273,17 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
     // Update or insert exercises (preserve existing IDs where possible)
     for (let index = 0; index < exercises.length; index++) {
       const exercise = exercises[index];
-      // Prefer matching by ID (handles duplicate names), fall back to name
-      const existingId = (exercise.id && existingExerciseById.has(exercise.id))
-        ? exercise.id
-        : existingExerciseByName.get(exercise.name);
+      // Prefer matching by ID (handles duplicate names), fall back to name.
+      // Each existing row can be claimed at most once (guards against the
+      // silent-overwrite bug where a newly-added exercise carrying a library
+      // id or duplicate name claimed a row another exercise already updated).
+      let existingId;
+      if (exercise.id && existingExerciseById.has(exercise.id) && !updatedExerciseIds.has(exercise.id)) {
+        existingId = exercise.id;
+      } else {
+        const byName = existingExerciseByName.get(exercise.name);
+        if (byName && !updatedExerciseIds.has(byName)) existingId = byName;
+      }
       const duration = exercise.prescribedDuration != null ? exercise.prescribedDuration : null;
       const rest = exercise.restDuration != null ? exercise.restDuration : null;
 
@@ -362,6 +389,16 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
     );
     const exerciseIds = finalExercises.rows.map(r => r.id);
 
+    // Revision snapshot (no-op edits are skipped inside recordRevision)
+    const snapshotAfter = await captureProgramSnapshot(client, programId);
+    await recordRevision(client, {
+      programId: parseInt(programId),
+      patientId: programPatientId,
+      changedBy: req.user.id,
+      before: snapshotBefore,
+      after: snapshotAfter,
+    });
+
     await client.query('COMMIT');
 
     audit.log(req, 'program_update', 'program', parseInt(programId));
@@ -377,6 +414,30 @@ router.put('/:programId', requireRole('clinician'), async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   } finally {
     client.release();
+  }
+});
+
+// Get revision history for a program (clinician only)
+router.get('/:programId/revisions', requireRole('clinician'), async (req, res) => {
+  try {
+    const { renderProgramDiff } = require('../services/program-diff');
+    const revisions = await db.getAll(
+      `SELECT id, patient_id, changed_by, scribe_session_id, snapshot_before, snapshot_after, changed_at
+       FROM program_revisions WHERE program_id = $1 ORDER BY changed_at DESC LIMIT 50`,
+      [req.params.programId]
+    );
+    res.json({
+      revisions: revisions.map(r => ({
+        id: r.id,
+        changedBy: r.changed_by,
+        scribeSessionId: r.scribe_session_id,
+        changedAt: r.changed_at,
+        changes: renderProgramDiff(r.snapshot_before, r.snapshot_after),
+      })),
+    });
+  } catch (error) {
+    console.error('Get program revisions error:', error);
+    res.status(500).json({ error: 'Failed to get program revisions' });
   }
 });
 

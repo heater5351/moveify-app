@@ -50,6 +50,10 @@ export type CompletionData = {
 }
 
 export type ProgramExercise = Exercise & {
+  /** Server program_exercises row id — set when loaded from an existing program.
+   *  Distinct from `id`, which is the library exercise id for newly added
+   *  exercises and must NOT be sent as a row id on update (collision risk). */
+  programExerciseId?: number;
   sets: number;
   reps: number;
   prescribedWeight?: number;

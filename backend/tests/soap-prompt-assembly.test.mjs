@@ -44,6 +44,25 @@ describe('buildSoapUserMessage', () => {
     expect(msg.indexOf(TRANSCRIPT)).toBeLessThan(msg.indexOf('Generate the SOAP note.'));
   });
 
+  it('includes a delimited prescription-changes block marked authoritative', () => {
+    const msg = buildSoapUserMessage({
+      transcript: TRANSCRIPT,
+      programDiff: ['Squat with Barbell: 3×8 → 4×6; weight 20 → 25 kg', 'Added: Calf Raise with Dumbbells (3×12 @ 10 kg)'],
+    });
+    expect(msg).toContain('=== PRESCRIPTION CHANGES — EXACT ===');
+    expect(msg).toContain('=== END PRESCRIPTION CHANGES ===');
+    expect(msg).toContain('- Squat with Barbell: 3×8 → 4×6; weight 20 → 25 kg');
+    expect(msg).toContain('- Added: Calf Raise with Dumbbells (3×12 @ 10 kg)');
+    expect(msg).toContain('these recorded values are authoritative');
+    // changes precede the transcript
+    expect(msg.indexOf('END PRESCRIPTION CHANGES')).toBeLessThan(msg.indexOf(TRANSCRIPT));
+  });
+
+  it('omits the prescription-changes block for an empty diff', () => {
+    const msg = buildSoapUserMessage({ transcript: TRANSCRIPT, programDiff: [] });
+    expect(msg).not.toContain('PRESCRIPTION CHANGES');
+  });
+
   it('handles summary-only and note-only history, with singular/same-day wording', () => {
     const summaryOnly = buildSoapUserMessage({
       transcript: TRANSCRIPT,

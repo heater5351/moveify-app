@@ -873,6 +873,24 @@ async function initDatabase() {
           FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE
     `);
 
+    // Program revisions — before/after snapshots of every program create/update,
+    // optionally linked to the scribe session they happened around (Phase 2 of
+    // the scribe context upgrades). snapshot_before is NULL for program creation.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS program_revisions (
+        id SERIAL PRIMARY KEY,
+        program_id INTEGER NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+        patient_id INTEGER NOT NULL,
+        changed_by INTEGER REFERENCES users(id),
+        scribe_session_id INTEGER REFERENCES scribe_sessions(id) ON DELETE SET NULL,
+        snapshot_before JSONB,
+        snapshot_after JSONB NOT NULL,
+        changed_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_program_revisions_program ON program_revisions(program_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_program_revisions_patient_time ON program_revisions(patient_id, changed_at)`);
+
     // Seed default SOAP template (exercise physiology)
     await db.query(`
       INSERT INTO soap_templates (name, discipline, system_prompt, is_default)

@@ -37,7 +37,7 @@ Use bullet points within each section. Use clinical terminology appropriate for 
  * so the instruction survives custom per-clinician system prompts. Later phases
  * (program diffs, in-session measurements, outcome scores) slot in as new blocks here.
  */
-function buildSoapUserMessage({ transcript, priorContext }) {
+function buildSoapUserMessage({ transcript, priorContext, programDiff }) {
   const blocks = [];
 
   if (priorContext && (priorContext.summary || priorContext.lastNote)) {
@@ -60,6 +60,14 @@ Background from previous sessions. Use it ONLY for continuity and trend statemen
 
 ${parts.join('\n\n')}
 === END PATIENT HISTORY ===`);
+  }
+
+  if (Array.isArray(programDiff) && programDiff.length > 0) {
+    blocks.push(`=== PRESCRIPTION CHANGES — EXACT ===
+The exercise program changes below were recorded by the system during this session. Reflect them accurately in the Plan section (exact exercises, sets, reps, weights — do not round, rename, or invent changes). The transcript may discuss them too; where they differ, these recorded values are authoritative.
+
+${programDiff.map(line => `- ${line}`).join('\n')}
+=== END PRESCRIPTION CHANGES ===`);
   }
 
   blocks.push(`Here is the consultation transcript:\n\n${transcript}`);

@@ -22,6 +22,20 @@ what to know now, links).
 
 ---
 
+## 2026-06-12 — Scribe Phase 2: program-edit snapshots + save-bug fix
+
+- New `program_revisions` table: every program create/update records before/after
+  JSONB snapshots inside the same transaction (`services/program-revisions.js`),
+  stamped with the active scribe session (patient+clinician, 12h bound) when one
+  exists. SOAP generation sweeps revisions in the session window (start −30 min →
+  end +60 min) and injects a human-readable diff (`services/program-diff.js`) as
+  an authoritative PRESCRIPTION CHANGES prompt block. `GET /api/programs/:id/revisions`
+  (clinician) returns rendered history.
+- **Program-exercise save bug fixed** (silent overwrite when adding exercises during
+  edit): frontend now stamps `programExerciseId` at edit-load and sends it as `id`
+  (library ids no longer masquerade as row ids); backend PUT additionally guards
+  that each existing row can be claimed once (id or name match).
+
 ## 2026-06-11 — Scribe Phase 1: prior-note context in SOAP generation
 
 - SOAP generation now feeds the LLM patient history by default: the rolling
