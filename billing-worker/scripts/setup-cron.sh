@@ -21,24 +21,27 @@ TZ="${TZ:-Australia/Sydney}"
 
 # (name, schedule, path) — the path is appended to SERVICE_URL.
 #
-# Cadence note (cost review 2026-06-07): the high-frequency polls were stretched
-# from */15 to hourly to cut Cloud Run wakes ~75%. None need sub-hourly freshness
-# — all are cursor/recompute based, so a less frequent run just processes a bigger
-# batch with no data loss. See "GCP Cost Review 2026-06" in the exec-assistant vault.
+# Cadence note (cost sweeps 2026-06-07 + 2026-06-11): the high-frequency polls
+# were stretched */15 → hourly, then the pure-accounting syncs went daily —
+# batched 5:00–5:20 AEST so one warm instance serves all three, ahead of the
+# 6:00 Tyro ingest. None need sub-daily freshness — all are cursor/recompute
+# based, so a less frequent run just processes a bigger batch with no data loss.
+# process-referrals stays hourly (its output can be acted on same-day).
+# See "GCP Cost Review 2026-06" in the exec-assistant vault.
 JOBS=(
-  "billing-poll-cliniko-appointments|0 * * * *|/cron/poll-cliniko-appointments"
+  "billing-sync-cliniko|0 5 * * *|/cron/sync-cliniko"
+  "billing-poll-cliniko-appointments|10 5 * * *|/cron/poll-cliniko-appointments"
+  "billing-sync-block-progress|20 5 * * *|/cron/sync-block-progress"
   "process-referrals|0 * * * *|/cron/process-referrals"
-  "billing-sync-block-progress|0 * * * *|/cron/sync-block-progress"
   # billing-reconcile disabled 2026-05-23: it compared against Cliniko invoices,
   # which are not a reliable source of truth. Rework to Xero<->backend if a
   # reconciler is needed. (Live job paused via `gcloud scheduler jobs pause`.)
   "billing-daily-summary|30 1 * * *|/cron/daily-summary"
   "billing-ingest-tyro-drive|0 6 * * *|/cron/ingest-tyro-drive"
+  "billing-dashboard-sync|0 7 * * *|/cron/dashboard-sync"
   "billing-sweep-idempotency|0 3 * * 0|/cron/sweep-idempotency"
 )
 # Not managed here (kept off this list to match live state):
-#   - billing-sync-cliniko / billing-dashboard-sync: defined historically but not
-#     currently deployed as scheduler jobs.
 #   - moveify-reconcile-agreements + staging variants: created at agreement-flow
 #     go-live, see CLAUDE.md "Service-Agreement → Stripe Automation".
 

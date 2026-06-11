@@ -33,11 +33,17 @@ what to know now, links).
   version). `billing-worker/lib/secrets.js` `setSecret` now destroys superseded versions
   after adding (best-effort); worker SA granted `secretVersionManager` on
   `XERO_REFRESH_TOKEN`. One-off cleanup destroyed 161 stale versions across 12 secrets.
-- `billing-sync-cliniko` scheduler moved 15-min → hourly. Zombie `moveify-api` service
-  (accidentally re-created 2026-06-07 by a stray source deploy) deleted again.
-  Obsolete `moveify-jwt-secret` deleted (Phase 4 removed the JWT path).
-- Pending: dropping `min-instances=1` on `moveify-backend` (~$20/mo) once the cold-start
-  feel is validated on staging.
+- **Cron cadence (middle path):** pure-accounting crons (`billing-sync-cliniko`,
+  `billing-poll-cliniko-appointments`, `billing-sync-block-progress`) moved to **daily**,
+  batched 5:00/5:10/5:20 AEST ahead of the 6:00 Tyro ingest. `process-referrals` stays
+  hourly (output can be acted on same-day); `reconcile-agreements` stays 6-hourly
+  (protects new sign-ups). `setup-cron.sh` updated to match live.
+- **`moveify-backend` now `min-instances=0`** — was the largest recurring line (~$20/mo
+  for an always-warm instance). `startup-cpu-boost` stays ON to soften cold starts.
+  Consequence: first request after an idle period takes a few seconds.
+- Zombie `moveify-api` service (accidentally re-created 2026-06-07 by a stray source
+  deploy) deleted again. Obsolete `moveify-jwt-secret` deleted (Phase 4 removed JWT).
+- Projected steady-state after sweep: ~$26–28/mo gross (~$21–23 net) vs $30 budget.
 
 ## 2026-06-10 — App rebrand: Manrope everywhere (matches handout branding)
 
