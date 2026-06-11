@@ -34,7 +34,8 @@ describe('buildSoapUserMessage', () => {
     });
     expect(msg).toContain('=== PATIENT HISTORY — CONTEXT ONLY ===');
     expect(msg).toContain('=== END PATIENT HISTORY ===');
-    expect(msg).toContain('Do NOT copy findings');
+    expect(msg).toContain('NEVER restate, copy, list, or summarise previous findings');
+    expect(msg).toContain('Not assessed this session');
     expect(msg).toContain('Rolling treatment summary (4 prior sessions):');
     expect(msg).toContain('Most recent prior note (7 days ago):');
     expect(msg).toContain('R knee OA');

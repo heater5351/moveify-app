@@ -56,7 +56,12 @@ function buildSoapUserMessage({ transcript, priorContext, programDiff }) {
       parts.push(`Most recent prior note${when}:\n${priorContext.lastNote}`);
     }
     blocks.push(`=== PATIENT HISTORY — CONTEXT ONLY ===
-Background from previous sessions. Use it ONLY for continuity and trend statements (e.g. "pain improved from 6/10 last session to 3/10 today" or "progress since last session" in the Assessment). Do NOT copy findings, measurements, or plans from this history into today's note — report only what occurred in this session's transcript.
+Background from previous sessions. Strict rules for using it:
+- Use it ONLY to phrase a trend when today's transcript contains a comparable NEW finding (e.g. "pain 3/10 today, down from 6/10 last session"), or for one brief continuity sentence in the Assessment.
+- NEVER restate, copy, list, or summarise previous findings, measurements, test results, or plans anywhere in today's note — not even labelled as "previous" or "remain current". The reader has the prior note.
+- If today's transcript contains little or no information for a section, write a single line such as "Not assessed this session" or "Nil new reported" — do NOT fill the section from this history.
+- Do not infer or assume anything not explicitly in today's transcript (e.g. do not write "no new symptoms reported" or "education provided" unless it was actually said).
+Today's note documents today's session only. A short note for a short session is correct.
 
 ${parts.join('\n\n')}
 === END PATIENT HISTORY ===`);
