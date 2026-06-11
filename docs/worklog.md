@@ -22,6 +22,20 @@ what to know now, links).
 
 ---
 
+## 2026-06-11 — Scribe Phase 1: prior-note context in SOAP generation
+
+- SOAP generation now feeds the LLM patient history by default: the rolling
+  `patient_summaries` summary (existing `scribe-summary.js`) + the most recent
+  completed prior note, in a delimited "context only" block. Client can opt out
+  per-generation via `useHistory: false` (checkbox "Patient history" next to
+  Generate Note in `ProgressNotePage.tsx`). Audit detail gains `historyUsed`.
+- `generateSoapNote` now takes `({ transcript, priorContext }, systemPrompt)`
+  (string still accepted) via a new prompt-assembly layer
+  (`buildSoapUserMessage` in `scribe-llm.js`) — Phases 2–4 of the scribe
+  upgrades (program diffs, measurements, PROM scores) slot in as new blocks.
+  Plan: vault `20-Projects\Moveify-App\Build Plan - Scribe Context, Assessments
+  & Outcome Measures.md`. No schema or env changes.
+
 ## 2026-06-11 — GCP cost sweep #2 (budget breach investigation)
 
 - 90%-of-$30-budget alert traced via BigQuery billing export: steady-state pace was

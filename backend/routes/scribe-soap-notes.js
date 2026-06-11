@@ -3,6 +3,7 @@ const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { encrypt, decrypt } = require('../services/scribe-encryption');
 const { generateSoapNote } = require('../services/scribe-llm');
+const { getPatientSummary } = require('../services/scribe-summary');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -11,7 +12,7 @@ router.use(authenticate, requireRole('clinician'));
 // Verify session belongs to this clinician
 async function verifySession(sessionId, clinicianId) {
   const result = await db.query(
-    'SELECT id, clinician_id, started_at FROM scribe_sessions WHERE id = $1',
+    'SELECT id, clinician_id, patient_id, started_at FROM scribe_sessions WHERE id = $1',
     [sessionId]
   );
   if (result.rows.length === 0) return null;
@@ -105,7 +106,7 @@ router.post('/:sessionId/transcript', async (req, res) => {
 // POST /api/scribe/sessions/:sessionId/soap-note/generate
 router.post('/:sessionId/soap-note/generate', async (req, res) => {
   try {
-    const { transcript } = req.body;
+    const { transcript, useHistory } = req.body;
     if (!transcript) return res.status(400).json({ error: 'Transcript required' });
 
     const session = await verifySession(req.params.sessionId, req.user.id);
@@ -128,10 +129,41 @@ router.post('/:sessionId/soap-note/generate', async (req, res) => {
       'SELECT system_prompt_enc FROM clinician_preferences WHERE user_id = $1',
       [req.user.id]
     );
-    const { decrypt: dec } = require('../services/scribe-encryption');
-    const customPrompt = prefResult.rows.length > 0 ? dec(prefResult.rows[0].system_prompt_enc) : undefined;
+    const customPrompt = prefResult.rows.length > 0 ? decrypt(prefResult.rows[0].system_prompt_enc) : undefined;
 
-    const { content, model } = await generateSoapNote(transcript, customPrompt);
+    // Prior-note context: rolling summary + most recent completed prior note.
+    // Default on; client sends useHistory: false for a "fresh note". Failures here
+    // degrade to a history-free generation — never block the note.
+    let priorContext = null;
+    if (useHistory !== false) {
+      try {
+        const [summary, lastNoteRes] = await Promise.all([
+          getPatientSummary(session.patient_id),
+          db.query(
+            `SELECT sn.subjective_enc, ss.session_date
+             FROM soap_notes sn JOIN scribe_sessions ss ON sn.session_id = ss.id
+             WHERE ss.patient_id = $1 AND ss.id <> $2 AND ss.status = 'completed'
+             ORDER BY sn.created_at DESC LIMIT 1`,
+            [session.patient_id, session.id]
+          ),
+        ]);
+        const lastNoteRow = lastNoteRes.rows[0];
+        if (summary || lastNoteRow) {
+          priorContext = {
+            summary: summary ? summary.summary : undefined,
+            sessionCount: summary ? summary.sessionCount : undefined,
+            lastNote: lastNoteRow ? decrypt(lastNoteRow.subjective_enc) : undefined,
+            lastNoteDaysAgo: lastNoteRow
+              ? Math.max(0, Math.round((Date.now() - new Date(lastNoteRow.session_date).getTime()) / 86400000))
+              : undefined,
+          };
+        }
+      } catch (err) {
+        console.error('Prior-context fetch failed (continuing without history):', err.message);
+      }
+    }
+
+    const { content, model } = await generateSoapNote({ transcript, priorContext }, customPrompt);
 
     const result = await db.query(
       `INSERT INTO soap_notes (session_id, subjective_enc, generated_by, llm_model)
@@ -145,7 +177,7 @@ router.post('/:sessionId/soap-note/generate', async (req, res) => {
       [req.params.sessionId]
     );
 
-    audit.log(req, 'soap_note_generated', 'soap_note', result.rows[0].id, { model, wordCount });
+    audit.log(req, 'soap_note_generated', 'soap_note', result.rows[0].id, { model, wordCount, historyUsed: !!priorContext });
 
     res.status(201).json({
       id: result.rows[0].id,

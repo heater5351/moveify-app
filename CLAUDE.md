@@ -336,6 +336,7 @@ All routes are prefixed with `/api`. Routes marked with a lock require authentic
 | `blocks.js` | `/api/blocks` | Block read/prescription | Both roles + access check |
 | `agreements.js` | `/api/agreements` | `POST /generate` (mint tokenised link) | Clinician only |
 | `agreements.js` | `/api/agreements` | `GET /validate/:token`, `POST /:token/sign` | Public (token-gated, rate-limited) |
+| `scribe-soap-notes.js` | `/api/scribe/sessions` | `POST /:id/soap-note/generate` (body `useHistory`, default true — injects rolling patient summary + last completed note as context-only prompt block via `buildSoapUserMessage` in `services/scribe-llm.js`), transcript/note CRUD | Clinician only |
 | `scribe-handout.js` | `/api/scribe/sessions` | `POST /:id/handout/generate`, `POST /:id/handout/docx` | Clinician only (ephemeral, audit only) |
 | `scribe-reassessment.js` | `/api/scribe/sessions` | `POST /:id/reassessment/{generate,regrade,narrative,docx}` | Clinician only (baseline vs latest comparison; `audience` 'patient'\|'gp' + docx `variant`; `generate` takes optional `previousReportText` + optional `baselineSessionId`; ephemeral, audit only) |
 | `scribe-documents.js` | `/api/scribe/documents` | `POST /extract` (PDF/DOCX/TXT → text, multer in-memory) | Clinician only (ephemeral, nothing stored/logged) |

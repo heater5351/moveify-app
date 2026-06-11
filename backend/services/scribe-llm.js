@@ -31,13 +31,50 @@ Plan
 
 Use bullet points within each section. Use clinical terminology appropriate for exercise physiology documentation. Be concise but thorough — capture all clinically relevant information from the transcript. Do not fabricate information not present in the transcript.`;
 
-async function generateSoapNote(transcript, systemPrompt) {
-  if (!transcript || transcript.trim().length < 20) {
+/**
+ * Assemble the user message for SOAP generation from structured context blocks.
+ * Each block carries its own handling instruction (context-only vs transcribe-verbatim),
+ * so the instruction survives custom per-clinician system prompts. Later phases
+ * (program diffs, in-session measurements, outcome scores) slot in as new blocks here.
+ */
+function buildSoapUserMessage({ transcript, priorContext }) {
+  const blocks = [];
+
+  if (priorContext && (priorContext.summary || priorContext.lastNote)) {
+    const parts = [];
+    if (priorContext.summary) {
+      const count = priorContext.sessionCount
+        ? ` (${priorContext.sessionCount} prior session${priorContext.sessionCount === 1 ? '' : 's'})`
+        : '';
+      parts.push(`Rolling treatment summary${count}:\n${priorContext.summary}`);
+    }
+    if (priorContext.lastNote) {
+      const d = priorContext.lastNoteDaysAgo;
+      const when = d != null
+        ? ` (${d === 0 ? 'earlier today' : `${d} day${d === 1 ? '' : 's'} ago`})`
+        : '';
+      parts.push(`Most recent prior note${when}:\n${priorContext.lastNote}`);
+    }
+    blocks.push(`=== PATIENT HISTORY — CONTEXT ONLY ===
+Background from previous sessions. Use it ONLY for continuity and trend statements (e.g. "pain improved from 6/10 last session to 3/10 today" or "progress since last session" in the Assessment). Do NOT copy findings, measurements, or plans from this history into today's note — report only what occurred in this session's transcript.
+
+${parts.join('\n\n')}
+=== END PATIENT HISTORY ===`);
+  }
+
+  blocks.push(`Here is the consultation transcript:\n\n${transcript}`);
+  blocks.push('Generate the SOAP note.');
+  return blocks.join('\n\n');
+}
+
+async function generateSoapNote(input, systemPrompt) {
+  const opts = typeof input === 'string' ? { transcript: input } : (input || {});
+  if (!opts.transcript || opts.transcript.trim().length < 20) {
     throw new Error('Transcript too short to generate a meaningful SOAP note');
   }
   const command = new ConverseCommand({
     modelId: MODEL_ID,
-    messages: [{ role: 'user', content: [{ text: `Here is the consultation transcript:\n\n${transcript}\n\nGenerate the SOAP note.` }] }],
+    messages: [{ role: 'user', content: [{ text: buildSoapUserMessage(opts) }] }],
     system: [{ text: systemPrompt || DEFAULT_SYSTEM_PROMPT }],
     inferenceConfig: { maxTokens: 2000 },
   });
@@ -649,4 +686,4 @@ async function generateReport(soapNoteContent, systemPrompt) {
   };
 }
 
-module.exports = { generateSoapNote, generateHandout, generateReport, groundClinicalContext, consolidateClinicalContext, extractFindings, generateReassessmentNarrative, generateGPReassessmentNarrative, extractSubjectiveComparison, extractLetterMeta };
+module.exports = { generateSoapNote, buildSoapUserMessage, generateHandout, generateReport, groundClinicalContext, consolidateClinicalContext, extractFindings, generateReassessmentNarrative, generateGPReassessmentNarrative, extractSubjectiveComparison, extractLetterMeta };

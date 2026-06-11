@@ -32,6 +32,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
   const [speakerMap, setSpeakerMap] = useState<Record<number, 'clinician' | 'patient'>>({});
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState('');
+  const [includeHistory, setIncludeHistory] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [recordingDone, setRecordingDone] = useState(false);
@@ -257,7 +258,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
       if (!sid) throw new Error('Could not create session');
       const res = await apiFetch(`/sessions/${sid}/soap-note/generate`, {
         method: 'POST',
-        body: JSON.stringify({ transcript }),
+        body: JSON.stringify({ transcript, useHistory: includeHistory }),
       });
       if (!res.ok) throw new Error('Generation failed');
       const data = await res.json();
@@ -475,6 +476,18 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
               <button onClick={handleStartRecording} className="flex items-center gap-1.5 border-2 border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm font-semibold transition active:scale-95">
                 <Mic className="w-3.5 h-3.5" /> Record Again
               </button>
+              <label
+                className="flex items-center gap-1.5 text-xs text-gray-500 font-medium cursor-pointer select-none"
+                title="Include this patient's prior notes as background context when generating"
+              >
+                <input
+                  type="checkbox"
+                  checked={includeHistory}
+                  onChange={e => setIncludeHistory(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-primary-400"
+                />
+                Patient history
+              </label>
             </>
           )}
 
