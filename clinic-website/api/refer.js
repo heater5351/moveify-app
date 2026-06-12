@@ -151,20 +151,23 @@ function buildEmailBody(p, refId) {
 }
 
 // Raw RFC-2822 multipart/mixed message: plain-text body + base64 attachments.
+// Subject is RFC 2047-encoded and the body base64-encoded — raw UTF-8 in a
+// header or a 7bit body renders as mojibake (Ã¢Â€Â”) in Gmail.
 function buildRawEmail(from, to, subject, textBody, attachments) {
   const boundary = '----MoveifyReferral' + Date.now().toString(36);
+  const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, 'utf8').toString('base64')}?=`;
   const parts = [
     `From: ${from}`,
     `To: ${to}`,
-    `Subject: ${subject}`,
+    `Subject: ${encodedSubject}`,
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     '',
     `--${boundary}`,
     'Content-Type: text/plain; charset=utf-8',
-    'Content-Transfer-Encoding: 7bit',
+    'Content-Transfer-Encoding: base64',
     '',
-    textBody,
+    Buffer.from(textBody, 'utf8').toString('base64'),
   ];
   for (const att of attachments) {
     const safeName = att.name.replace(/[^\w. -]/g, '_');
