@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Refer a Patient - Moveify Health Solutions</title>
+    <meta name="description" content="Refer a client to Moveify Health Solutions for exercise physiology. NDIS (self/plan-managed), DVA, Medicare CDM and private referrals welcome." />
+    <link rel="icon" type="image/png" sizes="32x32" href="./assets/moveify-icon-square.jpg" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: { extend: { colors: { brand: '#46c1c0', branddark: '#2fa3a2', navy: '#132232' } } }
+      };
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .field-label { display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.375rem; }
+        .field-input { display: block; width: 100%; padding: 0.625rem 1rem; border-radius: 0.375rem; border: 1px solid #d1d5db; font-size: 0.95rem; background: #fff; }
+        .field-input:focus { outline: none; border-color: #46c1c0; box-shadow: 0 0 0 2px rgba(70,193,192,0.25); }
+        .req::after { content: " *"; color: #dc2626; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <div class="max-w-3xl mx-auto px-6 py-12">
+        <a href="/" class="inline-block mb-8">
+            <img src="./assets/moveify-logo.png" alt="Moveify Health Solutions" class="h-12 w-auto" />
+        </a>
+
+        <h1 class="text-3xl font-bold mb-3">Refer a Patient</h1>
+        <p class="text-gray-600 mb-2">
+            For GPs, physiotherapists, support coordinators, plan managers and other health professionals.
+            We'll contact your client within <strong>2 business days</strong> of receiving the referral.
+        </p>
+        <p class="text-gray-600 mb-1">
+            Accredited Exercise Physiologist (ESSA) &middot; Provider of NDIS (self/plan-managed), DVA, Medicare CDM and privately funded services.
+        </p>
+        <p class="text-sm text-gray-500 mb-8">
+            Prefer paper? <a href="./assets/moveify-referral-form-v1.pdf" class="text-brand hover:underline font-medium" download>Download the referral form PDF</a>
+            and email it to <a href="mailto:ryan@moveifyhealth.com" class="text-brand hover:underline">ryan@moveifyhealth.com</a>.
+        </p>
+
+        <!-- Success state (hidden until submit succeeds) -->
+        <div id="successPanel" class="hidden bg-white border border-brand rounded-xl p-8 text-center">
+            <div class="text-brand text-5xl mb-4">&#10003;</div>
+            <h2 class="text-2xl font-semibold mb-2">Referral received</h2>
+            <p class="text-gray-600 mb-4" id="successMessage">We'll contact your client within 2 business days.</p>
+            <p class="text-sm text-gray-500">Reference: <span id="successRef" class="font-mono font-semibold"></span></p>
+            <p class="text-sm text-gray-500 mt-4">Need to send larger documents? Email them to
+                <a href="mailto:ryan@moveifyhealth.com" class="text-brand hover:underline">ryan@moveifyhealth.com</a> quoting the reference above.</p>
+        </div>
+
+        <form id="referForm" class="space-y-10" novalidate>
+            <!-- Honeypot — hidden from humans, bots fill it -->
+            <div class="hidden" aria-hidden="true">
+                <label>Website<input type="text" name="website" id="hp_website" tabindex="-1" autocomplete="off" /></label>
+            </div>
+
+            <!-- 1. Referrer -->
+            <fieldset class="bg-white border border-gray-200 rounded-xl p-6">
+                <legend class="text-lg font-semibold px-2 -ml-2">1. Referrer (your details)</legend>
+                <div class="grid md:grid-cols-2 gap-4 mt-2">
+                    <div><label class="field-label req" for="ref_name">Name</label>
+                        <input class="field-input" type="text" id="ref_name" autocomplete="name" /></div>
+                    <div><label class="field-label" for="ref_role">Role</label>
+                        <input class="field-input" type="text" id="ref_role" placeholder="e.g. GP, physiotherapist, support coordinator" /></div>
+                    <div><label class="field-label" for="ref_org">Organisation</label>
+                        <input class="field-input" type="text" id="ref_org" /></div>
+                    <div><label class="field-label" for="ref_provider">Provider number (if GP/medical)</label>
+                        <input class="field-input" type="text" id="ref_provider" /></div>
+                    <div><label class="field-label req" for="ref_phone">Phone</label>
+                        <input class="field-input" type="tel" id="ref_phone" /></div>
+                    <div><label class="field-label req" for="ref_email">Email</label>
+                        <input class="field-input" type="email" id="ref_email" /></div>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">Phone or email required — we'll use it to confirm the first appointment.</p>
+                <label class="flex items-start gap-2 mt-4 text-sm text-gray-700">
+                    <input type="checkbox" id="ref_reports" class="mt-1 accent-[#46c1c0]" />
+                    Please send progress/outcome reports to me
+                </label>
+            </fieldset>
+
+            <!-- 2. Client -->
+            <fieldset class="bg-white border border-gray-200 rounded-xl p-6">
+                <legend class="text-lg font-semibold px-2 -ml-2">2. Client</legend>
+                <div class="grid md:grid-cols-2 gap-4 mt-2">
+                    <div><label class="field-label req" for="cl_name">Full name</label>
+                        <input class="field-input" type="text" id="cl_name" /></div>
+                    <div><label class="field-label" for="cl_dob">Date of birth</label>
+                        <input class="field-input" type="date" id="cl_dob" /></div>
+                    <div><label class="field-label" for="cl_phone">Phone</label>
+                        <input class="field-input" type="tel" id="cl_phone" /></div>
+                    <div><label class="field-label" for="cl_email">Email</label>
+                        <input class="field-input" type="email" id="cl_email" /></div>
+                    <div class="md:col-span-2"><label class="field-label" for="cl_address">Address</label>
+                        <input class="field-input" type="text" id="cl_address" /></div>
+                    <div><label class="field-label" for="cl_contact">Preferred contact method</label>
+                        <select class="field-input" id="cl_contact">
+                            <option value="">Select…</option>
+                            <option>Phone</option>
+                            <option>Email</option>
+                            <option>Via referrer</option>
+                        </select></div>
+                    <div><label class="field-label" for="cl_interpreter">Interpreter required — language (leave blank if none)</label>
+                        <input class="field-input" type="text" id="cl_interpreter" /></div>
+                    <div class="md:col-span-2"><label class="field-label" for="cl_access">Other accessibility needs</label>
+                        <input class="field-input" type="text" id="cl_access" /></div>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">A client phone, email, or guardian contact is required.</p>
+
+                <div class="mt-5 border-t border-gray-100 pt-4">
+                    <p class="text-sm font-medium text-gray-700 mb-3">Guardian / nominee / carer (if applicable)</p>
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <div><label class="field-label" for="gu_name">Name</label>
+                            <input class="field-input" type="text" id="gu_name" /></div>
+                        <div><label class="field-label" for="gu_rel">Relationship</label>
+                            <input class="field-input" type="text" id="gu_rel" /></div>
+                        <div><label class="field-label" for="gu_contact">Contact (phone/email)</label>
+                            <input class="field-input" type="text" id="gu_contact" /></div>
+                    </div>
+                    <label class="flex items-start gap-2 mt-3 text-sm text-gray-700">
+                        <input type="checkbox" id="gu_permission" class="mt-1 accent-[#46c1c0]" />
+                        Permission to contact the guardian/nominee
+                    </label>
+                </div>
+            </fieldset>
+
+            <!-- 3. Reason for referral -->
+            <fieldset class="bg-white border border-gray-200 rounded-xl p-6">
+                <legend class="text-lg font-semibold px-2 -ml-2">3. Reason for referral</legend>
+                <div class="space-y-4 mt-2">
+                    <div><label class="field-label req" for="rs_primary">Primary reason / diagnosis</label>
+                        <input class="field-input" type="text" id="rs_primary" /></div>
+                    <div><label class="field-label" for="rs_history">Relevant medical history &amp; current medications (or attach a summary below)</label>
+                        <textarea class="field-input" id="rs_history" rows="3"></textarea></div>
+                    <div><label class="field-label" for="rs_redflags">Red flags / precautions (cardiac, falls, post-op restrictions, behavioural)</label>
+                        <textarea class="field-input" id="rs_redflags" rows="2"></textarea></div>
+                    <div><label class="field-label" for="rs_goals">Goals the client/referrer wants addressed</label>
+                        <textarea class="field-input" id="rs_goals" rows="2"></textarea></div>
+                    <div><label class="field-label" for="rs_providers">Other providers involved (physio, OT, psych)</label>
+                        <input class="field-input" type="text" id="rs_providers" /></div>
+                </div>
+            </fieldset>
+
+            <!-- 4. Funding -->
+            <fieldset class="bg-white border border-gray-200 rounded-xl p-6">
+                <legend class="text-lg font-semibold px-2 -ml-2">4. Funding <span class="text-red-600">*</span></legend>
+                <div class="grid sm:grid-cols-2 gap-3 mt-2">
+                    <label class="flex items-center gap-2 border border-gray-200 rounded-lg px-4 py-3 cursor-pointer hover:border-brand">
+                        <input type="radio" name="funding" value="ndis" class="accent-[#46c1c0]" /> <span>NDIS</span></label>
+                    <label class="flex items-center gap-2 border border-gray-200 rounded-lg px-4 py-3 cursor-pointer hover:border-brand">
+                        <input type="radio" name="funding" value="dva" class="accent-[#46c1c0]" /> <span>DVA</span></label>
+                    <label class="flex items-center gap-2 border border-gray-200 rounded-lg px-4 py-3 cursor-pointer hover:border-brand">
+                        <input type="radio" name="funding" value="cdm" class="accent-[#46c1c0]" /> <span>Medicare CDM (GPCCMP / former EPC)</span></label>
+                    <label class="flex items-center gap-2 border border-gray-200 rounded-lg px-4 py-3 cursor-pointer hover:border-brand">
+                        <input type="radio" name="funding" value="private" class="accent-[#46c1c0]" /> <span>Private / health insurance / other</span></label>
+                </div>
+
+                <!-- NDIS block -->
+                <div id="block_ndis" class="hidden mt-6 border-t border-gray-100 pt-5 space-y-4">
+                    <p class="text-sm text-gray-600">We accept <strong>self-managed and plan-managed</strong> participants only — not NDIA/agency-managed.</p>
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <div><label class="field-label" for="nd_number">NDIS participant number</label>
+                            <input class="field-input" type="text" id="nd_number" /></div>
+                        <div><label class="field-label" for="nd_start">Plan start date</label>
+                            <input class="field-input" type="date" id="nd_start" /></div>
+                        <div><label class="field-label" for="nd_end">Plan end date</label>
+                            <input class="field-input" type="date" id="nd_end" /></div>
+                    </div>
+                    <div>
+                        <label class="field-label">Plan management</label>
+                        <div class="flex flex-wrap gap-3">
+                            <label class="flex items-center gap-2 text-sm"><input type="radio" name="nd_mgmt" value="Self-managed" class="accent-[#46c1c0]" /> Self-managed</label>
+                            <label class="flex items-center gap-2 text-sm"><input type="radio" name="nd_mgmt" value="Plan-managed" class="accent-[#46c1c0]" /> Plan-managed</label>
+                            <label class="flex items-center gap-2 text-sm"><input type="radio" name="nd_mgmt" value="NDIA-managed" class="accent-[#46c1c0]" /> NDIA-managed</label>
+                        </div>
+                        <p id="ndiaWarning" class="hidden mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-3">
+                            We're not currently registered with the NDIA, so we're unable to accept agency-managed participants.
+                            Self-managed and plan-managed referrals are welcome.
+                        </p>
+                    </div>
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <div><label class="field-label" for="nd_pm_name">Plan manager — name</label>
+                            <input class="field-input" type="text" id="nd_pm_name" /></div>
+                        <div><label class="field-label" for="nd_pm_org">Plan manager — organisation</label>
+                            <input class="field-input" type="text" id="nd_pm_org" /></div>
+                        <div><label class="field-label" for="nd_pm_email">Plan manager — invoice email</label>
+                            <input class="field-input" type="email" id="nd_pm_email" /></div>
+                    </div>
+                    <div class="grid md:grid-cols-4 gap-4">
+                        <div><label class="field-label" for="nd_sc_name">Support coordinator — name</label>
+                            <input class="field-input" type="text" id="nd_sc_name" /></div>
+                        <div><label class="field-label" for="nd_sc_org">Organisation</label>
+                            <input class="field-input" type="text" id="nd_sc_org" /></div>
+                        <div><label class="field-label" for="nd_sc_phone">Phone</label>
+                            <input class="field-input" type="tel" id="nd_sc_phone" /></div>
+                        <div><label class="field-label" for="nd_sc_email">Email</label>
+                            <input class="field-input" type="email" id="nd_sc_email" /></div>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div><label class="field-label" for="nd_budget">Funding budget</label>
+                            <select class="field-input" id="nd_budget">
+                                <option value="">Select…</option>
+                                <option>Improved Daily Living (Cat 15)</option>
+                                <option>Improved Health &amp; Wellbeing (Cat 12)</option>
+                                <option>Unsure</option>
+                            </select></div>
+                        <div><label class="field-label" for="nd_goals">NDIS plan goals relevant to this referral</label>
+                            <input class="field-input" type="text" id="nd_goals" /></div>
+                    </div>
+                </div>
+
+                <!-- DVA block -->
+                <div id="block_dva" class="hidden mt-6 border-t border-gray-100 pt-5 space-y-4">
+                    <p class="text-sm text-gray-600">No cost to the client — DVA billed directly.</p>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div><label class="field-label" for="dv_card">Card</label>
+                            <select class="field-input" id="dv_card">
+                                <option value="">Select…</option>
+                                <option>Gold</option>
+                                <option>Gold TPI</option>
+                                <option>White</option>
+                            </select></div>
+                        <div><label class="field-label" for="dv_file">DVA file number</label>
+                            <input class="field-input" type="text" id="dv_file" /></div>
+                    </div>
+                    <div><label class="field-label" for="dv_conditions">If White Card — accepted condition(s) this referral relates to</label>
+                        <input class="field-input" type="text" id="dv_conditions" /></div>
+                    <div>
+                        <label class="field-label">D904 / treatment cycle referral (required before first appointment)</label>
+                        <div class="flex gap-4">
+                            <label class="flex items-center gap-2 text-sm"><input type="radio" name="dv_d904" value="Attached" class="accent-[#46c1c0]" /> Attached below</label>
+                            <label class="flex items-center gap-2 text-sm"><input type="radio" name="dv_d904" value="Will follow" class="accent-[#46c1c0]" /> Will follow</label>
+                        </div>
+                    </div>
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <div><label class="field-label" for="dv_gp_name">Usual GP — name</label>
+                            <input class="field-input" type="text" id="dv_gp_name" /></div>
+                        <div><label class="field-label" for="dv_gp_practice">Practice</label>
+                            <input class="field-input" type="text" id="dv_gp_practice" /></div>
+                        <div><label class="field-label" for="dv_gp_contact">Contact</label>
+                            <input class="field-input" type="text" id="dv_gp_contact" /></div>
+                    </div>
+                    <div><label class="field-label" for="dv_therapies">Other physical therapies currently received (physio/chiro/osteo) + usual days</label>
+                        <input class="field-input" type="text" id="dv_therapies" /></div>
+                </div>
+
+                <!-- CDM block -->
+                <div id="block_cdm" class="hidden mt-6 border-t border-gray-100 pt-5 space-y-4">
+                    <div>
+                        <label class="field-label">CDM plan / referral</label>
+                        <div class="flex gap-4">
+                            <label class="flex items-center gap-2 text-sm"><input type="radio" name="cd_plan" value="Attached" class="accent-[#46c1c0]" /> Attached below</label>
+                            <label class="flex items-center gap-2 text-sm"><input type="radio" name="cd_plan" value="Will follow" class="accent-[#46c1c0]" /> Will follow</label>
+                        </div>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div><label class="field-label" for="cd_sessions">Number of EP sessions allocated (of 5/year)</label>
+                            <input class="field-input" type="text" id="cd_sessions" /></div>
+                        <div><label class="field-label" for="cd_gp_provider">Referring GP provider number</label>
+                            <input class="field-input" type="text" id="cd_gp_provider" /></div>
+                    </div>
+                </div>
+
+                <!-- Private block -->
+                <div id="block_private" class="hidden mt-6 border-t border-gray-100 pt-5 space-y-4">
+                    <div><label class="field-label" for="pv_detail">Detail (e.g. private, health insurance, Return to Work SA)</label>
+                        <input class="field-input" type="text" id="pv_detail" /></div>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div><label class="field-label" for="pv_claim">Claim number (if compensable)</label>
+                            <input class="field-input" type="text" id="pv_claim" /></div>
+                        <div><label class="field-label" for="pv_case">Case manager</label>
+                            <input class="field-input" type="text" id="pv_case" /></div>
+                    </div>
+                </div>
+            </fieldset>
+
+            <!-- Attachments -->
+            <fieldset class="bg-white border border-gray-200 rounded-xl p-6">
+                <legend class="text-lg font-semibold px-2 -ml-2">Attachments (optional)</legend>
+                <p class="text-sm text-gray-600 mt-2 mb-3">D904, CDM plan, or referral letter — up to 2 files, 3&nbsp;MB combined (PDF, JPG, PNG, DOC, DOCX).
+                    Larger documents? Email them to <a href="mailto:ryan@moveifyhealth.com" class="text-brand hover:underline">ryan@moveifyhealth.com</a> quoting your reference ID after submitting.</p>
+                <input class="field-input" type="file" id="attachments" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" />
+                <p id="fileError" class="hidden mt-2 text-sm text-red-700"></p>
+            </fieldset>
+
+            <!-- 5. Attribution -->
+            <fieldset class="bg-white border border-gray-200 rounded-xl p-6">
+                <legend class="text-lg font-semibold px-2 -ml-2">5. How did you hear about Moveify? (optional)</legend>
+                <select class="field-input mt-2" id="attribution">
+                    <option value="">Select…</option>
+                    <option>GP</option>
+                    <option>Physio</option>
+                    <option>Support coordinator</option>
+                    <option>Plan manager</option>
+                    <option>Friend/family</option>
+                    <option>Existing client</option>
+                    <option>Web search</option>
+                    <option>Social media</option>
+                    <option>Other</option>
+                </select>
+            </fieldset>
+
+            <!-- 6. Consent -->
+            <fieldset class="bg-white border border-gray-200 rounded-xl p-6">
+                <legend class="text-lg font-semibold px-2 -ml-2">6. Consent <span class="text-red-600">*</span></legend>
+                <div class="space-y-3 mt-2">
+                    <label class="flex items-start gap-2 text-sm text-gray-700">
+                        <input type="checkbox" id="consent_referral" class="mt-1 accent-[#46c1c0]" />
+                        The client consents to this referral and to Moveify contacting them directly.
+                    </label>
+                    <label class="flex items-start gap-2 text-sm text-gray-700">
+                        <input type="checkbox" id="consent_sharing" class="mt-1 accent-[#46c1c0]" />
+                        The client consents to relevant health information being shared between the referrer and Moveify for the purpose of care.
+                    </label>
+                </div>
+            </fieldset>
+
+            <div>
+                <p id="formError" class="hidden mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-3"></p>
+                <button type="submit" id="submitBtn"
+                    class="w-full sm:w-auto px-8 py-3 rounded-md bg-brand text-white font-semibold hover:bg-branddark disabled:opacity-50 disabled:cursor-not-allowed transition">
+                    Submit referral
+                </button>
+            </div>
+        </form>
+
+        <p class="text-xs text-gray-500 mt-10">
+            Moveify Health Solutions &middot; 4 George St, Williamstown SA 5351 &middot; 0435 524 991 &middot; ryan@moveifyhealth.com<br />
+            Moveify handles personal information under the <em>Privacy Act 1988</em> (Cth) —
+            <a href="/privacy-policy" class="text-brand hover:underline">privacy policy</a>.
+        </p>
+    </div>
+
+    <script>
+    (function () {
+        var pageLoadedAt = Date.now();
+        var form = document.getElementById('referForm');
+        var submitBtn = document.getElementById('submitBtn');
+        var formError = document.getElementById('formError');
+        var fileError = document.getElementById('fileError');
+        var ndiaWarning = document.getElementById('ndiaWarning');
+
+        var val = function (id) { return (document.getElementById(id).value || '').trim(); };
+        var checked = function (id) { return document.getElementById(id).checked; };
+        var radio = function (name) {
+            var el = document.querySelector('input[name="' + name + '"]:checked');
+            return el ? el.value : '';
+        };
+
+        // Conditional funding blocks
+        var blocks = { ndis: 'block_ndis', dva: 'block_dva', cdm: 'block_cdm', private: 'block_private' };
+        document.querySelectorAll('input[name="funding"]').forEach(function (r) {
+            r.addEventListener('change', function () {
+                Object.keys(blocks).forEach(function (k) {
+                    document.getElementById(blocks[k]).classList.toggle('hidden', k !== r.value);
+                });
+                updateNdiaBlock();
+            });
+        });
+
+        // NDIA-managed hard block
+        function updateNdiaBlock() {
+            var blocked = radio('funding') === 'ndis' && radio('nd_mgmt') === 'NDIA-managed';
+            ndiaWarning.classList.toggle('hidden', radio('nd_mgmt') !== 'NDIA-managed');
+            submitBtn.disabled = blocked;
+        }
+        document.querySelectorAll('input[name="nd_mgmt"]').forEach(function (r) {
+            r.addEventListener('change', updateNdiaBlock);
+        });
+
+        // Attachments: 2 files, 3 MB combined
+        var MAX_TOTAL = 3 * 1024 * 1024;
+        document.getElementById('attachments').addEventListener('change', function () {
+            var files = this.files;
+            var total = 0;
+            for (var i = 0; i < files.length; i++) total += files[i].size;
+            if (files.length > 2) {
+                fileError.textContent = 'Maximum 2 files.';
+                fileError.classList.remove('hidden'); this.value = '';
+            } else if (total > MAX_TOTAL) {
+                fileError.textContent = 'Files exceed the 3 MB combined limit — email larger documents to ryan@moveifyhealth.com instead.';
+                fileError.classList.remove('hidden'); this.value = '';
+            } else {
+                fileError.classList.add('hidden');
+            }
+        });
+
+        function readFile(file) {
+            return new Promise(function (resolve, reject) {
+                var reader = new FileReader();
+                reader.onload = function () {
+                    resolve({ name: file.name, data: reader.result.split(',')[1] });
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function showError(msg) {
+            formError.textContent = msg;
+            formError.classList.remove('hidden');
+            formError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function clientValidate() {
+            if (!val('ref_name')) return 'Please enter your name (section 1).';
+            if (!val('ref_phone') && !val('ref_email')) return 'Please enter your phone or email (section 1).';
+            if (!val('cl_name')) return "Please enter the client's full name (section 2).";
+            if (!val('cl_phone') && !val('cl_email') && !val('gu_contact')) return 'Please provide a client phone, email, or guardian contact (section 2).';
+            if (!val('rs_primary')) return 'Please enter the primary reason for referral (section 3).';
+            if (!radio('funding')) return 'Please select a funding type (section 4).';
+            if (radio('funding') === 'ndis' && radio('nd_mgmt') === 'NDIA-managed') {
+                return "We're not currently registered with the NDIA, so we're unable to accept agency-managed participants. Self-managed and plan-managed referrals are welcome.";
+            }
+            if (!checked('consent_referral') || !checked('consent_sharing')) return 'Both consent boxes are required (section 6).';
+            return null;
+        }
+
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            formError.classList.add('hidden');
+
+            // Spam control: real users take longer than 3 seconds.
+            if (Date.now() - pageLoadedAt < 3000) {
+                showError('Please review the form before submitting.');
+                return;
+            }
+
+            var err = clientValidate();
+            if (err) { showError(err); return; }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting…';
+
+            try {
+                var files = document.getElementById('attachments').files;
+                var attachments = [];
+                for (var i = 0; i < files.length; i++) attachments.push(await readFile(files[i]));
+
+                var payload = {
+                    website: document.getElementById('hp_website').value,
+                    referrer: {
+                        name: val('ref_name'), role: val('ref_role'), organisation: val('ref_org'),
+                        providerNumber: val('ref_provider'), phone: val('ref_phone'), email: val('ref_email'),
+                        progressReports: checked('ref_reports')
+                    },
+                    client: {
+                        fullName: val('cl_name'), dob: val('cl_dob'), phone: val('cl_phone'), email: val('cl_email'),
+                        address: val('cl_address'), preferredContact: val('cl_contact'),
+                        interpreterLanguage: val('cl_interpreter'), accessibility: val('cl_access'),
+                        guardian: {
+                            name: val('gu_name'), relationship: val('gu_rel'),
+                            contact: val('gu_contact'), permission: checked('gu_permission')
+                        }
+                    },
+                    reason: {
+                        primary: val('rs_primary'), history: val('rs_history'), redFlags: val('rs_redflags'),
+                        goals: val('rs_goals'), otherProviders: val('rs_providers')
+                    },
+                    funding: radio('funding'),
+                    ndis: {
+                        participantNumber: val('nd_number'), planStart: val('nd_start'), planEnd: val('nd_end'),
+                        management: radio('nd_mgmt'),
+                        planManagerName: val('nd_pm_name'), planManagerOrg: val('nd_pm_org'), planManagerEmail: val('nd_pm_email'),
+                        coordinatorName: val('nd_sc_name'), coordinatorOrg: val('nd_sc_org'),
+                        coordinatorPhone: val('nd_sc_phone'), coordinatorEmail: val('nd_sc_email'),
+                        budget: val('nd_budget'), goals: val('nd_goals')
+                    },
+                    dva: {
+                        card: val('dv_card'), fileNumber: val('dv_file'), whiteConditions: val('dv_conditions'),
+                        d904: radio('dv_d904'),
+                        gpName: val('dv_gp_name'), gpPractice: val('dv_gp_practice'), gpContact: val('dv_gp_contact'),
+                        otherTherapies: val('dv_therapies')
+                    },
+                    cdm: {
+                        planAttached: radio('cd_plan'), sessionsAllocated: val('cd_sessions'),
+                        gpProviderNumber: val('cd_gp_provider')
+                    },
+                    private: { detail: val('pv_detail'), claimNumber: val('pv_claim'), caseManager: val('pv_case') },
+                    attribution: val('attribution'),
+                    consentReferral: checked('consent_referral'),
+                    consentSharing: checked('consent_sharing'),
+                    attachments: attachments
+                };
+
+                var res = await fetch('/api/refer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                var data = await res.json().catch(function () { return {}; });
+
+                if (!res.ok) {
+                    showError(data.error || 'Something went wrong. Please try again, or email ryan@moveifyhealth.com.');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit referral';
+                    return;
+                }
+
+                var firstName = val('cl_name').split(/\s+/)[0] || 'your client';
+                document.getElementById('successMessage').textContent =
+                    "We'll contact " + firstName + ' within 2 business days.';
+                document.getElementById('successRef').textContent = data.referenceId || '';
+                form.classList.add('hidden');
+                document.getElementById('successPanel').classList.remove('hidden');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (ex) {
+                showError('Something went wrong. Please try again, or email ryan@moveifyhealth.com.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit referral';
+            }
+        });
+    })();
+    </script>
+</body>
+</html>
