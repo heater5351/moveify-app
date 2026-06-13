@@ -120,17 +120,21 @@ describe('buildNdisAgreement', () => {
     expect(text).toMatch(/up to 5 hours/);
   });
 
-  it('always includes a funding-periods clause (NDIS s33), even with no period set', () => {
-    const a = buildNdisAgreement({ details: validDetails });
-    const fp = a.parts[0].sections.find((s) => /Funding periods/.test(s.heading));
-    expect(fp).toBeTruthy();
-    const text = JSON.stringify(fp);
-    expect(text).toMatch(/funding periods/i);
-    expect(text).toMatch(/will not claim more than is available/);
-    expect(text).toMatch(/roll over/);
+  it('renders a "no funding periods" clause for rolled-over / unset plans (does not invent periods)', () => {
+    for (const details of [validDetails, { ...validDetails, fundingPeriod: 'none' }]) {
+      const a = buildNdisAgreement({ details });
+      const fp = a.parts[0].sections.find((s) => /Funding periods/.test(s.heading));
+      expect(fp).toBeTruthy();
+      const text = JSON.stringify(fp);
+      expect(text).toMatch(/does not use shorter funding periods/);
+      expect(text).toMatch(/whole plan term/);
+      // Must NOT assert period mechanics that don't apply.
+      expect(text).not.toMatch(/will not claim more than is available/);
+      expect(text).not.toMatch(/roll over/);
+    }
   });
 
-  it('states the chosen funding period and per-period amount when supplied', () => {
+  it('states the chosen funding period and per-period amount when a period applies', () => {
     const a = buildNdisAgreement({
       details: { ...validDetails, fundingPeriod: 'quarterly', fundingPeriodAmountCents: 261860 },
     });
@@ -138,6 +142,8 @@ describe('buildNdisAgreement', () => {
     const text = JSON.stringify(fp);
     expect(text).toMatch(/every 3 months/);
     expect(text).toMatch(/\$2618\.60/);
+    expect(text).toMatch(/will not claim more than is available/);
+    expect(text).toMatch(/roll over/);
   });
 
   it('omits the per-period amount line when not supplied', () => {

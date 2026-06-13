@@ -29,7 +29,7 @@ const { formatMoney } = require('./agreement-template');
 
 // Bump if the clause wording changes, so previously-signed agreements stay
 // attributable to the exact text the participant saw (stored per signed row).
-const NDIS_AGREEMENT_VERSION = 'ndis-v1.3-2026-06-13';
+const NDIS_AGREEMENT_VERSION = 'ndis-v1.4-2026-06-13';
 
 // EP line items, verified against NDIS Pricing Arrangements & Price Limits
 // 2025-26 (effective 1 July 2025). Re-check on the next 1 July update.
@@ -61,17 +61,19 @@ const TRAVEL_KM_RATE_CENTS = 99;
 // provider and cannot claim from NDIA-managed plans. The route hard-rejects it.
 const MANAGEMENT_TYPES = ['self_managed', 'plan_managed'];
 
-// Funding periods (NDIS Act s33, in effect from 19 May 2025): a plan's budget is
-// released in instalments over the plan, not all up front. Default is quarterly
-// for most therapy supports; the operator picks the one the participant's plan
-// uses. Providers can't see these in the portal — the participant / plan manager
-// must advise. Service agreements MUST now address funding periods, hence the
-// always-on clause below. `unset` renders the clause generically.
+// Funding periods (NDIS Act s33, in effect from 19 May 2025): a NEW/reassessed
+// plan's budget is released in instalments over the plan, not all up front
+// (usually quarterly). But this is NOT universal — many participants are still on
+// rolled-over or pre-reform plans where the whole budget is available for the plan
+// term. So the operator picks what the participant's plan actually does, including
+// `none` (no funding periods). Providers can't see periods in the portal — the
+// participant / plan manager must advise. The clause renders accordingly; `none`
+// (and unset) state that no funding periods apply rather than inventing them.
 const FUNDING_PERIODS = {
+  none: 'No funding periods — the whole budget is available for the plan term (e.g. a rolled-over or pre-reform plan)',
   quarterly: 'Quarterly — funding released every 3 months',
   monthly: 'Monthly — funding released each month',
   upfront: 'Up front — funding released at the start of the plan',
-  '12_months': '12 months — the whole budget is available for the plan',
   other: 'As stated in the participant’s NDIS plan',
 };
 
@@ -269,15 +271,29 @@ function paymentSection(details) {
   return { heading: 'Payment & claiming', body };
 }
 
-// Funding periods (NDIS Act s33). Always rendered — the NDIA's provider guidance
-// is explicit that service agreements must now set out how supports are delivered
-// and claimed within each funding period. States the specific period when known.
+// Funding periods (NDIS Act s33). Rendered to match the participant's actual plan.
+// New/reassessed plans (since 19 May 2025) release funding in periods (usually
+// quarterly) — but rolled-over / pre-reform plans have the whole budget available
+// for the term. `none` (and unset) state that no funding periods apply rather than
+// inventing them; a real period states the specifics and how claiming respects it.
 function fundingPeriodSection(details) {
-  const label = FUNDING_PERIODS[details.fundingPeriod];
+  const fp = FUNDING_PERIODS[details.fundingPeriod] ? details.fundingPeriod : 'none';
+
+  if (fp === 'none') {
+    return {
+      heading: 'Funding periods',
+      body: [
+        'This participant’s plan does not use shorter funding periods — the funding for these supports is available across the whole plan term (for example, a plan that pre-dates the funding-period changes or has been rolled over). Moveify will deliver and claim supports against the available budget as they are delivered.',
+        'If a future plan introduces funding periods (instalments of the budget released at set intervals), the participant or their plan manager / support coordinator will let Moveify know, and this agreement will be updated so claiming stays within each period’s available funding.',
+      ],
+    };
+  }
+
+  const label = FUNDING_PERIODS[fp];
   const body = [
-    'The participant’s NDIS funding is released in funding periods — portions of the plan budget made available at set intervals (most commonly every 3 months) rather than all at once. A funding period starts on the participant’s plan start date, not at the start of a calendar month.',
+    'The participant’s NDIS funding is released in funding periods — portions of the plan budget made available at set intervals rather than all at once. A funding period starts on the participant’s plan start date, not at the start of a calendar month.',
+    `For this participant, funding for these supports is released: ${label}.`,
   ];
-  if (label) body.push(`For this participant, funding for these supports is released: ${label}.`);
   const bullets = [];
   if (Number.isFinite(details.fundingPeriodAmountCents) && details.fundingPeriodAmountCents > 0) {
     bullets.push(`Indicative funding available for these supports each period: ~${formatMoney(details.fundingPeriodAmountCents)} (the participant or plan manager confirms the exact amount).`);

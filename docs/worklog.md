@@ -61,14 +61,16 @@ what to know now, links).
 
 ## 2026-06-13 — NDIS agreement: funding periods, est. funding, printable PDF
 
-- Follow-ups to the NDIS variant above (now `NDIS_AGREEMENT_VERSION` `ndis-v1.3-2026-06-13`):
-- **Funding periods clause (always rendered)** — NDIS Act s33 (in effect 19 May 2025)
-  releases a plan budget in instalments (usually quarterly), and the NDIA's provider
-  guidance is explicit that service agreements must address it. Clause states we claim
-  only within the current period's available funds, split claims across a period
-  boundary, rely on the participant/plan-manager for period dates+amounts (providers
-  can't see them in the portal), and that unspent funds roll forward within the plan.
-  Operator picks the period (`FUNDING_PERIODS`) + an optional per-period $ amount.
+- Follow-ups to the NDIS variant above (now `NDIS_AGREEMENT_VERSION` `ndis-v1.4-2026-06-13`):
+- **Funding periods clause (conditional)** — NDIS Act s33 (in effect 19 May 2025)
+  releases a NEW/reassessed plan's budget in instalments (usually quarterly), and the
+  NDIA's provider guidance says agreements should address it. **But not all plans have
+  periods** — rolled-over / pre-reform plans have the whole budget for the term — so the
+  operator picks the period (`FUNDING_PERIODS`, **default `none`**) and the clause renders
+  to match: `none`/unset states that no periods apply (doesn't invent them); a real period
+  states we claim only within the current period's funds, split claims across a boundary,
+  rely on the participant/plan-manager for dates+amounts (providers can't see them in the
+  portal), and that unspent funds roll forward within the plan. Optional per-period $ amount.
 - **Indicative funding estimate** (added v1.2) — optional session/reporting/travel
   hours + km render an "up to / estimated" Schedule-of-Supports cost with a total and
   an explicit "not a fixed charge · unused estimates are not charged" disclaimer.

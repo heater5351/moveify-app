@@ -33,13 +33,14 @@ const NDIS_MGMT = [
   { value: 'self_managed', label: 'Self-managed' },
 ];
 const NDIS_RATE_CAP = 166.99;
-// Funding periods (NDIS s33, from 19 May 2025). Quarterly is the default for most
-// therapy supports; operator selects what the participant's plan actually uses.
+// Funding periods (NDIS s33, from 19 May 2025). Only new/reassessed plans use them
+// (usually quarterly); rolled-over / pre-reform plans have the whole budget for the
+// term — so default to "none" and let the operator pick when periods actually apply.
 const NDIS_FUNDING_PERIODS = [
+  { value: 'none', label: 'None — whole plan (rolled-over / pre-reform)' },
   { value: 'quarterly', label: 'Quarterly (every 3 months)' },
   { value: 'monthly', label: 'Monthly' },
   { value: 'upfront', label: 'Up front' },
-  { value: '12_months', label: '12 months (whole plan)' },
   { value: 'other', label: 'Other / as per plan' },
 ];
 
@@ -47,7 +48,7 @@ const emptyNdis = {
   ndisNumber: '', planStart: '', planEnd: '',
   lineItem: '15_200_0126_1_3', rate: '166.99', managementType: 'plan_managed',
   delivery: 'In clinic', frequency: '1 × 60 min / week',
-  fundingPeriod: 'quarterly', fundingPeriodAmount: '',
+  fundingPeriod: 'none', fundingPeriodAmount: '',
   travelApplicable: 'no', nonFaceToFace: 'yes',
   estSessionHours: '', estReportingHours: '', estTravelHours: '', estTravelKm: '',
   planManagerName: '', planManagerContact: '',
@@ -139,10 +140,12 @@ const NdisFields = ({ ndis, upd }: { ndis: typeof emptyNdis; upd: (k: keyof type
           {NDIS_FUNDING_PERIODS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
         </select>
       </div>
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Funding available per period ($, optional)</label>
-        <input type="number" step="0.01" min="0" value={ndis.fundingPeriodAmount} onChange={(e) => upd('fundingPeriodAmount', e.target.value)} placeholder="e.g. 2618.60" className={inputCls} />
-      </div>
+      {ndis.fundingPeriod !== 'none' && (
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Funding available per period ($, optional)</label>
+          <input type="number" step="0.01" min="0" value={ndis.fundingPeriodAmount} onChange={(e) => upd('fundingPeriodAmount', e.target.value)} placeholder="e.g. 2618.60" className={inputCls} />
+        </div>
+      )}
     </div>
 
     <div className="grid grid-cols-2 gap-3">
