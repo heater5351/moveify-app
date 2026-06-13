@@ -556,7 +556,7 @@ Then rebuild the APK/AAB via Android Studio or Gradle for testing/submission.
 ## Business & Compliance Context (vault)
 
 Strategy, pricing, billing design, and compliance docs live in the executive-assistant
-vault at `C:\Users\dilig\Documents\executive-assistant` (read-only from here; it is
+vault at `C:\Users\dilig\Documents\executive-assistant` (read-mostly from here; it is
 PHI-free and secret-free by rule, so safe to read). Start at the index and read on
 demand — don't bulk-load (some docs are long):
 
@@ -569,5 +569,15 @@ The index maps "working on X → read Y". Consult it when touching:
 
 The vault is authoritative for *intent/rationale*; the repo is authoritative for *code*.
 Don't copy vault content into the repo — link by path. Flag any code↔vault mismatch.
-(The vault dir is granted read access via `permissions.additionalDirectories` in
+(The vault dir is granted access via `permissions.additionalDirectories` in
 `.claude/settings.local.json`.)
+
+**Keep the vault in sync when you ship (since 2026-06-13).** When a code session
+fulfils or supersedes a vault build/plan note (e.g. a `… - Pending Code Edit.md`),
+update that note in the same session: set its `status`, add a short "what shipped"
+summary pointing back to the repo as authoritative for code, and tick its follow-ups.
+Keep edits **PHI-free and secret-free**, and **don't rewrite the decisions/rationale**
+— only the status/implementation layer. Add a one-line pointer to the vault's
+`Context Index for Code Sessions.md` if the work introduces a new capability. The
+Content-Engine `Performance Ledger` remains append-only. This mirrors the repo's own
+worklog/CLAUDE.md self-maintenance rule — do both so neither source drifts.
