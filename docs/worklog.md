@@ -59,6 +59,27 @@ what to know now, links).
   Source: vault `App Agreements - NDIS Variant - Pending Code Edit` + `NDIS Service
   Agreement Template` + `NDIS EP Billing Reference`.
 
+## 2026-06-13 — NDIS agreement: funding periods, est. funding, printable PDF
+
+- Follow-ups to the NDIS variant above (now `NDIS_AGREEMENT_VERSION` `ndis-v1.3-2026-06-13`):
+- **Funding periods clause (always rendered)** — NDIS Act s33 (in effect 19 May 2025)
+  releases a plan budget in instalments (usually quarterly), and the NDIA's provider
+  guidance is explicit that service agreements must address it. Clause states we claim
+  only within the current period's available funds, split claims across a period
+  boundary, rely on the participant/plan-manager for period dates+amounts (providers
+  can't see them in the portal), and that unspent funds roll forward within the plan.
+  Operator picks the period (`FUNDING_PERIODS`) + an optional per-period $ amount.
+- **Indicative funding estimate** (added v1.2) — optional session/reporting/travel
+  hours + km render an "up to / estimated" Schedule-of-Supports cost with a total and
+  an explicit "not a fixed charge · unused estimates are not charged" disclaimer.
+- **Printable PDF** — new public, token-gated `GET /api/agreements/:token/pdf`. Pending
+  link → **unsigned preview** (PREVIEW banner + blank hand-sign lines); signed → the
+  captured signature + audit trail. `renderAgreementPdf` gained a `draft` flag. Sign
+  page (`AgreementPage`) has a "Download / print a copy" link + a "Download your signed
+  copy" button on the confirmation screen. Applies to private agreements too.
+- No schema/env changes (reuses `details` JSONB + the existing flag). ⚠ Still inside
+  the un-merged NDIS copy pending Ryan's legal review.
+
 ## 2026-06-12 — Scribe Phase 2: program-edit snapshots + save-bug fix
 
 - New `program_revisions` table: every program create/update records before/after

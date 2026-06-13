@@ -27,6 +27,7 @@ const {
   NDIS_AGREEMENT_VERSION,
   NDIS_RATE_CAP_CENTS,
   MANAGEMENT_TYPES,
+  FUNDING_PERIODS,
   isValidLineItem,
   buildNdisAgreement,
 } = require('../lib/ndis-agreement-content');
@@ -127,6 +128,12 @@ async function generateNdis(req, res) {
     estReportingHours: estHours(d.estReportingHours),
     estTravelHours: estHours(d.estTravelHours),
     estTravelKm: estHours(d.estTravelKm),
+    // Funding period (NDIS s33). Optional; clause renders generically if unset.
+    fundingPeriod: Object.prototype.hasOwnProperty.call(FUNDING_PERIODS, d.fundingPeriod) ? d.fundingPeriod : undefined,
+    fundingPeriodAmountCents: (() => {
+      const c = Math.round(Number(d.fundingPeriodAmount) * 100);
+      return Number.isFinite(c) && c > 0 ? c : undefined;
+    })(),
     planManager: obj(d.planManager, ['name', 'contact']),
     supportCoordinator: obj(d.supportCoordinator, ['name', 'org', 'contact']),
     representative: obj(d.representative, ['name', 'relationship', 'authority']),
@@ -244,6 +251,53 @@ router.get('/validate/:token', async (req, res) => {
     });
   } catch (err) {
     console.error('Agreement validate error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /:token/pdf — public, token-gated. Streams a printable PDF of the
+// agreement. For a still-pending link this is an UNSIGNED preview copy (the
+// operator/participant can read or hand-sign it); once signed, it renders the
+// captured signature + audit trail. Same secret (the 32-byte token) as validate.
+router.get('/:token/pdf', async (req, res) => {
+  if (!automationEnabled()) return res.status(503).json({ error: 'Agreement automation is disabled' });
+  try {
+    const a = await db.getOne(
+      `SELECT * FROM service_agreements WHERE token = $1 AND status IN ('pending', 'signed')`,
+      [req.params.token]
+    );
+    if (!a) return res.status(404).json({ error: 'Invalid or expired agreement link' });
+    if (a.status === 'pending' && new Date(a.token_expires_at) < new Date()) {
+      return res.status(404).json({ error: 'Invalid or expired agreement link' });
+    }
+
+    const { name, dob } = await clinikoNameEmail(a.cliniko_patient_id);
+    const isSigned = a.status === 'signed';
+    const common = {
+      patientName: name,
+      draft: !isSigned,
+      signedName: isSigned ? a.signed_name : undefined,
+      signedAt: isSigned && a.signed_at ? new Date(a.signed_at).toISOString() : undefined,
+      signedIp: isSigned ? a.signed_ip : undefined,
+      signature: isSigned ? a.signed_signature : undefined,
+    };
+
+    let pdf;
+    if (a.kind === 'ndis') {
+      const agreement = buildNdisAgreement({ details: a.details, patientName: name, patientDob: dob });
+      if (!agreement) return res.status(404).json({ error: 'Agreement could not be rendered' });
+      pdf = await renderAgreementPdf({ ...common, agreement, signedCapacity: isSigned ? a.signed_capacity : undefined });
+    } else {
+      pdf = await renderAgreementPdf({ ...common, tier: a.tier, path: a.path, startDate: a.start_date });
+    }
+
+    const fname = `${a.kind === 'ndis' ? 'NDIS-' : ''}Service-Agreement${isSigned ? '-signed' : '-preview'}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${fname}"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(pdf);
+  } catch (err) {
+    console.error('Agreement PDF error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

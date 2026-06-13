@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle, AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, ShieldCheck, Printer } from 'lucide-react';
 import { API_URL } from '../config';
 
 interface AgreementSection {
@@ -174,6 +174,7 @@ export const AgreementPage = () => {
   const [signedDone, setSignedDone] = useState(false);
 
   const isNdis = details?.kind === 'ndis';
+  const pdfUrl = token ? `${API_URL}/agreements/${encodeURIComponent(token)}/pdf` : '';
 
   const signedDate = new Date().toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -254,9 +255,16 @@ export const AgreementPage = () => {
           <h1 className="text-xl font-bold font-display text-secondary-500 mb-2">Agreement signed</h1>
           <p className="text-slate-500 text-sm">
             Thank you{details.patientName ? `, ${details.patientName.split(' ')[0]}` : ''}. Your NDIS Service Agreement is
-            signed and on file with Moveify Health Solutions. A copy can be provided on request — contact the clinic if
-            you’d like one sent to you or your plan manager.
+            signed and on file with Moveify Health Solutions.
           </p>
+          <a
+            href={pdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-5 inline-flex items-center gap-1.5 px-4 py-2.5 bg-primary-400 text-white rounded-lg hover:bg-primary-500 font-medium text-sm"
+          >
+            <Printer size={16} /> Download your signed copy
+          </a>
           <p className="text-slate-400 text-xs mt-4">Moveify Health Solutions</p>
         </div>
       </div>
@@ -311,6 +319,17 @@ export const AgreementPage = () => {
                     <div className="flex justify-between gap-4"><dt className="text-slate-400">Start date</dt><dd className="font-medium text-slate-800 text-right">{a.startDate}</dd></div>
                   )}
                 </dl>
+              </div>
+
+              <div className="mt-3 flex justify-end">
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700"
+                >
+                  <Printer size={15} /> Download / print a copy
+                </a>
               </div>
 
               <p className="mt-5 text-sm text-slate-500 leading-relaxed">{a.about}</p>

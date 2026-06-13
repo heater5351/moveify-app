@@ -120,6 +120,34 @@ describe('buildNdisAgreement', () => {
     expect(text).toMatch(/up to 5 hours/);
   });
 
+  it('always includes a funding-periods clause (NDIS s33), even with no period set', () => {
+    const a = buildNdisAgreement({ details: validDetails });
+    const fp = a.parts[0].sections.find((s) => /Funding periods/.test(s.heading));
+    expect(fp).toBeTruthy();
+    const text = JSON.stringify(fp);
+    expect(text).toMatch(/funding periods/i);
+    expect(text).toMatch(/will not claim more than is available/);
+    expect(text).toMatch(/roll over/);
+  });
+
+  it('states the chosen funding period and per-period amount when supplied', () => {
+    const a = buildNdisAgreement({
+      details: { ...validDetails, fundingPeriod: 'quarterly', fundingPeriodAmountCents: 261860 },
+    });
+    const fp = a.parts[0].sections.find((s) => /Funding periods/.test(s.heading));
+    const text = JSON.stringify(fp);
+    expect(text).toMatch(/every 3 months/);
+    expect(text).toMatch(/\$2618\.60/);
+  });
+
+  it('omits the per-period amount line when not supplied', () => {
+    const a = buildNdisAgreement({ details: { ...validDetails, fundingPeriod: 'monthly' } });
+    const fp = a.parts[0].sections.find((s) => /Funding periods/.test(s.heading));
+    const text = JSON.stringify(fp);
+    expect(text).toMatch(/released each month/);
+    expect(text).not.toMatch(/Indicative funding available for these supports each period/);
+  });
+
   it('numbers clauses sequentially after the participant header', () => {
     const a = buildNdisAgreement({ details: validDetails });
     expect(a.parts[0].sections[0].heading).toBe('Participant & Plan');

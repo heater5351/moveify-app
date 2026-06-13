@@ -29,7 +29,7 @@ const { formatMoney } = require('./agreement-template');
 
 // Bump if the clause wording changes, so previously-signed agreements stay
 // attributable to the exact text the participant saw (stored per signed row).
-const NDIS_AGREEMENT_VERSION = 'ndis-v1.2-2026-06-13';
+const NDIS_AGREEMENT_VERSION = 'ndis-v1.3-2026-06-13';
 
 // EP line items, verified against NDIS Pricing Arrangements & Price Limits
 // 2025-26 (effective 1 July 2025). Re-check on the next 1 July update.
@@ -60,6 +60,20 @@ const TRAVEL_KM_RATE_CENTS = 99;
 // NDIA-managed (Agency) is intentionally absent — Moveify is an unregistered
 // provider and cannot claim from NDIA-managed plans. The route hard-rejects it.
 const MANAGEMENT_TYPES = ['self_managed', 'plan_managed'];
+
+// Funding periods (NDIS Act s33, in effect from 19 May 2025): a plan's budget is
+// released in instalments over the plan, not all up front. Default is quarterly
+// for most therapy supports; the operator picks the one the participant's plan
+// uses. Providers can't see these in the portal — the participant / plan manager
+// must advise. Service agreements MUST now address funding periods, hence the
+// always-on clause below. `unset` renders the clause generically.
+const FUNDING_PERIODS = {
+  quarterly: 'Quarterly — funding released every 3 months',
+  monthly: 'Monthly — funding released each month',
+  upfront: 'Up front — funding released at the start of the plan',
+  '12_months': '12 months — the whole budget is available for the plan',
+  other: 'As stated in the participant’s NDIS plan',
+};
 
 const MANAGEMENT_LABELS = {
   self_managed: 'Self-managed',
@@ -255,6 +269,33 @@ function paymentSection(details) {
   return { heading: 'Payment & claiming', body };
 }
 
+// Funding periods (NDIS Act s33). Always rendered — the NDIA's provider guidance
+// is explicit that service agreements must now set out how supports are delivered
+// and claimed within each funding period. States the specific period when known.
+function fundingPeriodSection(details) {
+  const label = FUNDING_PERIODS[details.fundingPeriod];
+  const body = [
+    'The participant’s NDIS funding is released in funding periods — portions of the plan budget made available at set intervals (most commonly every 3 months) rather than all at once. A funding period starts on the participant’s plan start date, not at the start of a calendar month.',
+  ];
+  if (label) body.push(`For this participant, funding for these supports is released: ${label}.`);
+  const bullets = [];
+  if (Number.isFinite(details.fundingPeriodAmountCents) && details.fundingPeriodAmountCents > 0) {
+    bullets.push(`Indicative funding available for these supports each period: ~${formatMoney(details.fundingPeriodAmountCents)} (the participant or plan manager confirms the exact amount).`);
+  }
+  bullets.push(
+    'Moveify will deliver and claim supports within the funding available in the current funding period, and will not claim more than is available for that period.',
+    'Where a course of supports spans two funding periods, claims may be split so each is claimed in the correct period.',
+    'Because providers cannot see funding-period dates or amounts in the NDIS portal, the participant (or their plan manager / support coordinator) will tell Moveify the funding-period dates and the amount available for these supports, and will advise of any change at plan reassessment.',
+    'Unspent funds roll over into the next funding period within the same plan; they do not carry past the plan end date.',
+  );
+  return {
+    heading: 'Funding periods',
+    body,
+    bullets,
+    note: 'Funding periods control when funding becomes available, not the total amount in the plan. This keeps supports available across the whole plan and helps avoid overspending early.',
+  };
+}
+
 function cancellationSection() {
   return {
     heading: 'Cancellations & no-shows',
@@ -362,6 +403,7 @@ const CLAUSE_BUILDERS = [
   nonFaceToFaceSection,
   estimatesSection, // conditional — returns null when no estimate supplied
   paymentSection,
+  fundingPeriodSection,
   cancellationSection,
   responsibilitiesSection,
   changesSection,
@@ -410,6 +452,7 @@ module.exports = {
   NDIS_RATE_CAP_CENTS,
   MANAGEMENT_TYPES,
   MANAGEMENT_LABELS,
+  FUNDING_PERIODS,
   DEFAULT_NFF_ITEMS,
   isValidLineItem,
   buildNdisAgreement,

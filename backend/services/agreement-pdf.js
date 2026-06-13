@@ -26,7 +26,7 @@ const RULE = '#E2E8F0';
  *
  * @returns {Promise<Buffer>}
  */
-function renderAgreementPdf({ patientName, tier, path, startDate, signedName, signedAt, signedIp, signature, agreement: prebuilt, signedCapacity }) {
+function renderAgreementPdf({ patientName, tier, path, startDate, signedName, signedAt, signedIp, signature, agreement: prebuilt, signedCapacity, draft }) {
   return new Promise((resolve, reject) => {
     try {
       const agreement = prebuilt || buildAgreement({ tier, path, startDate });
@@ -70,6 +70,11 @@ function renderAgreementPdf({ patientName, tier, path, startDate, signedName, si
       doc.fontSize(18).font('Helvetica-Bold').fillColor(NAVY).text(agreement.docTitle);
       doc.moveDown(0.1);
       doc.fontSize(8).font('Helvetica').fillColor(SUB).text(`Agreement version: ${agreement.version}`);
+      if (draft) {
+        doc.moveDown(0.15);
+        doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#B45309')
+          .text('PREVIEW — UNSIGNED COPY. Sign electronically via your secure link, or print and sign by hand below.');
+      }
       doc.moveDown(0.6);
 
       // ── Provider + program summary ──
@@ -138,17 +143,36 @@ function renderAgreementPdf({ patientName, tier, path, startDate, signedName, si
         }
       }
 
-      doc.fontSize(9.5).font('Helvetica').fillColor(INK);
-      doc.text(`Signed by: ${signedName || '—'}`);
-      if (signedCapacity) doc.text(`Signing capacity: ${signedCapacity}`);
-      doc.text(`Date/time: ${signedAt || '—'}`);
-      doc.text(`IP address: ${signedIp || '—'}`);
-      doc.moveDown(0.4);
-      doc.fontSize(7.5).fillColor(SUB).text(
-        isNdis
-          ? 'This document records an electronic acceptance, including the signatory’s drawn signature, typed name, timestamp and IP address. Supports are claimed against the participant’s NDIS plan; there is no Direct Debit mandate.'
-          : 'This document records an electronic acceptance, including the signatory’s drawn signature and explicit Direct Debit authorisation. The bank-level Direct Debit mandate (BECS/card) was captured separately by our payment provider, Stripe.',
-      );
+      if (draft) {
+        // Unsigned preview: blank hand-sign lines so a printed copy can be wet-signed.
+        const lineW = 240;
+        const signLine = (label) => {
+          const y = doc.y + 16;
+          doc.moveTo(left, y).lineTo(left + lineW, y).lineWidth(0.5).strokeColor(RULE).stroke();
+          doc.fontSize(8).font('Helvetica').fillColor(SUB).text(label, left, y + 3);
+          doc.moveDown(1.4);
+        };
+        doc.moveDown(0.6);
+        signLine('Signature');
+        signLine('Name (printed)');
+        signLine('Date');
+        doc.moveDown(0.2);
+        doc.fontSize(7.5).fillColor(SUB).text(
+          'This is an unsigned preview for review. Signing electronically via the secure link is preferred and records a timestamp and audit trail; a hand-signed copy is also accepted.',
+        );
+      } else {
+        doc.fontSize(9.5).font('Helvetica').fillColor(INK);
+        doc.text(`Signed by: ${signedName || '—'}`);
+        if (signedCapacity) doc.text(`Signing capacity: ${signedCapacity}`);
+        doc.text(`Date/time: ${signedAt || '—'}`);
+        doc.text(`IP address: ${signedIp || '—'}`);
+        doc.moveDown(0.4);
+        doc.fontSize(7.5).fillColor(SUB).text(
+          isNdis
+            ? 'This document records an electronic acceptance, including the signatory’s drawn signature, typed name, timestamp and IP address. Supports are claimed against the participant’s NDIS plan; there is no Direct Debit mandate.'
+            : 'This document records an electronic acceptance, including the signatory’s drawn signature and explicit Direct Debit authorisation. The bank-level Direct Debit mandate (BECS/card) was captured separately by our payment provider, Stripe.',
+        );
+      }
 
       doc.end();
     } catch (err) {
