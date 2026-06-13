@@ -64,6 +64,36 @@ describe('buildNdisAgreement', () => {
     expect(text).toMatch(/GST-free/);
   });
 
+  it('lists all 8 Code of Conduct elements (incl. sexual misconduct + fair pricing)', () => {
+    const a = buildNdisAgreement({ details: validDetails });
+    const coc = a.parts[0].sections.find((s) => /Code of Conduct/.test(s.heading));
+    expect(coc.bullets).toHaveLength(8);
+    const text = JSON.stringify(coc.bullets);
+    expect(text).toMatch(/sexual misconduct/);
+    expect(text).toMatch(/fair prices/);
+  });
+
+  it('covers travel + non-face-to-face supports per the toggles', () => {
+    const clinic = buildNdisAgreement({ details: { ...validDetails, travelApplicable: false, nonFaceToFace: true } });
+    const clinicText = JSON.stringify(clinic.parts[0].sections);
+    expect(clinicText).toMatch(/no provider travel is charged/);
+    expect(clinicText).toMatch(/Progress and outcome report writing/);
+    expect(clinicText).toMatch(/non-face-to-face option/);
+
+    const mobile = buildNdisAgreement({ details: { ...validDetails, travelApplicable: true, nonFaceToFace: false } });
+    const mobileText = JSON.stringify(mobile.parts[0].sections);
+    expect(mobileText).toMatch(/\$0\.99 per kilometre/);
+    expect(mobileText).toMatch(/50% of the hourly support rate/);
+    expect(mobileText).toMatch(/not separately charged/);
+  });
+
+  it('numbers clauses sequentially after the participant header', () => {
+    const a = buildNdisAgreement({ details: validDetails });
+    expect(a.parts[0].sections[0].heading).toBe('Participant & Plan');
+    expect(a.parts[0].sections[1].heading).toMatch(/^1\. /);
+    expect(a.parts[0].sections[2].heading).toMatch(/^2\. /);
+  });
+
   it('renders the matching management-type payment clause only', () => {
     const paymentClause = (a) => JSON.stringify(a.parts[0].sections.find((s) => /Payment & claiming/.test(s.heading)));
 

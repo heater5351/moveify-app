@@ -33,10 +33,17 @@ what to know now, links).
 - New `backend/lib/ndis-agreement-content.js` — `buildNdisAgreement(details)` emits
   the **same `{ parts:[{sections}] }` shape** as `buildAgreement`, so the PDF
   renderer + sign page render it unchanged. Mirrors the vault *NDIS Service
-  Agreement Template* (12 clauses): itemised Schedule of Supports (line items
-  `15_200_0126_1_3` IDL / `12_027_0128_3_3` IHW, $166.99/hr cap), GST-free, the
-  **7-clear-day / up-to-100% NDIS short-notice cancellation rule**, and an explicit
-  **NDIS Code of Conduct** clause. Separate `NDIS_AGREEMENT_VERSION`.
+  Agreement Template* + verified against official NDIS material (Code of Conduct,
+  service-agreement fact sheet, PAPL 2025-26): itemised Schedule of Supports (line
+  items `15_200_0126_1_3` IDL / `12_027_0128_3_3` IHW, $166.99/hr cap), GST-free,
+  the **7-clear-day / up-to-100% NDIS short-notice cancellation rule**, explicit
+  **Travel** (50% labour + $0.99/km non-labour, agreed-in-advance; clinic-based
+  default = not charged) and **itemised non-face-to-face supports** (program/resource
+  dev, progress/report writing, SC/plan-manager/GP liaison, phone/video/email
+  check-ins, case conferencing — "only chargeable because stated here"), a review
+  clause, and the full **8-element NDIS Code of Conduct** (incl. sexual misconduct +
+  fair pricing). Travel/NFF are operator toggles. Dynamic clause numbering.
+  Separate `NDIS_AGREEMENT_VERSION` (`ndis-v1.1-2026-06-13`).
 - Schema (additive, nullable): `service_agreements.kind` (default `'private'`),
   `details` JSONB (NDIS payload), `signed_capacity`; path CHECK widened to allow
   `'ndis'`. NDIS rows store `tier='ndis'`, `path='ndis'`.

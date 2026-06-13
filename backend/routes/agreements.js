@@ -112,6 +112,11 @@ async function generateNdis(req, res) {
     managementType: d.managementType,
     delivery: clean(d.delivery),
     frequency: clean(d.frequency),
+    travelApplicable: d.travelApplicable === true,
+    // Non-face-to-face supports default ON (claimable only because listed); the
+    // operator can disable. Custom item list optional — falls back to defaults.
+    nonFaceToFace: d.nonFaceToFace !== false,
+    nffItems: Array.isArray(d.nffItems) ? d.nffItems.map(clean).filter(Boolean).slice(0, 12) : undefined,
     planManager: obj(d.planManager, ['name', 'contact']),
     supportCoordinator: obj(d.supportCoordinator, ['name', 'org', 'contact']),
     representative: obj(d.representative, ['name', 'relationship', 'authority']),

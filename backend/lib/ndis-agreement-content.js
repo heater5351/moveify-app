@@ -12,18 +12,24 @@
 // renderer, the /validate API, and the patient sign page render it with no
 // renderer changes.
 //
-// Source (vault, read-only): NDIS Service Agreement Template + NDIS EP Billing
-// Reference (NDIS Pricing Arrangements & Price Limits 2025-26). The clause prose
-// reproduces that template; line items + the $166.99/hr cap come from the billing
-// reference. ⚠ Final clinical/legal wording still needs Ryan's sign-off before
-// go-live (the feature ships behind AGREEMENT_AUTOMATION_ENABLED).
+// Sources (verified 2026-06-13 against official NDIS material):
+//   - Clause set + completeness: NDIS "Things to consider when making a service
+//     agreement" fact sheet (supports/cost/travel/responsibilities/review/
+//     dispute) — ndis.gov.au/media/2429.
+//   - Code of Conduct (8 elements): NDIS Quality & Safeguards Commission —
+//     ndiscommission.gov.au/rules-and-standards/ndis-code-conduct.
+//   - Line items, $166.99/hr cap, travel (therapy: 50% labour up to time caps,
+//     $0.99/km non-labour) and non-face-to-face claiming: NDIS Pricing
+//     Arrangements & Price Limits 2025-26 + vault NDIS EP Billing Reference.
+// ⚠ Final clinical/legal wording still needs Ryan's sign-off before go-live
+// (the feature ships behind AGREEMENT_AUTOMATION_ENABLED).
 
 const { PROVIDER } = require('./agreement-content');
 const { formatMoney } = require('./agreement-template');
 
 // Bump if the clause wording changes, so previously-signed agreements stay
 // attributable to the exact text the participant saw (stored per signed row).
-const NDIS_AGREEMENT_VERSION = 'ndis-v1.0-2026-06-13';
+const NDIS_AGREEMENT_VERSION = 'ndis-v1.1-2026-06-13';
 
 // EP line items, verified against NDIS Pricing Arrangements & Price Limits
 // 2025-26 (effective 1 July 2025). Re-check on the next 1 July update.
@@ -55,6 +61,16 @@ const MANAGEMENT_LABELS = {
   plan_managed: 'Plan-managed',
 };
 
+// Default itemised non-face-to-face supports (claimable only because listed in
+// the signed agreement). Operator can override via details.nffItems.
+const DEFAULT_NFF_ITEMS = [
+  'Program and resource development — designing and updating your individualised exercise program and home-exercise resources',
+  'Progress and outcome report writing — e.g. reports for your support coordinator, plan manager, GP, or NDIS plan review',
+  'Communication and liaison with your support coordinator, plan manager, GP, and other providers (with your consent)',
+  'Phone, video, or email check-ins and clinical follow-up between sessions',
+  'Case conferencing about your supports',
+];
+
 const SUPPORT_EMAIL = 'ryan@moveifyhealth.com';
 
 function str(v) {
@@ -65,12 +81,11 @@ function isValidLineItem(code) {
   return Object.prototype.hasOwnProperty.call(NDIS_LINE_ITEMS, code);
 }
 
-// Default per-plan cancellation/ending notice. The NDIS short-notice rule (clause
-// 6) is fixed by the Pricing Arrangements; this only governs ending the whole
-// agreement (clause 9).
+// Default per-plan ending notice (clause: Ending this agreement). The NDIS
+// short-notice cancellation rule is fixed by the Pricing Arrangements.
 const DEFAULT_ENDING_NOTICE_DAYS = 14;
 
-// ── Section builders ───────────────────────────────────────────────────────────
+// ── Header block (un-numbered) ─────────────────────────────────────────────────
 
 function participantSection(details, patientName, patientDob) {
   const lines = [];
@@ -88,13 +103,17 @@ function participantSection(details, patientName, patientDob) {
   return { heading: 'Participant & Plan', body: lines };
 }
 
+// ── Numbered clause builders (each takes details; heading carries NO number —
+// buildNdisAgreement prefixes the running clause number) ───────────────────────
+
 function termSection(details) {
   const start = str(details.planStart) || '—';
   const end = str(details.planEnd) || '—';
   return {
-    heading: '1. Term',
+    heading: 'Term & review',
     body: [
-      `This agreement starts on ${start} and ends on ${end}, aligned to the participant's current NDIS plan. A new agreement will be issued when a new plan begins.`,
+      `This agreement starts on ${start} and ends on ${end}, aligned to the participant’s current NDIS plan.`,
+      'The agreement will be reviewed at the participant’s NDIS plan review, or sooner if either party requests it. A new agreement will be issued when a new plan begins.',
     ],
   };
 }
@@ -102,7 +121,7 @@ function termSection(details) {
 function goalsSection(details) {
   const goals = Array.isArray(details.goals) ? details.goals.map(str).filter(Boolean) : [];
   const section = {
-    heading: '2. Purpose & goals',
+    heading: 'Purpose & goals',
     body: ['This agreement covers Accredited Exercise Physiology supports to work toward the participant’s NDIS plan goals.'],
   };
   if (goals.length) section.bullets = goals;
@@ -118,23 +137,59 @@ function supportsSection(details) {
   if (str(details.delivery)) bullets.push(`Delivery: ${str(details.delivery)}`);
   if (str(details.frequency)) bullets.push(`Frequency: ${str(details.frequency)}`);
   return {
-    heading: '3. Supports to be provided (Schedule of Supports)',
+    heading: 'Supports to be provided (Schedule of Supports)',
     body: ['Accredited Exercise Physiology supports, billed against the participant’s NDIS plan:'],
     bullets,
-    note: 'The schedule may be adjusted by agreement between both parties as the participant’s needs change (see clause 8).',
+    note: 'The schedule may be adjusted by agreement between both parties as the participant’s needs change (see “Changes to this agreement”).',
   };
 }
 
 function costsSection(details) {
   const rate = formatMoney(details.rateCents);
   return {
-    heading: '4. Costs',
+    heading: 'Costs',
     bullets: [
       `Rate: ${rate} per hour (NDIS unit: hour; charged pro-rata for part hours). This does not exceed the NDIS price limit.`,
-      'Non-face-to-face supports (e.g. program design, liaison) and report writing are charged at the above hourly rate only where clinically required and agreed — and only because it is stated here.',
-      'Travel is charged per NDIS travel rules where applicable.',
+      'Materials or products, if any, are charged only as agreed in writing.',
       'GST: The parties agree the supports under this agreement are supports provided to a participant under their NDIS plan and are GST-free under section 38-38 of A New Tax System (Goods and Services Tax) Act 1999.',
     ],
+    note: 'Travel and non-face-to-face supports are addressed in the clauses below — they can only be charged because they are set out in this agreement.',
+  };
+}
+
+function travelSection(details) {
+  if (details.travelApplicable) {
+    return {
+      heading: 'Travel',
+      body: ['Where supports are delivered in your home or the community, provider travel may be charged in addition to the support, in line with the NDIS Pricing Arrangements:'],
+      bullets: [
+        'Travel time at up to 50% of the hourly support rate, within the NDIS travel-time limits for our area.',
+        'Non-labour travel costs — $0.99 per kilometre for a provider vehicle, plus actual tolls and parking — claimed under the separate “Provider Travel – non-labour costs” line item.',
+      ],
+      note: 'Travel is only charged where agreed in this agreement and reflects actual travel undertaken. Clinic-based sessions do not incur travel charges.',
+    };
+  }
+  return {
+    heading: 'Travel',
+    body: ['Supports are delivered at the clinic, so no provider travel is charged. If home or community visits are agreed in future, travel will be charged in line with the NDIS Pricing Arrangements and recorded in an updated agreement.'],
+  };
+}
+
+function nonFaceToFaceSection(details) {
+  if (details.nonFaceToFace === false) {
+    return {
+      heading: 'Non-face-to-face supports',
+      body: ['Non-face-to-face supports (e.g. program design, report writing, liaison) are not separately charged under this agreement.'],
+    };
+  }
+  const items = Array.isArray(details.nffItems) && details.nffItems.length
+    ? details.nffItems.map(str).filter(Boolean)
+    : DEFAULT_NFF_ITEMS;
+  return {
+    heading: 'Non-face-to-face supports',
+    body: ['In addition to face-to-face sessions, the following non-face-to-face supports may be claimed against your plan at the hourly support rate — but only where they are clinically required and directly benefit you, and only because they are listed here:'],
+    bullets: items,
+    note: 'Non-face-to-face time is recorded and itemised on invoices using the relevant support item’s non-face-to-face option.',
   };
 }
 
@@ -149,12 +204,12 @@ function paymentSection(details) {
     body.push('Moveify will invoice the participant directly; the participant pays and claims reimbursement from the NDIS.');
   }
   body.push('By signing, the participant authorises Moveify to claim/invoice for supports delivered under this agreement, and confirms there is sufficient funding in the relevant support budget.');
-  return { heading: '5. Payment & claiming', body };
+  return { heading: 'Payment & claiming', body };
 }
 
 function cancellationSection() {
   return {
-    heading: '6. Cancellations & no-shows',
+    heading: 'Cancellations & no-shows',
     body: ['For NDIS-funded supports, the NDIS short-notice cancellation rule applies. This replaces Moveify’s general 48-hour clinic policy.'],
     bullets: [
       'A short-notice cancellation occurs if the participant does not attend, is not present at the agreed place/time, or gives less than 7 clear days’ notice.',
@@ -165,14 +220,14 @@ function cancellationSection() {
   };
 }
 
-function responsibilitiesSection(details) {
+function responsibilitiesSection() {
   return {
-    heading: '7. Responsibilities',
+    heading: 'Responsibilities',
     subsections: [
       {
         subheading: 'Moveify will',
         body: [
-          'Deliver supports by a qualified Accredited Exercise Physiologist, safely and on time; treat the participant with respect and protect their privacy; give as much notice as possible if it needs to change or cancel an appointment; and communicate honestly about supports and costs, issuing clear invoices.',
+          'Deliver supports by a qualified Accredited Exercise Physiologist, safely and on time; treat the participant with respect and protect their privacy; give as much notice as possible if it needs to change or cancel an appointment; and communicate honestly about supports and costs, issuing clear, itemised invoices.',
         ],
       },
       {
@@ -187,7 +242,7 @@ function responsibilitiesSection(details) {
 
 function changesSection() {
   return {
-    heading: '8. Changes to this agreement',
+    heading: 'Changes to this agreement',
     body: [
       'Either party may request changes. Changes to the supports, schedule or costs will be agreed in writing (an amendment sheet or updated schedule) and signed or acknowledged by both parties before they take effect.',
     ],
@@ -197,7 +252,7 @@ function changesSection() {
 function endingSection(details) {
   const days = Number.isFinite(details.endingNoticeDays) ? details.endingNoticeDays : DEFAULT_ENDING_NOTICE_DAYS;
   return {
-    heading: '9. Ending this agreement',
+    heading: 'Ending this agreement',
     bullets: [
       `Either party may end this agreement with ${days} days’ written notice.`,
       'Either party may end it immediately if the other seriously breaches it, or if continuing would create a health or safety risk.',
@@ -208,7 +263,7 @@ function endingSection(details) {
 
 function complaintsSection() {
   return {
-    heading: '10. Feedback & complaints',
+    heading: 'Feedback & complaints',
     body: [
       `Raise any concern directly with Moveify at ${SUPPORT_EMAIL}. We will acknowledge within 2 business days and respond within 10.`,
       'If a concern can’t be resolved, the participant can contact the NDIS Quality and Safeguards Commission: 1800 035 544 · www.ndiscommission.gov.au.',
@@ -216,20 +271,28 @@ function complaintsSection() {
   };
 }
 
-// NDIS Code of Conduct clause (explicitly requested). The Code governs provider
-// and worker conduct; complaints route to the NDIS Commission (clause 10).
+// NDIS Code of Conduct — all 8 elements as published by the NDIS Quality &
+// Safeguards Commission (incl. sexual misconduct and fair pricing).
 function codeOfConductSection() {
   return {
-    heading: '11. NDIS Code of Conduct',
-    body: [
-      'Moveify Health Solutions and its practitioners deliver these supports in accordance with the NDIS Code of Conduct. This means we will act with respect for the participant’s rights, dignity and autonomy; provide supports safely, competently and with care and skill; act with integrity, honesty and transparency; promptly raise and act on concerns about the quality or safety of supports; and take all reasonable steps to prevent and respond to abuse, neglect, violence and exploitation.',
+    heading: 'NDIS Code of Conduct',
+    body: ['Moveify Health Solutions and its workers deliver these supports in accordance with the NDIS Code of Conduct, which requires us to:'],
+    bullets: [
+      'Act with respect for your individual rights to freedom of expression, self-determination, and decision-making;',
+      'Respect your privacy;',
+      'Provide supports and services in a safe and competent manner, with care and skill;',
+      'Act with integrity, honesty, and transparency;',
+      'Promptly raise and act on concerns about matters that may affect the quality or safety of your supports;',
+      'Take all reasonable steps to prevent and respond to all forms of violence against, and exploitation, neglect and abuse of, people with disability;',
+      'Take all reasonable steps to prevent and respond to sexual misconduct; and',
+      'Provide supports at fair prices, with no unreasonable price difference for NDIS participants.',
     ],
   };
 }
 
 function privacySection() {
   return {
-    heading: '12. Privacy, consent & other providers',
+    heading: 'Privacy, consent & other providers',
     body: [
       'Moveify collects, uses, stores and discloses personal and health information in accordance with the Privacy Act 1988 (Cth) and the Australian Privacy Principles. Specific consents (treatment, communication with the participant’s GP and funded-scheme contacts including the plan manager and support coordinator, data handling, and session documentation) are set out in the Moveify Consent & Pre-Exercise Questionnaire, which forms part of this engagement. The participant may withdraw any consent at any time by contacting ' + SUPPORT_EMAIL + '.',
       'Moveify will work cooperatively with the participant’s other providers where the participant consents, and declares no conflict of interest in providing these supports.',
@@ -238,6 +301,26 @@ function privacySection() {
 }
 
 // ── Top-level builder ──────────────────────────────────────────────────────────
+
+// Numbered clauses, in order. Travel + non-face-to-face always render (content
+// varies by toggle) so cost coverage is explicit per the NDIS service-agreement
+// checklist.
+const CLAUSE_BUILDERS = [
+  termSection,
+  goalsSection,
+  supportsSection,
+  costsSection,
+  travelSection,
+  nonFaceToFaceSection,
+  paymentSection,
+  cancellationSection,
+  responsibilitiesSection,
+  changesSection,
+  endingSection,
+  complaintsSection,
+  codeOfConductSection,
+  privacySection,
+];
 
 // Returns the full structured NDIS agreement, or null if details are unusable.
 function buildNdisAgreement({ details, patientName, patientDob } = {}) {
@@ -248,21 +331,11 @@ function buildNdisAgreement({ details, patientName, patientDob } = {}) {
   const rate = formatMoney(details.rateCents);
   const mgmt = MANAGEMENT_LABELS[details.managementType];
 
-  const sections = [
-    participantSection(details, patientName, patientDob),
-    termSection(details),
-    goalsSection(details),
-    supportsSection(details),
-    costsSection(details),
-    paymentSection(details),
-    cancellationSection(),
-    responsibilitiesSection(details),
-    changesSection(),
-    endingSection(details),
-    complaintsSection(),
-    codeOfConductSection(),
-    privacySection(),
-  ];
+  const numbered = CLAUSE_BUILDERS.map((fn, i) => {
+    const s = fn(details);
+    return { ...s, heading: `${i + 1}. ${s.heading}` };
+  });
+  const sections = [participantSection(details, patientName, patientDob), ...numbered];
 
   return {
     version: NDIS_AGREEMENT_VERSION,
@@ -273,12 +346,12 @@ function buildNdisAgreement({ details, patientName, patientDob } = {}) {
     tierLabel: `NDIS Exercise Physiology — ${item.budgetCategory}`,
     startDate: str(details.planStart) || null,
     provider: PROVIDER,
-    about: 'This NDIS Service Agreement sets out the Accredited Exercise Physiology supports Moveify Health Solutions will provide under the participant’s NDIS plan, the costs, and how supports are claimed. It is read alongside the Moveify Consent & Pre-Exercise Questionnaire. By signing, the participant (or authorised representative) confirms they have read and understood all terms.',
+    about: 'This NDIS Service Agreement sets out the Accredited Exercise Physiology supports Moveify Health Solutions will provide under the participant’s NDIS plan, the costs (including travel and non-face-to-face supports), and how supports are claimed. It is read alongside the Moveify Consent & Pre-Exercise Questionnaire. By signing, the participant (or authorised representative) confirms they have read and understood all terms.',
     feesSummary: `${rate}/hr · GST-free · ${mgmt}`,
     parts: [
       { key: 'A', title: 'Agreement Terms', sections },
     ],
-    signatureNote: 'By signing, the participant (or their authorised representative) confirms they have read and understood this NDIS Service Agreement and agree to its terms, including the NDIS short-notice cancellation policy. Where signing as a representative, the signatory confirms they have legal authority to enter this agreement on the participant’s behalf.',
+    signatureNote: 'By signing, the participant (or their authorised representative) confirms they have read and understood this NDIS Service Agreement and agree to its terms, including the NDIS short-notice cancellation policy and the travel and non-face-to-face supports set out above. Where signing as a representative, the signatory confirms they have legal authority to enter this agreement on the participant’s behalf.',
   };
 }
 
@@ -288,6 +361,7 @@ module.exports = {
   NDIS_RATE_CAP_CENTS,
   MANAGEMENT_TYPES,
   MANAGEMENT_LABELS,
+  DEFAULT_NFF_ITEMS,
   isValidLineItem,
   buildNdisAgreement,
 };

@@ -38,6 +38,7 @@ const emptyNdis = {
   ndisNumber: '', planStart: '', planEnd: '',
   lineItem: '15_200_0126_1_3', rate: '166.99', managementType: 'plan_managed',
   delivery: 'In clinic', frequency: '1 × 60 min / week',
+  travelApplicable: 'no', nonFaceToFace: 'yes',
   planManagerName: '', planManagerContact: '',
   scName: '', scOrg: '', scContact: '',
   repName: '', repRelationship: '', repAuthority: '',
@@ -117,6 +118,23 @@ const NdisFields = ({ ndis, upd }: { ndis: typeof emptyNdis; upd: (k: keyof type
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">Frequency</label>
         <input type="text" value={ndis.frequency} onChange={(e) => upd('frequency', e.target.value)} placeholder="1 × 60 min / week" className={inputCls} />
+      </div>
+    </div>
+
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Travel (home/community visits)</label>
+        <select value={ndis.travelApplicable} onChange={(e) => upd('travelApplicable', e.target.value)} className={inputCls}>
+          <option value="no">Not applicable — clinic-based</option>
+          <option value="yes">Applicable — charge travel</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Non-face-to-face supports</label>
+        <select value={ndis.nonFaceToFace} onChange={(e) => upd('nonFaceToFace', e.target.value)} className={inputCls}>
+          <option value="yes">Claimable (reports, liaison, calls)</option>
+          <option value="no">Not charged</option>
+        </select>
       </div>
     </div>
 
@@ -220,6 +238,8 @@ export const GenerateAgreementModal = ({ onClose }: GenerateAgreementModalProps)
         ndisNumber: ndis.ndisNumber, planStart: ndis.planStart, planEnd: ndis.planEnd,
         lineItem: ndis.lineItem, rate, managementType: ndis.managementType,
         delivery: ndis.delivery, frequency: ndis.frequency,
+        travelApplicable: ndis.travelApplicable === 'yes',
+        nonFaceToFace: ndis.nonFaceToFace === 'yes',
         planManager: ndis.managementType === 'plan_managed'
           ? { name: ndis.planManagerName, contact: ndis.planManagerContact } : undefined,
         supportCoordinator: { name: ndis.scName, org: ndis.scOrg, contact: ndis.scContact },
