@@ -29,7 +29,7 @@ const { formatMoney } = require('./agreement-template');
 
 // Bump if the clause wording changes, so previously-signed agreements stay
 // attributable to the exact text the participant saw (stored per signed row).
-const NDIS_AGREEMENT_VERSION = 'ndis-v1.1-2026-06-13';
+const NDIS_AGREEMENT_VERSION = 'ndis-v1.2-2026-06-13';
 
 // EP line items, verified against NDIS Pricing Arrangements & Price Limits
 // 2025-26 (effective 1 July 2025). Re-check on the next 1 July update.
@@ -51,6 +51,11 @@ const NDIS_LINE_ITEMS = {
 // National price cap (MMM 1–5), 2025-26. Therapy supports have no per-state
 // variation. The operator-entered rate must not exceed this.
 const NDIS_RATE_CAP_CENTS = 16699;
+
+// Travel rates (therapy, 2025-26): labour at 50% of the support rate; non-labour
+// at $0.99/km for a provider vehicle. Used for the indicative funding estimate.
+const TRAVEL_LABOUR_FACTOR = 0.5;
+const TRAVEL_KM_RATE_CENTS = 99;
 
 // NDIA-managed (Agency) is intentionally absent — Moveify is an unregistered
 // provider and cannot claim from NDIA-managed plans. The route hard-rejects it.
@@ -193,6 +198,49 @@ function nonFaceToFaceSection(details) {
   };
 }
 
+// Indicative funding estimate (Schedule of Supports cost). Renders only when the
+// operator supplies at least one estimate. Frames figures as "up to / estimated"
+// — reserves funding + records consent, but actual claims reflect real delivery
+// (Code of Conduct: integrity + fair pricing). Returns null when nothing to show.
+function estimatesSection(details) {
+  const rateCents = details.rateCents;
+  const num = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+  const f2f = num(details.estSessionHours);
+  const rep = num(details.estReportingHours);
+  const travH = details.travelApplicable ? num(details.estTravelHours) : 0;
+  const travKm = details.travelApplicable ? num(details.estTravelKm) : 0;
+  if (!(f2f || rep || travH || travKm)) return null;
+
+  const bullets = [];
+  let total = 0;
+  if (f2f) {
+    const c = Math.round(f2f * rateCents); total += c;
+    bullets.push(`Exercise Physiology sessions: ~${f2f} hours × ${formatMoney(rateCents)} = ~${formatMoney(c)}`);
+  }
+  if (rep) {
+    const c = Math.round(rep * rateCents); total += c;
+    bullets.push(`Reporting & non-face-to-face: up to ${rep} hours × ${formatMoney(rateCents)} = ~${formatMoney(c)}`);
+  }
+  if (travH) {
+    const travRate = Math.round(rateCents * TRAVEL_LABOUR_FACTOR);
+    const c = Math.round(travH * travRate); total += c;
+    bullets.push(`Travel time: ~${travH} hours × ${formatMoney(travRate)} (50% of rate) = ~${formatMoney(c)}`);
+  }
+  if (travKm) {
+    const c = Math.round(travKm * TRAVEL_KM_RATE_CENTS); total += c;
+    bullets.push(`Travel distance: ~${travKm} km × ${formatMoney(TRAVEL_KM_RATE_CENTS)} = ~${formatMoney(c)}`);
+  }
+  return {
+    heading: 'Estimated funding usage (indicative)',
+    body: ['The following estimates the funding this agreement may use over its term, so that enough budget is set aside. These figures are indicative only:'],
+    bullets,
+    note: `Estimated total over the agreement: ~${formatMoney(total)}. These are estimates, not a fixed charge — actual claims reflect supports actually delivered and clinically required, are made only against available funding, and will not exceed it. Unused estimates are not charged.`,
+  };
+}
+
 function paymentSection(details) {
   const mgmt = MANAGEMENT_LABELS[details.managementType] || details.managementType;
   const body = [`Plan management — this participant is: ${mgmt}.`];
@@ -312,6 +360,7 @@ const CLAUSE_BUILDERS = [
   costsSection,
   travelSection,
   nonFaceToFaceSection,
+  estimatesSection, // conditional — returns null when no estimate supplied
   paymentSection,
   cancellationSection,
   responsibilitiesSection,
@@ -331,10 +380,10 @@ function buildNdisAgreement({ details, patientName, patientDob } = {}) {
   const rate = formatMoney(details.rateCents);
   const mgmt = MANAGEMENT_LABELS[details.managementType];
 
-  const numbered = CLAUSE_BUILDERS.map((fn, i) => {
-    const s = fn(details);
-    return { ...s, heading: `${i + 1}. ${s.heading}` };
-  });
+  const numbered = CLAUSE_BUILDERS
+    .map((fn) => fn(details))
+    .filter(Boolean)
+    .map((s, i) => ({ ...s, heading: `${i + 1}. ${s.heading}` }));
   const sections = [participantSection(details, patientName, patientDob), ...numbered];
 
   return {

@@ -97,6 +97,11 @@ async function generateNdis(req, res) {
     return res.status(400).json({ error: `Rate exceeds the NDIS price limit of $${(NDIS_RATE_CAP_CENTS / 100).toFixed(2)}/hr` });
   }
   const clean = (s) => (typeof s === 'string' ? s.trim().slice(0, 500) : undefined);
+  // Indicative estimate quantity: a non-negative number, clamped to a sane cap.
+  const estHours = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? Math.min(n, 100000) : undefined;
+  };
   const obj = (o, keys) => {
     const out = {};
     let any = false;
@@ -117,6 +122,11 @@ async function generateNdis(req, res) {
     // operator can disable. Custom item list optional — falls back to defaults.
     nonFaceToFace: d.nonFaceToFace !== false,
     nffItems: Array.isArray(d.nffItems) ? d.nffItems.map(clean).filter(Boolean).slice(0, 12) : undefined,
+    // Optional indicative funding estimate (hours / km). Clamp to sane bounds.
+    estSessionHours: estHours(d.estSessionHours),
+    estReportingHours: estHours(d.estReportingHours),
+    estTravelHours: estHours(d.estTravelHours),
+    estTravelKm: estHours(d.estTravelKm),
     planManager: obj(d.planManager, ['name', 'contact']),
     supportCoordinator: obj(d.supportCoordinator, ['name', 'org', 'contact']),
     representative: obj(d.representative, ['name', 'relationship', 'authority']),

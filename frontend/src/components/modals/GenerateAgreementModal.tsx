@@ -39,6 +39,7 @@ const emptyNdis = {
   lineItem: '15_200_0126_1_3', rate: '166.99', managementType: 'plan_managed',
   delivery: 'In clinic', frequency: '1 × 60 min / week',
   travelApplicable: 'no', nonFaceToFace: 'yes',
+  estSessionHours: '', estReportingHours: '', estTravelHours: '', estTravelKm: '',
   planManagerName: '', planManagerContact: '',
   scName: '', scOrg: '', scContact: '',
   repName: '', repRelationship: '', repAuthority: '',
@@ -158,6 +159,33 @@ const NdisFields = ({ ndis, upd }: { ndis: typeof emptyNdis; upd: (k: keyof type
       <textarea value={ndis.goals} onChange={(e) => upd('goals', e.target.value)} rows={3} placeholder="Improve functional capacity for daily tasks&#10;Increase independence with mobility" className={inputCls} />
     </div>
 
+    <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+      <p className="text-xs font-medium text-gray-700 mb-1">Estimated funding usage (optional, indicative)</p>
+      <p className="text-[11px] text-slate-500 mb-3">Reserves budget for sessions, reporting and travel. Shown as “up to / estimated” — actual claims reflect what’s delivered.</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Session hours (over term)</label>
+          <input type="number" step="0.5" min="0" value={ndis.estSessionHours} onChange={(e) => upd('estSessionHours', e.target.value)} placeholder="e.g. 26" className={inputCls} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Reporting / non-face-to-face hours</label>
+          <input type="number" step="0.5" min="0" value={ndis.estReportingHours} onChange={(e) => upd('estReportingHours', e.target.value)} placeholder="e.g. 5" className={inputCls} />
+        </div>
+      </div>
+      {ndis.travelApplicable === 'yes' && (
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Travel hours (over term)</label>
+            <input type="number" step="0.25" min="0" value={ndis.estTravelHours} onChange={(e) => upd('estTravelHours', e.target.value)} placeholder="e.g. 6" className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Travel km (over term)</label>
+            <input type="number" step="1" min="0" value={ndis.estTravelKm} onChange={(e) => upd('estTravelKm', e.target.value)} placeholder="e.g. 200" className={inputCls} />
+          </div>
+        </div>
+      )}
+    </div>
+
     <details className="text-sm">
       <summary className="cursor-pointer text-slate-500 hover:text-slate-700">Authorised representative / nominee (optional)</summary>
       <div className="grid grid-cols-3 gap-3 mt-3">
@@ -240,6 +268,8 @@ export const GenerateAgreementModal = ({ onClose }: GenerateAgreementModalProps)
         delivery: ndis.delivery, frequency: ndis.frequency,
         travelApplicable: ndis.travelApplicable === 'yes',
         nonFaceToFace: ndis.nonFaceToFace === 'yes',
+        estSessionHours: ndis.estSessionHours, estReportingHours: ndis.estReportingHours,
+        estTravelHours: ndis.estTravelHours, estTravelKm: ndis.estTravelKm,
         planManager: ndis.managementType === 'plan_managed'
           ? { name: ndis.planManagerName, contact: ndis.planManagerContact } : undefined,
         supportCoordinator: { name: ndis.scName, org: ndis.scOrg, contact: ndis.scContact },

@@ -87,6 +87,39 @@ describe('buildNdisAgreement', () => {
     expect(mobileText).toMatch(/not separately charged/);
   });
 
+  it('omits the funding-estimate clause when no estimate is supplied', () => {
+    const a = buildNdisAgreement({ details: validDetails });
+    const text = JSON.stringify(a.parts[0].sections);
+    expect(text).not.toMatch(/Estimated funding usage/);
+  });
+
+  it('renders an indicative funding estimate with a total + disclaimer when supplied', () => {
+    const a = buildNdisAgreement({
+      details: { ...validDetails, travelApplicable: true, estSessionHours: 26, estReportingHours: 5, estTravelHours: 6, estTravelKm: 200 },
+    });
+    const est = a.parts[0].sections.find((s) => /Estimated funding usage/.test(s.heading));
+    expect(est).toBeTruthy();
+    const text = JSON.stringify(est);
+    expect(text).toMatch(/up to 5 hours/);          // reporting framed as "up to"
+    expect(text).toMatch(/50% of rate/);            // travel labour
+    expect(text).toMatch(/200 km/);                 // travel distance
+    // 26h×166.99 + 5h×166.99 + 6h×83.50 (rounded 8350) + 200×0.99
+    // = 4341.74 + 834.95 + 501.00 + 198.00 = 5875.69
+    expect(text).toMatch(/\$5875\.69/);
+    expect(text).toMatch(/not a fixed charge/);
+    expect(text).toMatch(/Unused estimates are not charged/);
+  });
+
+  it('excludes travel from the estimate when travel is not applicable', () => {
+    const a = buildNdisAgreement({
+      details: { ...validDetails, travelApplicable: false, estReportingHours: 5, estTravelHours: 6, estTravelKm: 200 },
+    });
+    const est = a.parts[0].sections.find((s) => /Estimated funding usage/.test(s.heading));
+    const text = JSON.stringify(est);
+    expect(text).not.toMatch(/Travel/);
+    expect(text).toMatch(/up to 5 hours/);
+  });
+
   it('numbers clauses sequentially after the participant header', () => {
     const a = buildNdisAgreement({ details: validDetails });
     expect(a.parts[0].sections[0].heading).toBe('Participant & Plan');
