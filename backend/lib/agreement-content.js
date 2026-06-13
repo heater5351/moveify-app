@@ -29,7 +29,7 @@ const {
 // postcode. The current Cliniko agreement shows 5352 — confirm which is correct.
 const PROVIDER = {
   name: 'Ryan Heath — Accredited Exercise Physiologist',
-  accreditation: 'ESSA Accreditation: AEP ID #8977',
+  accreditation: 'ESSA Accreditation: AEP ID #48977',
   business: 'Moveify Health Solutions  |  ABN 52 263 141 529',
   location: '4 George St, Williamstown SA 5351',
   contact: 'ryan@moveifyhealth.com',
