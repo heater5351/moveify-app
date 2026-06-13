@@ -22,6 +22,36 @@ what to know now, links).
 
 ---
 
+## 2026-06-13 — NDIS agreement variant (signature-only, no Stripe)
+
+- Added an **NDIS** kind to the service-agreement feature. Reuses the existing
+  spine (tokenised link → drawn signature → PDF → Cliniko attachment → audit →
+  versioning) but **branches off before the billing-worker call**: NDIS is
+  signature-only — no Stripe Checkout, no Direct Debit, no subscription. Funding
+  is invoiced to the plan manager (plan-managed) or participant (self-managed);
+  **NDIA-managed is hard-rejected** (unregistered provider) client- + server-side.
+- New `backend/lib/ndis-agreement-content.js` — `buildNdisAgreement(details)` emits
+  the **same `{ parts:[{sections}] }` shape** as `buildAgreement`, so the PDF
+  renderer + sign page render it unchanged. Mirrors the vault *NDIS Service
+  Agreement Template* (12 clauses): itemised Schedule of Supports (line items
+  `15_200_0126_1_3` IDL / `12_027_0128_3_3` IHW, $166.99/hr cap), GST-free, the
+  **7-clear-day / up-to-100% NDIS short-notice cancellation rule**, and an explicit
+  **NDIS Code of Conduct** clause. Separate `NDIS_AGREEMENT_VERSION`.
+- Schema (additive, nullable): `service_agreements.kind` (default `'private'`),
+  `details` JSONB (NDIS payload), `signed_capacity`; path CHECK widened to allow
+  `'ndis'`. NDIS rows store `tier='ndis'`, `path='ndis'`.
+- Routes: `/generate` accepts `kind:'ndis'` (+ NDIS fields, rate-cap + NDIA guard);
+  `/validate/:token` returns the NDIS doc + `kind`; `/:token/sign` branches to a
+  signature-only path (captures `signed_capacity`, stores the PDF, terminal
+  `'signed'`, returns `{ signed:true }` — **no** `checkoutUrl`). Frontend:
+  `AgreementPage` shows a capacity field + signed-confirmation state (no Stripe
+  redirect); `GenerateAgreementModal` gains an NDIS mode.
+- Gated by the existing `AGREEMENT_AUTOMATION_ENABLED` flag (no new env var).
+  ⚠ **Clause copy still needs Ryan's final legal review before the dev→main merge**
+  — the flag is ON in prod, so the NDIS option goes live to operators on merge.
+  Source: vault `App Agreements - NDIS Variant - Pending Code Edit` + `NDIS Service
+  Agreement Template` + `NDIS EP Billing Reference`.
+
 ## 2026-06-12 — Scribe Phase 2: program-edit snapshots + save-bug fix
 
 - New `program_revisions` table: every program create/update records before/after

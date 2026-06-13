@@ -28,6 +28,7 @@ interface Provider {
 
 interface Agreement {
   version: string;
+  kind?: string;
   docTitle: string;
   tierLabel: string | null;
   startDate: string | null;
@@ -39,6 +40,7 @@ interface Agreement {
 }
 
 interface AgreementDetails {
+  kind?: string;
   patientName: string;
   tier: string;
   path: string;
@@ -165,8 +167,13 @@ export const AgreementPage = () => {
   const [signature, setSignature] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [ddAuthorised, setDdAuthorised] = useState(false);
+  const [signingAsRep, setSigningAsRep] = useState(false);
+  const [capacity, setCapacity] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [signedDone, setSignedDone] = useState(false);
+
+  const isNdis = details?.kind === 'ndis';
 
   const signedDate = new Date().toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -191,16 +198,22 @@ export const AgreementPage = () => {
     if (!signedName.trim()) { setSubmitError('Please type your full name to sign.'); return; }
     if (!signature) { setSubmitError('Please draw your signature in the box.'); return; }
     if (!consent) { setSubmitError('Please tick the box to confirm you have read the agreement.'); return; }
-    if (!ddAuthorised) { setSubmitError('Please confirm the Direct Debit authorisation.'); return; }
+    if (!isNdis && !ddAuthorised) { setSubmitError('Please confirm the Direct Debit authorisation.'); return; }
+    if (isNdis && signingAsRep && !capacity.trim()) { setSubmitError('Please describe your authority to sign (e.g. plan nominee, guardian).'); return; }
     setSubmitting(true);
     try {
+      const body = isNdis
+        ? { signedName: signedName.trim(), consent: true, signature, signedCapacity: signingAsRep ? capacity.trim() : '' }
+        : { signedName: signedName.trim(), consent: true, signature, ddAuthorised: true };
       const res = await fetch(`${API_URL}/agreements/${encodeURIComponent(token)}/sign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signedName: signedName.trim(), consent: true, signature, ddAuthorised: true }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (res.ok && data.checkoutUrl) {
+      if (res.ok && isNdis && data.signed) {
+        setSignedDone(true);
+      } else if (res.ok && data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
       } else {
         setSubmitError(data.error || 'Could not submit the agreement. Please contact the clinic.');
@@ -228,6 +241,23 @@ export const AgreementPage = () => {
           <h1 className="text-xl font-bold font-display text-secondary-500 mb-2">Link unavailable</h1>
           <p className="text-slate-500 text-sm">{loadError || 'This agreement link is invalid or has expired.'}</p>
           <p className="text-slate-400 text-xs mt-4">Please contact Moveify Health Solutions for a new link.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (signedDone) {
+    return (
+      <div className="min-h-dvh bg-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-sm max-w-md w-full p-8 text-center">
+          <CheckCircle className="text-green-500 mx-auto mb-4" size={44} />
+          <h1 className="text-xl font-bold font-display text-secondary-500 mb-2">Agreement signed</h1>
+          <p className="text-slate-500 text-sm">
+            Thank you{details.patientName ? `, ${details.patientName.split(' ')[0]}` : ''}. Your NDIS Service Agreement is
+            signed and on file with Moveify Health Solutions. A copy can be provided on request — contact the clinic if
+            you’d like one sent to you or your plan manager.
+          </p>
+          <p className="text-slate-400 text-xs mt-4">Moveify Health Solutions</p>
         </div>
       </div>
     );
@@ -309,6 +339,37 @@ export const AgreementPage = () => {
               className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-400 focus:border-transparent"
             />
 
+            {isNdis && (
+              <div className="mt-4">
+                <span className="block text-sm font-medium text-slate-700 mb-2">I am signing as</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSigningAsRep(false)}
+                    className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium ${!signingAsRep ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    The participant
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSigningAsRep(true)}
+                    className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium ${signingAsRep ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    Authorised representative
+                  </button>
+                </div>
+                {signingAsRep && (
+                  <input
+                    type="text"
+                    value={capacity}
+                    onChange={(e) => setCapacity(e.target.value)}
+                    placeholder="Your authority to sign — e.g. plan nominee, guardian"
+                    className="mt-2 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-400 focus:border-transparent text-sm"
+                  />
+                )}
+              </div>
+            )}
+
             <div className="flex items-center justify-between mt-4 mb-2">
               <label className="block text-sm font-medium text-slate-700">Signature</label>
               <span className="text-xs text-slate-400">Date: {signedDate}</span>
@@ -323,23 +384,25 @@ export const AgreementPage = () => {
                 className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-400 focus:ring-primary-400"
               />
               <span className="text-sm text-slate-600">
-                I have read and understood both Part A (Clinical Services) and Part B (Direct Debit Request Service
-                Agreement), and I consent to the collection and handling of my health information in accordance with the
-                Moveify Privacy Policy.
+                {isNdis
+                  ? 'I have read and understood this NDIS Service Agreement, including the NDIS short-notice cancellation policy, and I consent to the collection and handling of health information in accordance with the Moveify Privacy Policy and Consent & Pre-Exercise Questionnaire.'
+                  : 'I have read and understood both Part A (Clinical Services) and Part B (Direct Debit Request Service Agreement), and I consent to the collection and handling of my health information in accordance with the Moveify Privacy Policy.'}
               </span>
             </label>
-            <label className="flex items-start gap-3 mt-4 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={ddAuthorised}
-                onChange={(e) => setDdAuthorised(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-400 focus:ring-primary-400"
-              />
-              <span className="text-sm text-slate-600">
-                I authorise Moveify Health Solutions to debit my nominated account for the fees set out in this
-                agreement, and confirm I am an account holder or authorised signatory on that account.
-              </span>
-            </label>
+            {!isNdis && (
+              <label className="flex items-start gap-3 mt-4 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ddAuthorised}
+                  onChange={(e) => setDdAuthorised(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-400 focus:ring-primary-400"
+                />
+                <span className="text-sm text-slate-600">
+                  I authorise Moveify Health Solutions to debit my nominated account for the fees set out in this
+                  agreement, and confirm I am an account holder or authorised signatory on that account.
+                </span>
+              </label>
+            )}
 
             {submitError && (
               <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{submitError}</div>
@@ -347,13 +410,18 @@ export const AgreementPage = () => {
 
             <button
               onClick={handleSign}
-              disabled={submitting || !signedName.trim() || !signature || !consent || !ddAuthorised}
+              disabled={submitting || !signedName.trim() || !signature || !consent || (!isNdis && !ddAuthorised)}
               className="mt-6 w-full px-4 py-3 bg-primary-400 text-white rounded-lg hover:bg-primary-500 font-medium disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {submitting ? <><Loader2 className="animate-spin" size={18} /> Setting up…</> : 'Agree & continue to payment setup'}
+              {submitting
+                ? <><Loader2 className="animate-spin" size={18} /> {isNdis ? 'Signing…' : 'Setting up…'}</>
+                : (isNdis ? 'Agree & sign' : 'Agree & continue to payment setup')}
             </button>
             <p className="text-xs text-slate-400 mt-3 text-center flex items-center justify-center gap-1.5">
-              <ShieldCheck size={13} /> You’ll next set up your Direct Debit (card or bank account) securely with Stripe. No payment is taken yet.
+              <ShieldCheck size={13} />
+              {isNdis
+                ? ' Your signed agreement is stored securely with Moveify. No payment details are collected — supports are claimed against your NDIS plan.'
+                : ' You’ll next set up your Direct Debit (card or bank account) securely with Stripe. No payment is taken yet.'}
             </p>
           </div>
         </div>

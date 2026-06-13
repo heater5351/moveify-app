@@ -995,6 +995,19 @@ Output only the four sections with their exact headings. No preamble. No comment
     await db.query(`ALTER TABLE service_agreements ADD COLUMN IF NOT EXISTS signed_signature TEXT`);
     await db.query(`ALTER TABLE service_agreements ADD COLUMN IF NOT EXISTS dd_authorised BOOLEAN DEFAULT false`);
 
+    // NDIS agreement variant (signature-only, no Stripe leg). `kind` discriminates
+    // 'private' (block/post-casual/continuity → Stripe) from 'ndis' (invoiced to
+    // plan/participant). `details` holds the NDIS payload (line item, rate, plan
+    // dates, management type, plan manager, SC, goals). `signed_capacity` records
+    // whether a representative/nominee signed. All additive + nullable.
+    await db.query(`ALTER TABLE service_agreements ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'private'`);
+    await db.query(`ALTER TABLE service_agreements ADD COLUMN IF NOT EXISTS details JSONB`);
+    await db.query(`ALTER TABLE service_agreements ADD COLUMN IF NOT EXISTS signed_capacity TEXT`);
+    // Widen the path CHECK so NDIS rows (tier/path = 'ndis') satisfy it. Drop +
+    // re-add by the conventional constraint name — idempotent across restarts.
+    await db.query(`ALTER TABLE service_agreements DROP CONSTRAINT IF EXISTS service_agreements_path_check`);
+    await db.query(`ALTER TABLE service_agreements ADD CONSTRAINT service_agreements_path_check CHECK (path IN ('standard', 'post_casual', 'continuity', 'ndis'))`);
+
     console.log('✅ Service agreements table initialized');
 
     console.log('✅ Database tables initialized');

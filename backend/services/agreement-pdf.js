@@ -14,16 +14,23 @@ const RULE = '#E2E8F0';
 /**
  * Renders the signed service agreement to a PDF Buffer in the Moveify brand
  * style. Captures the exact, versioned agreement the patient saw — provider
- * header, Part A (clinical services), Part B (DDRSA), and the e-signature block
- * (drawn signature + typed name + timestamp + IP). PHI-light: only the patient's
- * name and the selected program appear — no clinical/health detail.
+ * header, the agreement parts, and the e-signature block (drawn signature +
+ * typed name + timestamp + IP). PHI-light: only the patient's name and the
+ * selected program appear — no clinical/health detail.
+ *
+ * For private (block/post-casual/continuity) agreements, pass tier/path and the
+ * builder produces the Part A + Part B (DDRSA) document. For NDIS agreements,
+ * pass a pre-built `agreement` object (from buildNdisAgreement) — it has no Part B
+ * and the Stripe Direct-Debit footnote is omitted. `signedCapacity` records who
+ * signed when a representative/nominee signs on the participant's behalf.
  *
  * @returns {Promise<Buffer>}
  */
-function renderAgreementPdf({ patientName, tier, path, startDate, signedName, signedAt, signedIp, signature }) {
+function renderAgreementPdf({ patientName, tier, path, startDate, signedName, signedAt, signedIp, signature, agreement: prebuilt, signedCapacity }) {
   return new Promise((resolve, reject) => {
     try {
-      const agreement = buildAgreement({ tier, path, startDate });
+      const agreement = prebuilt || buildAgreement({ tier, path, startDate });
+      const isNdis = agreement && agreement.kind === 'ndis';
       const doc = new PDFDocument({ size: 'A4', margin: 50 });
       const chunks = [];
       doc.on('data', (c) => chunks.push(c));
@@ -133,11 +140,14 @@ function renderAgreementPdf({ patientName, tier, path, startDate, signedName, si
 
       doc.fontSize(9.5).font('Helvetica').fillColor(INK);
       doc.text(`Signed by: ${signedName || '—'}`);
+      if (signedCapacity) doc.text(`Signing capacity: ${signedCapacity}`);
       doc.text(`Date/time: ${signedAt || '—'}`);
       doc.text(`IP address: ${signedIp || '—'}`);
       doc.moveDown(0.4);
       doc.fontSize(7.5).fillColor(SUB).text(
-        'This document records an electronic acceptance, including the signatory’s drawn signature and explicit Direct Debit authorisation. The bank-level Direct Debit mandate (BECS/card) was captured separately by our payment provider, Stripe.',
+        isNdis
+          ? 'This document records an electronic acceptance, including the signatory’s drawn signature, typed name, timestamp and IP address. Supports are claimed against the participant’s NDIS plan; there is no Direct Debit mandate.'
+          : 'This document records an electronic acceptance, including the signatory’s drawn signature and explicit Direct Debit authorisation. The bank-level Direct Debit mandate (BECS/card) was captured separately by our payment provider, Stripe.',
       );
 
       doc.end();

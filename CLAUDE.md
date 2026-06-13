@@ -360,7 +360,7 @@ Defined in `backend/database/init.js`. Key tables:
 | `audit_logs` | user_id, action, resource_type, resource_id, details (JSONB), ip_address | Audit trail for key operations |
 | `invitation_tokens` | ..., clinician_id | Links invitations to the clinician who created them |
 | `app_state` | key (PK), value, updated_at | Generic key/value store. Holds the Cliniko auto-sync cursor `cliniko_patient_last_sync` |
-| `service_agreements` | cliniko_patient_id, clinician_id, tier, path, status, token, signed_name/at/ip, agreement_version, stripe_customer_id, stripe_schedule_id, cliniko_attachment_id | Sign-up automation. One row per minted agreement link. See "Service-Agreement → Stripe Automation" below |
+| `service_agreements` | cliniko_patient_id, clinician_id, kind, tier, path, details (JSONB), status, token, signed_name/at/ip/capacity, agreement_version, stripe_customer_id, stripe_schedule_id, cliniko_attachment_id | Sign-up automation. One row per minted agreement link. `kind` = `'private'` (block/post-casual/continuity → Stripe) or `'ndis'` (signature-only, no Stripe; NDIS payload in `details`, `tier`/`path`=`'ndis'`, built by `lib/ndis-agreement-content.js`). See "Service-Agreement → Stripe Automation" below |
 
 ### Database patterns
 

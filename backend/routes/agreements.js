@@ -23,28 +23,120 @@ const {
   tierLabel,
 } = require('../lib/agreement-template');
 const { buildAgreement } = require('../lib/agreement-content');
+const {
+  NDIS_AGREEMENT_VERSION,
+  NDIS_RATE_CAP_CENTS,
+  MANAGEMENT_TYPES,
+  isValidLineItem,
+  buildNdisAgreement,
+} = require('../lib/ndis-agreement-content');
 
 const router = express.Router();
 
 const automationEnabled = () => process.env.AGREEMENT_AUTOMATION_ENABLED === 'true';
 
-// Best-effort Cliniko name/email lookup. Never throws — the agreement flow must
-// not hard-fail on a Cliniko blip. Returns { name, email } (possibly blank).
+// Best-effort Cliniko name/email/dob lookup. Never throws — the agreement flow
+// must not hard-fail on a Cliniko blip. Returns { name, email, dob } (blanks ok).
 async function clinikoNameEmail(clinikoPatientId) {
   try {
     const cp = await cliniko.getPatient(clinikoPatientId);
     return {
       name: `${cp.first_name || ''} ${cp.last_name || ''}`.trim(),
       email: cp.email || '',
+      dob: cp.date_of_birth || '',
     };
   } catch {
-    return { name: '', email: '' };
+    return { name: '', email: '', dob: '' };
+  }
+}
+
+// Mints + stores a tokenised agreement row, invalidating any earlier UNSIGNED
+// link for the same patient. Shared by the private + NDIS generate paths.
+async function mintAgreement({ req, clinikoPatientId, tier, path, kind, details, startDate, version }) {
+  const existing = await db.getOne('SELECT id FROM users WHERE cliniko_patient_id = $1', [String(clinikoPatientId)]);
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+  await db.query(
+    `UPDATE service_agreements SET status = 'expired', updated_at = NOW()
+     WHERE cliniko_patient_id = $1 AND status = 'pending'`,
+    [String(clinikoPatientId)]
+  );
+  const row = await db.getOne(`
+    INSERT INTO service_agreements
+      (patient_id, cliniko_patient_id, clinician_id, kind, tier, path, details, start_date, status, token, token_expires_at, agreement_version)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11)
+    RETURNING id
+  `, [existing?.id || null, String(clinikoPatientId), req.user.id, kind, tier, path, details ? JSON.stringify(details) : null, startDate || null, token, expiresAt, version]);
+  const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  return { agreementId: row.id, token, link: `${baseUrl}/agreement?token=${token}`, expiresAt };
+}
+
+// NDIS generate path — signature-only agreement (no Stripe). Validates the NDIS
+// payload, rejects NDIA-managed (unregistered provider), enforces the price cap.
+async function generateNdis(req, res) {
+  const { clinikoPatientId, ndis } = req.body || {};
+  if (!clinikoPatientId || !/^\d+$/.test(String(clinikoPatientId))) {
+    return res.status(400).json({ error: 'clinikoPatientId must be numeric' });
+  }
+  const d = ndis || {};
+  // NDIA-managed is a hard stop — Moveify is not a registered NDIS provider.
+  if (d.managementType === 'ndia_managed' || d.managementType === 'NDIA-managed') {
+    return res.status(422).json({ error: 'NDIA-managed plans are not supported — Moveify is not a registered NDIS provider. Use self-managed or plan-managed.' });
+  }
+  if (!MANAGEMENT_TYPES.includes(d.managementType)) {
+    return res.status(400).json({ error: 'A valid plan management type is required (self_managed or plan_managed)' });
+  }
+  if (!isValidLineItem(d.lineItem)) return res.status(400).json({ error: 'A valid NDIS line item is required' });
+  for (const [k, label] of [['planStart', 'Plan start'], ['planEnd', 'Plan end']]) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d[k] || ''))) return res.status(400).json({ error: `${label} must be YYYY-MM-DD` });
+  }
+  // Rate arrives in dollars; store cents. Must be positive and within the cap.
+  const rateCents = Math.round(Number(d.rate) * 100);
+  if (!Number.isFinite(rateCents) || rateCents <= 0) return res.status(400).json({ error: 'A valid hourly rate is required' });
+  if (rateCents > NDIS_RATE_CAP_CENTS) {
+    return res.status(400).json({ error: `Rate exceeds the NDIS price limit of $${(NDIS_RATE_CAP_CENTS / 100).toFixed(2)}/hr` });
+  }
+  const clean = (s) => (typeof s === 'string' ? s.trim().slice(0, 500) : undefined);
+  const obj = (o, keys) => {
+    const out = {};
+    let any = false;
+    for (const key of keys) { const v = clean(o?.[key]); if (v) { out[key] = v; any = true; } }
+    return any ? out : undefined;
+  };
+  const details = {
+    ndisNumber: clean(d.ndisNumber),
+    planStart: d.planStart,
+    planEnd: d.planEnd,
+    lineItem: d.lineItem,
+    rateCents,
+    managementType: d.managementType,
+    delivery: clean(d.delivery),
+    frequency: clean(d.frequency),
+    planManager: obj(d.planManager, ['name', 'contact']),
+    supportCoordinator: obj(d.supportCoordinator, ['name', 'org', 'contact']),
+    representative: obj(d.representative, ['name', 'relationship', 'authority']),
+    goals: Array.isArray(d.goals) ? d.goals.map(clean).filter(Boolean).slice(0, 10) : undefined,
+    endingNoticeDays: Number.isFinite(Number(d.endingNoticeDays)) ? Number(d.endingNoticeDays) : undefined,
+  };
+
+  try {
+    const out = await mintAgreement({
+      req, clinikoPatientId, tier: 'ndis', path: 'ndis', kind: 'ndis',
+      details, startDate: d.planStart, version: NDIS_AGREEMENT_VERSION,
+    });
+    audit.log(req, 'agreement_generate', 'service_agreement', out.agreementId, { kind: 'ndis', managementType: d.managementType });
+    res.json(out);
+  } catch (err) {
+    console.error('NDIS agreement generate error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
 // POST /generate — clinician mints a tokenised agreement link.
 router.post('/generate', authenticate, requireRole('clinician'), async (req, res) => {
   if (!automationEnabled()) return res.status(503).json({ error: 'Agreement automation is disabled' });
+
+  if ((req.body || {}).kind === 'ndis') return generateNdis(req, res);
 
   const { clinikoPatientId, tier, path, startDate } = req.body || {};
   if (!clinikoPatientId || !tier || !path) {
@@ -105,9 +197,26 @@ router.get('/validate/:token', async (req, res) => {
     `, [req.params.token]);
     if (!a) return res.status(404).json({ error: 'Invalid or expired agreement link' });
 
-    const { name } = await clinikoNameEmail(a.cliniko_patient_id);
+    const { name, dob } = await clinikoNameEmail(a.cliniko_patient_id);
+
+    if (a.kind === 'ndis') {
+      const agreement = buildNdisAgreement({ details: a.details, patientName: name, patientDob: dob });
+      return res.json({
+        valid: true,
+        kind: 'ndis',
+        patientName: name,
+        tier: a.tier,
+        path: a.path,
+        tierLabel: agreement ? agreement.tierLabel : null,
+        startDate: a.start_date,
+        agreementVersion: a.agreement_version,
+        agreement,
+      });
+    }
+
     res.json({
       valid: true,
+      kind: 'private',
       patientName: name,
       tier: a.tier,
       path: a.path,
@@ -124,10 +233,96 @@ router.get('/validate/:token', async (req, res) => {
   }
 });
 
-// POST /:token/sign — public. Records the signature, stores the PDF in Cliniko,
-// opens the Stripe setup Checkout, returns its URL.
+// Shared drawn-signature validation. Returns an error string, or null if valid.
+function validateSignature(signature) {
+  if (typeof signature !== 'string' || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signature)) {
+    return 'A drawn signature is required';
+  }
+  if (signature.length > 90_000) return 'Signature image is too large';
+  return null;
+}
+
+// NDIS sign path — signature-only. Records the signature, stores the signed PDF
+// in Cliniko, and finishes ('signed' is terminal — no Stripe / checkout). A PDF
+// upload failure is best-effort and does not undo the signature.
+async function signNdis(req, res) {
+  const { signedName, consent, signature, signedCapacity } = req.body || {};
+  if (!signedName || consent !== true) {
+    return res.status(400).json({ error: 'A typed name and consent are required' });
+  }
+  const sigErr = validateSignature(signature);
+  if (sigErr) return res.status(400).json({ error: sigErr });
+  const capacity = typeof signedCapacity === 'string' ? signedCapacity.trim().slice(0, 200) : '';
+
+  try {
+    const a = await db.getOne(`
+      UPDATE service_agreements
+      SET status = 'signed', signed_name = $2, signed_at = NOW(), signed_ip = $3,
+          signed_signature = $4, signed_capacity = $5, updated_at = NOW()
+      WHERE token = $1 AND status = 'pending' AND token_expires_at > NOW() AND kind = 'ndis'
+      RETURNING *
+    `, [req.params.token, String(signedName).slice(0, 200), req.ip, signature, capacity || null]);
+    if (!a) return res.status(410).json({ error: 'This link is invalid, expired, or already used' });
+
+    const { name: patientName, dob } = await clinikoNameEmail(a.cliniko_patient_id);
+
+    // Render + store the signed PDF in Cliniko, once. Best-effort: the signature
+    // is already the record, so a Cliniko blip must not fail the request.
+    if (!a.cliniko_attachment_id) {
+      try {
+        const agreement = buildNdisAgreement({ details: a.details, patientName, patientDob: dob });
+        const pdf = await renderAgreementPdf({
+          agreement,
+          patientName,
+          signedName: a.signed_name,
+          signedAt: new Date(a.signed_at).toISOString(),
+          signedIp: a.signed_ip,
+          signature: a.signed_signature,
+          signedCapacity: a.signed_capacity,
+        });
+        const att = await cliniko.uploadAttachment(
+          a.cliniko_patient_id,
+          pdf,
+          `NDIS Service Agreement ${new Date().toISOString().slice(0, 10)}.pdf`,
+          'application/pdf',
+          'Signed NDIS service agreement (Moveify)'
+        );
+        if (att?.id) {
+          await db.query('UPDATE service_agreements SET cliniko_attachment_id = $1, updated_at = NOW() WHERE id = $2', [String(att.id), a.id]);
+        }
+      } catch (pdfErr) {
+        console.error('NDIS agreement PDF upload failed (signature still recorded):', pdfErr.message);
+      }
+    }
+
+    audit.log(req, 'agreement_sign', 'service_agreement', a.id, { kind: 'ndis' });
+    res.json({ signed: true });
+  } catch (err) {
+    console.error('NDIS agreement sign error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// POST /:token/sign — public. Records the signature, stores the PDF in Cliniko.
+// Private agreements then open a Stripe setup Checkout and return its URL; NDIS
+// agreements are signature-only and finish on signing.
 router.post('/:token/sign', async (req, res) => {
   if (!automationEnabled()) return res.status(503).json({ error: 'Agreement automation is disabled' });
+
+  // Peek the kind before claiming, so the right validation + flow applies.
+  let peekKind;
+  try {
+    const peek = await db.getOne(
+      `SELECT kind FROM service_agreements WHERE token = $1 AND status = 'pending' AND token_expires_at > NOW()`,
+      [req.params.token]
+    );
+    peekKind = peek ? peek.kind : null;
+  } catch (e) {
+    console.error('Agreement sign peek error:', e);
+    return res.status(500).json({ error: 'Server error' });
+  }
+  if (!peekKind) return res.status(410).json({ error: 'This link is invalid, expired, or already used' });
+  if (peekKind === 'ndis') return signNdis(req, res);
 
   const { signedName, consent, signature, ddAuthorised } = req.body || {};
   if (!signedName || consent !== true) {
