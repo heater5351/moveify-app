@@ -22,6 +22,23 @@ what to know now, links).
 
 ---
 
+## 2026-06-14 — Clinician adherence Dashboard (new landing page)
+
+- New **Dashboard** tab, now the **clinician landing page** (replaces Program
+  Builder as the default `currentPage` at login — set in both `handleLogin` and the
+  `onAuthStateChanged` session-restore path). Patients still land on the portal.
+- At-a-glance triage of who is keeping up with their exercise programs: summary
+  cards (On track / Slipping / At risk / Fallen off / Pain flags) over a sortable,
+  worst-first table. Signals: 14-day completion %, days-since-last-activity, and
+  high-pain (≥7/10) alerts. **Active-program patients only**; others surfaced as a
+  count line. Row click → existing `PatientProfile` (Back returns to the Dashboard).
+- New endpoint `GET /api/patients/adherence-summary?days=14` (clinician-only,
+  registered **before** `/:patientId`). Compact one-row-per-patient payload computed
+  server-side via new `backend/services/adherence.js` (`resolveProgramWindow` +
+  `computeAdherence` — self-contained copy of the schedule-aware math; the
+  `routes/programs.js` per-patient analytics path is untouched). No schema/env
+  changes. Tests: `backend/tests/adherence.test.mjs`.
+
 ## 2026-06-13 — NDIS agreement variant (signature-only, no Stripe)
 
 - Added an **NDIS** kind to the service-agreement feature. Reuses the existing

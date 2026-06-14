@@ -4,6 +4,7 @@ const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { requirePatientAccess, requireAdmin } = require('../middleware/ownership');
 const audit = require('../services/audit');
+const { resolveProgramWindow, computeAdherence } = require('../services/adherence');
 
 const router = express.Router();
 
@@ -375,6 +376,144 @@ router.get('/', requireRole('clinician'), async (req, res) => {
     res.json({ patients: formattedPatients });
   } catch (error) {
     console.error('Get patients error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Cross-patient adherence summary for the clinician Dashboard.
+// Compact: one row per patient with a currently-active program. MUST stay registered
+// before GET /:patientId so the literal path isn't captured by the param route.
+router.get('/adherence-summary', requireRole('clinician'), async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 14;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const windowStartStr = toLocalDateString(new Date(today.getTime() - (days - 1) * 86400000));
+
+    // 1. All patients (id + name only)
+    const patients = await db.getAll(
+      `SELECT id, name FROM users WHERE role = 'patient' ORDER BY name ASC`
+    );
+
+    if (patients.length === 0) {
+      audit.log(req, 'dashboard_view', 'patient', null, { count: 0 });
+      return res.json({ days, rows: [], noActiveProgramCount: 0 });
+    }
+
+    const patientIds = patients.map(p => p.id);
+
+    // 2. All programs for those patients (fields needed to resolve the active window)
+    const allPrograms = await db.getAll(
+      `SELECT id, patient_id, name, frequency, start_date, created_at, duration, custom_end_date
+       FROM programs WHERE patient_id = ANY($1)`,
+      [patientIds]
+    );
+    const programIds = allPrograms.map(p => p.id);
+
+    // 3. Non-warmup exercise counts per program
+    const exCountByProgram = {};
+    if (programIds.length > 0) {
+      const exRows = await db.getAll(
+        `SELECT program_id, COUNT(*)::int AS count
+         FROM program_exercises
+         WHERE program_id = ANY($1) AND (is_warmup IS NOT TRUE)
+         GROUP BY program_id`,
+        [programIds]
+      );
+      exRows.forEach(r => { exCountByProgram[r.program_id] = r.count; });
+    }
+
+    // Determine which programs are currently active, indexed by patient.
+    const programsByPatient = {};
+    const activeProgramIds = new Set();
+    const patientsWithActive = new Set();
+    allPrograms.forEach(p => {
+      const frequency = (() => { try { return p.frequency ? JSON.parse(p.frequency) : []; } catch { return []; } })();
+      const program = { ...p, frequency };
+      if (!programsByPatient[p.patient_id]) programsByPatient[p.patient_id] = [];
+      programsByPatient[p.patient_id].push(program);
+      if (resolveProgramWindow(p, today).isActive) {
+        activeProgramIds.add(p.id);
+        patientsWithActive.add(p.patient_id);
+      }
+    });
+
+    // 4. Window completions (non-warmup) joined to their program — for active-program counts + pain.
+    const windowCompletionsByPatient = {};
+    const painByPatient = {};
+    if (programIds.length > 0) {
+      const compRows = await db.getAll(
+        `SELECT pe.program_id, p.patient_id, ec.completion_date, ec.pain_level
+         FROM exercise_completions ec
+         JOIN program_exercises pe ON ec.exercise_id = pe.id
+         JOIN programs p ON pe.program_id = p.id
+         WHERE p.patient_id = ANY($1)
+           AND (pe.is_warmup IS NOT TRUE)
+           AND ec.completion_date >= $2`,
+        [patientIds, windowStartStr]
+      );
+      compRows.forEach(r => {
+        if (!activeProgramIds.has(r.program_id)) return; // only active programs count
+        windowCompletionsByPatient[r.patient_id] = (windowCompletionsByPatient[r.patient_id] || 0) + 1;
+        if (r.pain_level != null && r.pain_level >= 7) {
+          const dateStr = normalizeDateStr(r.completion_date);
+          const existing = painByPatient[r.patient_id];
+          if (!existing || r.pain_level > existing.maxPain) {
+            painByPatient[r.patient_id] = { maxPain: r.pain_level, date: dateStr };
+          }
+        }
+      });
+    }
+
+    // 5. Last activity (all-time) per patient
+    const lastActivityByPatient = {};
+    if (programIds.length > 0) {
+      const lastRows = await db.getAll(
+        `SELECT p.patient_id, MAX(ec.completion_date) AS last_date
+         FROM exercise_completions ec
+         JOIN program_exercises pe ON ec.exercise_id = pe.id
+         JOIN programs p ON pe.program_id = p.id
+         WHERE p.patient_id = ANY($1)
+         GROUP BY p.patient_id`,
+        [patientIds]
+      );
+      lastRows.forEach(r => { lastActivityByPatient[r.patient_id] = normalizeDateStr(r.last_date); });
+    }
+
+    // Build one row per patient with an active program.
+    const rows = patients
+      .filter(p => patientsWithActive.has(p.id))
+      .map(p => {
+        const lastActivity = lastActivityByPatient[p.id] || null;
+        const adherence = computeAdherence({
+          programs: programsByPatient[p.id] || [],
+          exercisesByProgram: exCountByProgram,
+          completionsInWindow: windowCompletionsByPatient[p.id] || 0,
+          lastActivityDate: lastActivity,
+          days,
+          today
+        });
+        const activeProgramCount = (programsByPatient[p.id] || [])
+          .filter(prog => activeProgramIds.has(prog.id)).length;
+        return {
+          patientId: p.id,
+          name: p.name,
+          activeProgramCount,
+          completionRate: adherence.completionRate,
+          daysSinceLastActivity: adherence.daysSinceLastActivity,
+          lastActivity,
+          painAlert: painByPatient[p.id] || null,
+          status: adherence.status
+        };
+      });
+
+    const noActiveProgramCount = patients.length - patientsWithActive.size;
+
+    audit.log(req, 'dashboard_view', 'patient', null, { count: rows.length });
+
+    res.json({ days, rows, noActiveProgramCount });
+  } catch (error) {
+    console.error('Adherence summary error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

@@ -230,6 +230,7 @@ gcloud run services logs tail moveify-billing-worker --region australia-southeas
 
 **Authenticated pages do NOT use React Router.** Navigation is state-driven via `currentPage` in App.tsx:
 
+- `'dashboard'` → DashboardPage (clinician landing page — adherence triage overview)
 - `'exercises'` → ExerciseLibrary + ProgramBuilder (side by side)
 - `'patients'` → PatientsPage
 - `'programs'` → PatientProfile (viewing a specific patient's programs)
@@ -322,6 +323,7 @@ All routes are prefixed with `/api`. Routes marked with a lock require authentic
 | `auth.js` | `/api/auth` | `GET /me` | Any authenticated user |
 | `invitations.js` | `/api/invitations` | `POST /generate` | Clinician only |
 | `patients.js` | `/api/patients` | `GET /` (all patients), `GET /:id`, `DELETE /:id` | Clinician (DELETE = admin only) |
+| `patients.js` | `/api/patients` | `GET /adherence-summary?days=14` (Dashboard: one compact adherence row per active-program patient — completion %, days-since-activity, high-pain flag, status. Computed via `services/adherence.js`. **Registered before `/:patientId`.**) | Clinician only |
 | `programs.js` | `/api/programs` | `POST /patient/:patientId`, `PUT /:programId`, `DELETE /:programId`, `GET /:programId/revisions` | Clinician only |
 | `programs.js` | `/api/programs` | `PATCH /exercise/:exerciseId/complete` | Patient only (uses `req.user.id`) |
 | `programs.js` | `/api/programs` | `GET /patient/:patientId`, `GET /analytics/patient/:patientId` | Both roles + access check |

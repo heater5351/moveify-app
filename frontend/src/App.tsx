@@ -43,6 +43,7 @@ import { auth, setCachedToken } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { toLocalDateString } from './utils/date.ts';
 import { useCapacitorBackButton } from './hooks/useCapacitorBackButton';
+import { DashboardPage, type AdherenceRow } from './components/DashboardPage.tsx';
 
 function App() {
   // Authentication state
@@ -57,6 +58,12 @@ function App() {
   const [viewingPatient, setViewingPatient] = useState<Patient | null>(null);
   const [scribeEverOpened, setScribeEverOpened] = useState(false);
   const [scribeRecordingActive, setScribeRecordingActive] = useState(false);
+
+  // Dashboard (clinician adherence overview)
+  const ADHERENCE_DAYS = 14;
+  const [adherenceRows, setAdherenceRows] = useState<AdherenceRow[]>([]);
+  const [adherenceLoading, setAdherenceLoading] = useState(false);
+  const [noActiveProgramCount, setNoActiveProgramCount] = useState(0);
 
   // Persistent progress note — survives tab navigation
   const [activeNote, setActiveNote] = useState<{ patientId: number; patientName: string; sessionId?: number } | null>(null);
@@ -236,6 +243,7 @@ function App() {
             if (!cancelled) {
               setLoggedInUser({ id: user.id, email: user.email, name: user.name, phone: user.phone, role: 'clinician', isAdmin: !!user.is_admin, defaultLocationId: user.default_location_id, locationName: user.location_name });
               setUserRole('clinician');
+              setCurrentPage('dashboard');
             }
           }
           if (!cancelled) setIsLoggedIn(true);
@@ -276,6 +284,32 @@ function App() {
       fetchPatients();
     }
   }, [isLoggedIn, userRole]);
+
+  const fetchAdherence = async () => {
+    setAdherenceLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/patients/adherence-summary?days=${ADHERENCE_DAYS}`, {
+        headers: await getAuthHeaders()
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setAdherenceRows(data.rows || []);
+        setNoActiveProgramCount(data.noActiveProgramCount || 0);
+      }
+    } catch (error) {
+      console.error('Failed to fetch adherence summary:', error);
+    } finally {
+      setAdherenceLoading(false);
+    }
+  };
+
+  // Refresh adherence whenever the clinician opens the Dashboard
+  useEffect(() => {
+    if (isLoggedIn && userRole === 'clinician' && currentPage === 'dashboard') {
+      fetchAdherence();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, userRole, currentPage]);
 
   // Update logged in patient when patients array changes
   useEffect(() => {
@@ -332,6 +366,9 @@ function App() {
   const handleLogin = (role: UserRole, patient?: Patient, user?: User) => {
     setIsLoggedIn(true);
     setUserRole(role);
+    if (role === 'clinician') {
+      setCurrentPage('dashboard');
+    }
     if (patient) {
       setLoggedInPatient(patient);
     }
@@ -1087,6 +1124,16 @@ function App() {
             {userRole === 'clinician' && (
               <div className="flex items-stretch h-14 overflow-x-auto no-scrollbar">
                 <button
+                  onClick={() => { setCurrentPage('dashboard'); setViewingPatient(null); }}
+                  className={`px-3 md:px-5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                    currentPage === 'dashboard'
+                      ? 'border-moveify-teal text-white'
+                      : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/20'
+                  }`}
+                >
+                  Dashboard
+                </button>
+                <button
                   onClick={() => setCurrentPage('exercises')}
                   className={`px-3 md:px-5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                     currentPage === 'exercises'
@@ -1301,6 +1348,18 @@ function App() {
       ) : currentPage === 'education' ? (
         <div className="flex-1 overflow-y-auto px-6 py-7">
           <EducationLibrary />
+        </div>
+      ) : currentPage === 'dashboard' && !viewingPatient ? (
+        <div className="flex-1 overflow-y-auto px-3 md:px-6 py-4 md:py-7">
+          <DashboardPage
+            rows={adherenceRows}
+            loading={adherenceLoading}
+            days={ADHERENCE_DAYS}
+            noActiveProgramCount={noActiveProgramCount}
+            patients={patients}
+            onViewPatient={setViewingPatient}
+            onRefresh={fetchAdherence}
+          />
         </div>
       ) : currentPage === 'scribe' ? (
         null
