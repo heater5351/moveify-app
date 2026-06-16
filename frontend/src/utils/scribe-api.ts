@@ -215,6 +215,10 @@ export interface CatalogMeasure {
   min: number;
   max: number;
   step: number;
+  /** 'presets' → tappable preset grid (ROM); 'keypad' → numeric keypad. */
+  input?: 'presets' | 'keypad';
+  /** Increment between preset buttons when input === 'presets'. */
+  presetStep?: number;
 }
 
 export interface AssessmentCatalogEntry {
