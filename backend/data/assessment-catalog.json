@@ -1,13 +1,13 @@
 {
   "_meta": {
-    "description": "Catalog for the in-session structured assessment panel (Phase 3 of the scribe context upgrades). Each measure's `key` MUST equal a test key in normative-data.json so the deterministic engine (normative-data.interpretByKey) grades the captured value against age/sex norms — exactly the same grounding the handout uses, but from a tapped number rather than text extracted from speech. The UI is fully driven by this file: adding an assessment is data, not code. Keep it curated — this is a quick-capture panel, not an EMR.",
+    "description": "Catalog for the in-session structured assessment panel (Phase 3 of the scribe context upgrades). Each measure's `key` MUST equal a test key in normative-data.json so the deterministic engine (normative-data.interpretByKey) grades the captured value against age/sex norms — exactly the same grounding the handout uses, but from a tapped number rather than text extracted from speech. The UI is fully driven by this file: adding an assessment is data, not code. Assessments are grouped by `category` in the picker.",
     "laterality": {
       "bilateral": "Capture a left and a right value (each stored as its own row). The norm is not side-specific; a >10% side-to-side gap is flagged at grading.",
-      "single": "One value for the whole body (stored with side='bilateral'). Use for non-lateralised tests like the 30-second sit-to-stand."
+      "single": "One value for the whole body (stored with side='bilateral'). Use for non-lateralised tests."
     },
     "input": {
-      "presets": "Tablet-fast: render tappable preset buttons from min→max in `presetStep` increments (e.g. ROM eyeballed to the nearest 10°). Tapping commits and advances.",
-      "keypad": "On-screen numeric keypad for an exact instrument read (grip dynamometer kg, stopwatch seconds, rep counts)."
+      "presets": "Tablet-fast: tappable preset buttons from min→max in `presetStep` increments (e.g. ROM eyeballed to the nearest 10°). Tapping commits and advances.",
+      "keypad": "On-screen numeric keypad for an exact instrument read (dynamometer kg, stopwatch seconds, counts, mmol/L)."
     }
   },
   "assessments": [
@@ -15,6 +15,7 @@
       "key": "hip_rom",
       "displayName": "Hip ROM",
       "region": "Hip",
+      "category": "Range of Motion",
       "laterality": "bilateral",
       "measures": [
         { "key": "hip_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 150, "step": 1, "input": "presets", "presetStep": 10 },
@@ -25,25 +26,17 @@
       "key": "knee_rom",
       "displayName": "Knee ROM",
       "region": "Knee",
+      "category": "Range of Motion",
       "laterality": "bilateral",
       "measures": [
         { "key": "knee_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 160, "step": 1, "input": "presets", "presetStep": 10 }
       ]
     },
     {
-      "key": "shoulder_rom",
-      "displayName": "Shoulder ROM",
-      "region": "Shoulder",
-      "laterality": "bilateral",
-      "measures": [
-        { "key": "shoulder_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 180, "step": 1, "input": "presets", "presetStep": 10 },
-        { "key": "shoulder_abduction_rom", "label": "Abduction", "unit": "degrees", "min": 0, "max": 180, "step": 1, "input": "presets", "presetStep": 10 }
-      ]
-    },
-    {
       "key": "ankle_rom",
       "displayName": "Ankle ROM",
       "region": "Ankle",
+      "category": "Range of Motion",
       "laterality": "bilateral",
       "measures": [
         { "key": "ankle_dorsiflexion_rom", "label": "Dorsiflexion", "unit": "degrees", "min": 0, "max": 40, "step": 1, "input": "presets", "presetStep": 5 },
@@ -51,39 +44,225 @@
       ]
     },
     {
+      "key": "shoulder_rom",
+      "displayName": "Shoulder ROM",
+      "region": "Shoulder",
+      "category": "Range of Motion",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "shoulder_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 180, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "shoulder_abduction_rom", "label": "Abduction", "unit": "degrees", "min": 0, "max": 180, "step": 1, "input": "presets", "presetStep": 10 }
+      ]
+    },
+    {
+      "key": "wrist_rom",
+      "displayName": "Wrist ROM",
+      "region": "Wrist",
+      "category": "Range of Motion",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "wrist_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "wrist_extension_rom", "label": "Extension", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 }
+      ]
+    },
+    {
+      "key": "lumbar_flexion",
+      "displayName": "Lumbar Flexion ROM",
+      "region": "Spine",
+      "category": "Range of Motion",
+      "laterality": "single",
+      "measures": [
+        { "key": "lumbar_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 }
+      ]
+    },
+    {
+      "key": "thoracic_extension",
+      "displayName": "Thoracic Extension",
+      "region": "Spine",
+      "category": "Range of Motion",
+      "laterality": "single",
+      "measures": [
+        { "key": "thoracic_extension_test", "label": "Extension", "unit": "degrees", "min": 0, "max": 60, "step": 1, "input": "presets", "presetStep": 10 }
+      ]
+    },
+    {
       "key": "grip_strength",
       "displayName": "Grip Strength",
       "region": "Upper limb",
+      "category": "Strength & Endurance",
       "laterality": "bilateral",
       "measures": [
         { "key": "grip_strength", "label": "Grip", "unit": "kg", "min": 0, "max": 80, "step": 0.5, "input": "keypad" }
       ]
     },
     {
-      "key": "single_leg_stance",
-      "displayName": "Single-Leg Stance (eyes open)",
-      "region": "Balance",
-      "laterality": "bilateral",
-      "measures": [
-        { "key": "four_stage_balance_single_leg", "label": "Hold", "unit": "seconds", "min": 0, "max": 60, "step": 1, "input": "keypad" }
-      ]
-    },
-    {
       "key": "single_leg_calf_raise",
       "displayName": "Single-Leg Calf Raise",
       "region": "Lower limb",
+      "category": "Strength & Endurance",
       "laterality": "bilateral",
       "measures": [
         { "key": "single_leg_calf_raise", "label": "Reps to fatigue", "unit": "reps", "min": 0, "max": 50, "step": 1, "input": "keypad" }
       ]
     },
     {
+      "key": "single_leg_rise",
+      "displayName": "Single-Leg Sit-to-Stand",
+      "region": "Lower limb",
+      "category": "Strength & Endurance",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "single_leg_rise_test", "label": "Reps", "unit": "reps", "min": 0, "max": 30, "step": 1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "neck_flexor_endurance",
+      "displayName": "Deep Neck Flexor Endurance",
+      "region": "Neck",
+      "category": "Strength & Endurance",
+      "laterality": "single",
+      "measures": [
+        { "key": "neck_flexor_endurance", "label": "Hold", "unit": "seconds", "min": 0, "max": 120, "step": 1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "single_leg_stance",
+      "displayName": "Single-Leg Stance (eyes open)",
+      "region": "Balance",
+      "category": "Balance",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "four_stage_balance_single_leg", "label": "Hold", "unit": "seconds", "min": 0, "max": 60, "step": 1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "tandem_stance",
+      "displayName": "Tandem Stance",
+      "region": "Balance",
+      "category": "Balance",
+      "laterality": "single",
+      "measures": [
+        { "key": "tandem_stance", "label": "Hold", "unit": "seconds", "min": 0, "max": 30, "step": 1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "mini_bestest",
+      "displayName": "Mini-BESTest",
+      "region": "Balance",
+      "category": "Balance",
+      "laterality": "single",
+      "measures": [
+        { "key": "mini_bestest", "label": "Score (/28)", "unit": "points", "min": 0, "max": 28, "step": 1, "input": "keypad" }
+      ]
+    },
+    {
       "key": "thirty_second_sit_to_stand",
       "displayName": "30-Second Sit-to-Stand",
       "region": "Lower limb",
+      "category": "Functional Capacity",
       "laterality": "single",
       "measures": [
         { "key": "thirty_second_sit_to_stand", "label": "Reps in 30 s", "unit": "reps", "min": 0, "max": 40, "step": 1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "five_times_sit_to_stand",
+      "displayName": "5x Sit-to-Stand",
+      "region": "Lower limb",
+      "category": "Functional Capacity",
+      "laterality": "single",
+      "measures": [
+        { "key": "five_times_sit_to_stand", "label": "Time", "unit": "seconds", "min": 0, "max": 60, "step": 0.1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "timed_up_and_go",
+      "displayName": "Timed Up and Go",
+      "region": "Mobility",
+      "category": "Functional Capacity",
+      "laterality": "single",
+      "measures": [
+        { "key": "timed_up_and_go", "label": "Time", "unit": "seconds", "min": 0, "max": 60, "step": 0.1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "gait_speed",
+      "displayName": "Gait Speed (comfortable)",
+      "region": "Mobility",
+      "category": "Functional Capacity",
+      "laterality": "single",
+      "measures": [
+        { "key": "gait_speed", "label": "Speed", "unit": "m_s", "min": 0, "max": 2.5, "step": 0.01, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "six_minute_walk",
+      "displayName": "6-Minute Walk",
+      "region": "Endurance",
+      "category": "Functional Capacity",
+      "laterality": "single",
+      "measures": [
+        { "key": "six_minute_walk", "label": "Distance", "unit": "metres", "min": 0, "max": 800, "step": 1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "modified_thomas_test",
+      "displayName": "Thomas Test (hip flexor)",
+      "region": "Hip",
+      "category": "Muscle Length",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "modified_thomas_test", "label": "Hip extension angle", "unit": "degrees", "min": 0, "max": 40, "step": 1, "input": "presets", "presetStep": 5 }
+      ]
+    },
+    {
+      "key": "pectoralis_minor_length",
+      "displayName": "Pec Minor Length",
+      "region": "Shoulder",
+      "category": "Muscle Length",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "pectoralis_minor_length", "label": "Length", "unit": "cm", "min": 8, "max": 20, "step": 0.1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "resting_heart_rate",
+      "displayName": "Resting Heart Rate",
+      "region": "Cardio",
+      "category": "Vitals & Screening",
+      "laterality": "single",
+      "measures": [
+        { "key": "resting_heart_rate", "label": "Heart rate", "unit": "bpm", "min": 30, "max": 200, "step": 1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "blood_glucose_fasting",
+      "displayName": "Fasting Blood Glucose",
+      "region": "Metabolic",
+      "category": "Vitals & Screening",
+      "laterality": "single",
+      "measures": [
+        { "key": "blood_glucose_fasting", "label": "Glucose", "unit": "mmol_L", "min": 2, "max": 30, "step": 0.1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "blood_glucose_random",
+      "displayName": "Random Blood Glucose",
+      "region": "Metabolic",
+      "category": "Vitals & Screening",
+      "laterality": "single",
+      "measures": [
+        { "key": "blood_glucose_random", "label": "Glucose", "unit": "mmol_L", "min": 2, "max": 30, "step": 0.1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "waist_circumference",
+      "displayName": "Waist Circumference",
+      "region": "Anthropometry",
+      "category": "Vitals & Screening",
+      "laterality": "single",
+      "measures": [
+        { "key": "waist_circumference", "label": "Waist", "unit": "cm", "min": 50, "max": 170, "step": 0.5, "input": "keypad" }
       ]
     }
   ]

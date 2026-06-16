@@ -8,6 +8,7 @@ interface AssessmentTrendsProps {
 
 const UNIT_LABEL: Record<string, string> = {
   degrees: '°', kg: 'kg', seconds: 'sec', reps: 'reps', cm: 'cm',
+  m_s: 'm/s', bpm: 'bpm', mmol_L: 'mmol/L', metres: 'm', points: 'pts',
 };
 function unitLabel(u: string | null) { return u ? (UNIT_LABEL[u] ?? u) : ''; }
 

@@ -20,6 +20,7 @@ interface FieldRef { measureKey: string; side: MeasurementSide; }
 
 const UNIT_LABEL: Record<string, string> = {
   degrees: '°', kg: 'kg', seconds: 'sec', reps: 'reps', cm: 'cm',
+  m_s: 'm/s', bpm: 'bpm', mmol_L: 'mmol/L', metres: 'm', points: 'pts',
 };
 function unitLabel(u: string) { return UNIT_LABEL[u] ?? u; }
 
@@ -59,6 +60,15 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
   }, [sessionId]);
 
   const selected = catalog.find(a => a.key === selectedKey) ?? null;
+
+  // Group the picker by category, preserving catalog order.
+  const byCategory = new Map<string, AssessmentCatalogEntry[]>();
+  for (const a of catalog) {
+    const list = byCategory.get(a.category) ?? [];
+    list.push(a);
+    byCategory.set(a.category, list);
+  }
+  const categories = [...byCategory.keys()];
 
   // Ordered list of capturable fields for the selected assessment (measure-major,
   // Left then Right) — drives the keypad's "Next" advance.
@@ -232,21 +242,28 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
 
       {!readOnly && (
         <>
-          {/* Assessment picker — large, easy-to-tap cards */}
-          <div className="grid grid-cols-2 gap-2.5 mb-4 shrink-0">
-            {catalog.map(a => (
-              <button
-                key={a.key}
-                onClick={() => { setSelectedKey(a.key); setFocused(null); setBuffer(''); }}
-                className={`min-h-20 rounded-2xl px-4 py-3 border-2 transition text-left flex flex-col justify-center active:scale-[0.98] ${
-                  selectedKey === a.key
-                    ? 'bg-primary-400 border-primary-400 text-white shadow-sm'
-                    : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'
-                }`}
-              >
-                <span className="text-base font-bold leading-tight">{a.displayName}</span>
-                <span className="text-xs font-medium opacity-70 mt-0.5">{a.region}</span>
-              </button>
+          {/* Assessment picker — large, easy-to-tap cards, grouped by category */}
+          <div className="mb-4 shrink-0 space-y-4">
+            {categories.map(cat => (
+              <div key={cat}>
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">{cat}</p>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {byCategory.get(cat)!.map(a => (
+                    <button
+                      key={a.key}
+                      onClick={() => { setSelectedKey(a.key); setFocused(null); setBuffer(''); }}
+                      className={`min-h-20 rounded-2xl px-4 py-3 border-2 transition text-left flex flex-col justify-center active:scale-[0.98] ${
+                        selectedKey === a.key
+                          ? 'bg-primary-400 border-primary-400 text-white shadow-sm'
+                          : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'
+                      }`}
+                    >
+                      <span className="text-base font-bold leading-tight">{a.displayName}</span>
+                      <span className="text-xs font-medium opacity-70 mt-0.5">{a.region}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
 

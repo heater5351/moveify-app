@@ -225,6 +225,8 @@ export interface AssessmentCatalogEntry {
   key: string;
   displayName: string;
   region: string;
+  /** Grouping header in the picker (e.g. "Range of Motion", "Balance"). */
+  category: string;
   laterality: 'bilateral' | 'single';
   measures: CatalogMeasure[];
 }
