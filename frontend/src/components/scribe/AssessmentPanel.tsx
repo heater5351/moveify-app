@@ -232,19 +232,20 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
 
       {!readOnly && (
         <>
-          {/* Assessment picker — large tap targets */}
-          <div className="grid grid-cols-2 gap-2 mb-3 shrink-0">
+          {/* Assessment picker — large, easy-to-tap cards */}
+          <div className="grid grid-cols-2 gap-2.5 mb-4 shrink-0">
             {catalog.map(a => (
               <button
                 key={a.key}
                 onClick={() => { setSelectedKey(a.key); setFocused(null); setBuffer(''); }}
-                className={`min-h-12 text-sm font-semibold rounded-xl px-3 py-2.5 border-2 transition text-left leading-tight ${
+                className={`min-h-20 rounded-2xl px-4 py-3 border-2 transition text-left flex flex-col justify-center active:scale-[0.98] ${
                   selectedKey === a.key
-                    ? 'bg-primary-400 border-primary-400 text-white'
+                    ? 'bg-primary-400 border-primary-400 text-white shadow-sm'
                     : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'
                 }`}
               >
-                {a.displayName}
+                <span className="text-base font-bold leading-tight">{a.displayName}</span>
+                <span className="text-xs font-medium opacity-70 mt-0.5">{a.region}</span>
               </button>
             ))}
           </div>
