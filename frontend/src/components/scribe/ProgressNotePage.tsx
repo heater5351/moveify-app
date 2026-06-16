@@ -4,6 +4,7 @@ import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 import { apiFetch, generateHandout, revertSessionToDraft } from '../../utils/scribe-api';
 import type { HandoutSections } from '../../types';
 import HandoutPreview from './HandoutPreview';
+import AssessmentPanel from './AssessmentPanel';
 
 interface ProgressNotePageProps {
   patientId: number;
@@ -427,6 +428,15 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
           </div>
         )}
         {generateError && <p className="text-xs text-red-500 mt-1 shrink-0">{generateError}</p>}
+      </div>
+
+      {/* Structured in-session assessments — graded into the note's Objective section */}
+      <div className="pt-3 shrink-0">
+        <AssessmentPanel
+          sessionId={sessionId ?? existingSessionId ?? null}
+          readOnly={isLocked}
+          ensureSession={ensureSession}
+        />
       </div>
 
       {/* Recording + transcript — draft only */}

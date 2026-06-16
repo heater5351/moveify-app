@@ -22,6 +22,30 @@ what to know now, links).
 
 ---
 
+## 2026-06-16 — Structured in-session assessments (scribe Phase 3)
+
+- New tap-capture panel in the scribe recorder (`AssessmentPanel.tsx`, collapsible
+  drawer in `ProgressNotePage.tsx`): pick assessment → side toggle (L/R) →
+  slider + ± steppers per measure. Optimistic per-value save. Seeded set: hip/knee/
+  shoulder/ankle ROM, grip, single-leg stance, single-leg calf raise, 30s STS.
+- **Catalog-driven** (`backend/data/assessment-catalog.json` + `services/assessment-catalog.js`).
+  Every measure `key` equals a `normative-data.json` test key, so captured values are
+  graded **deterministically** (new `normative-data.interpretByKey`) — same grounding
+  the handout uses, but from a tapped number instead of speech-extracted text.
+- **Schema (additive):** new `scribe_session_measurements` table — **plain numerics**
+  (same stance as `exercise_completions`/`daily_check_ins`, kept queryable for future
+  reassessment comparisons), `UNIQUE(session_id, assessment_key, side, measure_key)`
+  for upsert; `side='bilateral'` for non-lateralised tests.
+- **API** (`routes/scribe-measurements.js`, clinician-only, mounted at `/api/scribe`):
+  `GET /assessment-catalog`, and per-session `GET`/`POST`(upsert)/`DELETE /sessions/:id/measurements/...`.
+  Audit logs which test was captured, never the value.
+- **Generation wiring:** `scribe-soap-notes.js` generate fetches the rows + demographics,
+  renders grounded lines (`services/measurement-render.js`, incl. >=10% side-to-side
+  asymmetry flag), and passes them to a new `OBJECTIVE MEASUREMENTS — EXACT` block in
+  `buildSoapUserMessage`. `soap_note_generated` audit gains `measurements` count.
+- Tests: `backend/tests/measurement-render.test.mjs` (render + catalog alignment +
+  prompt block). Phases 1–2 shipped 2026-06-12; this is Phase 3. **Not yet deployed.**
+
 ## 2026-06-14 — Clinician adherence Dashboard (new landing page)
 
 - New **Dashboard** tab, now the **clinician landing page** (replaces Program

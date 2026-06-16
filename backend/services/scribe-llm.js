@@ -37,7 +37,7 @@ Use bullet points within each section. Use clinical terminology appropriate for 
  * so the instruction survives custom per-clinician system prompts. Later phases
  * (program diffs, in-session measurements, outcome scores) slot in as new blocks here.
  */
-function buildSoapUserMessage({ transcript, priorContext, programDiff }) {
+function buildSoapUserMessage({ transcript, priorContext, programDiff, measurements }) {
   const blocks = [];
 
   if (priorContext && (priorContext.summary || priorContext.lastNote)) {
@@ -65,6 +65,14 @@ Today's note documents today's session only. A short note for a short session is
 
 ${parts.join('\n\n')}
 === END PATIENT HISTORY ===`);
+  }
+
+  if (Array.isArray(measurements) && measurements.length > 0) {
+    blocks.push(`=== OBJECTIVE MEASUREMENTS — EXACT ===
+These assessment values were captured directly in the system during this session (not from the transcript). Record them in the Objective section exactly as given — do not round, alter, drop, or re-derive any value or unit. Each line includes a deterministic, age/sex-grounded interpretation; you may reflect those interpretations in the Objective/Assessment sections, but never invent normative numbers, percentiles, or cut-offs of your own. Where the transcript also mentions one of these tests, THESE recorded values are authoritative.
+
+${measurements.map(line => `- ${line}`).join('\n')}
+=== END OBJECTIVE MEASUREMENTS ===`);
   }
 
   if (Array.isArray(programDiff) && programDiff.length > 0) {

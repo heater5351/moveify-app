@@ -891,6 +891,28 @@ async function initDatabase() {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_program_revisions_program ON program_revisions(program_id)`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_program_revisions_patient_time ON program_revisions(patient_id, changed_at)`);
 
+    // Structured in-session measurements (Phase 3 of the scribe context upgrades).
+    // Tap-captured assessment values (ROM, grip, balance, sit-to-stand). Stored as
+    // PLAIN numerics — same stance as exercise_completions / daily_check_ins — so
+    // they stay queryable for reassessment trend comparisons. assessment_key and
+    // measure_key map to data/assessment-catalog.json; measure_key also matches a
+    // normative-data.json key so the value is graded deterministically at note
+    // generation. side='bilateral' is used for non-lateralised tests (e.g. STS).
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS scribe_session_measurements (
+        id SERIAL PRIMARY KEY,
+        session_id INTEGER NOT NULL REFERENCES scribe_sessions(id) ON DELETE CASCADE,
+        assessment_key TEXT NOT NULL,
+        side TEXT NOT NULL DEFAULT 'bilateral' CHECK (side IN ('left','right','bilateral')),
+        measure_key TEXT NOT NULL,
+        value NUMERIC NOT NULL,
+        unit TEXT,
+        recorded_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(session_id, assessment_key, side, measure_key)
+      )
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_session_measurements_session ON scribe_session_measurements(session_id)`);
+
     // Seed default SOAP template (exercise physiology)
     await db.query(`
       INSERT INTO soap_templates (name, discipline, system_prompt, is_default)

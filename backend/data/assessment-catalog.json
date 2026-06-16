@@ -1,0 +1,87 @@
+{
+  "_meta": {
+    "description": "Catalog for the in-session structured assessment panel (Phase 3 of the scribe context upgrades). Each measure's `key` MUST equal a test key in normative-data.json so the deterministic engine (normative-data.interpretByKey) grades the captured value against age/sex norms — exactly the same grounding the handout uses, but from a tapped number rather than text extracted from speech. The UI is fully driven by this file: adding an assessment is data, not code. Keep it curated — this is a quick-capture panel, not an EMR.",
+    "laterality": {
+      "bilateral": "Capture a left and a right value (each stored as its own row). The norm is not side-specific; a >10% side-to-side gap is flagged at grading.",
+      "single": "One value for the whole body (stored with side='bilateral'). Use for non-lateralised tests like the 30-second sit-to-stand."
+    },
+    "inputs": ["slider", "stepper"]
+  },
+  "assessments": [
+    {
+      "key": "hip_rom",
+      "displayName": "Hip ROM",
+      "region": "Hip",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "hip_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 150, "step": 1 },
+        { "key": "hip_extension_rom", "label": "Extension", "unit": "degrees", "min": 0, "max": 40, "step": 1 }
+      ]
+    },
+    {
+      "key": "knee_rom",
+      "displayName": "Knee ROM",
+      "region": "Knee",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "knee_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 160, "step": 1 }
+      ]
+    },
+    {
+      "key": "shoulder_rom",
+      "displayName": "Shoulder ROM",
+      "region": "Shoulder",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "shoulder_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 180, "step": 1 },
+        { "key": "shoulder_abduction_rom", "label": "Abduction", "unit": "degrees", "min": 0, "max": 180, "step": 1 }
+      ]
+    },
+    {
+      "key": "ankle_rom",
+      "displayName": "Ankle ROM",
+      "region": "Ankle",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "ankle_dorsiflexion_rom", "label": "Dorsiflexion", "unit": "degrees", "min": 0, "max": 40, "step": 1 },
+        { "key": "ankle_plantarflexion_rom", "label": "Plantarflexion", "unit": "degrees", "min": 0, "max": 70, "step": 1 }
+      ]
+    },
+    {
+      "key": "grip_strength",
+      "displayName": "Grip Strength",
+      "region": "Upper limb",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "grip_strength", "label": "Grip", "unit": "kg", "min": 0, "max": 80, "step": 0.5 }
+      ]
+    },
+    {
+      "key": "single_leg_stance",
+      "displayName": "Single-Leg Stance (eyes open)",
+      "region": "Balance",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "four_stage_balance_single_leg", "label": "Hold", "unit": "seconds", "min": 0, "max": 60, "step": 1 }
+      ]
+    },
+    {
+      "key": "single_leg_calf_raise",
+      "displayName": "Single-Leg Calf Raise",
+      "region": "Lower limb",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "single_leg_calf_raise", "label": "Reps to fatigue", "unit": "reps", "min": 0, "max": 50, "step": 1 }
+      ]
+    },
+    {
+      "key": "thirty_second_sit_to_stand",
+      "displayName": "30-Second Sit-to-Stand",
+      "region": "Lower limb",
+      "laterality": "single",
+      "measures": [
+        { "key": "thirty_second_sit_to_stand", "label": "Reps in 30 s", "unit": "reps", "min": 0, "max": 40, "step": 1 }
+      ]
+    }
+  ]
+}

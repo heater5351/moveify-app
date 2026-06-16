@@ -342,6 +342,7 @@ All routes are prefixed with `/api`. Routes marked with a lock require authentic
 | `scribe-handout.js` | `/api/scribe/sessions` | `POST /:id/handout/generate`, `POST /:id/handout/docx` | Clinician only (ephemeral, audit only) |
 | `scribe-reassessment.js` | `/api/scribe/sessions` | `POST /:id/reassessment/{generate,regrade,narrative,docx}` | Clinician only (baseline vs latest comparison; `audience` 'patient'\|'gp' + docx `variant`; `generate` takes optional `previousReportText` + optional `baselineSessionId`; ephemeral, audit only) |
 | `scribe-documents.js` | `/api/scribe/documents` | `POST /extract` (PDF/DOCX/TXT → text, multer in-memory) | Clinician only (ephemeral, nothing stored/logged) |
+| `scribe-measurements.js` | `/api/scribe` | `GET /assessment-catalog`; per-session `GET`/`POST` (upsert) / `DELETE /sessions/:id/measurements/...` (tap-captured ROM/strength/balance → `scribe_session_measurements`; measure keys aligned to `normative-data.json` so values are graded deterministically via `interpretByKey` into the SOAP `OBJECTIVE MEASUREMENTS` block) | Clinician only |
 
 ## Database Schema
 
@@ -359,6 +360,7 @@ Defined in `backend/database/init.js`. Key tables:
 | `education_modules` | title, content, category, estimated_duration_minutes, created_by | Text/video education |
 | `clinician_patients` | clinician_id, patient_id | **Legacy** — still exists in schema but no longer queried. Kept for migration safety |
 | `program_revisions` | program_id, patient_id, changed_by, scribe_session_id, snapshot_before/after (JSONB), changed_at | Before/after snapshot per program create/update (`snapshot_before` NULL on create). Written in-transaction by `services/program-revisions.js`; diff rendered by `services/program-diff.js` into the SOAP prompt |
+| `scribe_session_measurements` | session_id, assessment_key, side (`left`/`right`/`bilateral`), measure_key, value (NUMERIC), unit | Tap-captured in-session assessments (scribe Phase 3). **Plain numerics** (not encrypted — kept queryable, same stance as completions/check-ins). `UNIQUE(session_id, assessment_key, side, measure_key)` for upsert. `measure_key` matches a `normative-data.json` key → graded into the SOAP `OBJECTIVE MEASUREMENTS` block via `services/measurement-render.js`. Catalog: `data/assessment-catalog.json` |
 | `audit_logs` | user_id, action, resource_type, resource_id, details (JSONB), ip_address | Audit trail for key operations |
 | `invitation_tokens` | ..., clinician_id | Links invitations to the clinician who created them |
 | `app_state` | key (PK), value, updated_at | Generic key/value store. Holds the Cliniko auto-sync cursor `cliniko_patient_last_sync` |

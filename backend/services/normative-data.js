@@ -274,6 +274,20 @@ function interpret(testName, rawResult, age, sex) {
   return { key: match.key, ...result };
 }
 
+/**
+ * Classify a value against a KNOWN dataset key directly — no fuzzy name matching.
+ * Used by the in-session assessment panel, where the catalog already carries the
+ * exact normative key, so grading is fully deterministic. Returns null if the key
+ * isn't in the dataset. No patient values are logged.
+ */
+function interpretByKey(key, rawValue, age, sex) {
+  const def = load().tests[key];
+  if (!def) return null;
+  const parsed = parseValue(String(rawValue), def.unit);
+  const result = classify(def, parsed, age, sex);
+  return { key, ...result };
+}
+
 // ── Reassessment comparison ──────────────────────────────────────────────────
 // Word for the unit in change phrasing ("up 3 reps"). Mirrors scribe-llm's
 // unitSuffix but returns a trailing-space-free word for inline prose.
@@ -502,4 +516,4 @@ function buildComparisonInterpretation(res, { audience = 'patient' } = {}) {
   return parts.join(' ').replace(/\s+/g, ' ').trim() || null;
 }
 
-module.exports = { load, matchTest, parseValue, classify, interpret, buildInterpretation, compareValues, buildComparisonInterpretation, normalizeSex, _DATA_PATH: DATA_PATH };
+module.exports = { load, matchTest, parseValue, classify, interpret, interpretByKey, buildInterpretation, compareValues, buildComparisonInterpretation, normalizeSex, _DATA_PATH: DATA_PATH };

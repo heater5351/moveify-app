@@ -206,6 +206,70 @@ export function saveBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+// ── In-session structured assessments (Phase 3) ──────────────────────────────
+
+export interface CatalogMeasure {
+  key: string;
+  label: string;
+  unit: string;
+  min: number;
+  max: number;
+  step: number;
+}
+
+export interface AssessmentCatalogEntry {
+  key: string;
+  displayName: string;
+  region: string;
+  laterality: 'bilateral' | 'single';
+  measures: CatalogMeasure[];
+}
+
+export type MeasurementSide = 'left' | 'right' | 'bilateral';
+
+export interface Measurement {
+  id: number;
+  assessment_key: string;
+  side: MeasurementSide;
+  measure_key: string;
+  value: number;
+  unit: string | null;
+  recorded_at: string;
+}
+
+export async function fetchAssessmentCatalog(): Promise<AssessmentCatalogEntry[]> {
+  const res = await apiFetch('/assessment-catalog');
+  if (!res.ok) throw new Error('Failed to load assessment catalog');
+  return (await res.json()).assessments as AssessmentCatalogEntry[];
+}
+
+export async function fetchMeasurements(sessionId: number): Promise<Measurement[]> {
+  const res = await apiFetch(`/sessions/${sessionId}/measurements`);
+  if (!res.ok) throw new Error('Failed to load measurements');
+  return (await res.json()).measurements as Measurement[];
+}
+
+export async function saveMeasurement(
+  sessionId: number,
+  body: { assessmentKey: string; measureKey: string; side: MeasurementSide; value: number },
+): Promise<Measurement> {
+  const res = await apiFetch(`/sessions/${sessionId}/measurements`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to save measurement');
+  }
+  return (await res.json()).measurement as Measurement;
+}
+
+export async function deleteMeasurement(sessionId: number, measurementId: number): Promise<void> {
+  const res = await apiFetch(`/sessions/${sessionId}/measurements/${measurementId}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete measurement');
+}
+
 export async function generateReport(
   sessionId: number,
   type: 'cdmp',
