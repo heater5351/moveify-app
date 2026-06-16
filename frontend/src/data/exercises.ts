@@ -2774,5 +2774,146 @@ export const exercises: Exercise[] = [
     equipment: 'Bodyweight',
     position: 'Supine',
     exerciseType: 'duration'
+  },
+
+  // Spinal Mobility & Mobility Drills
+  {
+    id: 271,
+    name: 'Cat Camel',
+    category: 'Musculoskeletal',
+    duration: '2 sets x 10 reps',
+    description: 'Start on your hands and knees with hands under your shoulders and knees under your hips. Slowly round your spine toward the ceiling and tuck your chin (camel). Then reverse, dropping your belly and lifting your chest and tailbone (cat). Move smoothly between the two ends of range with your breath.',
+    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Cat%20Camel',
+    jointArea: 'Spine',
+    muscleGroup: 'Lower Back, Core',
+    movementType: 'Flexion, Extension',
+    equipment: 'Bodyweight',
+    position: 'Kneeling'
+  },
+  {
+    id: 272,
+    name: 'Child\'s Pose with Lateral Reach',
+    category: 'Musculoskeletal',
+    duration: '3 sets x 30s per side',
+    description: 'Kneel with your toes together and knees apart, then sit your hips back toward your heels and walk your hands forward into child\'s pose. Walk both hands across to one side until you feel a stretch down the opposite side of your back, and hold. Return to centre and repeat to the other side.',
+    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Child%27s%20Pose%20with%20Lateral%20Reach',
+    jointArea: 'Spine, Shoulder',
+    muscleGroup: 'Lats, Lower Back',
+    movementType: 'Flexion',
+    equipment: 'Bodyweight',
+    position: 'Kneeling',
+    exerciseType: 'duration'
+  },
+  {
+    id: 273,
+    name: 'Cobra Pose',
+    category: 'Musculoskeletal',
+    duration: '3 sets x 30 seconds',
+    description: 'Lie face down with your hands under your shoulders and legs extended behind you. Press through your hands to lift your chest and straighten your arms, extending through your upper and lower back. Keep your hips and the front of your thighs on the floor and your shoulders relaxed away from your ears.',
+    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Cobra%20Pose',
+    jointArea: 'Spine',
+    muscleGroup: 'Lower Back',
+    movementType: 'Extension',
+    equipment: 'Bodyweight',
+    position: 'Prone',
+    exerciseType: 'duration'
+  },
+  {
+    id: 274,
+    name: 'Semi Cobra Pose',
+    category: 'Musculoskeletal',
+    duration: '3 sets x 30 seconds',
+    description: 'Lie face down and prop yourself up on your forearms with your elbows under your shoulders. Lift your chest into a gentle low-back extension while keeping your hips and forearms grounded. This is a lower-range version of the cobra — keep the stretch comfortable and your neck long.',
+    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Semi%20Cobra%20Pose',
+    jointArea: 'Spine',
+    muscleGroup: 'Lower Back',
+    movementType: 'Extension',
+    equipment: 'Bodyweight',
+    position: 'Prone',
+    exerciseType: 'duration'
+  },
+  {
+    id: 275,
+    name: 'Supine Pelvic Tilt',
+    category: 'Musculoskeletal',
+    duration: '3 sets x 10 reps',
+    description: 'Lie on your back with your knees bent and feet flat on the floor. Gently flatten your lower back into the floor by tilting your pelvis backward and engaging your lower abdominals. Hold briefly, then release back to a neutral spine. Keep the movement small and controlled through your pelvis, not your legs.',
+    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Supine%20Pelvic%20Tilt',
+    jointArea: 'Spine, Hip',
+    muscleGroup: 'Core, Lower Back',
+    movementType: 'Flexion, Extension',
+    equipment: 'Bodyweight',
+    position: 'Supine'
+  },
+
+  // Single Leg Calf Raise Variations
+  {
+    id: 276,
+    name: 'Single Leg Calf Raise on Incline with Bodyweight',
+    category: 'Musculoskeletal',
+    duration: '3 sets x 12 reps per leg',
+    description: 'Stand on one foot with the ball of your foot on an incline wedge so your toes are higher than your heel, using a wall or rail for light balance. Push through the ball of your foot to raise your heel as high as possible, then lower under control through the full range. The incline increases the stretch on your calf.',
+    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Leg%20Calf%20Raise%20on%20Incline%20with%20Bodyweight',
+    jointArea: 'Ankle',
+    muscleGroup: 'Calves',
+    movementType: 'Plantar Flexion',
+    equipment: 'Bodyweight',
+    position: 'Standing'
+  },
+  {
+    id: 277,
+    name: 'Single Leg Calf Raise with Bodyweight (Tibialis Posterior Bias)',
+    category: 'Musculoskeletal',
+    duration: '3 sets x 12 reps per leg',
+    description: 'Stand on one foot using a wall or rail for light balance. As you raise your heel, bias your weight toward the inside of your foot (through the big toe) and roll the ankle slightly inward to emphasise the tibialis posterior. Lower under control, keeping the inward bias throughout.',
+    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Leg%20Calf%20Raise%20with%20Bodyweight%20%28Tibialis%20Posterior%20Bias%29',
+    jointArea: 'Ankle',
+    muscleGroup: 'Calves, Tibialis Posterior',
+    movementType: 'Plantar Flexion',
+    equipment: 'Bodyweight',
+    position: 'Standing'
+  },
+  {
+    id: 278,
+    name: 'Single Leg Calf Raise on Incline with Bodyweight (Tibialis Posterior Bias)',
+    category: 'Musculoskeletal',
+    duration: '3 sets x 12 reps per leg',
+    description: 'Stand on one foot with the ball of your foot on an incline wedge, using a wall or rail for light balance. Raise your heel while biasing your weight toward the inside of your foot and rolling the ankle slightly inward to load the tibialis posterior. Lower under control through the full range, keeping the inward bias.',
+    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Single%20Leg%20Calf%20Raise%20on%20Incline%20with%20Bodyweight%20%28Tibialis%20Posterior%20Bias%29',
+    jointArea: 'Ankle',
+    muscleGroup: 'Calves, Tibialis Posterior',
+    movementType: 'Plantar Flexion',
+    equipment: 'Bodyweight',
+    position: 'Standing'
+  },
+
+  // Heels Elevated Squat
+  {
+    id: 279,
+    name: 'Heels Elevated Squat with Support',
+    category: 'Musculoskeletal',
+    duration: '3 sets x 12 reps',
+    description: 'Stand with your heels raised on a wedge or plate and hold a rail or handles in front of you for support. Keeping your torso upright, bend your knees and lower into a deep squat, letting your knees travel forward over your toes. Drive through your feet to stand. The elevated heels bias the load toward your quadriceps.',
+    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Heels%20Elevated%20Squat%20with%20Support',
+    jointArea: 'Hip, Knee',
+    muscleGroup: 'Quadriceps, Glutes',
+    movementType: 'Flexion, Extension',
+    equipment: 'Support',
+    position: 'Standing'
+  },
+
+  // Shoulder Internal Rotation
+  {
+    id: 280,
+    name: 'Eccentric Shoulder Internal Rotation with Dumbbell',
+    category: 'Musculoskeletal',
+    duration: '3 sets x 8 reps per side',
+    description: 'Half-kneel beside a bench with your upper arm supported across the pad and your elbow bent to 90 degrees, holding a dumbbell. Rotate your forearm upward to internally rotate the shoulder, then lower the weight slowly and under control into external rotation, emphasising the eccentric (lowering) phase. Keep your upper arm still on the bench throughout.',
+    videoUrl: 'https://storage.googleapis.com/moveify-exercise-videos/Eccentric%20Shoulder%20Internal%20Rotation%20with%20Dumbbell',
+    jointArea: 'Shoulder',
+    muscleGroup: 'Rotator Cuff',
+    movementType: 'Internal Rotation',
+    equipment: 'Dumbbells',
+    position: 'Kneeling'
   }
 ];
