@@ -1137,6 +1137,22 @@ shifts the value).
 - **Interpretation:** report observationally (e.g. scapular winging, dyskinesis,
   protraction strength asymmetry); avoid implying a measured length norm.
 
+## Berg Balance Scale (BBS)
+- **Measures:** static and dynamic balance across 14 functional tasks, each scored
+  0–4 (total **0–56**). Higher is better.
+- **Protocol:** standard 14-item battery (sitting/standing, transfers, reaching,
+  turning, single-leg stance, etc.).
+- **Interpretation / thresholds:**
+  - **45/56** is the classic cut-off for safe independent ambulation; **< 45**
+    indicates increased fall risk.
+  - **≤ 40** strongly associated with fall risk and gait that typically requires
+    assistance. (Scoring bands used in code: ≤40 high risk, 41–44 moderate, 45–56
+    consistent with independent ambulation.)
+- **MDC/MCID:** ~4–7 points, varies with baseline (larger near the floor).
+- **References:** Berg K et al. 1989/1992 (development); Shumway-Cook A et al. 1997
+  (fall-risk prediction). Screening measure — not a diagnosis; referral is the
+  clinician's decision.
+
 ## References (qualitative section)
 - Pectoralis minor: resting-length normative pilot (asymptomatic adults);
   **Struyf F et al.** reliability of pec minor resting length.

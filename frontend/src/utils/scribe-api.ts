@@ -215,10 +215,17 @@ export interface CatalogMeasure {
   min: number;
   max: number;
   step: number;
-  /** 'presets' → tappable preset grid (ROM); 'keypad' → numeric keypad. */
-  input?: 'presets' | 'keypad';
+  /** presets → tappable grid (ROM); keypad → numeric; compound → two values; toggle → pass/fail. */
+  input?: 'presets' | 'keypad' | 'compound' | 'toggle';
   /** Increment between preset buttons when input === 'presets'. */
   presetStep?: number;
+  /** Overrides the assessment's laterality for this measure (cervical rotation, etc.). */
+  laterality?: 'bilateral' | 'single';
+  /** Bounds for the second value of a compound measure (e.g. BP diastolic). */
+  min2?: number;
+  max2?: number;
+  /** Options for a toggle (pass/fail) measure. */
+  options?: { value: number; label: string }[];
 }
 
 export interface AssessmentCatalogEntry {
@@ -239,6 +246,7 @@ export interface Measurement {
   side: MeasurementSide;
   measure_key: string;
   value: number;
+  value2: number | null;
   unit: string | null;
   recorded_at: string;
 }
@@ -251,8 +259,11 @@ export interface MeasurementSeries {
   side: MeasurementSide;
   unit: string | null;
   displayName: string;
+  kind: 'numeric' | 'compound' | 'toggle';
   points: MeasurementPoint[];
   latestValue: number;
+  /** For compound ("120/80") and toggle (option label) kinds; null for numeric. */
+  latestLabel: string | null;
   latestInterpretation: string | null;
   change: { direction: string | null; absChange: number | null; text: string | null } | null;
 }
@@ -277,7 +288,7 @@ export async function fetchMeasurements(sessionId: number): Promise<Measurement[
 
 export async function saveMeasurement(
   sessionId: number,
-  body: { assessmentKey: string; measureKey: string; side: MeasurementSide; value: number },
+  body: { assessmentKey: string; measureKey: string; side: MeasurementSide; value: number; value2?: number | null },
 ): Promise<Measurement> {
   const res = await apiFetch(`/sessions/${sessionId}/measurements`, {
     method: 'POST',

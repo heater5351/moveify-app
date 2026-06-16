@@ -7,8 +7,11 @@
     },
     "input": {
       "presets": "Tablet-fast: tappable preset buttons from min→max in `presetStep` increments (e.g. ROM eyeballed to the nearest 10°). Tapping commits and advances.",
-      "keypad": "On-screen numeric keypad for an exact instrument read (dynamometer kg, stopwatch seconds, counts, mmol/L)."
-    }
+      "keypad": "On-screen numeric keypad for an exact instrument read (dynamometer kg, stopwatch seconds, counts, mmol/L).",
+      "compound": "Two numbers stored as value + value2 (e.g. blood pressure systolic/diastolic). `min/max` bound the first, `min2/max2` the second.",
+      "toggle": "Pass/fail or positive/negative observation. `options` lists {value,label}; the captured value is stored numerically and rendered as its label."
+    },
+    "note": "A measure may carry its own `laterality` to override the assessment's (e.g. cervical: flexion/extension single, rotation/lateral-flexion bilateral)."
   },
   "assessments": [
     {
@@ -86,6 +89,19 @@
       ]
     },
     {
+      "key": "cervical_rom",
+      "displayName": "Cervical ROM",
+      "region": "Neck",
+      "category": "Range of Motion",
+      "laterality": "single",
+      "measures": [
+        { "key": "cervical_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 80, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "cervical_extension_rom", "label": "Extension", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "cervical_rotation_rom", "label": "Rotation", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10, "laterality": "bilateral" },
+        { "key": "cervical_lateral_flexion_rom", "label": "Lateral Flexion", "unit": "degrees", "min": 0, "max": 60, "step": 1, "input": "presets", "presetStep": 10, "laterality": "bilateral" }
+      ]
+    },
+    {
       "key": "grip_strength",
       "displayName": "Grip Strength",
       "region": "Upper limb",
@@ -153,6 +169,16 @@
       "laterality": "single",
       "measures": [
         { "key": "mini_bestest", "label": "Score (/28)", "unit": "points", "min": 0, "max": 28, "step": 1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "berg_balance",
+      "displayName": "Berg Balance Scale",
+      "region": "Balance",
+      "category": "Balance",
+      "laterality": "single",
+      "measures": [
+        { "key": "berg_balance", "label": "Score (/56)", "unit": "points", "min": 0, "max": 56, "step": 1, "input": "keypad" }
       ]
     },
     {
@@ -226,6 +252,16 @@
       ]
     },
     {
+      "key": "blood_pressure",
+      "displayName": "Blood Pressure",
+      "region": "Cardio",
+      "category": "Vitals & Screening",
+      "laterality": "single",
+      "measures": [
+        { "key": "blood_pressure", "label": "Systolic / Diastolic", "unit": "mmHg", "min": 60, "max": 260, "min2": 30, "max2": 160, "step": 1, "input": "compound" }
+      ]
+    },
+    {
       "key": "resting_heart_rate",
       "displayName": "Resting Heart Rate",
       "region": "Cardio",
@@ -263,6 +299,26 @@
       "laterality": "single",
       "measures": [
         { "key": "waist_circumference", "label": "Waist", "unit": "cm", "min": 50, "max": 170, "step": 0.5, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "latissimus_dorsi_length",
+      "displayName": "Lat Dorsi Length",
+      "region": "Shoulder",
+      "category": "Special Tests",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "latissimus_dorsi_length", "label": "Result", "unit": "none", "min": 0, "max": 1, "step": 1, "input": "toggle", "options": [ { "value": 0, "label": "Negative (full elevation)" }, { "value": 1, "label": "Positive (restricted)" } ] }
+      ]
+    },
+    {
+      "key": "serratus_anterior_assessment",
+      "displayName": "Serratus Anterior",
+      "region": "Shoulder",
+      "category": "Special Tests",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "serratus_anterior_assessment", "label": "Result", "unit": "none", "min": 0, "max": 1, "step": 1, "input": "toggle", "options": [ { "value": 0, "label": "Normal control" }, { "value": 1, "label": "Winging / dyskinesis" } ] }
       ]
     }
   ]

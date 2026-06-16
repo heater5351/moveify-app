@@ -22,6 +22,26 @@ what to know now, links).
 
 ---
 
+## 2026-06-16 — Assessment catalog: full suite + compound/toggle (Tier 2)
+
+- Catalog now 30 assessments. Added the rest of the graded norm tests plus the
+  ones that needed new machinery: **blood pressure** (compound), **Berg Balance**,
+  **cervical ROM** (4 movements), **lat dorsi / serratus** (pass/fail).
+- **New measure input kinds** (catalog `input`): `compound` (two values → BP
+  systolic/diastolic) and `toggle` (pass/fail `options[]`). `presets`/`keypad` as before.
+- **Per-measure laterality override** — a measure may set its own `laterality`
+  (cervical: flexion/extension single, rotation/lateral-flexion bilateral).
+- **Schema (additive):** `scribe_session_measurements.value2 NUMERIC` (NULL except
+  compound) via `ADD COLUMN IF NOT EXISTS`.
+- **Norms:** added `berg_balance` (0–56 fall-risk categories) + 4 cervical movement
+  keys (capture-only qualitative — no age-mislabeling) to `normative-data.json`;
+  Berg also documented in `docs/normative-data.md`.
+- Render + series handle all three kinds (compound graded as "sys/dia"; toggle
+  rendered as its label, no fake norm + no asymmetry flag). Panel: compound keypad
+  with a "/" key, toggle option buttons, per-measure L/R fields.
+- Tests extended (`measurement-render.test.mjs`: compound, toggle, no-asymmetry).
+  **Still pending:** none of Tier 2's hard cases remain — BP/Berg/pass-fail all in.
+
 ## 2026-06-16 — Structured in-session assessments (scribe Phase 3)
 
 - New tap-capture panel in the scribe recorder (`AssessmentPanel.tsx`, collapsible

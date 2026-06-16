@@ -912,6 +912,9 @@ async function initDatabase() {
       )
     `);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_session_measurements_session ON scribe_session_measurements(session_id)`);
+    // Second value for compound measures (e.g. blood pressure diastolic). NULL for
+    // single-value measures. Additive — safe on existing rows.
+    await db.query(`ALTER TABLE scribe_session_measurements ADD COLUMN IF NOT EXISTS value2 NUMERIC`);
 
     // Seed default SOAP template (exercise physiology)
     await db.query(`

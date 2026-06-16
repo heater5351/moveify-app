@@ -98,13 +98,21 @@ export default function AssessmentTrends({ patientId }: AssessmentTrendsProps) {
                     {s.displayName}{side && <span className="text-slate-400 font-medium"> · {side}</span>}
                   </h3>
                   <div className="mt-1 flex items-baseline gap-1.5">
-                    <span className="text-2xl font-bold text-primary-600 font-mono">{s.latestValue}</span>
-                    <span className="text-sm text-slate-400">{unitLabel(s.unit)}</span>
+                    {s.kind === 'toggle' ? (
+                      <span className="text-base font-bold text-primary-600">{s.latestLabel}</span>
+                    ) : (
+                      <>
+                        <span className="text-2xl font-bold text-primary-600 font-mono">{s.latestLabel ?? s.latestValue}</span>
+                        <span className="text-sm text-slate-400">{unitLabel(s.unit)}</span>
+                      </>
+                    )}
                   </div>
                 </div>
-                <div className="shrink-0 text-primary-400">
-                  <Sparkline values={s.points.map(p => p.value)} />
-                </div>
+                {s.kind !== 'toggle' && (
+                  <div className="shrink-0 text-primary-400">
+                    <Sparkline values={s.points.map(p => p.value)} />
+                  </div>
+                )}
               </div>
 
               {s.change?.direction && (

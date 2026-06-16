@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Check, Loader2, X, AlertCircle, Delete, ArrowRight } from 'lucide-react';
 import {
   fetchAssessmentCatalog, fetchMeasurements, saveMeasurement, deleteMeasurement,
@@ -7,11 +7,8 @@ import {
 
 interface AssessmentPanelProps {
   sessionId: number | null;
-  /** When true the session is locked (completed) — values are read-only. */
   readOnly?: boolean;
-  /** Ensure a session exists before the first save (mirrors the recorder). */
   ensureSession: () => Promise<number | null>;
-  /** Bubble the recorded-measurement count up so the parent tab can badge it. */
   onCountChange?: (count: number) => void;
 }
 
@@ -20,33 +17,28 @@ interface FieldRef { measureKey: string; side: MeasurementSide; }
 
 const UNIT_LABEL: Record<string, string> = {
   degrees: '°', kg: 'kg', seconds: 'sec', reps: 'reps', cm: 'cm',
-  m_s: 'm/s', bpm: 'bpm', mmol_L: 'mmol/L', metres: 'm', points: 'pts',
+  m_s: 'm/s', bpm: 'bpm', mmol_L: 'mmol/L', metres: 'm', points: 'pts', mmHg: 'mmHg',
 };
 function unitLabel(u: string) { return UNIT_LABEL[u] ?? u; }
 
-function valueKey(assessmentKey: string, measureKey: string, side: MeasurementSide) {
-  return `${assessmentKey}:${measureKey}:${side}`;
-}
-
-function fmtVal(v: number) {
-  return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
+function valueKey(a: string, m: string, side: MeasurementSide) { return `${a}:${m}:${side}`; }
+function fmtVal(v: number) { return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100); }
+function inputMode(m: CatalogMeasure) { return m.input ?? 'keypad'; }
+function sidesOf(a: AssessmentCatalogEntry, m: CatalogMeasure): MeasurementSide[] {
+  return (m.laterality ?? a.laterality) === 'bilateral' ? ['left', 'right'] : ['bilateral'];
 }
 
 export default function AssessmentPanel({ sessionId, readOnly = false, ensureSession, onCountChange }: AssessmentPanelProps) {
   const [catalog, setCatalog] = useState<AssessmentCatalogEntry[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  // Source of truth from the server, keyed by valueKey.
   const [recorded, setRecorded] = useState<Record<string, Measurement>>({});
   const [status, setStatus] = useState<Record<string, SaveState>>({});
-  // Direct numeric entry: which field the keypad types into, and the typing buffer.
   const [focused, setFocused] = useState<FieldRef | null>(null);
   const [buffer, setBuffer] = useState('');
   const sessionIdRef = useRef<number | null>(sessionId);
   sessionIdRef.current = sessionId;
 
-  useEffect(() => {
-    fetchAssessmentCatalog().then(setCatalog).catch(() => setCatalog([]));
-  }, []);
+  useEffect(() => { fetchAssessmentCatalog().then(setCatalog).catch(() => setCatalog([])); }, []);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -70,87 +62,89 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
   }
   const categories = [...byCategory.keys()];
 
-  // Ordered list of capturable fields for the selected assessment (measure-major,
-  // Left then Right) — drives the keypad's "Next" advance.
-  const fieldOrder = useCallback((a: AssessmentCatalogEntry): FieldRef[] => {
-    const sides: MeasurementSide[] = a.laterality === 'bilateral' ? ['left', 'right'] : ['bilateral'];
-    return a.measures.flatMap(m => sides.map(side => ({ measureKey: m.key, side })));
-  }, []);
+  const committedRow = (measureKey: string, side: MeasurementSide): Measurement | null =>
+    (selected ? recorded[valueKey(selected.key, measureKey, side)] : null) ?? null;
 
-  const committedValue = useCallback((measureKey: string, side: MeasurementSide): number | null => {
-    if (!selected) return null;
-    const row = recorded[valueKey(selected.key, measureKey, side)];
-    return row ? row.value : null;
-  }, [recorded, selected]);
+  function fieldOrder(a: AssessmentCatalogEntry): FieldRef[] {
+    return a.measures.flatMap(m => sidesOf(a, m).map(side => ({ measureKey: m.key, side })));
+  }
 
-  const save = useCallback(async (a: AssessmentCatalogEntry, m: CatalogMeasure, side: MeasurementSide, raw: string) => {
-    const parsed = Number(raw);
-    if (raw === '' || !Number.isFinite(parsed)) return;
-    const clamped = Math.min(m.max, Math.max(m.min, parsed));
-    const k = valueKey(a.key, m.key, side);
+  async function save(m: CatalogMeasure, side: MeasurementSide, value: number, value2: number | null = null) {
+    if (!selected) return;
+    const k = valueKey(selected.key, m.key, side);
     setStatus(st => ({ ...st, [k]: 'saving' }));
     try {
       const sid = sessionIdRef.current ?? (await ensureSession());
       if (!sid) throw new Error('No session');
-      const saved = await saveMeasurement(sid, { assessmentKey: a.key, measureKey: m.key, side, value: clamped });
+      const saved = await saveMeasurement(sid, { assessmentKey: selected.key, measureKey: m.key, side, value, value2 });
       setRecorded(r => ({ ...r, [k]: saved }));
       setStatus(st => { const n = { ...st }; delete n[k]; return n; });
     } catch {
       setStatus(st => ({ ...st, [k]: 'error' }));
     }
-  }, [ensureSession]);
+  }
 
-  // Commit the current buffer to the focused field (if anything was typed).
-  const commitFocused = useCallback(() => {
+  function commitFocused() {
     if (!selected || !focused || buffer === '') return;
     const m = selected.measures.find(x => x.key === focused.measureKey);
-    if (m) save(selected, m, focused.side, buffer);
-  }, [selected, focused, buffer, save]);
+    if (!m) return;
+    if (inputMode(m) === 'compound') {
+      const [s, d] = buffer.split('/');
+      const sys = Number(s), dia = Number(d);
+      if (Number.isFinite(sys) && Number.isFinite(dia)) {
+        save(m, focused.side, Math.min(m.max, Math.max(m.min, sys)),
+          Math.min(m.max2 ?? m.max, Math.max(m.min2 ?? m.min, dia)));
+      }
+    } else {
+      const n = Number(buffer);
+      if (Number.isFinite(n)) save(m, focused.side, Math.min(m.max, Math.max(m.min, n)));
+    }
+  }
 
-  const focusField = useCallback((field: FieldRef) => {
-    commitFocused();
-    setFocused(field);
-    setBuffer('');
-  }, [commitFocused]);
-
-  const clear = useCallback(async (a: AssessmentCatalogEntry, measureKey: string, side: MeasurementSide) => {
-    const k = valueKey(a.key, measureKey, side);
-    const row = recorded[k];
-    setRecorded(r => { const n = { ...r }; delete n[k]; return n; });
-    setStatus(st => { const n = { ...st }; delete n[k]; return n; });
-    const sid = sessionIdRef.current;
-    if (row && sid) { try { await deleteMeasurement(sid, row.id); } catch { /* best-effort */ } }
-  }, [recorded]);
-
-  // Keypad actions ──────────────────────────────────────────────────────────
-  const focusedMeasure = selected && focused ? selected.measures.find(m => m.key === focused.measureKey) ?? null : null;
-  const allowDecimal = !!focusedMeasure && focusedMeasure.step % 1 !== 0;
-
-  const pressDigit = (d: string) => setBuffer(b => (b.length >= 5 ? b : b + d));
-  const pressDot = () => setBuffer(b => (allowDecimal && !b.includes('.') ? (b === '' ? '0.' : b + '.') : b));
-  const pressBackspace = () => setBuffer(b => b.slice(0, -1));
-  // Advance focus to the next field in the assessment (or dismiss after the last).
-  const advanceFrom = (field: FieldRef) => {
+  function focusField(field: FieldRef) { commitFocused(); setFocused(field); setBuffer(''); }
+  function advanceFrom(field: FieldRef) {
     if (!selected) { setFocused(null); setBuffer(''); return; }
     const order = fieldOrder(selected);
     const idx = order.findIndex(f => f.measureKey === field.measureKey && f.side === field.side);
     setFocused(order[idx + 1] ?? null);
     setBuffer('');
-  };
+  }
+
+  async function clear(measureKey: string, side: MeasurementSide) {
+    if (!selected) return;
+    const k = valueKey(selected.key, measureKey, side);
+    const row = recorded[k];
+    setRecorded(r => { const n = { ...r }; delete n[k]; return n; });
+    setStatus(st => { const n = { ...st }; delete n[k]; return n; });
+    const sid = sessionIdRef.current;
+    if (row && sid) { try { await deleteMeasurement(sid, row.id); } catch { /* best-effort */ } }
+  }
+
+  // ── Keypad / preset / toggle actions ────────────────────────────────────────
+  const focusedMeasure = selected && focused ? selected.measures.find(m => m.key === focused.measureKey) ?? null : null;
+  const mode = focusedMeasure ? inputMode(focusedMeasure) : 'keypad';
+  const allowDecimal = !!focusedMeasure && mode === 'keypad' && focusedMeasure.step % 1 !== 0;
+
+  const pressDigit = (d: string) => setBuffer(b => (b.replace(/[^0-9]/g, '').length >= 5 ? b : b + d));
+  const pressDot = () => setBuffer(b => (allowDecimal && !b.includes('.') ? (b === '' ? '0.' : b + '.') : b));
+  const pressSlash = () => setBuffer(b => (mode === 'compound' && b !== '' && !b.includes('/') ? b + '/' : b));
+  const pressBackspace = () => setBuffer(b => b.slice(0, -1));
   const pressNext = () => { if (!focused) return; commitFocused(); advanceFrom(focused); };
   const pressDone = () => { commitFocused(); setFocused(null); setBuffer(''); };
-  // Preset tap (ROM): commit the value directly and jump to the next field.
+
   const pickPreset = (value: number) => {
-    if (!selected || !focused) return;
-    const m = selected.measures.find(x => x.key === focused.measureKey);
-    if (m) save(selected, m, focused.side, String(value));
+    if (!focusedMeasure || !focused) return;
+    save(focusedMeasure, focused.side, value);
+    advanceFrom(focused);
+  };
+  const pickToggle = (value: number) => {
+    if (!focusedMeasure || !focused) return;
+    save(focusedMeasure, focused.side, value);
     advanceFrom(focused);
   };
 
-  // Input mode + preset values for the focused field.
-  const inputMode: 'presets' | 'keypad' = focusedMeasure?.input ?? 'keypad';
   const presetValues: number[] = [];
-  if (focusedMeasure && inputMode === 'presets') {
+  if (focusedMeasure && mode === 'presets') {
     const ps = focusedMeasure.presetStep ?? 10;
     for (let v = focusedMeasure.min; v <= focusedMeasure.max + 1e-9; v += ps) presetValues.push(Math.round(v * 100) / 100);
   }
@@ -162,18 +156,37 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
   function chipLabel(row: Measurement): string {
     const a = catalog.find(c => c.key === row.assessment_key);
     const m = a?.measures.find(x => x.key === row.measure_key);
+    const md = m ? inputMode(m) : 'keypad';
     const sideTag = row.side === 'left' ? ' L' : row.side === 'right' ? ' R' : '';
+    if (md === 'toggle') {
+      const opt = (m?.options ?? []).find(o => o.value === row.value);
+      return `${a?.displayName}${sideTag}: ${opt ? opt.label : row.value}`;
+    }
+    if (md === 'compound') {
+      return `${a?.displayName}${sideTag}: ${fmtVal(row.value)}/${row.value2 != null ? fmtVal(row.value2) : '?'}`;
+    }
     const name = m ? `${a?.displayName} ${m.label}` : row.assessment_key;
     return `${name}${sideTag}: ${fmtVal(row.value)}${row.unit ? unitLabel(row.unit) : ''}`;
   }
 
-  // Render one tappable value field.
   function valueField(m: CatalogMeasure, side: MeasurementSide, showSideLabel: boolean) {
+    const md = inputMode(m);
     const k = valueKey(selected!.key, m.key, side);
     const isFocused = !!focused && focused.measureKey === m.key && focused.side === side;
-    const committed = committedValue(m.key, side);
-    const display = isFocused && buffer !== '' ? buffer : (committed != null ? fmtVal(committed) : '');
+    const row = committedRow(m.key, side);
     const st = status[k];
+
+    let display = '';
+    if (md === 'toggle') {
+      const opt = row ? (m.options ?? []).find(o => o.value === row.value) : null;
+      display = opt ? opt.label : '';
+    } else if (md === 'compound') {
+      display = isFocused && buffer !== '' ? buffer : (row ? `${fmtVal(row.value)}/${row.value2 != null ? fmtVal(row.value2) : ''}` : '');
+    } else {
+      display = isFocused && buffer !== '' ? buffer : (row ? fmtVal(row.value) : '');
+    }
+    const showUnit = md !== 'toggle' && (display !== '' || (isFocused && md !== 'compound'));
+
     return (
       <button
         type="button"
@@ -186,15 +199,19 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
           {showSideLabel ? (side === 'left' ? 'Left' : 'Right') : m.label}
           {st === 'saving' && <Loader2 className="w-3 h-3 animate-spin" />}
           {st === 'error' && <AlertCircle className="w-3 h-3 text-red-500" />}
-          {!st && committed != null && <Check className="w-3.5 h-3.5 text-green-500" />}
+          {!st && row != null && <Check className="w-3.5 h-3.5 text-green-500" />}
         </span>
-        <span className="flex items-baseline gap-1">
-          <span className={`text-2xl font-bold font-mono ${display ? 'text-secondary-700' : 'text-gray-300'}`}>
-            {display || '—'}
+        {md === 'toggle' ? (
+          <span className={`block text-sm font-semibold mt-0.5 leading-tight ${display ? 'text-secondary-700' : 'text-gray-300'}`}>
+            {display || 'Tap to set'}
           </span>
-          {(display || isFocused) && <span className="text-sm text-gray-400">{unitLabel(m.unit)}</span>}
-          {isFocused && <span className="w-0.5 h-6 bg-primary-400 animate-pulse ml-0.5" />}
-        </span>
+        ) : (
+          <span className="flex items-baseline gap-1">
+            <span className={`text-2xl font-bold font-mono ${display ? 'text-secondary-700' : 'text-gray-300'}`}>{display || '—'}</span>
+            {showUnit && <span className="text-sm text-gray-400">{unitLabel(m.unit)}</span>}
+            {isFocused && <span className="w-0.5 h-6 bg-primary-400 animate-pulse ml-0.5" />}
+          </span>
+        )}
       </button>
     );
   }
@@ -220,14 +237,7 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
             <span key={row.id} className="inline-flex items-center gap-1 text-xs bg-primary-50 text-primary-700 rounded-full pl-2.5 pr-1 py-1">
               {chipLabel(row)}
               {!readOnly && (
-                <button
-                  onClick={() => {
-                    const a = catalog.find(c => c.key === row.assessment_key);
-                    if (a) clear(a, row.measure_key, row.side);
-                  }}
-                  className="p-0.5 rounded-full hover:bg-primary-100 text-primary-400"
-                  aria-label="Remove"
-                >
+                <button onClick={() => clear(row.measure_key, row.side)} className="p-0.5 rounded-full hover:bg-primary-100 text-primary-400" aria-label="Remove">
                   <X className="w-3 h-3" />
                 </button>
               )}
@@ -242,7 +252,7 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
 
       {!readOnly && (
         <>
-          {/* Assessment picker — large, easy-to-tap cards, grouped by category */}
+          {/* Assessment picker — large cards grouped by category */}
           <div className="mb-4 shrink-0 space-y-4">
             {categories.map(cat => (
               <div key={cat}>
@@ -253,9 +263,7 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                       key={a.key}
                       onClick={() => { setSelectedKey(a.key); setFocused(null); setBuffer(''); }}
                       className={`min-h-20 rounded-2xl px-4 py-3 border-2 transition text-left flex flex-col justify-center active:scale-[0.98] ${
-                        selectedKey === a.key
-                          ? 'bg-primary-400 border-primary-400 text-white shadow-sm'
-                          : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'
+                        selectedKey === a.key ? 'bg-primary-400 border-primary-400 text-white shadow-sm' : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'
                       }`}
                     >
                       <span className="text-base font-bold leading-tight">{a.displayName}</span>
@@ -271,33 +279,54 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
           {selected && (
             <div className="shrink-0">
               <div className="space-y-2.5">
-                {selected.measures.map(m => (
-                  <div key={m.key}>
-                    {selected.laterality === 'bilateral' && (
-                      <p className="text-xs font-semibold text-secondary-700 mb-1">{m.label}</p>
-                    )}
-                    <div className="flex gap-2">
-                      {selected.laterality === 'bilateral'
-                        ? (['left', 'right'] as const).map(side => (
-                            <div key={side} className="flex-1 flex">{valueField(m, side, true)}</div>
-                          ))
-                        : <div className="flex-1 flex">{valueField(m, 'bilateral', false)}</div>}
+                {selected.measures.map(m => {
+                  const sides = sidesOf(selected, m);
+                  const bilateral = sides.length === 2;
+                  return (
+                    <div key={m.key}>
+                      {bilateral && <p className="text-xs font-semibold text-secondary-700 mb-1">{m.label}</p>}
+                      <div className="flex gap-2">
+                        {sides.map(side => (
+                          <div key={side} className="flex-1 flex">{valueField(m, side, bilateral)}</div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
-              {/* Sticky input zone — preset grid (ROM) or numeric keypad — appears once a field is focused */}
+              {/* Sticky input zone — preset grid / keypad / compound keypad / toggle */}
               {focused && focusedMeasure && (
                 <div className="sticky bottom-0 bg-white pt-3 mt-3 border-t border-gray-100">
                   <p className="text-[11px] text-gray-400 mb-2 text-center">
-                    {inputMode === 'presets' ? 'Tap a value' : `Range ${focusedMeasure.min}–${focusedMeasure.max}${unitLabel(focusedMeasure.unit)}`} · saves automatically
+                    {mode === 'presets' ? 'Tap a value'
+                      : mode === 'toggle' ? 'Tap a result'
+                      : mode === 'compound' ? 'Systolic / Diastolic'
+                      : `Range ${focusedMeasure.min}–${focusedMeasure.max}${unitLabel(focusedMeasure.unit)}`} · saves automatically
                   </p>
 
-                  {inputMode === 'presets' ? (
+                  {mode === 'toggle' ? (
+                    <div className="grid grid-cols-1 gap-2">
+                      {(focusedMeasure.options ?? []).map(opt => {
+                        const isCur = committedRow(focusedMeasure.key, focused.side)?.value === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => pickToggle(opt.value)}
+                            className={`min-h-12 rounded-xl text-sm font-semibold border-2 px-4 transition active:scale-[0.98] ${
+                              isCur ? 'bg-primary-400 border-primary-400 text-white' : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : mode === 'presets' ? (
                     <div className="grid grid-cols-5 gap-2">
                       {presetValues.map(v => {
-                        const isCur = committedValue(focused.measureKey, focused.side) === v;
+                        const isCur = committedRow(focused.measureKey, focused.side)?.value === v;
                         return (
                           <button
                             key={v}
@@ -311,13 +340,7 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                           </button>
                         );
                       })}
-                      <button
-                        type="button"
-                        onClick={pressDone}
-                        className="h-12 rounded-xl text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition active:scale-95 col-span-2"
-                      >
-                        Done
-                      </button>
+                      <button type="button" onClick={pressDone} className="h-12 rounded-xl text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition active:scale-95 col-span-2">Done</button>
                     </div>
                   ) : (
                     <div className="grid grid-cols-4 gap-2">
@@ -332,7 +355,9 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                       {keypadKey('1', () => pressDigit('1'))}
                       {keypadKey('2', () => pressDigit('2'))}
                       {keypadKey('3', () => pressDigit('3'))}
-                      {keypadKey(allowDecimal ? '.' : '', allowDecimal ? pressDot : () => {}, allowDecimal ? '' : 'invisible')}
+                      {mode === 'compound'
+                        ? keypadKey('/', pressSlash)
+                        : keypadKey(allowDecimal ? '.' : '', allowDecimal ? pressDot : () => {}, allowDecimal ? '' : 'invisible')}
                       {keypadKey('0', () => pressDigit('0'))}
                       {keypadKey('Done', pressDone, 'bg-primary-400 text-white hover:bg-primary-500 text-base')}
                     </div>
@@ -342,9 +367,7 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
             </div>
           )}
 
-          {!selected && (
-            <p className="text-xs text-gray-400 shrink-0">Pick an assessment to record values.</p>
-          )}
+          {!selected && <p className="text-xs text-gray-400 shrink-0">Pick an assessment to record values.</p>}
         </>
       )}
     </div>

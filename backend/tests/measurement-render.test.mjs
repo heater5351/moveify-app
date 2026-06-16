@@ -69,6 +69,30 @@ describe('renderMeasurements', () => {
     expect(lines[0]).not.toContain('(Left)');
     expect(lines[0]).not.toContain('(Right)');
   });
+
+  it('renders a compound (blood pressure) value with grounded verdict', () => {
+    const rows = [{ assessment_key: 'blood_pressure', measure_key: 'blood_pressure', side: 'bilateral', value: '145', value2: '92', unit: 'mmHg' }];
+    const lines = renderMeasurements(rows, 60, 'male');
+    expect(lines[0]).toContain('145/92 mmHg');
+    expect(lines[0].toLowerCase()).toContain('elevated');
+  });
+
+  it('renders a toggle (pass/fail) measure as its label, with side', () => {
+    const rows = [{ assessment_key: 'latissimus_dorsi_length', measure_key: 'latissimus_dorsi_length', side: 'left', value: '1', value2: null, unit: 'none' }];
+    const lines = renderMeasurements(rows, 60, 'male');
+    expect(lines[0]).toContain('(Left)');
+    expect(lines[0]).toContain('Positive');
+    // No fabricated numeric verdict for a pass/fail observation.
+    expect(lines[0]).not.toContain('range');
+  });
+
+  it('does not flag asymmetry for non-numeric (toggle) bilateral results', () => {
+    const rows = [
+      { assessment_key: 'latissimus_dorsi_length', measure_key: 'latissimus_dorsi_length', side: 'left', value: '1', value2: null, unit: 'none' },
+      { assessment_key: 'latissimus_dorsi_length', measure_key: 'latissimus_dorsi_length', side: 'right', value: '0', value2: null, unit: 'none' },
+    ];
+    expect(renderMeasurements(rows, 60, 'male').some(l => l.includes('side-to-side'))).toBe(false);
+  });
 });
 
 describe('buildSoapUserMessage — measurements block', () => {

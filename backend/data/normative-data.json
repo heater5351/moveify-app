@@ -475,6 +475,54 @@
       "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
       "note": "No validated length test or norm. Report observationally (scapular winging, dyskinesis, protraction strength asymmetry).",
       "sourceShort": "no validated length norm"
+    },
+    "berg_balance": {
+      "displayName": "Berg Balance Scale",
+      "aliases": ["berg balance scale", "berg balance", "bbs", "berg"],
+      "unit": "points", "direction": "higher_better", "type": "threshold",
+      "maxScore": 56,
+      "categories": [
+        { "label": "high fall risk; gait typically requires assistance", "max": 40, "flag": true },
+        { "label": "moderate fall risk; below the 45/56 independence threshold", "max": 44, "flag": true },
+        { "label": "consistent with independent ambulation", "max": 56 }
+      ],
+      "cutoffs": [],
+      "mdc": { "value": 5, "unit": "points", "note": "MDC ~4-7 points; varies with baseline (higher near the floor)" },
+      "caveats": [],
+      "note": "14-item scale scored 0-56. The 45/56 cut-off is the classic fall-risk threshold; below ~40 strongly predicts assisted gait.",
+      "sourceShort": "Berg 1989; Shumway-Cook 1997"
+    },
+    "cervical_flexion_rom": {
+      "displayName": "Cervical Flexion ROM",
+      "aliases": ["cervical flexion", "neck flexion", "cervical flexion rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["method_dependent"],
+      "note": "CROM active-ROM reference mean ~46 deg (Youdas, mixed-age) but declines ~3 deg/decade — interpret against the patient's own baseline and symmetry, not a population norm.",
+      "sourceShort": "Youdas 1992"
+    },
+    "cervical_extension_rom": {
+      "displayName": "Cervical Extension ROM",
+      "aliases": ["cervical extension", "neck extension", "cervical extension rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["method_dependent"],
+      "note": "CROM reference mean ~67 deg (Youdas) but declines ~5 deg/decade — interpret against own baseline, not a population norm.",
+      "sourceShort": "Youdas 1992"
+    },
+    "cervical_rotation_rom": {
+      "displayName": "Cervical Rotation ROM",
+      "aliases": ["cervical rotation", "neck rotation", "cervical rotation rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["method_dependent", "symmetry_not_norm"],
+      "note": "CROM reference mean ~62 deg per side (Youdas). Interpret left/right symmetry and own baseline.",
+      "sourceShort": "Youdas 1992"
+    },
+    "cervical_lateral_flexion_rom": {
+      "displayName": "Cervical Lateral Flexion ROM",
+      "aliases": ["cervical lateral flexion", "cervical side bend", "neck lateral flexion", "cervical lateral flexion rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["method_dependent", "symmetry_not_norm"],
+      "note": "CROM reference mean ~37 deg per side (Youdas). Interpret left/right symmetry and own baseline.",
+      "sourceShort": "Youdas 1992"
     }
   }
 }
