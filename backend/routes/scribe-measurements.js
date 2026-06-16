@@ -2,6 +2,8 @@ const express = require('express');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { loadCatalog, findMeasure } = require('../services/assessment-catalog');
+const { buildSeries } = require('../services/measurement-series');
+const { getPatientDemographics } = require('../services/scribe-demographics');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -22,6 +24,26 @@ router.get('/assessment-catalog', (req, res) => {
   } catch (err) {
     console.error('Load assessment catalog error:', err.message);
     res.status(500).json({ error: 'Failed to load assessment catalog' });
+  }
+});
+
+// GET /api/scribe/patients/:patientId/measurements — longitudinal trend series
+// across all of a patient's sessions (any clinician; shared-access model).
+router.get('/patients/:patientId/measurements', async (req, res) => {
+  try {
+    const rows = await db.query(
+      `SELECT m.session_id, s.session_date, m.assessment_key, m.measure_key, m.side, m.value, m.unit
+       FROM scribe_session_measurements m
+       JOIN scribe_sessions s ON m.session_id = s.id
+       WHERE s.patient_id = $1
+       ORDER BY s.session_date ASC, m.id ASC`,
+      [req.params.patientId]
+    );
+    const { age = null, sex = null } = await getPatientDemographics(req.params.patientId);
+    res.json({ series: buildSeries(rows.rows, age, sex) });
+  } catch (err) {
+    console.error('Get measurement series error:', err.message);
+    res.status(500).json({ error: 'Failed to load measurement trends' });
   }
 });
 

@@ -237,6 +237,26 @@ export interface Measurement {
   recorded_at: string;
 }
 
+export interface MeasurementPoint { sessionId: number; date: string; value: number; }
+
+export interface MeasurementSeries {
+  assessmentKey: string;
+  measureKey: string;
+  side: MeasurementSide;
+  unit: string | null;
+  displayName: string;
+  points: MeasurementPoint[];
+  latestValue: number;
+  latestInterpretation: string | null;
+  change: { direction: string | null; absChange: number | null; text: string | null } | null;
+}
+
+export async function fetchMeasurementSeries(patientId: number): Promise<MeasurementSeries[]> {
+  const res = await apiFetch(`/patients/${patientId}/measurements`);
+  if (!res.ok) throw new Error('Failed to load measurement trends');
+  return (await res.json()).series as MeasurementSeries[];
+}
+
 export async function fetchAssessmentCatalog(): Promise<AssessmentCatalogEntry[]> {
   const res = await apiFetch('/assessment-catalog');
   if (!res.ok) throw new Error('Failed to load assessment catalog');

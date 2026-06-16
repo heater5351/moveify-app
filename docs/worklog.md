@@ -44,7 +44,15 @@ what to know now, links).
   asymmetry flag), and passes them to a new `OBJECTIVE MEASUREMENTS — EXACT` block in
   `buildSoapUserMessage`. `soap_note_generated` audit gains `measurements` count.
 - Tests: `backend/tests/measurement-render.test.mjs` (render + catalog alignment +
-  prompt block). Phases 1–2 shipped 2026-06-12; this is Phase 3. **Not yet deployed.**
+  prompt block). Phases 1–2 shipped 2026-06-12; this is Phase 3.
+- **Capture UX:** the scribe recorder's bottom half is now a segmented **Record /
+  Assessments** control (was a cramped drawer under the note editor); the note editor
+  stays visible above. In review (locked) the assessments show read-only, hidden when none.
+- **Patient-profile trend view:** new **Assessments** tab in `PatientProfile`
+  (`AssessmentTrends.tsx`) — longitudinal series per measure/side with latest value,
+  grounded verdict, baseline→latest change, and an inline sparkline. Backed by new
+  `GET /api/scribe/patients/:patientId/measurements` (`services/measurement-series.js`,
+  reuses `compareValues`/`interpretByKey` so trends read consistently with the notes).
 
 ## 2026-06-14 — Clinician adherence Dashboard (new landing page)
 

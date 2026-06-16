@@ -46,6 +46,8 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
   const [sessionStatus, setSessionStatus] = useState<string | null>(null);
   const [completedAt, setCompletedAt] = useState<string | null>(null);
   const [reverting, setReverting] = useState(false);
+  const [bottomTab, setBottomTab] = useState<'record' | 'assessments'>('record');
+  const [assessmentCount, setAssessmentCount] = useState(0);
 
   const linesRef = useRef<TranscriptLine[]>([]);
   const firstSpeakerRef = useRef<number | null>(null);
@@ -430,17 +432,53 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
         {generateError && <p className="text-xs text-red-500 mt-1 shrink-0">{generateError}</p>}
       </div>
 
-      {/* Structured in-session assessments — graded into the note's Objective section */}
-      <div className="pt-3 shrink-0">
-        <AssessmentPanel
-          sessionId={sessionId ?? existingSessionId ?? null}
-          readOnly={isLocked}
-          ensureSession={ensureSession}
-        />
-      </div>
+      {/* Locked review: read-only assessment summary (hidden when none recorded) */}
+      {isLocked && (
+        <div className={`pt-3 shrink-0 ${assessmentCount > 0 ? '' : 'hidden'}`}>
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5 block">Assessments</label>
+          <div className="max-h-52 overflow-y-auto">
+            <AssessmentPanel
+              sessionId={sessionId ?? existingSessionId ?? null}
+              readOnly
+              ensureSession={ensureSession}
+              onCountChange={setAssessmentCount}
+            />
+          </div>
+        </div>
+      )}
 
-      {/* Recording + transcript — draft only */}
+      {/* Draft: segmented Record / Assessments (the note editor stays above) */}
       {!isLocked && <div className="flex flex-col flex-1 min-h-0 pt-3">
+
+        {/* Segment control */}
+        <div className="flex gap-1 mb-3 shrink-0 bg-gray-100 rounded-lg p-1 self-start">
+          <button
+            onClick={() => setBottomTab('record')}
+            className={`px-3 py-1.5 rounded-md text-sm font-semibold transition ${bottomTab === 'record' ? 'bg-white text-secondary-700 shadow-sm' : 'text-gray-500'}`}
+          >
+            Record
+          </button>
+          <button
+            onClick={() => setBottomTab('assessments')}
+            className={`px-3 py-1.5 rounded-md text-sm font-semibold transition flex items-center gap-1.5 ${bottomTab === 'assessments' ? 'bg-white text-secondary-700 shadow-sm' : 'text-gray-500'}`}
+          >
+            Assessments
+            {assessmentCount > 0 && <span className="text-xs font-semibold text-white bg-primary-400 rounded-full px-1.5 py-0.5 leading-none">{assessmentCount}</span>}
+          </button>
+        </div>
+
+        {/* Assessments tab */}
+        {bottomTab === 'assessments' && (
+          <AssessmentPanel
+            sessionId={sessionId ?? existingSessionId ?? null}
+            readOnly={false}
+            ensureSession={ensureSession}
+            onCountChange={setAssessmentCount}
+          />
+        )}
+
+        {/* Record tab — controls + live transcript */}
+        {bottomTab === 'record' && <>
 
         {/* Controls */}
         <div className="flex items-center gap-2 mb-3 shrink-0 flex-wrap">
@@ -585,6 +623,7 @@ export default function ProgressNotePage({ patientId, patientName, onBack, exist
             </div>
           )}
         </div>
+        </>}
       </div>}
 
       {handoutError && <p className="text-xs text-red-500 mt-1 shrink-0">{handoutError}</p>}

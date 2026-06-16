@@ -342,7 +342,7 @@ All routes are prefixed with `/api`. Routes marked with a lock require authentic
 | `scribe-handout.js` | `/api/scribe/sessions` | `POST /:id/handout/generate`, `POST /:id/handout/docx` | Clinician only (ephemeral, audit only) |
 | `scribe-reassessment.js` | `/api/scribe/sessions` | `POST /:id/reassessment/{generate,regrade,narrative,docx}` | Clinician only (baseline vs latest comparison; `audience` 'patient'\|'gp' + docx `variant`; `generate` takes optional `previousReportText` + optional `baselineSessionId`; ephemeral, audit only) |
 | `scribe-documents.js` | `/api/scribe/documents` | `POST /extract` (PDF/DOCX/TXT → text, multer in-memory) | Clinician only (ephemeral, nothing stored/logged) |
-| `scribe-measurements.js` | `/api/scribe` | `GET /assessment-catalog`; per-session `GET`/`POST` (upsert) / `DELETE /sessions/:id/measurements/...` (tap-captured ROM/strength/balance → `scribe_session_measurements`; measure keys aligned to `normative-data.json` so values are graded deterministically via `interpretByKey` into the SOAP `OBJECTIVE MEASUREMENTS` block) | Clinician only |
+| `scribe-measurements.js` | `/api/scribe` | `GET /assessment-catalog`; per-session `GET`/`POST` (upsert) / `DELETE /sessions/:id/measurements/...` (tap-captured ROM/strength/balance → `scribe_session_measurements`; measure keys aligned to `normative-data.json` so values are graded deterministically via `interpretByKey` into the SOAP `OBJECTIVE MEASUREMENTS` block); `GET /patients/:patientId/measurements` (longitudinal trend series for the patient-profile Assessments tab, via `services/measurement-series.js`) | Clinician only |
 
 ## Database Schema
 

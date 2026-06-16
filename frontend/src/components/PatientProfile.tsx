@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown, FileText, Mail, Link, RefreshCw, Search, ChevronRight } from 'lucide-react';
+import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown, FileText, Mail, Link, RefreshCw, Search, ChevronRight, Activity } from 'lucide-react';
 import ScribeHistoryPage from './scribe/ScribeHistoryPage';
+import AssessmentTrends from './scribe/AssessmentTrends';
 import type { Patient, ClinicianFlag, BlockStatusResponse } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
@@ -23,7 +24,7 @@ interface PatientProfileProps {
 }
 
 export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram, onOpenNote, activeNoteSessionId, notesRefreshKey, onPatientSynced }: PatientProfileProps) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'education' | 'notes'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'assessments' | 'education' | 'notes'>('overview');
   const [showAssignEducationModal, setShowAssignEducationModal] = useState(false);
   const [educationModulesRefreshKey, setEducationModulesRefreshKey] = useState(0);
   const [flags, setFlags] = useState<ClinicianFlag[]>([]);
@@ -335,6 +336,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
           {[
             { id: 'overview', label: 'Overview', icon: <User size={15} /> },
             { id: 'analytics', label: 'Progress Analytics', icon: <TrendingUp size={15} /> },
+            { id: 'assessments', label: 'Assessments', icon: <Activity size={15} /> },
             { id: 'education', label: 'Education', icon: <BookOpen size={15} /> },
             { id: 'notes', label: 'Progress Notes', icon: <FileText size={15} /> },
           ].map(({ id, label, icon }) => (
@@ -517,6 +519,8 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
         </div>
       ) : activeTab === 'analytics' ? (
         <ProgressAnalytics patientId={patient.id} apiUrl={API_URL} assignedPrograms={patient.assignedPrograms} />
+      ) : activeTab === 'assessments' ? (
+        <AssessmentTrends patientId={patient.id} />
       ) : activeTab === 'notes' ? (
           <div>
             <div className="flex items-center justify-between gap-3 mb-5">
