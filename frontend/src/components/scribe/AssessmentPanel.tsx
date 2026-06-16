@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, Loader2, X, AlertCircle, Delete, ArrowRight } from 'lucide-react';
 import {
   fetchAssessmentCatalog, fetchMeasurements, saveMeasurement, deleteMeasurement,
@@ -149,6 +150,16 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
     for (let v = focusedMeasure.min; v <= focusedMeasure.max + 1e-9; v += ps) presetValues.push(Math.round(v * 100) / 100);
   }
 
+  // Sheet header context + the large live value shown in the overlay.
+  const fieldList = selected ? fieldOrder(selected) : [];
+  const fieldIdx = focused ? fieldList.findIndex(f => f.measureKey === focused.measureKey && f.side === focused.side) : -1;
+  const focusedRow = (selected && focused) ? committedRow(focused.measureKey, focused.side) : null;
+  let bigDisplay = '';
+  if (focusedMeasure) {
+    if (mode === 'compound') bigDisplay = buffer !== '' ? buffer : (focusedRow ? `${fmtVal(focusedRow.value)}/${focusedRow.value2 != null ? fmtVal(focusedRow.value2) : ''}` : '');
+    else if (mode !== 'toggle') bigDisplay = buffer !== '' ? buffer : (focusedRow ? fmtVal(focusedRow.value) : '');
+  }
+
   const recordedList = Object.values(recorded);
   const recordedCount = recordedList.length;
   useEffect(() => { onCountChange?.(recordedCount); }, [recordedCount, onCountChange]);
@@ -295,79 +306,106 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                 })}
               </div>
 
-              {/* Sticky input zone — preset grid / keypad / compound keypad / toggle */}
-              {focused && focusedMeasure && (
-                <div className="sticky bottom-0 bg-white pt-3 mt-3 border-t border-gray-100">
-                  <p className="text-[11px] text-gray-400 mb-2 text-center">
-                    {mode === 'presets' ? 'Tap a value'
-                      : mode === 'toggle' ? 'Tap a result'
-                      : mode === 'compound' ? 'Systolic / Diastolic'
-                      : `Range ${focusedMeasure.min}–${focusedMeasure.max}${unitLabel(focusedMeasure.unit)}`} · saves automatically
-                  </p>
-
-                  {mode === 'toggle' ? (
-                    <div className="grid grid-cols-1 gap-2">
-                      {(focusedMeasure.options ?? []).map(opt => {
-                        const isCur = committedRow(focusedMeasure.key, focused.side)?.value === opt.value;
-                        return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => pickToggle(opt.value)}
-                            className={`min-h-12 rounded-xl text-sm font-semibold border-2 px-4 transition active:scale-[0.98] ${
-                              isCur ? 'bg-primary-400 border-primary-400 text-white' : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : mode === 'presets' ? (
-                    <div className="grid grid-cols-5 gap-2">
-                      {presetValues.map(v => {
-                        const isCur = committedRow(focused.measureKey, focused.side)?.value === v;
-                        return (
-                          <button
-                            key={v}
-                            type="button"
-                            onClick={() => pickPreset(v)}
-                            className={`h-12 rounded-xl text-base font-semibold border-2 transition active:scale-95 ${
-                              isCur ? 'bg-primary-400 border-primary-400 text-white' : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'
-                            }`}
-                          >
-                            {v}
-                          </button>
-                        );
-                      })}
-                      <button type="button" onClick={pressDone} className="h-12 rounded-xl text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition active:scale-95 col-span-2">Done</button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-4 gap-2">
-                      {keypadKey('7', () => pressDigit('7'))}
-                      {keypadKey('8', () => pressDigit('8'))}
-                      {keypadKey('9', () => pressDigit('9'))}
-                      {keypadKey(<Delete className="w-5 h-5" />, pressBackspace, 'bg-gray-100 text-gray-600 hover:bg-gray-200')}
-                      {keypadKey('4', () => pressDigit('4'))}
-                      {keypadKey('5', () => pressDigit('5'))}
-                      {keypadKey('6', () => pressDigit('6'))}
-                      {keypadKey(<span className="flex items-center gap-1 text-sm"><ArrowRight className="w-4 h-4" />Next</span>, pressNext, 'bg-secondary-500 text-white hover:bg-secondary-600 row-span-2')}
-                      {keypadKey('1', () => pressDigit('1'))}
-                      {keypadKey('2', () => pressDigit('2'))}
-                      {keypadKey('3', () => pressDigit('3'))}
-                      {mode === 'compound'
-                        ? keypadKey('/', pressSlash)
-                        : keypadKey(allowDecimal ? '.' : '', allowDecimal ? pressDot : () => {}, allowDecimal ? '' : 'invisible')}
-                      {keypadKey('0', () => pressDigit('0'))}
-                      {keypadKey('Done', pressDone, 'bg-primary-400 text-white hover:bg-primary-500 text-base')}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
 
           {!selected && <p className="text-xs text-gray-400 shrink-0">Pick an assessment to record values.</p>}
+
+          {/* Input sheet — bottom overlay (fixed to the viewport) so the controls
+              are always reachable without scrolling. "Next" cycles the fields. */}
+          {focused && focusedMeasure && selected && createPortal(
+            <div className="fixed inset-0 z-[60] flex flex-col justify-end">
+              <div className="absolute inset-0 bg-secondary-900/40" onClick={pressDone} />
+              <div className="relative w-full max-w-2xl mx-auto bg-white rounded-t-3xl shadow-2xl px-4 pt-3 pb-7">
+                <div className="w-10 h-1.5 bg-gray-200 rounded-full mx-auto mb-3" />
+                <div className="flex items-start justify-between mb-3">
+                  <div className="min-w-0">
+                    <p className="text-base font-bold text-secondary-700 leading-tight">{selected.displayName}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {focusedMeasure.label}
+                      {sidesOf(selected, focusedMeasure).length === 2 && ` · ${focused.side === 'left' ? 'Left' : 'Right'}`}
+                      {fieldList.length > 1 && ` · ${fieldIdx + 1} of ${fieldList.length}`}
+                    </p>
+                  </div>
+                  <button onClick={pressDone} className="p-2 -mr-1 -mt-1 text-gray-400 hover:text-secondary-700 rounded-lg" aria-label="Done">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {mode !== 'toggle' && (
+                  <div className="text-center mb-1">
+                    <span className="text-4xl font-bold font-mono text-secondary-700">{bigDisplay || '—'}</span>
+                    <span className="text-lg text-gray-400 ml-1.5">{unitLabel(focusedMeasure.unit)}</span>
+                  </div>
+                )}
+                <p className="text-[11px] text-gray-400 text-center mb-3">
+                  {mode === 'presets' ? 'Tap a value'
+                    : mode === 'toggle' ? 'Tap a result'
+                    : mode === 'compound' ? 'Type systolic · / · diastolic'
+                    : `Range ${focusedMeasure.min}–${focusedMeasure.max}${unitLabel(focusedMeasure.unit)}`}
+                </p>
+
+                {mode === 'toggle' ? (
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {(focusedMeasure.options ?? []).map(opt => {
+                      const isCur = committedRow(focusedMeasure.key, focused.side)?.value === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => pickToggle(opt.value)}
+                          className={`min-h-14 rounded-xl text-base font-semibold border-2 px-4 transition active:scale-[0.98] ${
+                            isCur ? 'bg-primary-400 border-primary-400 text-white' : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : mode === 'presets' ? (
+                  <div className="grid grid-cols-5 gap-2">
+                    {presetValues.map(v => {
+                      const isCur = committedRow(focused.measureKey, focused.side)?.value === v;
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => pickPreset(v)}
+                          className={`h-14 rounded-xl text-lg font-semibold border-2 transition active:scale-95 ${
+                            isCur ? 'bg-primary-400 border-primary-400 text-white' : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'
+                          }`}
+                        >
+                          {v}
+                        </button>
+                      );
+                    })}
+                    <button type="button" onClick={pressDone} className="h-14 rounded-xl text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition active:scale-95 col-span-2">Done</button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2">
+                    {keypadKey('7', () => pressDigit('7'))}
+                    {keypadKey('8', () => pressDigit('8'))}
+                    {keypadKey('9', () => pressDigit('9'))}
+                    {keypadKey(<Delete className="w-5 h-5" />, pressBackspace, 'bg-gray-100 text-gray-600 hover:bg-gray-200')}
+                    {keypadKey('4', () => pressDigit('4'))}
+                    {keypadKey('5', () => pressDigit('5'))}
+                    {keypadKey('6', () => pressDigit('6'))}
+                    {keypadKey(<span className="flex items-center gap-1 text-sm"><ArrowRight className="w-4 h-4" />Next</span>, pressNext, 'bg-secondary-500 text-white hover:bg-secondary-600 row-span-2')}
+                    {keypadKey('1', () => pressDigit('1'))}
+                    {keypadKey('2', () => pressDigit('2'))}
+                    {keypadKey('3', () => pressDigit('3'))}
+                    {mode === 'compound'
+                      ? keypadKey('/', pressSlash)
+                      : keypadKey(allowDecimal ? '.' : '', allowDecimal ? pressDot : () => {}, allowDecimal ? '' : 'invisible')}
+                    {keypadKey('0', () => pressDigit('0'))}
+                    {keypadKey('Done', pressDone, 'bg-primary-400 text-white hover:bg-primary-500 text-base')}
+                  </div>
+                )}
+              </div>
+            </div>,
+            document.body
+          )}
         </>
       )}
     </div>
