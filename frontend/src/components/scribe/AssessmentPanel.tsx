@@ -405,34 +405,45 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
             ))}
           </div>
 
-          {/* ROM table — movement × Left/Right grid */}
-          {selected && selected.layout === 'table' && (
-            <div className="shrink-0 rounded-xl border border-gray-200 overflow-hidden">
-              {selected.measures.some(m => sidesOf(selected, m).length === 2) && (
-                <div className="flex items-center bg-gray-50 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
-                  <div className="flex-1 px-3 py-2">Movement</div>
-                  <div className="w-20 px-2 py-2 text-center">Left</div>
-                  <div className="w-20 px-2 py-2 text-center">Right</div>
+          {/* ROM table — centred modal (movement × Left/Right grid), so it's reachable
+              without scrolling past the picker. Tapping a cell opens the preset picker. */}
+          {selected && selected.layout === 'table' && createPortal(
+            <div className="fixed inset-0 z-[55] flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-secondary-900/40" onClick={() => { setSelectedKey(null); setFocused(null); }} />
+              <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl max-h-[85vh] overflow-y-auto">
+                <div className="flex items-center justify-between px-4 pt-4 pb-2">
+                  <p className="text-base font-bold text-secondary-700">{selected.displayName}</p>
+                  <button onClick={() => { setSelectedKey(null); setFocused(null); }} className="p-2 -mr-1 text-gray-400 hover:text-secondary-700" aria-label="Done"><X className="w-5 h-5" /></button>
                 </div>
-              )}
-              {selected.measures.map(m => {
-                const sides = sidesOf(selected, m);
-                const bilateral = sides.length === 2;
-                return (
-                  <div key={m.key} className="flex items-center border-t border-gray-100">
-                    <div className="flex-1 px-3 py-2 text-sm font-medium text-secondary-700">{m.label}</div>
-                    {bilateral ? (
-                      <>
-                        <div className="w-20 p-1.5">{romCell(m, 'left')}</div>
-                        <div className="w-20 p-1.5">{romCell(m, 'right')}</div>
-                      </>
-                    ) : (
-                      <div className="w-40 p-1.5">{romCell(m, 'bilateral')}</div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                <div className="px-4 pb-4 rounded-xl">
+                  {selected.measures.some(m => sidesOf(selected, m).length === 2) && (
+                    <div className="flex items-center text-[11px] font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                      <div className="flex-1 px-1 py-2">Movement</div>
+                      <div className="w-20 px-2 py-2 text-center">Left</div>
+                      <div className="w-20 px-2 py-2 text-center">Right</div>
+                    </div>
+                  )}
+                  {selected.measures.map(m => {
+                    const sides = sidesOf(selected, m);
+                    const bilateral = sides.length === 2;
+                    return (
+                      <div key={m.key} className="flex items-center border-b border-gray-50 last:border-0">
+                        <div className="flex-1 px-1 py-2 text-sm font-medium text-secondary-700">{m.label}</div>
+                        {bilateral ? (
+                          <>
+                            <div className="w-20 p-1.5">{romCell(m, 'left')}</div>
+                            <div className="w-20 p-1.5">{romCell(m, 'right')}</div>
+                          </>
+                        ) : (
+                          <div className="w-40 p-1.5">{romCell(m, 'bilateral')}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>,
+            document.body,
           )}
 
           {/* Stacked fields for non-table assessments */}
