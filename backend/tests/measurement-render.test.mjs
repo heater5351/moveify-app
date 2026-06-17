@@ -56,9 +56,9 @@ describe('renderMeasurements', () => {
   });
 
   it('degrades to value-only when age/sex unknown (no fabricated norm)', () => {
-    const rows = [{ assessment_key: 'hip_rom', measure_key: 'hip_flexion_rom', side: 'left', value: '95', unit: 'degrees' }];
+    const rows = [{ assessment_key: 'grip_strength', measure_key: 'grip_strength', side: 'left', value: '30', value2: null, unit: 'kg' }];
     const lines = renderMeasurements(rows, null, null);
-    expect(lines[0]).toContain('95°');
+    expect(lines[0]).toContain('30 kg');
     expect(lines[0]).not.toContain('expected range');
   });
 
@@ -92,6 +92,23 @@ describe('renderMeasurements', () => {
       { assessment_key: 'latissimus_dorsi_length', measure_key: 'latissimus_dorsi_length', side: 'right', value: '0', value2: null, unit: 'none' },
     ];
     expect(renderMeasurements(rows, 60, 'male').some(l => l.includes('side-to-side'))).toBe(false);
+  });
+
+  it('groups a ROM-table joint into one line with movements + L/R + asymmetry', () => {
+    const rows = [
+      { assessment_key: 'hip_rom', measure_key: 'hip_flexion_rom', side: 'left', value: '110', unit: 'degrees' },
+      { assessment_key: 'hip_rom', measure_key: 'hip_flexion_rom', side: 'right', value: '115', unit: 'degrees' },
+      { assessment_key: 'hip_rom', measure_key: 'hip_internal_rotation_rom', side: 'left', value: '30', unit: 'degrees' },
+      { assessment_key: 'hip_rom', measure_key: 'hip_internal_rotation_rom', side: 'right', value: '40', unit: 'degrees' },
+    ];
+    const lines = renderMeasurements(rows, 68, 'male');
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toBe('Hip ROM — Flexion L110/R115°; Internal Rotation L30/R40° (25% lower on left)');
+  });
+
+  it('renders a single-laterality ROM movement without L/R', () => {
+    const rows = [{ assessment_key: 'spine_rom', measure_key: 'lumbar_flexion_rom', side: 'bilateral', value: '60', unit: 'degrees' }];
+    expect(renderMeasurements(rows, 68, 'male')[0]).toBe('Spine ROM — Flexion 60°');
   });
 });
 

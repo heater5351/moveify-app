@@ -476,6 +476,120 @@
       "note": "No validated length test or norm. Report observationally (scapular winging, dyskinesis, protraction strength asymmetry).",
       "sourceShort": "no validated length norm"
     },
+    "hip_abduction_rom": {
+      "displayName": "Hip Abduction ROM", "aliases": ["hip abduction", "hip abduction rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal ~40-45 deg. Capture-only — interpret left/right symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "hip_adduction_rom": {
+      "displayName": "Hip Adduction ROM", "aliases": ["hip adduction", "hip adduction rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal ~20-30 deg. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "hip_internal_rotation_rom": {
+      "displayName": "Hip Internal Rotation ROM", "aliases": ["hip internal rotation", "hip ir", "hip internal rotation rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal ~40-45 deg. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "hip_external_rotation_rom": {
+      "displayName": "Hip External Rotation ROM", "aliases": ["hip external rotation", "hip er", "hip external rotation rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal ~45 deg. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "knee_extension_rom": {
+      "displayName": "Knee Extension ROM", "aliases": ["knee extension", "knee extension rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal 0 deg (full extension); a deficit = extension lag. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "shoulder_extension_rom": {
+      "displayName": "Shoulder Extension ROM", "aliases": ["shoulder extension", "shoulder extension rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal ~50-60 deg. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "shoulder_internal_rotation_rom": {
+      "displayName": "Shoulder Internal Rotation ROM", "aliases": ["shoulder internal rotation", "shoulder ir", "shoulder internal rotation rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal ~70 deg (in abduction). Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "shoulder_external_rotation_rom": {
+      "displayName": "Shoulder External Rotation ROM", "aliases": ["shoulder external rotation", "shoulder er", "shoulder external rotation rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal ~90 deg (in abduction). Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "elbow_flexion_rom": {
+      "displayName": "Elbow Flexion ROM", "aliases": ["elbow flexion", "elbow flexion rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal ~140-150 deg. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "elbow_extension_rom": {
+      "displayName": "Elbow Extension ROM", "aliases": ["elbow extension", "elbow extension rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal 0 deg (full extension); a deficit = flexion contracture. Capture-only — symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "forearm_pronation_rom": {
+      "displayName": "Forearm Pronation ROM", "aliases": ["forearm pronation", "pronation", "forearm pronation rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal ~80 deg. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "forearm_supination_rom": {
+      "displayName": "Forearm Supination ROM", "aliases": ["forearm supination", "supination", "forearm supination rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal ~80 deg. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "wrist_radial_deviation_rom": {
+      "displayName": "Wrist Radial Deviation ROM", "aliases": ["wrist radial deviation", "radial deviation", "wrist radial deviation rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal ~20 deg. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "wrist_ulnar_deviation_rom": {
+      "displayName": "Wrist Ulnar Deviation ROM", "aliases": ["wrist ulnar deviation", "ulnar deviation", "wrist ulnar deviation rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal ~30 deg. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "ankle_inversion_rom": {
+      "displayName": "Ankle Inversion ROM", "aliases": ["ankle inversion", "subtalar inversion", "ankle inversion rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal ~35 deg. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "ankle_eversion_rom": {
+      "displayName": "Ankle Eversion ROM", "aliases": ["ankle eversion", "subtalar eversion", "ankle eversion rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "AAOS normal ~15-20 deg. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+    },
+    "lumbar_extension_rom": {
+      "displayName": "Lumbar Extension ROM", "aliases": ["lumbar extension", "lumbar extension rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["method_dependent"],
+      "note": "AAOS normal ~25-30 deg; highly method-dependent. Capture-only — interpret own change.", "sourceShort": "AAOS / AMA"
+    },
+    "thoracolumbar_rotation_rom": {
+      "displayName": "Thoracolumbar Rotation ROM", "aliases": ["thoracolumbar rotation", "trunk rotation", "spine rotation", "thoracolumbar rotation rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["method_dependent", "symmetry_not_norm"],
+      "note": "AAOS normal ~30-45 deg. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS / AMA"
+    },
+    "thoracolumbar_lateral_flexion_rom": {
+      "displayName": "Thoracolumbar Lateral Flexion ROM", "aliases": ["thoracolumbar lateral flexion", "trunk side bend", "spine lateral flexion", "thoracolumbar lateral flexion rom"],
+      "unit": "degrees", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["method_dependent", "symmetry_not_norm"],
+      "note": "AAOS normal ~25-35 deg. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS / AMA"
+    },
     "berg_balance": {
       "displayName": "Berg Balance Scale",
       "aliases": ["berg balance scale", "berg balance", "bbs", "berg"],

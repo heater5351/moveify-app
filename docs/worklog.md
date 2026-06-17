@@ -68,6 +68,24 @@ what to know now, links).
   (need sourcing + licensing — Mini-BEST/LEFS/etc. carry commercial-use caveats).
   The scoring engine + runner pattern are shared with the Berg/Mini-BEST instruments.
 
+## 2026-06-17 — ROM rework: movement×L/R table + all planes (capture-only)
+
+- ROM assessments restructured into a **goniometry-style table** (movement rows ×
+  Left/Right) — `layout: "table"` on the assessment; `AssessmentPanel` renders the grid
+  and a cell tap opens the existing centred preset picker (Next cycles cells). Replaces
+  the stacked one-movement-per-card flow.
+- **All clinically-measured planes** per joint: Cervical, Shoulder (×5), Elbow/forearm
+  (new ×4), Wrist (×4), Spine (×5), Hip (×6), Knee (×2), Ankle (×4). New planes are
+  **capture-only** (qualitative, value + ≥10% L/R asymmetry, no within/below verdict) —
+  added to `normative-data.json` (~18 keys, `symmetry_not_norm`/`method_dependent` caveats,
+  AAOS-normal note for reference only). Existing graded ROM keys + the handout's
+  transcript grounding are untouched.
+- **Note output:** `measurement-render.js` now renders one line per joint for ROM
+  tables — `Hip ROM — Flexion L110/R115°; Internal Rotation L30/R40° (25% lower on left)`
+  — instead of a line per movement. Non-table measures unchanged.
+- Catalog now restructured (lumbar_flexion + thoracic_extension folded into **Spine ROM**;
+  new **Elbow ROM**). No schema change; existing measure keys preserved. 193 backend tests.
+
 ## 2026-06-17 — Multi-item instruments: Berg + Mini-BESTest (guided runner)
 
 - Berg Balance Scale (14 items × 0–4) and Mini-BESTest (14 items × 0–2, 4 sections)

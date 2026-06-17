@@ -265,6 +265,29 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
     );
   }
 
+  // Compact tappable cell for the ROM table — opens the same centred picker.
+  function romCell(m: CatalogMeasure, side: MeasurementSide) {
+    const k = valueKey(selected!.key, m.key, side);
+    const row = committedRow(m.key, side);
+    const isFocused = !!focused && focused.measureKey === m.key && focused.side === side;
+    const st = status[k];
+    return (
+      <button
+        type="button"
+        onClick={() => focusField({ measureKey: m.key, side })}
+        className={`w-full h-11 rounded-lg border-2 text-base font-mono font-semibold flex items-center justify-center gap-1 transition active:scale-95 ${
+          isFocused ? 'border-primary-400 bg-primary-50 text-secondary-700'
+            : row != null ? 'border-gray-200 bg-white text-secondary-700'
+            : 'border-dashed border-gray-200 bg-white text-gray-300'
+        }`}
+      >
+        {row != null ? `${fmtVal(row.value)}${unitLabel(m.unit)}` : '—'}
+        {st === 'saving' && <Loader2 className="w-3 h-3 animate-spin text-gray-400" />}
+        {st === 'error' && <AlertCircle className="w-3 h-3 text-red-500" />}
+      </button>
+    );
+  }
+
   function keypadKey(label: React.ReactNode, onClick: () => void, extra = '') {
     return (
       <button
@@ -354,7 +377,10 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                       key={a.key}
                       onClick={() => {
                         if (a.instrument) { setRunnerKey(a.key); setSelectedKey(null); setFocused(null); }
-                        else {
+                        else if (a.layout === 'table') {
+                          // ROM table is the overview — show it first, tap a cell to enter.
+                          setSelectedKey(a.key); setFocused(null); setBuffer('');
+                        } else {
                           // Open the input sheet immediately on the first field — no
                           // scrolling down past the picker to find it.
                           setSelectedKey(a.key);
@@ -379,8 +405,38 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
             ))}
           </div>
 
-          {/* Fields for the selected assessment */}
-          {selected && (
+          {/* ROM table — movement × Left/Right grid */}
+          {selected && selected.layout === 'table' && (
+            <div className="shrink-0 rounded-xl border border-gray-200 overflow-hidden">
+              {selected.measures.some(m => sidesOf(selected, m).length === 2) && (
+                <div className="flex items-center bg-gray-50 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+                  <div className="flex-1 px-3 py-2">Movement</div>
+                  <div className="w-20 px-2 py-2 text-center">Left</div>
+                  <div className="w-20 px-2 py-2 text-center">Right</div>
+                </div>
+              )}
+              {selected.measures.map(m => {
+                const sides = sidesOf(selected, m);
+                const bilateral = sides.length === 2;
+                return (
+                  <div key={m.key} className="flex items-center border-t border-gray-100">
+                    <div className="flex-1 px-3 py-2 text-sm font-medium text-secondary-700">{m.label}</div>
+                    {bilateral ? (
+                      <>
+                        <div className="w-20 p-1.5">{romCell(m, 'left')}</div>
+                        <div className="w-20 p-1.5">{romCell(m, 'right')}</div>
+                      </>
+                    ) : (
+                      <div className="w-40 p-1.5">{romCell(m, 'bilateral')}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Stacked fields for non-table assessments */}
+          {selected && selected.layout !== 'table' && (
             <div className="shrink-0">
               <div className="space-y-2.5">
                 {selected.measures.map(m => {
@@ -398,7 +454,6 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                   );
                 })}
               </div>
-
             </div>
           )}
 

@@ -16,35 +16,17 @@
   },
   "assessments": [
     {
-      "key": "hip_rom",
-      "displayName": "Hip ROM",
-      "region": "Hip",
+      "key": "cervical_rom",
+      "displayName": "Cervical ROM",
+      "region": "Neck",
       "category": "Range of Motion",
-      "laterality": "bilateral",
+      "laterality": "single",
+      "layout": "table",
       "measures": [
-        { "key": "hip_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 150, "step": 1, "input": "presets", "presetStep": 10 },
-        { "key": "hip_extension_rom", "label": "Extension", "unit": "degrees", "min": 0, "max": 40, "step": 1, "input": "presets", "presetStep": 5 }
-      ]
-    },
-    {
-      "key": "knee_rom",
-      "displayName": "Knee ROM",
-      "region": "Knee",
-      "category": "Range of Motion",
-      "laterality": "bilateral",
-      "measures": [
-        { "key": "knee_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 160, "step": 1, "input": "presets", "presetStep": 10 }
-      ]
-    },
-    {
-      "key": "ankle_rom",
-      "displayName": "Ankle ROM",
-      "region": "Ankle",
-      "category": "Range of Motion",
-      "laterality": "bilateral",
-      "measures": [
-        { "key": "ankle_dorsiflexion_rom", "label": "Dorsiflexion", "unit": "degrees", "min": 0, "max": 40, "step": 1, "input": "presets", "presetStep": 5 },
-        { "key": "ankle_plantarflexion_rom", "label": "Plantarflexion", "unit": "degrees", "min": 0, "max": 70, "step": 1, "input": "presets", "presetStep": 10 }
+        { "key": "cervical_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 80, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "cervical_extension_rom", "label": "Extension", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "cervical_rotation_rom", "label": "Rotation", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10, "laterality": "bilateral" },
+        { "key": "cervical_lateral_flexion_rom", "label": "Lateral Flexion", "unit": "degrees", "min": 0, "max": 60, "step": 1, "input": "presets", "presetStep": 10, "laterality": "bilateral" }
       ]
     },
     {
@@ -53,9 +35,27 @@
       "region": "Shoulder",
       "category": "Range of Motion",
       "laterality": "bilateral",
+      "layout": "table",
       "measures": [
         { "key": "shoulder_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 180, "step": 1, "input": "presets", "presetStep": 10 },
-        { "key": "shoulder_abduction_rom", "label": "Abduction", "unit": "degrees", "min": 0, "max": 180, "step": 1, "input": "presets", "presetStep": 10 }
+        { "key": "shoulder_extension_rom", "label": "Extension", "unit": "degrees", "min": 0, "max": 60, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "shoulder_abduction_rom", "label": "Abduction", "unit": "degrees", "min": 0, "max": 180, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "shoulder_internal_rotation_rom", "label": "Internal Rotation", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "shoulder_external_rotation_rom", "label": "External Rotation", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 }
+      ]
+    },
+    {
+      "key": "elbow_rom",
+      "displayName": "Elbow ROM",
+      "region": "Elbow",
+      "category": "Range of Motion",
+      "laterality": "bilateral",
+      "layout": "table",
+      "measures": [
+        { "key": "elbow_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 150, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "elbow_extension_rom", "label": "Extension", "unit": "degrees", "min": 0, "max": 20, "step": 1, "input": "presets", "presetStep": 5 },
+        { "key": "forearm_pronation_rom", "label": "Pronation", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "forearm_supination_rom", "label": "Supination", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 }
       ]
     },
     {
@@ -64,42 +64,69 @@
       "region": "Wrist",
       "category": "Range of Motion",
       "laterality": "bilateral",
+      "layout": "table",
       "measures": [
         { "key": "wrist_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 },
-        { "key": "wrist_extension_rom", "label": "Extension", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 }
+        { "key": "wrist_extension_rom", "label": "Extension", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "wrist_radial_deviation_rom", "label": "Radial Deviation", "unit": "degrees", "min": 0, "max": 25, "step": 1, "input": "presets", "presetStep": 5 },
+        { "key": "wrist_ulnar_deviation_rom", "label": "Ulnar Deviation", "unit": "degrees", "min": 0, "max": 40, "step": 1, "input": "presets", "presetStep": 5 }
       ]
     },
     {
-      "key": "lumbar_flexion",
-      "displayName": "Lumbar Flexion ROM",
+      "key": "spine_rom",
+      "displayName": "Spine ROM",
       "region": "Spine",
       "category": "Range of Motion",
       "laterality": "single",
+      "layout": "table",
       "measures": [
-        { "key": "lumbar_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 }
+        { "key": "lumbar_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "lumbar_extension_rom", "label": "Extension", "unit": "degrees", "min": 0, "max": 40, "step": 1, "input": "presets", "presetStep": 5 },
+        { "key": "thoracolumbar_rotation_rom", "label": "Rotation", "unit": "degrees", "min": 0, "max": 50, "step": 1, "input": "presets", "presetStep": 5, "laterality": "bilateral" },
+        { "key": "thoracolumbar_lateral_flexion_rom", "label": "Lateral Flexion", "unit": "degrees", "min": 0, "max": 45, "step": 1, "input": "presets", "presetStep": 5, "laterality": "bilateral" },
+        { "key": "thoracic_extension_test", "label": "Thoracic Extension", "unit": "degrees", "min": 0, "max": 60, "step": 1, "input": "presets", "presetStep": 10 }
       ]
     },
     {
-      "key": "thoracic_extension",
-      "displayName": "Thoracic Extension",
-      "region": "Spine",
+      "key": "hip_rom",
+      "displayName": "Hip ROM",
+      "region": "Hip",
       "category": "Range of Motion",
-      "laterality": "single",
+      "laterality": "bilateral",
+      "layout": "table",
       "measures": [
-        { "key": "thoracic_extension_test", "label": "Extension", "unit": "degrees", "min": 0, "max": 60, "step": 1, "input": "presets", "presetStep": 10 }
+        { "key": "hip_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 150, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "hip_extension_rom", "label": "Extension", "unit": "degrees", "min": 0, "max": 40, "step": 1, "input": "presets", "presetStep": 5 },
+        { "key": "hip_abduction_rom", "label": "Abduction", "unit": "degrees", "min": 0, "max": 50, "step": 1, "input": "presets", "presetStep": 5 },
+        { "key": "hip_adduction_rom", "label": "Adduction", "unit": "degrees", "min": 0, "max": 30, "step": 1, "input": "presets", "presetStep": 5 },
+        { "key": "hip_internal_rotation_rom", "label": "Internal Rotation", "unit": "degrees", "min": 0, "max": 50, "step": 1, "input": "presets", "presetStep": 5 },
+        { "key": "hip_external_rotation_rom", "label": "External Rotation", "unit": "degrees", "min": 0, "max": 60, "step": 1, "input": "presets", "presetStep": 5 }
       ]
     },
     {
-      "key": "cervical_rom",
-      "displayName": "Cervical ROM",
-      "region": "Neck",
+      "key": "knee_rom",
+      "displayName": "Knee ROM",
+      "region": "Knee",
       "category": "Range of Motion",
-      "laterality": "single",
+      "laterality": "bilateral",
+      "layout": "table",
       "measures": [
-        { "key": "cervical_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 80, "step": 1, "input": "presets", "presetStep": 10 },
-        { "key": "cervical_extension_rom", "label": "Extension", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10 },
-        { "key": "cervical_rotation_rom", "label": "Rotation", "unit": "degrees", "min": 0, "max": 90, "step": 1, "input": "presets", "presetStep": 10, "laterality": "bilateral" },
-        { "key": "cervical_lateral_flexion_rom", "label": "Lateral Flexion", "unit": "degrees", "min": 0, "max": 60, "step": 1, "input": "presets", "presetStep": 10, "laterality": "bilateral" }
+        { "key": "knee_flexion_rom", "label": "Flexion", "unit": "degrees", "min": 0, "max": 160, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "knee_extension_rom", "label": "Extension", "unit": "degrees", "min": 0, "max": 15, "step": 1, "input": "presets", "presetStep": 5 }
+      ]
+    },
+    {
+      "key": "ankle_rom",
+      "displayName": "Ankle ROM",
+      "region": "Ankle",
+      "category": "Range of Motion",
+      "laterality": "bilateral",
+      "layout": "table",
+      "measures": [
+        { "key": "ankle_dorsiflexion_rom", "label": "Dorsiflexion", "unit": "degrees", "min": 0, "max": 40, "step": 1, "input": "presets", "presetStep": 5 },
+        { "key": "ankle_plantarflexion_rom", "label": "Plantarflexion", "unit": "degrees", "min": 0, "max": 70, "step": 1, "input": "presets", "presetStep": 10 },
+        { "key": "ankle_inversion_rom", "label": "Inversion", "unit": "degrees", "min": 0, "max": 40, "step": 1, "input": "presets", "presetStep": 5 },
+        { "key": "ankle_eversion_rom", "label": "Eversion", "unit": "degrees", "min": 0, "max": 25, "step": 1, "input": "presets", "presetStep": 5 }
       ]
     },
     {

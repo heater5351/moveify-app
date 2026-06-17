@@ -254,6 +254,8 @@ export interface AssessmentCatalogEntry {
   /** Grouping header in the picker (e.g. "Range of Motion", "Balance"). */
   category: string;
   laterality: 'bilateral' | 'single';
+  /** 'table' → render as a movement × Left/Right grid (ROM). */
+  layout?: 'table';
   measures: CatalogMeasure[];
   /** Present for multi-item scored protocols (Berg, Mini-BEST). */
   instrument?: AssessmentInstrument;
