@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Loader2, X, AlertCircle, Delete, ArrowRight } from 'lucide-react';
+import { Check, Loader2, X, AlertCircle, Delete, ArrowRight, ClipboardList } from 'lucide-react';
 import {
   fetchAssessmentCatalog, fetchMeasurements, saveMeasurement, deleteMeasurement,
   type AssessmentCatalogEntry, type CatalogMeasure, type Measurement, type MeasurementSide,
 } from '../../utils/scribe-api';
+import InstrumentRunner from './InstrumentRunner';
 
 interface AssessmentPanelProps {
   sessionId: number | null;
@@ -36,6 +37,7 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
   const [status, setStatus] = useState<Record<string, SaveState>>({});
   const [focused, setFocused] = useState<FieldRef | null>(null);
   const [buffer, setBuffer] = useState('');
+  const [runnerKey, setRunnerKey] = useState<string | null>(null);
   const sessionIdRef = useRef<number | null>(sessionId);
   sessionIdRef.current = sessionId;
 
@@ -176,6 +178,9 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
     if (md === 'compound') {
       return `${a?.displayName}${sideTag}: ${fmtVal(row.value)}/${row.value2 != null ? fmtVal(row.value2) : '?'}`;
     }
+    if (md === 'instrument') {
+      return `${a?.displayName}: ${fmtVal(row.value)}/${a?.instrument?.maxScore ?? '?'}`;
+    }
     const name = m ? `${a?.displayName} ${m.label}` : row.assessment_key;
     return `${name}${sideTag}: ${fmtVal(row.value)}${row.unit ? unitLabel(row.unit) : ''}`;
   }
@@ -272,13 +277,19 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                   {byCategory.get(cat)!.map(a => (
                     <button
                       key={a.key}
-                      onClick={() => { setSelectedKey(a.key); setFocused(null); setBuffer(''); }}
+                      onClick={() => {
+                        if (a.instrument) { setRunnerKey(a.key); setSelectedKey(null); setFocused(null); }
+                        else { setSelectedKey(a.key); setFocused(null); setBuffer(''); }
+                      }}
                       className={`min-h-20 rounded-2xl px-4 py-3 border-2 transition text-left flex flex-col justify-center active:scale-[0.98] ${
                         selectedKey === a.key ? 'bg-primary-400 border-primary-400 text-white shadow-sm' : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'
                       }`}
                     >
-                      <span className="text-base font-bold leading-tight">{a.displayName}</span>
-                      <span className="text-xs font-medium opacity-70 mt-0.5">{a.region}</span>
+                      <span className="text-base font-bold leading-tight flex items-center gap-1.5">
+                        {a.instrument && <ClipboardList className="w-4 h-4 shrink-0 opacity-70" />}
+                        {a.displayName}
+                      </span>
+                      <span className="text-xs font-medium opacity-70 mt-0.5">{a.instrument ? `${a.instrument.items.length}-item test` : a.region}</span>
                     </button>
                   ))}
                 </div>
@@ -310,6 +321,24 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
           )}
 
           {!selected && <p className="text-xs text-gray-400 shrink-0">Pick an assessment to record values.</p>}
+
+          {/* Guided runner for multi-item instruments (Berg, Mini-BEST) */}
+          {runnerKey && (() => {
+            const a = catalog.find(c => c.key === runnerKey);
+            if (!a || !a.instrument) return null;
+            const mKey = a.measures[0].key;
+            const existing = recorded[valueKey(a.key, mKey, 'bilateral')];
+            return (
+              <InstrumentRunner
+                assessment={a}
+                sessionId={sessionId}
+                ensureSession={ensureSession}
+                initialDetail={existing?.detail ?? null}
+                onClose={() => setRunnerKey(null)}
+                onSaved={(m) => setRecorded(r => ({ ...r, [valueKey(m.assessment_key, m.measure_key, m.side)]: m }))}
+              />
+            );
+          })()}
 
           {/* Input sheet — bottom overlay (fixed to the viewport) so the controls
               are always reachable without scrolling. "Next" cycles the fields. */}

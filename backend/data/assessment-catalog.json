@@ -9,7 +9,8 @@
       "presets": "Tablet-fast: tappable preset buttons from min→max in `presetStep` increments (e.g. ROM eyeballed to the nearest 10°). Tapping commits and advances.",
       "keypad": "On-screen numeric keypad for an exact instrument read (dynamometer kg, stopwatch seconds, counts, mmol/L).",
       "compound": "Two numbers stored as value + value2 (e.g. blood pressure systolic/diastolic). `min/max` bound the first, `min2/max2` the second.",
-      "toggle": "Pass/fail or positive/negative observation. `options` lists {value,label}; the captured value is stored numerically and rendered as its label."
+      "toggle": "Pass/fail or positive/negative observation. `options` lists {value,label}; the captured value is stored numerically and rendered as its label.",
+      "instrument": "Multi-item scored protocol (Berg, Mini-BEST). The assessment carries an `instrument` block with `items[]` (each: name, instruction, anchored `options`, optional `bilateral`/`section`). The clinician scores item-by-item in a guided runner; the server sums the total (worse side for bilateral items), stores it in `value` (graded vs the norm key) with the per-item breakdown in `detail`."
     },
     "note": "A measure may carry its own `laterality` to override the assessment's (e.g. cervical: flexion/extension single, rotation/lateral-flexion bilateral)."
   },
@@ -167,8 +168,70 @@
       "region": "Balance",
       "category": "Balance",
       "laterality": "single",
+      "instrument": {
+        "maxScore": 28,
+        "attribution": "© 2005–2013 Oregon Health & Science University. Free for clinical use with attribution (bestest.us).",
+        "items": [
+          { "key": "sit_to_stand", "section": "Anticipatory", "name": "Sit to stand", "instruction": "Cross your arms; try not to use your hands. Please stand up now.", "options": [
+            { "value": 2, "label": "Normal: stands without hands, stabilises independently" },
+            { "value": 1, "label": "Moderate: stands WITH hands on first attempt" },
+            { "value": 0, "label": "Severe: unable without assistance / several attempts" } ] },
+          { "key": "rise_to_toes", "section": "Anticipatory", "name": "Rise to toes", "instruction": "Hands on hips, feet shoulder width. Rise as high as you can onto your toes; hold ≥3 seconds.", "options": [
+            { "value": 2, "label": "Normal: stable 3 s at maximum height" },
+            { "value": 1, "label": "Moderate: not full range, or unstable for 3 s" },
+            { "value": 0, "label": "Severe: <3 seconds" } ] },
+          { "key": "stand_on_one_leg", "section": "Anticipatory", "name": "Stand on one leg", "instruction": "Hands on hips, lift one leg behind you and hold as long as you can (best of 2 trials per side).", "bilateral": true, "options": [
+            { "value": 2, "label": "Normal: 20 seconds" },
+            { "value": 1, "label": "Moderate: <20 seconds" },
+            { "value": 0, "label": "Severe: unable" } ] },
+          { "key": "stepping_forward", "section": "Reactive Postural Control", "name": "Compensatory stepping — forward", "instruction": "Lean forward against my hands beyond your limits; when I release, step to avoid a fall.", "options": [
+            { "value": 2, "label": "Normal: recovers with a single, large step" },
+            { "value": 1, "label": "Moderate: more than one step to recover" },
+            { "value": 0, "label": "Severe: no step / would fall / falls spontaneously" } ] },
+          { "key": "stepping_backward", "section": "Reactive Postural Control", "name": "Compensatory stepping — backward", "instruction": "Lean backward against my hands beyond your limits; when I release, step to avoid a fall.", "options": [
+            { "value": 2, "label": "Normal: recovers with a single, large step" },
+            { "value": 1, "label": "Moderate: more than one step to recover" },
+            { "value": 0, "label": "Severe: no step / would fall / falls spontaneously" } ] },
+          { "key": "stepping_lateral", "section": "Reactive Postural Control", "name": "Compensatory stepping — lateral", "instruction": "Feet together; lean into my hand beyond your sideways limit; when I release, step to avoid a fall.", "bilateral": true, "options": [
+            { "value": 2, "label": "Normal: recovers with 1 step (crossover or lateral)" },
+            { "value": 1, "label": "Moderate: several steps to recover" },
+            { "value": 0, "label": "Severe: falls or cannot step" } ] },
+          { "key": "stance_eyes_open_firm", "section": "Sensory Orientation", "name": "Stance: eyes open, firm surface", "instruction": "Hands on hips, feet together, eyes open. Stay as still as possible (up to 30 s).", "options": [
+            { "value": 2, "label": "Normal: 30 seconds" },
+            { "value": 1, "label": "Moderate: <30 seconds" },
+            { "value": 0, "label": "Severe: unable" } ] },
+          { "key": "stance_eyes_closed_foam", "section": "Sensory Orientation", "name": "Stance: eyes closed, foam", "instruction": "On the foam, hands on hips, feet together, eyes closed. Stay as still as possible (up to 30 s).", "options": [
+            { "value": 2, "label": "Normal: 30 seconds" },
+            { "value": 1, "label": "Moderate: <30 seconds" },
+            { "value": 0, "label": "Severe: unable" } ] },
+          { "key": "incline_eyes_closed", "section": "Sensory Orientation", "name": "Incline, eyes closed", "instruction": "Stand on the incline ramp, toes toward the top, arms at sides, eyes closed (up to 30 s).", "options": [
+            { "value": 2, "label": "Normal: 30 s, aligns with gravity" },
+            { "value": 1, "label": "Moderate: <30 s OR aligns with surface" },
+            { "value": 0, "label": "Severe: unable" } ] },
+          { "key": "change_in_gait_speed", "section": "Dynamic Gait", "name": "Change in gait speed", "instruction": "Walk at normal speed; on 'fast' walk as fast as you can, on 'slow' walk very slowly.", "options": [
+            { "value": 2, "label": "Normal: changes speed significantly, no imbalance" },
+            { "value": 1, "label": "Moderate: unable to change speed OR signs of imbalance" },
+            { "value": 0, "label": "Severe: no significant change AND signs of imbalance" } ] },
+          { "key": "walk_head_turns", "section": "Dynamic Gait", "name": "Walk with head turns — horizontal", "instruction": "Walk at normal speed; turn your head right/left on command, keep walking straight.", "options": [
+            { "value": 2, "label": "Normal: head turns, no change in speed, good balance" },
+            { "value": 1, "label": "Moderate: head turns with reduction in gait speed" },
+            { "value": 0, "label": "Severe: head turns with imbalance" } ] },
+          { "key": "walk_pivot_turns", "section": "Dynamic Gait", "name": "Walk with pivot turns", "instruction": "Walk at normal speed; on 'turn and stop', turn quickly, face the opposite way, feet close together.", "options": [
+            { "value": 2, "label": "Normal: turns feet-close FAST (<3 steps), good balance" },
+            { "value": 1, "label": "Moderate: turns feet-close SLOW (≥4 steps), good balance" },
+            { "value": 0, "label": "Severe: cannot turn feet-close without imbalance" } ] },
+          { "key": "step_over_obstacles", "section": "Dynamic Gait", "name": "Step over obstacles", "instruction": "Walk at normal speed; at the box, step over it (not around) and keep walking.", "options": [
+            { "value": 2, "label": "Normal: steps over box, minimal speed change, good balance" },
+            { "value": 1, "label": "Moderate: steps over but touches box OR slows cautiously" },
+            { "value": 0, "label": "Severe: unable to step over OR steps around box" } ] },
+          { "key": "tug_dual_task", "section": "Dynamic Gait", "name": "Timed Up & Go with dual task", "instruction": "TUG while counting backwards by threes. Compare with TUG alone (decrease a point if gait slows >10%).", "options": [
+            { "value": 2, "label": "Normal: no noticeable change vs TUG without dual task" },
+            { "value": 1, "label": "Moderate: dual task affects counting OR walking (>10%)" },
+            { "value": 0, "label": "Severe: stops counting while walking, or stops walking" } ] }
+        ]
+      },
       "measures": [
-        { "key": "mini_bestest", "label": "Score (/28)", "unit": "points", "min": 0, "max": 28, "step": 1, "input": "keypad" }
+        { "key": "mini_bestest", "label": "Total (/28)", "unit": "points", "min": 0, "max": 28, "step": 1, "input": "instrument" }
       ]
     },
     {
@@ -177,8 +240,98 @@
       "region": "Balance",
       "category": "Balance",
       "laterality": "single",
+      "instrument": {
+        "maxScore": 56,
+        "attribution": "Berg K et al. 1989. Public-domain clinical scale.",
+        "items": [
+          { "key": "sit_to_stand", "name": "Sitting to standing", "instruction": "Please stand up. Try not to use your hands for support.", "options": [
+            { "value": 4, "label": "Stands, no hands, stabilises independently" },
+            { "value": 3, "label": "Stands independently using hands" },
+            { "value": 2, "label": "Stands using hands after several tries" },
+            { "value": 1, "label": "Needs minimal aid to stand or stabilise" },
+            { "value": 0, "label": "Needs moderate or maximal assist" } ] },
+          { "key": "standing_unsupported", "name": "Standing unsupported", "instruction": "Please stand for two minutes without holding on.", "options": [
+            { "value": 4, "label": "Stands safely 2 minutes" },
+            { "value": 3, "label": "Stands 2 minutes with supervision" },
+            { "value": 2, "label": "Stands 30 seconds unsupported" },
+            { "value": 1, "label": "Needs several tries to stand 30 seconds" },
+            { "value": 0, "label": "Unable to stand 30 seconds unsupported" } ] },
+          { "key": "sitting_unsupported", "name": "Sitting unsupported", "instruction": "Please sit with arms folded for two minutes (back unsupported, feet supported).", "options": [
+            { "value": 4, "label": "Sits safely and securely 2 minutes" },
+            { "value": 3, "label": "Sits 2 minutes under supervision" },
+            { "value": 2, "label": "Sits 30 seconds" },
+            { "value": 1, "label": "Sits 10 seconds" },
+            { "value": 0, "label": "Unable to sit without support 10 seconds" } ] },
+          { "key": "standing_to_sitting", "name": "Standing to sitting", "instruction": "Please sit down.", "options": [
+            { "value": 4, "label": "Sits safely with minimal use of hands" },
+            { "value": 3, "label": "Controls descent by using hands" },
+            { "value": 2, "label": "Uses back of legs against chair to control descent" },
+            { "value": 1, "label": "Sits independently but uncontrolled descent" },
+            { "value": 0, "label": "Needs assist to sit" } ] },
+          { "key": "transfers", "name": "Transfers", "instruction": "Transfer one way toward a seat with armrests and one way toward a seat without armrests.", "options": [
+            { "value": 4, "label": "Transfers safely, minor use of hands" },
+            { "value": 3, "label": "Transfers safely, definite need of hands" },
+            { "value": 2, "label": "Transfers with verbal cueing and/or supervision" },
+            { "value": 1, "label": "Needs one person to assist" },
+            { "value": 0, "label": "Needs two people to assist or supervise" } ] },
+          { "key": "standing_eyes_closed", "name": "Standing with eyes closed", "instruction": "Please close your eyes and stand still for 10 seconds.", "options": [
+            { "value": 4, "label": "Stands 10 seconds safely" },
+            { "value": 3, "label": "Stands 10 seconds with supervision" },
+            { "value": 2, "label": "Stands 3 seconds" },
+            { "value": 1, "label": "Unable to keep eyes closed 3 s but stays safely" },
+            { "value": 0, "label": "Needs help to keep from falling" } ] },
+          { "key": "standing_feet_together", "name": "Standing with feet together", "instruction": "Place your feet together and stand without holding on.", "options": [
+            { "value": 4, "label": "Feet together independently, stands 1 minute safely" },
+            { "value": 3, "label": "Feet together independently, 1 minute with supervision" },
+            { "value": 2, "label": "Feet together independently but <30 seconds" },
+            { "value": 1, "label": "Needs help to position but stands 15 s feet together" },
+            { "value": 0, "label": "Needs help to position, unable to hold 15 seconds" } ] },
+          { "key": "reaching_forward", "name": "Reaching forward with outstretched arm", "instruction": "Lift arm to 90°, stretch your fingers and reach forward as far as you can.", "options": [
+            { "value": 4, "label": "Reaches forward confidently >25 cm (10 in)" },
+            { "value": 3, "label": "Reaches forward >12 cm (5 in)" },
+            { "value": 2, "label": "Reaches forward >5 cm (2 in)" },
+            { "value": 1, "label": "Reaches forward but needs supervision" },
+            { "value": 0, "label": "Loses balance / requires external support" } ] },
+          { "key": "retrieve_object", "name": "Retrieving object from floor", "instruction": "Pick up the shoe/slipper in front of your feet.", "options": [
+            { "value": 4, "label": "Picks up slipper safely and easily" },
+            { "value": 3, "label": "Picks up slipper but needs supervision" },
+            { "value": 2, "label": "Reaches 2–5 cm from slipper, keeps balance" },
+            { "value": 1, "label": "Unable to pick up, needs supervision while trying" },
+            { "value": 0, "label": "Unable / needs assist to keep from falling" } ] },
+          { "key": "turn_look_behind", "name": "Turning to look behind", "instruction": "Turn to look directly behind you over the left shoulder, then the right.", "options": [
+            { "value": 4, "label": "Looks behind both sides, good weight shift" },
+            { "value": 3, "label": "Looks behind one side only, less shift other side" },
+            { "value": 2, "label": "Turns sideways only but maintains balance" },
+            { "value": 1, "label": "Needs supervision when turning" },
+            { "value": 0, "label": "Needs assist to keep from falling" } ] },
+          { "key": "turn_360", "name": "Turning 360 degrees", "instruction": "Turn completely around in a full circle, pause, then turn the other way.", "options": [
+            { "value": 4, "label": "Turns 360° safely in ≤4 seconds each way" },
+            { "value": 3, "label": "Turns 360° safely one side only ≤4 seconds" },
+            { "value": 2, "label": "Turns 360° safely but slowly" },
+            { "value": 1, "label": "Needs close supervision or verbal cueing" },
+            { "value": 0, "label": "Needs assistance while turning" } ] },
+          { "key": "alternate_foot_stool", "name": "Placing alternate foot on stool", "instruction": "Place each foot alternately on the step/stool until each foot has touched four times.", "options": [
+            { "value": 4, "label": "Stands independently, 8 steps in 20 seconds" },
+            { "value": 3, "label": "Stands independently, 8 steps in >20 seconds" },
+            { "value": 2, "label": "Completes 4 steps without aid, with supervision" },
+            { "value": 1, "label": "Completes >2 steps, needs minimal assist" },
+            { "value": 0, "label": "Needs assistance / unable to try" } ] },
+          { "key": "one_foot_in_front", "name": "Standing with one foot in front", "instruction": "Place one foot directly in front of the other (tandem); if not possible, step ahead.", "options": [
+            { "value": 4, "label": "Foot tandem independently, holds 30 seconds" },
+            { "value": 3, "label": "Foot ahead independently, holds 30 seconds" },
+            { "value": 2, "label": "Small step independently, holds 30 seconds" },
+            { "value": 1, "label": "Needs help to step but holds 15 seconds" },
+            { "value": 0, "label": "Loses balance while stepping or standing" } ] },
+          { "key": "standing_one_leg", "name": "Standing on one leg", "instruction": "Stand on one leg as long as you can without holding on.", "options": [
+            { "value": 4, "label": "Lifts leg independently, holds >10 seconds" },
+            { "value": 3, "label": "Lifts leg independently, holds 5–10 seconds" },
+            { "value": 2, "label": "Lifts leg independently, holds ≥3 seconds" },
+            { "value": 1, "label": "Tries to lift, <3 s but stays standing independently" },
+            { "value": 0, "label": "Unable / needs assist to prevent fall" } ] }
+        ]
+      },
       "measures": [
-        { "key": "berg_balance", "label": "Score (/56)", "unit": "points", "min": 0, "max": 56, "step": 1, "input": "keypad" }
+        { "key": "berg_balance", "label": "Total (/56)", "unit": "points", "min": 0, "max": 56, "step": 1, "input": "instrument" }
       ]
     },
     {

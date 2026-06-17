@@ -215,8 +215,8 @@ export interface CatalogMeasure {
   min: number;
   max: number;
   step: number;
-  /** presets → tappable grid (ROM); keypad → numeric; compound → two values; toggle → pass/fail. */
-  input?: 'presets' | 'keypad' | 'compound' | 'toggle';
+  /** presets → grid; keypad → numeric; compound → two values; toggle → pass/fail; instrument → multi-item runner. */
+  input?: 'presets' | 'keypad' | 'compound' | 'toggle' | 'instrument';
   /** Increment between preset buttons when input === 'presets'. */
   presetStep?: number;
   /** Overrides the assessment's laterality for this measure (cervical rotation, etc.). */
@@ -228,6 +228,25 @@ export interface CatalogMeasure {
   options?: { value: number; label: string }[];
 }
 
+export interface InstrumentItemOption { value: number; label: string }
+export interface InstrumentItem {
+  key: string;
+  name: string;
+  instruction: string;
+  options: InstrumentItemOption[];
+  /** Scored on both sides; the worse (lower) side counts toward the total. */
+  bilateral?: boolean;
+  /** Optional grouping header (Mini-BEST sections). */
+  section?: string;
+}
+export interface AssessmentInstrument {
+  maxScore: number;
+  attribution?: string;
+  items: InstrumentItem[];
+}
+/** Per-item answers: a number, or {left,right} for bilateral items. */
+export type InstrumentDetail = Record<string, number | { left?: number; right?: number }>;
+
 export interface AssessmentCatalogEntry {
   key: string;
   displayName: string;
@@ -236,6 +255,8 @@ export interface AssessmentCatalogEntry {
   category: string;
   laterality: 'bilateral' | 'single';
   measures: CatalogMeasure[];
+  /** Present for multi-item scored protocols (Berg, Mini-BEST). */
+  instrument?: AssessmentInstrument;
 }
 
 export type MeasurementSide = 'left' | 'right' | 'bilateral';
@@ -248,6 +269,7 @@ export interface Measurement {
   value: number;
   value2: number | null;
   unit: string | null;
+  detail?: InstrumentDetail | null;
   recorded_at: string;
 }
 
@@ -298,6 +320,22 @@ export async function saveMeasurement(
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error((err as { error?: string }).error || 'Failed to save measurement');
+  }
+  return (await res.json()).measurement as Measurement;
+}
+
+export async function saveInstrument(
+  sessionId: number,
+  body: { assessmentKey: string; measureKey: string; detail: InstrumentDetail },
+): Promise<Measurement> {
+  const res = await apiFetch(`/sessions/${sessionId}/measurements`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...body, value: 0 }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to save instrument');
   }
   return (await res.json()).measurement as Measurement;
 }

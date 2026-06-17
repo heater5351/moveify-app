@@ -22,6 +22,25 @@ what to know now, links).
 
 ---
 
+## 2026-06-17 — Multi-item instruments: Berg + Mini-BESTest (guided runner)
+
+- Berg Balance Scale (14 items × 0–4) and Mini-BESTest (14 items × 0–2, 4 sections)
+  are now full **scored instruments**, not a single typed total. New catalog `input`
+  kind `instrument` with an `instrument` block (`items[]`: name, instruction, anchored
+  `options`, optional `bilateral`/`section`). Item content sourced verbatim from the
+  official protocols (Berg public-domain; Mini-BEST ©OHSU, free clinical use w/
+  attribution — **licensing to confirm before commercial go-live**).
+- **Guided one-item-per-screen runner** (`InstrumentRunner.tsx`, full-screen portal):
+  instruction + anchored descriptor buttons, progress bar + running total, review
+  screen to edit any item, save. Bilateral items (Mini-BEST 3 & 6) capture L+R.
+- **Scoring is server-authoritative + deterministic** (`services/instrument-scoring.js`,
+  unit-tested): sum of items, worse (lower) side for bilateral. The total stores in
+  `value` (graded vs the existing `berg_balance`/`mini_bestest` norm); per-item scores
+  in a new additive **`detail JSONB`** column. Berg fall-risk bands corrected to the
+  standard 41–56 / 21–40 / 1–20 (norm + `normative-data.md`).
+- Tests: `instrument-scoring.test.mjs` (sum, bilateral worse-side, validation, grading).
+  This scoring engine is the foundation the Phase 4 PROM kiosk will reuse.
+
 ## 2026-06-16 — Assessment catalog: full suite + compound/toggle (Tier 2)
 
 - Catalog now 30 assessments. Added the rest of the graded norm tests plus the

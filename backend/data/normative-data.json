@@ -482,14 +482,14 @@
       "unit": "points", "direction": "higher_better", "type": "threshold",
       "maxScore": 56,
       "categories": [
-        { "label": "high fall risk; gait typically requires assistance", "max": 40, "flag": true },
-        { "label": "moderate fall risk; below the 45/56 independence threshold", "max": 44, "flag": true },
-        { "label": "consistent with independent ambulation", "max": 56 }
+        { "label": "high fall risk", "max": 20, "flag": true },
+        { "label": "medium fall risk", "max": 40, "flag": true },
+        { "label": "low fall risk", "max": 56 }
       ],
       "cutoffs": [],
       "mdc": { "value": 5, "unit": "points", "note": "MDC ~4-7 points; varies with baseline (higher near the floor)" },
       "caveats": [],
-      "note": "14-item scale scored 0-56. The 45/56 cut-off is the classic fall-risk threshold; below ~40 strongly predicts assisted gait.",
+      "note": "14-item scale scored 0-56. Fall-risk bands: 41-56 low, 21-40 medium, 1-20 high. The 45/56 cut-off is also cited as the classic independence threshold (Berg 1992).",
       "sourceShort": "Berg 1989; Shumway-Cook 1997"
     },
     "cervical_flexion_rom": {

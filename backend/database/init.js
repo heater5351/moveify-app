@@ -915,6 +915,9 @@ async function initDatabase() {
     // Second value for compound measures (e.g. blood pressure diastolic). NULL for
     // single-value measures. Additive — safe on existing rows.
     await db.query(`ALTER TABLE scribe_session_measurements ADD COLUMN IF NOT EXISTS value2 NUMERIC`);
+    // Per-item breakdown for multi-item instruments (Berg, Mini-BEST): the summed
+    // total lives in `value` (graded), the item scores in `detail`. NULL otherwise.
+    await db.query(`ALTER TABLE scribe_session_measurements ADD COLUMN IF NOT EXISTS detail JSONB`);
 
     // Seed default SOAP template (exercise physiology)
     await db.query(`
