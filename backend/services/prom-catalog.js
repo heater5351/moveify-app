@@ -10,7 +10,18 @@ const CATALOG_PATH = path.join(__dirname, '../data/prom-catalog.json');
 
 let CATALOG = null;
 function loadProms() {
-  if (!CATALOG) CATALOG = JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8'));
+  if (!CATALOG) {
+    CATALOG = JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8'));
+    // Resolve a prom-level `itemScale` onto each item that has no input of its own,
+    // so items carrying only `text` (LEFS/K10/DASS-21) get a usable numeric scale.
+    for (const p of CATALOG.proms) {
+      if (p.itemScale && Array.isArray(p.items)) {
+        for (const it of p.items) {
+          if (!it.scale && !it.options && !it.type) it.scale = p.itemScale;
+        }
+      }
+    }
+  }
   return CATALOG;
 }
 

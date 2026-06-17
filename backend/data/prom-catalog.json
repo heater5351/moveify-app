@@ -1,11 +1,12 @@
 {
   "_meta": {
-    "description": "Patient-completed outcome measures (PROMs) for the in-clinic kiosk (Phase 4). Each PROM defines its items (or clinician-entered activities), a 0-N tappable scale, a deterministic `scoring` shape, and interpretation `bands`. Scoring is computed server-side (services/prom-scoring.js), never by the LLM. Seed ONLY license-safe instruments — many PROMs are copyrighted for electronic/commercial use. `license` records the basis per instrument; confirm before commercial go-live.",
+    "description": "Patient-completed outcome measures (PROMs) for the in-clinic kiosk (Phase 4). Each PROM defines items (numeric `scale`, choice `options`, or `yesno`), optional `reverse`/`subscale`, a deterministic `scoring` shape, and interpretation `bands`. Scoring is server-side (services/prom-scoring.js), never the LLM. Seed ONLY license-safe instruments; `license` records the basis. ⚠ Item wording AUTHORED from the standard published forms — VERIFY against the official instrument before go-live.",
     "scoring": {
       "single": "Score = the single item's value.",
-      "average": "Score = mean of the (clinician-entered) activity ratings (PSFS).",
-      "sum": "Score = sum of item values (e.g. LEFS).",
-      "percentage": "Score = sum / max possible × 100 (e.g. NDI/ODI)."
+      "average": "Mean of items (NPRS) or clinician-entered activities (PSFS).",
+      "sum": "Sum of item values (LEFS, K10).",
+      "percentage": "Sum / max possible × 100 (NDI/ODI).",
+      "subscales": "Sum per `subscale` (× optional multiplier), each banded (DASS-21, PROMIS-10)."
     }
   },
   "proms": [
@@ -15,14 +16,12 @@
       "shortName": "Pain (NPRS)",
       "license": "Public domain.",
       "higherIsBetter": false,
-      "scoring": "single",
-      "patientIntro": "Please rate your pain over the past week.",
+      "scoring": "average",
+      "patientIntro": "Please rate your pain on a scale from 0 to 10.",
       "items": [
-        {
-          "key": "pain",
-          "text": "On average over the past week, how bad has your pain been?",
-          "scale": { "min": 0, "max": 10, "minLabel": "No pain", "maxLabel": "Worst pain imaginable" }
-        }
+        { "key": "now", "text": "What is your pain right now?", "scale": { "min": 0, "max": 10, "minLabel": "No pain", "maxLabel": "Worst pain imaginable" } },
+        { "key": "avg", "text": "On average over the past 7 days, how bad has your pain been?", "scale": { "min": 0, "max": 10, "minLabel": "No pain", "maxLabel": "Worst pain imaginable" } },
+        { "key": "worst", "text": "At its worst over the past 7 days, how bad has your pain been?", "scale": { "min": 0, "max": 10, "minLabel": "No pain", "maxLabel": "Worst pain imaginable" } }
       ],
       "bands": [
         { "max": 0, "label": "No pain" },
@@ -40,9 +39,7 @@
       "scoring": "average",
       "patientIntro": "For each activity, rate how able you are to do it today.",
       "activities": {
-        "min": 1,
-        "max": 5,
-        "clinicianEntered": true,
+        "min": 1, "max": 5, "clinicianEntered": true,
         "prompt": "Activity the patient finds difficult (e.g. walking 20 min, climbing stairs)",
         "scale": { "min": 0, "max": 10, "minLabel": "Unable to perform", "maxLabel": "Able as before injury" }
       },
@@ -51,6 +48,110 @@
         { "max": 6, "label": "Moderate limitation" },
         { "max": 8.9, "label": "Mild limitation" },
         { "max": 10, "label": "Minimal or no limitation" }
+      ]
+    },
+    {
+      "key": "lefs",
+      "name": "Lower Extremity Functional Scale",
+      "shortName": "Lower limb (LEFS)",
+      "license": "Free for clinical use (Binkley et al. 1999).",
+      "higherIsBetter": true,
+      "scoring": "sum",
+      "patientIntro": "For each activity, rate how much difficulty you have doing it today.",
+      "itemScale": { "min": 0, "max": 4, "minLabel": "Extreme difficulty or unable", "maxLabel": "No difficulty" },
+      "items": [
+        { "key": "l1", "text": "Any of your usual work, housework or school activities" },
+        { "key": "l2", "text": "Your usual hobbies, recreational or sporting activities" },
+        { "key": "l3", "text": "Getting into or out of the bath" },
+        { "key": "l4", "text": "Walking between rooms" },
+        { "key": "l5", "text": "Putting on your shoes or socks" },
+        { "key": "l6", "text": "Squatting" },
+        { "key": "l7", "text": "Lifting an object, like a bag of groceries, from the floor" },
+        { "key": "l8", "text": "Performing light activities around your home" },
+        { "key": "l9", "text": "Performing heavy activities around your home" },
+        { "key": "l10", "text": "Getting into or out of a car" },
+        { "key": "l11", "text": "Walking 2 blocks" },
+        { "key": "l12", "text": "Walking a mile" },
+        { "key": "l13", "text": "Going up or down 10 stairs (about 1 flight)" },
+        { "key": "l14", "text": "Standing for 1 hour" },
+        { "key": "l15", "text": "Sitting for 1 hour" },
+        { "key": "l16", "text": "Running on even ground" },
+        { "key": "l17", "text": "Running on uneven ground" },
+        { "key": "l18", "text": "Making sharp turns while running fast" },
+        { "key": "l19", "text": "Hopping" },
+        { "key": "l20", "text": "Rolling over in bed" }
+      ],
+      "bands": [
+        { "max": 20, "label": "Severe limitation" },
+        { "max": 40, "label": "Moderate limitation" },
+        { "max": 60, "label": "Mild limitation" },
+        { "max": 80, "label": "Minimal or no limitation" }
+      ]
+    },
+    {
+      "key": "k10",
+      "name": "Kessler Psychological Distress Scale (K10)",
+      "shortName": "Distress (K10)",
+      "license": "Free for clinical use (Kessler 2002).",
+      "higherIsBetter": false,
+      "scoring": "sum",
+      "patientIntro": "In the past 4 weeks, about how often did you feel…",
+      "itemScale": { "min": 1, "max": 5, "minLabel": "None of the time", "maxLabel": "All of the time" },
+      "items": [
+        { "key": "k1", "text": "…tired out for no good reason?" },
+        { "key": "k2", "text": "…nervous?" },
+        { "key": "k3", "text": "…so nervous that nothing could calm you down?" },
+        { "key": "k4", "text": "…hopeless?" },
+        { "key": "k5", "text": "…restless or fidgety?" },
+        { "key": "k6", "text": "…so restless you could not sit still?" },
+        { "key": "k7", "text": "…depressed?" },
+        { "key": "k8", "text": "…that everything was an effort?" },
+        { "key": "k9", "text": "…so sad that nothing could cheer you up?" },
+        { "key": "k10", "text": "…worthless?" }
+      ],
+      "bands": [
+        { "max": 19, "label": "Likely to be well" },
+        { "max": 24, "label": "Mild distress" },
+        { "max": 29, "label": "Moderate distress" },
+        { "max": 50, "label": "Severe distress" }
+      ]
+    },
+    {
+      "key": "dass21",
+      "name": "Depression Anxiety Stress Scales (DASS-21)",
+      "shortName": "DASS-21",
+      "license": "Free for clinical/research use (Lovibond & Lovibond 1995).",
+      "higherIsBetter": false,
+      "scoring": "subscales",
+      "patientIntro": "Over the past week, how much did each statement apply to you?",
+      "itemScale": { "min": 0, "max": 3, "minLabel": "Did not apply to me", "maxLabel": "Applied very much / most of the time" },
+      "subscales": [
+        { "key": "d", "name": "Depression", "multiplier": 2, "maxScore": 42, "bands": [ { "max": 9, "label": "Normal" }, { "max": 13, "label": "Mild" }, { "max": 20, "label": "Moderate" }, { "max": 27, "label": "Severe" }, { "max": 99, "label": "Extremely severe" } ] },
+        { "key": "a", "name": "Anxiety", "multiplier": 2, "maxScore": 42, "bands": [ { "max": 7, "label": "Normal" }, { "max": 9, "label": "Mild" }, { "max": 14, "label": "Moderate" }, { "max": 19, "label": "Severe" }, { "max": 99, "label": "Extremely severe" } ] },
+        { "key": "s", "name": "Stress", "multiplier": 2, "maxScore": 42, "bands": [ { "max": 14, "label": "Normal" }, { "max": 18, "label": "Mild" }, { "max": 25, "label": "Moderate" }, { "max": 33, "label": "Severe" }, { "max": 99, "label": "Extremely severe" } ] }
+      ],
+      "items": [
+        { "key": "q1", "subscale": "s", "text": "I found it hard to wind down" },
+        { "key": "q2", "subscale": "a", "text": "I was aware of dryness of my mouth" },
+        { "key": "q3", "subscale": "d", "text": "I couldn't seem to experience any positive feeling at all" },
+        { "key": "q4", "subscale": "a", "text": "I experienced breathing difficulty (e.g. rapid breathing, breathlessness without exertion)" },
+        { "key": "q5", "subscale": "d", "text": "I found it difficult to work up the initiative to do things" },
+        { "key": "q6", "subscale": "s", "text": "I tended to over-react to situations" },
+        { "key": "q7", "subscale": "a", "text": "I experienced trembling (e.g. in the hands)" },
+        { "key": "q8", "subscale": "s", "text": "I felt that I was using a lot of nervous energy" },
+        { "key": "q9", "subscale": "a", "text": "I was worried about situations in which I might panic and make a fool of myself" },
+        { "key": "q10", "subscale": "d", "text": "I felt that I had nothing to look forward to" },
+        { "key": "q11", "subscale": "s", "text": "I found myself getting agitated" },
+        { "key": "q12", "subscale": "s", "text": "I found it difficult to relax" },
+        { "key": "q13", "subscale": "d", "text": "I felt down-hearted and blue" },
+        { "key": "q14", "subscale": "s", "text": "I was intolerant of anything that kept me from getting on with what I was doing" },
+        { "key": "q15", "subscale": "a", "text": "I felt I was close to panic" },
+        { "key": "q16", "subscale": "d", "text": "I was unable to become enthusiastic about anything" },
+        { "key": "q17", "subscale": "d", "text": "I felt I wasn't worth much as a person" },
+        { "key": "q18", "subscale": "s", "text": "I felt that I was rather touchy" },
+        { "key": "q19", "subscale": "a", "text": "I was aware of my heart acting up without exertion (heart rate increase, missing a beat)" },
+        { "key": "q20", "subscale": "a", "text": "I felt scared without any good reason" },
+        { "key": "q21", "subscale": "d", "text": "I felt that life was meaningless" }
       ]
     }
   ]

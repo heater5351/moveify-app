@@ -939,6 +939,9 @@ async function initDatabase() {
     `);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_session_outcomes_session ON scribe_session_outcomes(session_id)`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_session_outcomes_patient ON scribe_session_outcomes(patient_id, prom_key)`);
+    // Per-subscale breakdown for multi-subscale PROMs (DASS-21, PROMIS-10). Derived
+    // scores+bands only (not raw responses), so plain like `score`. NULL otherwise.
+    await db.query(`ALTER TABLE scribe_session_outcomes ADD COLUMN IF NOT EXISTS detail JSONB`);
 
     // Clinician kiosk-exit PIN (hashed). Gates leaving the patient-facing PROM kiosk
     // while the iPad is signed in as the clinician. Additive.

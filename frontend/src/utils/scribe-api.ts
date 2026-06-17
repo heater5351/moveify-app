@@ -301,7 +301,10 @@ export async function fetchMeasurementSeries(patientId: number): Promise<Measure
 export interface PromItem {
   key: string;
   text: string;
-  scale: { min: number; max: number; minLabel?: string; maxLabel?: string };
+  scale?: { min: number; max: number; minLabel?: string; maxLabel?: string };
+  options?: { value: number; label: string }[];
+  type?: 'yesno';
+  subscale?: string;
 }
 export interface PromCatalogEntry {
   key: string;
@@ -318,7 +321,8 @@ export interface PromCatalogEntry {
 /** Patient responses: fixed-item map, or clinician-named activities each rated. */
 export type PromResponses = Record<string, number> | { activities: { name: string; score: number }[] };
 
-export interface OutcomeResult { id?: number; promKey: string; score: number | null; band: string | null; completedAt?: string }
+export interface OutcomeSubscale { key: string; name: string; score: number | null; band: string | null; max: number | null }
+export interface OutcomeResult { id?: number; promKey: string; score: number | null; band: string | null; subscales?: OutcomeSubscale[] | null; completedAt?: string }
 
 export async function fetchPromCatalog(): Promise<PromCatalogEntry[]> {
   const res = await apiFetch('/prom-catalog');

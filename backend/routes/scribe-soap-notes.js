@@ -8,7 +8,7 @@ const { renderProgramDiff } = require('../services/program-diff');
 const { renderMeasurements } = require('../services/measurement-render');
 const { getPatientDemographics } = require('../services/scribe-demographics');
 const { getProm } = require('../services/prom-catalog');
-const { summarizeOutcome } = require('../services/prom-scoring');
+const { outcomeLines } = require('../services/prom-scoring');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -211,13 +211,12 @@ router.post('/:sessionId/soap-note/generate', async (req, res) => {
     let outcomes = [];
     try {
       const rows = await db.query(
-        'SELECT prom_key, score, score_band FROM scribe_session_outcomes WHERE session_id = $1 ORDER BY id ASC',
+        'SELECT prom_key, score, score_band, detail FROM scribe_session_outcomes WHERE session_id = $1 ORDER BY id ASC',
         [req.params.sessionId]
       );
       for (const o of rows.rows) {
         const prom = getProm(o.prom_key);
-        const line = prom && summarizeOutcome(prom, o.score != null ? Number(o.score) : null, o.score_band);
-        if (line) outcomes.push(line);
+        if (prom) outcomes.push(...outcomeLines(prom, o.score != null ? Number(o.score) : null, o.score_band, o.detail));
       }
     } catch (err) {
       console.error('Outcome fetch failed (continuing without it):', err.message);

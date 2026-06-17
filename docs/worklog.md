@@ -35,10 +35,16 @@ what to know now, links).
   derived `score` + `score_band` stored plain for the note/trend. `prom_completed`
   audit logs the PROM key only, never the responses.
 - **Deterministic scoring** (`services/prom-scoring.js`, server-authoritative, unit-
-  tested): shapes single/average/sum/percentage. Catalog `data/prom-catalog.json`
-  seeds **NPRS** (single, public domain) + **PSFS** (average of clinician-entered
-  activities, free). Score+band feed a new SOAP `PATIENT-REPORTED OUTCOME MEASURES`
-  block (`buildSoapUserMessage`).
+  tested). Generalized item model — numeric `scale`, choice `options`, or `yesno`,
+  with optional `reverse`/`subscale`; scoring shapes single/average/sum/percentage/
+  **subscales** (per-subscale sum × multiplier, e.g. DASS-21 ×2). Subscale breakdown
+  stored in `scribe_session_outcomes.detail` (additive JSONB). Score+band feed a new
+  SOAP `PATIENT-REPORTED OUTCOME MEASURES` block (`buildSoapUserMessage`, one line per
+  subscale). Catalog `data/prom-catalog.json` seeds **NPRS** (3-item composite), **PSFS**
+  (clinician-entered activities, defaults to 3), **LEFS**, **K10**, **DASS-21** — all
+  free/public-domain. ⚠ Item wording **authored from the standard forms — to verify
+  against the official instruments**. Remaining (UEFI, RMDQ, NDI, ODI [licence-flag],
+  Örebro-SF, PROMIS-10) = next batch.
 - Routes (`routes/scribe-proms.js`, clinician-only, `/api/scribe`): `GET /prom-catalog`,
   session `POST`/`GET /outcomes`, `GET /patients/:id/outcomes`, kiosk-PIN set/verify.
 - **Deferred (4b):** PDF render → Cliniko attachment; LEFS/NDI/Örebro catalog expansion

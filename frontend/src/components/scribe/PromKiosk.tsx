@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Lock, ArrowLeft, Check, Loader2, Plus, X } from 'lucide-react';
-import { submitOutcome, verifyKioskPin, type PromCatalogEntry, type PromResponses, type OutcomeResult } from '../../utils/scribe-api';
+import { submitOutcome, verifyKioskPin, type PromCatalogEntry, type PromItem, type PromResponses, type OutcomeResult } from '../../utils/scribe-api';
 
 interface PromKioskProps {
   prom: PromCatalogEntry;
@@ -11,13 +11,13 @@ interface PromKioskProps {
   onExit: () => void; // called after PIN-verified exit
 }
 
-interface Question { key: string; text: string; scale: { min: number; max: number; minLabel?: string; maxLabel?: string }; }
+interface Question { key: string; text: string; item: PromItem; }
 
 export default function PromKiosk({ prom, sessionId, ensureSession, onComplete, onExit }: PromKioskProps) {
   const isPsfs = prom.scoring === 'average' && !!prom.activities?.clinicianEntered;
 
   const [phase, setPhase] = useState<'setup' | 'intro' | 'question' | 'thanks'>(isPsfs ? 'setup' : 'intro');
-  const [activities, setActivities] = useState<string[]>(['']);
+  const [activities, setActivities] = useState<string[]>(['', '', '']);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [qIdx, setQIdx] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -32,9 +32,9 @@ export default function PromKiosk({ prom, sessionId, ensureSession, onComplete, 
   const questions: Question[] = useMemo(() => {
     if (isPsfs) {
       const sc = prom.activities!.scale;
-      return activities.map((name, i) => ({ key: `act_${i}`, text: name, scale: sc }));
+      return activities.map((name, i) => ({ key: `act_${i}`, text: name, item: { key: `act_${i}`, text: name, scale: sc } }));
     }
-    return (prom.items ?? []).map(it => ({ key: it.key, text: it.text, scale: it.scale }));
+    return (prom.items ?? []).map(it => ({ key: it.key, text: it.text, item: it }));
   }, [isPsfs, activities, prom]);
 
   function pick(value: number) {
@@ -144,25 +144,48 @@ export default function PromKiosk({ prom, sessionId, ensureSession, onComplete, 
           <div className="flex-1 flex flex-col justify-center">
             <h2 className="text-2xl font-bold text-secondary-700 mb-10 leading-snug text-center">{questions[qIdx].text}</h2>
 
-            <div className="grid grid-cols-6 sm:grid-cols-11 gap-2">
-              {Array.from({ length: questions[qIdx].scale.max - questions[qIdx].scale.min + 1 }, (_, n) => questions[qIdx].scale.min + n).map(v => {
-                const isCur = answers[questions[qIdx].key] === v;
+            {(() => {
+              const item = questions[qIdx].item;
+              const cur = answers[questions[qIdx].key];
+              if (item.type === 'yesno') {
                 return (
-                  <button
-                    key={v}
-                    onClick={() => pick(v)}
-                    disabled={saving}
-                    className={`aspect-square rounded-xl text-xl font-bold border-2 transition active:scale-95 ${isCur ? 'bg-primary-400 border-primary-400 text-white' : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'}`}
-                  >
-                    {v}
-                  </button>
+                  <div className="grid grid-cols-2 gap-3 max-w-md mx-auto w-full">
+                    {[{ v: 1, l: 'Yes' }, { v: 0, l: 'No' }].map(o => (
+                      <button key={o.v} onClick={() => pick(o.v)} disabled={saving}
+                        className={`min-h-16 rounded-xl text-lg font-bold border-2 transition active:scale-95 ${cur === o.v ? 'bg-primary-400 border-primary-400 text-white' : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'}`}>{o.l}</button>
+                    ))}
+                  </div>
                 );
-              })}
-            </div>
-            <div className="flex justify-between text-sm text-gray-400 mt-3 px-1">
-              <span>{questions[qIdx].scale.minLabel}</span>
-              <span>{questions[qIdx].scale.maxLabel}</span>
-            </div>
+              }
+              if (item.options) {
+                return (
+                  <div className="space-y-2.5 max-w-xl mx-auto w-full">
+                    {item.options.map(o => (
+                      <button key={o.value} onClick={() => pick(o.value)} disabled={saving}
+                        className={`w-full flex items-center gap-3 min-h-14 rounded-xl border-2 px-4 py-3 text-left transition active:scale-[0.99] ${cur === o.value ? 'border-primary-400 bg-primary-50' : 'border-gray-200 bg-white hover:border-primary-300'}`}>
+                        <span className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-lg font-bold ${cur === o.value ? 'bg-primary-400 text-white' : 'bg-gray-100 text-secondary-700'}`}>{o.value}</span>
+                        <span className="text-base font-medium text-secondary-700 leading-snug">{o.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              }
+              const sc = item.scale!;
+              return (
+                <>
+                  <div className="grid grid-cols-6 sm:grid-cols-11 gap-2">
+                    {Array.from({ length: sc.max - sc.min + 1 }, (_, n) => sc.min + n).map(v => (
+                      <button key={v} onClick={() => pick(v)} disabled={saving}
+                        className={`aspect-square rounded-xl text-xl font-bold border-2 transition active:scale-95 ${cur === v ? 'bg-primary-400 border-primary-400 text-white' : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'}`}>{v}</button>
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-400 mt-3 px-1">
+                    <span>{sc.minLabel}</span>
+                    <span>{sc.maxLabel}</span>
+                  </div>
+                </>
+              );
+            })()}
             {saving && <div className="flex items-center justify-center gap-2 text-sm text-primary-600 mt-6"><Loader2 className="w-4 h-4 animate-spin" /> Saving…</div>}
             {error && <p className="text-sm text-red-500 text-center mt-4">{error}</p>}
           </div>

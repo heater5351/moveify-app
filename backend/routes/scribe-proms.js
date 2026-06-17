@@ -98,19 +98,19 @@ router.post('/sessions/:sessionId/outcomes', async (req, res) => {
     const err = validateResponses(prom, responses);
     if (err) return res.status(400).json({ error: err });
 
-    const { score, band } = scoreProm(prom, responses);
+    const { score, band, subscales } = scoreProm(prom, responses);
 
     const result = await db.query(
-      `INSERT INTO scribe_session_outcomes (session_id, patient_id, prom_key, responses_enc, score, score_band)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO scribe_session_outcomes (session_id, patient_id, prom_key, responses_enc, score, score_band, detail)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
        ON CONFLICT (session_id, prom_key)
-       DO UPDATE SET responses_enc = EXCLUDED.responses_enc, score = EXCLUDED.score, score_band = EXCLUDED.score_band, completed_at = NOW()
+       DO UPDATE SET responses_enc = EXCLUDED.responses_enc, score = EXCLUDED.score, score_band = EXCLUDED.score_band, detail = EXCLUDED.detail, completed_at = NOW()
        RETURNING id, completed_at`,
-      [session.id, session.patient_id, promKey, encrypt(JSON.stringify(responses)), score, band]
+      [session.id, session.patient_id, promKey, encrypt(JSON.stringify(responses)), score, band, subscales ? JSON.stringify(subscales) : null]
     );
     // Audit which PROM was completed — never the raw responses (sensitive self-report).
     audit.log(req, 'prom_completed', 'scribe_session', session.id, { promKey });
-    res.json({ id: result.rows[0].id, promKey, score, band, completedAt: result.rows[0].completed_at });
+    res.json({ id: result.rows[0].id, promKey, score, band, subscales: subscales || null, completedAt: result.rows[0].completed_at });
   } catch (err) {
     console.error('Submit outcome error:', err.message);
     res.status(500).json({ error: 'Failed to save outcome measure' });
@@ -123,10 +123,10 @@ router.get('/sessions/:sessionId/outcomes', async (req, res) => {
     const session = await verifySession(req.params.sessionId, req.user.id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
     const r = await db.query(
-      `SELECT prom_key, score, score_band, completed_at FROM scribe_session_outcomes WHERE session_id = $1 ORDER BY id ASC`,
+      `SELECT prom_key, score, score_band, detail, completed_at FROM scribe_session_outcomes WHERE session_id = $1 ORDER BY id ASC`,
       [req.params.sessionId]
     );
-    res.json({ outcomes: r.rows.map(o => ({ promKey: o.prom_key, score: o.score != null ? Number(o.score) : null, band: o.score_band, completedAt: o.completed_at })) });
+    res.json({ outcomes: r.rows.map(o => ({ promKey: o.prom_key, score: o.score != null ? Number(o.score) : null, band: o.score_band, subscales: o.detail || null, completedAt: o.completed_at })) });
   } catch (err) {
     console.error('Get outcomes error:', err.message);
     res.status(500).json({ error: 'Failed to load outcomes' });

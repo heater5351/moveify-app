@@ -300,9 +300,12 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
         <div className="flex flex-wrap gap-1.5 mb-3 shrink-0">
           {outcomes.map(o => {
             const p = proms.find(x => x.key === o.promKey);
+            const label = o.subscales && o.subscales.length
+              ? `${p?.shortName || o.promKey}: ${o.subscales.map(s => `${s.name.slice(0, 1)}${s.score}`).join('/')}`
+              : `${p?.shortName || o.promKey}: ${o.score}${o.band ? ` (${o.band})` : ''}`;
             return (
               <span key={o.promKey} className="inline-flex items-center gap-1 text-xs bg-secondary-500/10 text-secondary-700 rounded-full px-2.5 py-1">
-                <ClipboardCheck className="w-3 h-3" /> {(p?.shortName || o.promKey)}: {o.score}{o.band ? ` (${o.band})` : ''}
+                <ClipboardCheck className="w-3 h-3" /> {label}
               </span>
             );
           })}
@@ -332,7 +335,7 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                         {done ? <ClipboardCheck className="w-4 h-4 text-green-500 shrink-0" /> : <ClipboardList className="w-4 h-4 shrink-0 opacity-70" />}
                         {p.shortName || p.name}
                       </span>
-                      <span className="text-xs font-medium opacity-70 mt-0.5">{done ? `${done.score} (${done.band})` : 'Tap to hand to patient'}</span>
+                      <span className="text-xs font-medium opacity-70 mt-0.5">{done ? (done.subscales && done.subscales.length ? 'Completed' : `${done.score} (${done.band})`) : 'Tap to hand to patient'}</span>
                     </button>
                   );
                 })}
