@@ -182,15 +182,19 @@ export default function PromKiosk({ prom, sessionId, ensureSession, onComplete, 
                 );
               }
               const sc = item.scale!;
+              const count = sc.max - sc.min + 1;
+              // Columns = number of options so a 0-3 spreads across the full width
+              // (big buttons) just like a 0-10, instead of bunching to the left.
+              const maxW = count <= 5 ? 'max-w-xl' : 'max-w-3xl';
               return (
                 <>
-                  <div className="grid grid-cols-6 sm:grid-cols-11 gap-2.5 max-w-3xl mx-auto w-full">
-                    {Array.from({ length: sc.max - sc.min + 1 }, (_, n) => sc.min + n).map(v => (
+                  <div className={`grid gap-2.5 ${maxW} mx-auto w-full`} style={{ gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))` }}>
+                    {Array.from({ length: count }, (_, n) => sc.min + n).map(v => (
                       <button key={v} onClick={() => pick(v)} disabled={saving}
-                        className={`aspect-square min-h-14 rounded-2xl text-2xl font-bold border-2 transition active:scale-95 ${cur === v ? 'bg-primary-400 border-primary-400 text-white' : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'}`}>{v}</button>
+                        className={`h-16 sm:h-20 rounded-2xl text-2xl font-bold border-2 transition active:scale-95 ${cur === v ? 'bg-primary-400 border-primary-400 text-white' : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'}`}>{v}</button>
                     ))}
                   </div>
-                  <div className="flex justify-between text-lg text-gray-500 mt-4 px-1 max-w-3xl mx-auto w-full">
+                  <div className={`flex justify-between text-lg text-gray-500 mt-4 px-1 ${maxW} mx-auto w-full`}>
                     <span>{sc.minLabel}</span>
                     <span className="text-right">{sc.maxLabel}</span>
                   </div>
