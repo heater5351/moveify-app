@@ -456,10 +456,9 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
           {/* Input sheet — bottom overlay (fixed to the viewport) so the controls
               are always reachable without scrolling. "Next" cycles the fields. */}
           {focused && focusedMeasure && selected && createPortal(
-            <div className="fixed inset-0 z-[60] flex flex-col justify-end">
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
               <div className="absolute inset-0 bg-secondary-900/40" onClick={pressDone} />
-              <div className="relative w-full max-w-2xl mx-auto bg-white rounded-t-3xl shadow-2xl px-4 pt-3 pb-7">
-                <div className="w-10 h-1.5 bg-gray-200 rounded-full mx-auto mb-3" />
+              <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl px-4 pt-4 pb-5 max-h-[85vh] overflow-y-auto">
                 <div className="flex items-start justify-between mb-3">
                   <div className="min-w-0">
                     <p className="text-base font-bold text-secondary-700 leading-tight">{selected.displayName}</p>
