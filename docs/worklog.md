@@ -32,9 +32,12 @@ what to know now, links).
   UEFI = sum/80.
 - **ODI** included with a licence note (©Fairbank/Mapi — free for non-funded research &
   individual clinical practice; commercial/electronic use may need a licence; Ryan's call).
-- **PROMIS-10** deferred: needs a raw→T-score lookup scoring shape + the pain-item recode
-  (T-score tables already sourced) — a focused follow-up. Tests: `prom-scoring.test.mjs`
-  (188 backend tests pass).
+- **PROMIS-10** now added too: new `tscore` scoring shape — each subscale sums its
+  (recoded) items then maps the raw sum to a standardised T-score via the official
+  lookup tables. Physical = Global03/06/07/08, Mental = Global02/04/05/10; pain item
+  recoded 0-10→5-1; fatigue/emotional response values pre-reversed (v1.2). Sourced from
+  the HealthMeasures scoring manual. **PROM library now 11 instruments**; 191 backend
+  tests pass. (Phase 4b PDF→Cliniko still the only deferred piece.)
 
 ## 2026-06-17 — Phase 4 (4a): patient-completed outcome measures (PROM kiosk)
 

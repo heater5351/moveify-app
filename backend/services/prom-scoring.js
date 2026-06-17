@@ -26,6 +26,18 @@ function reversed(item, v) {
   const { min, max } = itemRange(item);
   return max + min - v;
 }
+// Item value after any recode, for sum/subscale/T-score scoring. PROMIS pain item
+// (0-10) collapses to a 1-5 value per the official scoring manual.
+function recodedValue(item, v) {
+  if (item && item.recode === 'pain10to5') {
+    if (v === 0) return 5;
+    if (v <= 3) return 4;
+    if (v <= 6) return 3;
+    if (v <= 9) return 2;
+    return 1;
+  }
+  return reversed(item, v);
+}
 function bandFor(bands, score) {
   if (!Array.isArray(bands) || score == null) return null;
   const b = bands.find(x => score <= x.max) || bands[bands.length - 1];
@@ -66,6 +78,23 @@ function scoreProm(prom, responses) {
     const score = vs.length ? round1(mean(vs)) : null;
     return { score, band: bandFor(prom.bands, score), max: itemRange(items[0]).max, subscales: null };
   }
+  // T-score lookup (PROMIS Global-10): each subscale sums its (recoded) items, then
+  // a raw→T conversion table maps the summed raw score to a standardised T-score.
+  if (prom.scoring === 'tscore') {
+    const byKey = new Map(items.map(it => [it.key, it]));
+    const subs = (prom.subscales || []).map(sub => {
+      const raw = sub.items.reduce((acc, key) => {
+        const it = byKey.get(key);
+        const v = Number(r[key]);
+        return Number.isFinite(v) ? acc + recodedValue(it, v) : acc;
+      }, 0);
+      const t = sub.tscoreTable[String(raw)];
+      const score = t != null ? t : null;
+      return { key: sub.key, name: sub.name, raw, score, band: bandFor(sub.bands, score), max: null };
+    });
+    return { score: null, band: null, max: null, subscales: subs };
+  }
+
   if (prom.scoring === 'subscales') {
     const subs = (prom.subscales || []).map(sub => {
       const vs = items.filter(it => it.subscale === sub.key).map(val).filter(v => v != null);

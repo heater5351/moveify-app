@@ -443,6 +443,35 @@
         { "max": 49, "label": "Lower risk of work disability" },
         { "max": 100, "label": "Higher risk of work disability (>50)" }
       ]
+    },
+    {
+      "key": "promis10",
+      "name": "PROMIS Global Health (Global-10)",
+      "shortName": "Global health (PROMIS-10)",
+      "license": "Free (PROMIS Health Organization / HealthMeasures).",
+      "higherIsBetter": true,
+      "scoring": "tscore",
+      "patientIntro": "These questions ask about your overall health and wellbeing.",
+      "subscales": [
+        { "key": "physical", "name": "Physical Health", "items": ["g3", "g6", "g7", "g8"],
+          "tscoreTable": { "4": 16.2, "5": 19.9, "6": 23.5, "7": 26.7, "8": 29.6, "9": 32.4, "10": 34.9, "11": 37.4, "12": 39.8, "13": 42.3, "14": 44.9, "15": 47.7, "16": 50.8, "17": 54.1, "18": 57.7, "19": 61.9, "20": 67.7 },
+          "bands": [ { "max": 35, "label": "Poor" }, { "max": 45, "label": "Below average" }, { "max": 55, "label": "Average" }, { "max": 100, "label": "Above average" } ] },
+        { "key": "mental", "name": "Mental Health", "items": ["g2", "g4", "g5", "g10"],
+          "tscoreTable": { "4": 21.2, "5": 25.1, "6": 28.4, "7": 31.3, "8": 33.8, "9": 36.3, "10": 38.8, "11": 41.1, "12": 43.5, "13": 45.8, "14": 48.3, "15": 50.8, "16": 53.3, "17": 56.0, "18": 59.0, "19": 62.5, "20": 67.6 },
+          "bands": [ { "max": 35, "label": "Poor" }, { "max": 45, "label": "Below average" }, { "max": 55, "label": "Average" }, { "max": 100, "label": "Above average" } ] }
+      ],
+      "items": [
+        { "key": "g1", "text": "In general, would you say your health is:", "options": [ { "value": 5, "label": "Excellent" }, { "value": 4, "label": "Very good" }, { "value": 3, "label": "Good" }, { "value": 2, "label": "Fair" }, { "value": 1, "label": "Poor" } ] },
+        { "key": "g2", "text": "In general, would you say your quality of life is:", "options": [ { "value": 5, "label": "Excellent" }, { "value": 4, "label": "Very good" }, { "value": 3, "label": "Good" }, { "value": 2, "label": "Fair" }, { "value": 1, "label": "Poor" } ] },
+        { "key": "g3", "text": "In general, how would you rate your physical health?", "options": [ { "value": 5, "label": "Excellent" }, { "value": 4, "label": "Very good" }, { "value": 3, "label": "Good" }, { "value": 2, "label": "Fair" }, { "value": 1, "label": "Poor" } ] },
+        { "key": "g4", "text": "In general, how would you rate your mental health, including your mood and your ability to think clearly?", "options": [ { "value": 5, "label": "Excellent" }, { "value": 4, "label": "Very good" }, { "value": 3, "label": "Good" }, { "value": 2, "label": "Fair" }, { "value": 1, "label": "Poor" } ] },
+        { "key": "g5", "text": "In general, how would you rate your satisfaction with your social activities and relationships?", "options": [ { "value": 5, "label": "Excellent" }, { "value": 4, "label": "Very good" }, { "value": 3, "label": "Good" }, { "value": 2, "label": "Fair" }, { "value": 1, "label": "Poor" } ] },
+        { "key": "g6", "text": "In general, please rate how well you carry out your usual social activities and roles (at home, at work, in your community, and responsibilities as a parent, child, spouse, employee, friend, etc.).", "options": [ { "value": 5, "label": "Excellent" }, { "value": 4, "label": "Very good" }, { "value": 3, "label": "Good" }, { "value": 2, "label": "Fair" }, { "value": 1, "label": "Poor" } ] },
+        { "key": "g7", "text": "How would you rate your pain on average?", "recode": "pain10to5", "scale": { "min": 0, "max": 10, "minLabel": "No pain", "maxLabel": "Worst pain imaginable" } },
+        { "key": "g8", "text": "How would you rate your fatigue on average?", "options": [ { "value": 5, "label": "None" }, { "value": 4, "label": "Mild" }, { "value": 3, "label": "Moderate" }, { "value": 2, "label": "Severe" }, { "value": 1, "label": "Very severe" } ] },
+        { "key": "g9", "text": "To what extent are you able to carry out your everyday physical activities such as walking, climbing stairs, carrying groceries, or moving a chair?", "options": [ { "value": 5, "label": "Completely" }, { "value": 4, "label": "Mostly" }, { "value": 3, "label": "Moderately" }, { "value": 2, "label": "A little" }, { "value": 1, "label": "Not at all" } ] },
+        { "key": "g10", "text": "In the past 7 days, how often have you been bothered by emotional problems such as feeling anxious, depressed or irritable?", "options": [ { "value": 5, "label": "Never" }, { "value": 4, "label": "Rarely" }, { "value": 3, "label": "Sometimes" }, { "value": 2, "label": "Often" }, { "value": 1, "label": "Always" } ] }
+      ]
     }
   ]
 }

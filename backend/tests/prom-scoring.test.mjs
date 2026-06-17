@@ -113,6 +113,27 @@ describe('UEFI / RMDQ', () => {
   });
 });
 
+describe('PROMIS-10 (T-score lookup + pain recode)', () => {
+  const p = getProm('promis10');
+  it('maps best/worst raw sums to the published T-scores', () => {
+    const best = { g1: 5, g2: 5, g3: 5, g4: 5, g5: 5, g6: 5, g7: 0, g8: 5, g9: 5, g10: 5 };
+    const bs = scoreProm(p, best).subscales;
+    expect(bs.find(s => s.key === 'physical')).toMatchObject({ raw: 20, score: 67.7 });
+    expect(bs.find(s => s.key === 'mental')).toMatchObject({ raw: 20, score: 67.6 });
+    const worst = { g1: 1, g2: 1, g3: 1, g4: 1, g5: 1, g6: 1, g7: 10, g8: 1, g9: 1, g10: 1 };
+    const ws = scoreProm(p, worst).subscales;
+    expect(ws.find(s => s.key === 'physical')).toMatchObject({ raw: 4, score: 16.2, band: 'Poor' });
+  });
+  it('applies the pain 0-10 → 5-1 recode in the physical sum', () => {
+    // g3=3,g6=3,g7=5(→3),g8=3 → raw 12 → T 39.8
+    const mid = { g1: 3, g2: 4, g3: 3, g4: 4, g5: 3, g6: 3, g7: 5, g8: 3, g9: 3, g10: 4 };
+    expect(scoreProm(p, mid).subscales.find(s => s.key === 'physical')).toMatchObject({ raw: 12, score: 39.8 });
+  });
+  it('requires every item', () => {
+    expect(validateResponses(p, { g1: 5, g2: 5, g3: 5, g4: 5, g5: 5, g6: 5, g8: 5, g9: 5, g10: 5 })).toContain('g7');
+  });
+});
+
 describe('Örebro-SF (reverse items 3,4,8)', () => {
   const e = getProm('orebro');
   it('reverses the function/work items so higher total = higher risk', () => {
