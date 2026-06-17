@@ -74,3 +74,56 @@ describe('DASS-21 (subscales × 2)', () => {
     expect(validateResponses(dass, { q1: 2 })).toContain('required');
   });
 });
+
+describe('NDI / ODI (10 choice sections → %)', () => {
+  const ndi = getProm('ndi');
+  const odi = getProm('odi');
+  it('each has 10 sections of 6 statements', () => {
+    for (const p of [ndi, odi]) {
+      expect(p.items.length).toBe(10);
+      expect(p.items.every(i => i.options.length === 6)).toBe(true);
+    }
+  });
+  it('scores as a percentage of 50', () => {
+    expect(scoreProm(ndi, Object.fromEntries(ndi.items.map(i => [i.key, 0]))).score).toBe(0);
+    expect(scoreProm(ndi, Object.fromEntries(ndi.items.map(i => [i.key, 5]))).score).toBe(100);
+    // 5 sections at 3, 5 at 2 = 25/50 = 50%
+    const mixed = Object.fromEntries(ndi.items.map((i, idx) => [i.key, idx < 5 ? 3 : 2]));
+    expect(scoreProm(ndi, mixed).score).toBe(50);
+    expect(scoreProm(ndi, mixed).band).toBe('Severe disability');
+  });
+  it('bands ODI at minimal/severe', () => {
+    expect(scoreProm(odi, Object.fromEntries(odi.items.map(i => [i.key, 0]))).band).toBe('Minimal disability');
+    expect(scoreProm(odi, Object.fromEntries(odi.items.map(i => [i.key, 5]))).band).toBe('Bed-bound or severe');
+  });
+  it('rejects an invalid section choice', () => {
+    expect(validateResponses(ndi, Object.fromEntries(ndi.items.map((i, idx) => [i.key, idx === 0 ? 7 : 0])))).toContain('invalid');
+  });
+});
+
+describe('UEFI / RMDQ', () => {
+  it('UEFI sums to 80 at full function', () => {
+    const u = getProm('uefi');
+    expect(scoreProm(u, Object.fromEntries(u.items.map(i => [i.key, 4]))).score).toBe(80);
+  });
+  it('RMDQ counts yes answers (0-24)', () => {
+    const r = getProm('rmdq');
+    expect(scoreProm(r, Object.fromEntries(r.items.map(i => [i.key, 1]))).score).toBe(24);
+    expect(scoreProm(r, Object.fromEntries(r.items.map((i, ix) => [i.key, ix < 5 ? 1 : 0]))).band).toBe('Mild disability');
+  });
+});
+
+describe('Örebro-SF (reverse items 3,4,8)', () => {
+  const e = getProm('orebro');
+  it('reverses the function/work items so higher total = higher risk', () => {
+    const worst = { e1: 10, e2: 10, e3: 0, e4: 0, e5: 10, e6: 10, e7: 10, e8: 0, e9: 10, e10: 10 };
+    expect(scoreProm(e, worst).score).toBe(100);
+    const best = { e1: 1, e2: 0, e3: 10, e4: 10, e5: 0, e6: 0, e7: 0, e8: 10, e9: 0, e10: 0 };
+    expect(scoreProm(e, best).score).toBe(1);
+  });
+  it('flags >50 as higher risk', () => {
+    const ex = { e1: 5, e2: 6, e3: 3, e4: 4, e5: 5, e6: 4, e7: 7, e8: 8, e9: 6, e10: 5 };
+    expect(scoreProm(e, ex).score).toBe(53);
+    expect(scoreProm(e, ex).band).toContain('Higher risk');
+  });
+});

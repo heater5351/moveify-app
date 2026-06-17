@@ -22,6 +22,20 @@ what to know now, links).
 
 ---
 
+## 2026-06-17 — PROM library batch 2 (sourced from official forms)
+
+- Added **NDI**, **ODI**, **UEFI**, **Roland-Morris (RMDQ)**, **Örebro-SF** — catalog
+  now 10 PROMs. Item content transcribed verbatim from official forms (WA L&I ODI,
+  MSU NDI, MAIC Örebro) — still to verify, but sourced not invented.
+- Exercises every engine shape: NDI/ODI = 10 choice-statement sections → **percentage**;
+  RMDQ = 24 **yes/no** → sum; Örebro = **reverse**-scored items 3/4/8 → sum (>50 high risk);
+  UEFI = sum/80.
+- **ODI** included with a licence note (©Fairbank/Mapi — free for non-funded research &
+  individual clinical practice; commercial/electronic use may need a licence; Ryan's call).
+- **PROMIS-10** deferred: needs a raw→T-score lookup scoring shape + the pain-item recode
+  (T-score tables already sourced) — a focused follow-up. Tests: `prom-scoring.test.mjs`
+  (188 backend tests pass).
+
 ## 2026-06-17 — Phase 4 (4a): patient-completed outcome measures (PROM kiosk)
 
 - **PromKiosk.tsx** — full-screen patient-facing questionnaire (one item per screen,
