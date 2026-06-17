@@ -508,8 +508,8 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
             );
           })()}
 
-          {/* Input sheet — bottom overlay (fixed to the viewport) so the controls
-              are always reachable without scrolling. "Next" cycles the fields. */}
+          {/* Input picker — centred modal (shared by ROM cells and every other
+              measure). "Next" cycles the fields/cells. */}
           {focused && focusedMeasure && selected && createPortal(
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
               <div className="absolute inset-0 bg-secondary-900/40" onClick={pressDone} />
