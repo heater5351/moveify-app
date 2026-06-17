@@ -354,7 +354,14 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                       key={a.key}
                       onClick={() => {
                         if (a.instrument) { setRunnerKey(a.key); setSelectedKey(null); setFocused(null); }
-                        else { setSelectedKey(a.key); setFocused(null); setBuffer(''); }
+                        else {
+                          // Open the input sheet immediately on the first field — no
+                          // scrolling down past the picker to find it.
+                          setSelectedKey(a.key);
+                          setBuffer('');
+                          const m = a.measures[0];
+                          setFocused({ measureKey: m.key, side: sidesOf(a, m)[0] });
+                        }
                       }}
                       className={`min-h-20 rounded-2xl px-4 py-3 border-2 transition text-left flex flex-col justify-center active:scale-[0.98] ${
                         selectedKey === a.key ? 'bg-primary-400 border-primary-400 text-white shadow-sm' : 'bg-white border-gray-200 text-secondary-700 hover:border-primary-300'
