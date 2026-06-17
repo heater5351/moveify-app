@@ -572,6 +572,14 @@
       "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
       "note": "AAOS normal ~15-20 deg. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
     },
+    "knee_to_wall_test": {
+      "displayName": "Knee-to-Wall Test (WBLT)",
+      "aliases": ["knee to wall", "knee-to-wall", "ankle to wall", "weight bearing lunge", "weight-bearing lunge test", "wblt", "dorsiflexion lunge", "lunge test"],
+      "unit": "cm", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Weight-bearing ankle dorsiflexion; toe-to-wall distance by tape measure. Distance norms are population-dependent — interpret side-to-side (a >~2 cm difference is clinically meaningful) and the patient's own change.",
+      "sourceShort": "Bennell 1998; WBLT normative studies"
+    },
     "lumbar_extension_rom": {
       "displayName": "Lumbar Extension ROM", "aliases": ["lumbar extension", "lumbar extension rom"],
       "unit": "degrees", "direction": "higher_better", "type": "qualitative",
