@@ -46,9 +46,13 @@ function renderRomJoint(assessment, rows) {
     if (left != null || right != null) {
       let seg = `${m.label} L${left != null ? fmt(left) : '—'}/R${right != null ? fmt(right) : '—'}${u}`;
       if (left != null && right != null) {
-        const hi = Math.max(left, right), lo = Math.min(left, right);
-        if (hi > 0 && (hi - lo) / hi >= 0.10) {
-          seg += ` (${Math.round((hi - lo) / hi * 100)}% lower on ${right < left ? 'right' : 'left'})`;
+        // Percentage asymmetry only makes sense for positive ROM. For movements that
+        // can be negative (extension deficit), show the plain degree difference instead.
+        if (left > 0 && right > 0) {
+          const hi = Math.max(left, right), lo = Math.min(left, right);
+          if ((hi - lo) / hi >= 0.10) seg += ` (${Math.round((hi - lo) / hi * 100)}% lower on ${right < left ? 'right' : 'left'})`;
+        } else if (Math.abs(left - right) >= 5) {
+          seg += ` (L/R differ ${fmt(Math.abs(left - right))}${u})`;
         }
       }
       segs.push(seg);

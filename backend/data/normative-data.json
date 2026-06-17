@@ -504,7 +504,7 @@
       "displayName": "Knee Extension ROM", "aliases": ["knee extension", "knee extension rom"],
       "unit": "degrees", "direction": "higher_better", "type": "qualitative",
       "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
-      "note": "AAOS normal 0 deg (full extension); a deficit = extension lag. Capture-only — interpret symmetry and own baseline.", "sourceShort": "AAOS"
+      "note": "0 deg = full extension. Negative = extension deficit / flexion contracture (lacks full extension); positive = hyperextension. Capture-only — symmetry and own baseline.", "sourceShort": "AAOS"
     },
     "shoulder_extension_rom": {
       "displayName": "Shoulder Extension ROM", "aliases": ["shoulder extension", "shoulder extension rom"],
@@ -534,7 +534,7 @@
       "displayName": "Elbow Extension ROM", "aliases": ["elbow extension", "elbow extension rom"],
       "unit": "degrees", "direction": "higher_better", "type": "qualitative",
       "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
-      "note": "AAOS normal 0 deg (full extension); a deficit = flexion contracture. Capture-only — symmetry and own baseline.", "sourceShort": "AAOS"
+      "note": "0 deg = full extension. Negative = extension deficit / flexion contracture (lacks full extension); positive = hyperextension. Capture-only — symmetry and own baseline.", "sourceShort": "AAOS"
     },
     "forearm_pronation_rom": {
       "displayName": "Forearm Pronation ROM", "aliases": ["forearm pronation", "pronation", "forearm pronation rom"],
