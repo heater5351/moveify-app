@@ -296,6 +296,75 @@ export async function fetchMeasurementSeries(patientId: number): Promise<Measure
   return (await res.json()).series as MeasurementSeries[];
 }
 
+// ── Patient-reported outcome measures (PROMs — Phase 4) ──────────────────────
+
+export interface PromItem {
+  key: string;
+  text: string;
+  scale: { min: number; max: number; minLabel?: string; maxLabel?: string };
+}
+export interface PromCatalogEntry {
+  key: string;
+  name: string;
+  shortName?: string;
+  license?: string;
+  higherIsBetter?: boolean;
+  scoring: 'single' | 'average' | 'sum' | 'percentage';
+  patientIntro?: string;
+  items?: PromItem[];
+  activities?: { min: number; max: number; clinicianEntered?: boolean; prompt?: string; scale: { min: number; max: number; minLabel?: string; maxLabel?: string } };
+  bands?: { max: number; label: string }[];
+}
+/** Patient responses: fixed-item map, or clinician-named activities each rated. */
+export type PromResponses = Record<string, number> | { activities: { name: string; score: number }[] };
+
+export interface OutcomeResult { id?: number; promKey: string; score: number | null; band: string | null; completedAt?: string }
+
+export async function fetchPromCatalog(): Promise<PromCatalogEntry[]> {
+  const res = await apiFetch('/prom-catalog');
+  if (!res.ok) throw new Error('Failed to load outcome-measure catalog');
+  return (await res.json()).proms as PromCatalogEntry[];
+}
+
+export async function fetchSessionOutcomes(sessionId: number): Promise<OutcomeResult[]> {
+  const res = await apiFetch(`/sessions/${sessionId}/outcomes`);
+  if (!res.ok) throw new Error('Failed to load outcomes');
+  return (await res.json()).outcomes as OutcomeResult[];
+}
+
+export async function submitOutcome(sessionId: number, promKey: string, responses: PromResponses): Promise<OutcomeResult> {
+  const res = await apiFetch(`/sessions/${sessionId}/outcomes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ promKey, responses }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to save outcome');
+  }
+  return (await res.json()) as OutcomeResult;
+}
+
+export async function getKioskPinSet(): Promise<boolean> {
+  const res = await apiFetch('/kiosk-pin');
+  if (!res.ok) return false;
+  return (await res.json()).set as boolean;
+}
+
+export async function setKioskPin(pin: string): Promise<void> {
+  const res = await apiFetch('/kiosk-pin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to set PIN');
+  }
+}
+
+export async function verifyKioskPin(pin: string): Promise<boolean> {
+  const res = await apiFetch('/kiosk-pin/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) });
+  if (!res.ok) return false;
+  return (await res.json()).ok as boolean;
+}
+
 export async function fetchAssessmentCatalog(): Promise<AssessmentCatalogEntry[]> {
   const res = await apiFetch('/assessment-catalog');
   if (!res.ok) throw new Error('Failed to load assessment catalog');

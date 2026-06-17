@@ -7,6 +7,8 @@ const { getPatientSummary } = require('../services/scribe-summary');
 const { renderProgramDiff } = require('../services/program-diff');
 const { renderMeasurements } = require('../services/measurement-render');
 const { getPatientDemographics } = require('../services/scribe-demographics');
+const { getProm } = require('../services/prom-catalog');
+const { summarizeOutcome } = require('../services/prom-scoring');
 const audit = require('../services/audit');
 
 const router = express.Router();
@@ -204,7 +206,24 @@ router.post('/:sessionId/soap-note/generate', async (req, res) => {
       console.error('Measurement render failed (continuing without it):', err.message);
     }
 
-    const { content, model } = await generateSoapNote({ transcript, priorContext, programDiff, measurements }, customPrompt);
+    // Patient-reported outcome measures completed in clinic (score + band only —
+    // never the raw responses). Best-effort.
+    let outcomes = [];
+    try {
+      const rows = await db.query(
+        'SELECT prom_key, score, score_band FROM scribe_session_outcomes WHERE session_id = $1 ORDER BY id ASC',
+        [req.params.sessionId]
+      );
+      for (const o of rows.rows) {
+        const prom = getProm(o.prom_key);
+        const line = prom && summarizeOutcome(prom, o.score != null ? Number(o.score) : null, o.score_band);
+        if (line) outcomes.push(line);
+      }
+    } catch (err) {
+      console.error('Outcome fetch failed (continuing without it):', err.message);
+    }
+
+    const { content, model } = await generateSoapNote({ transcript, priorContext, programDiff, measurements, outcomes }, customPrompt);
 
     const result = await db.query(
       `INSERT INTO soap_notes (session_id, subjective_enc, generated_by, llm_model)
@@ -218,7 +237,7 @@ router.post('/:sessionId/soap-note/generate', async (req, res) => {
       [req.params.sessionId]
     );
 
-    audit.log(req, 'soap_note_generated', 'soap_note', result.rows[0].id, { model, wordCount, historyUsed: !!priorContext, programChanges: programDiff.length, measurements: measurements.length });
+    audit.log(req, 'soap_note_generated', 'soap_note', result.rows[0].id, { model, wordCount, historyUsed: !!priorContext, programChanges: programDiff.length, measurements: measurements.length, outcomes: outcomes.length });
 
     res.status(201).json({
       id: result.rows[0].id,

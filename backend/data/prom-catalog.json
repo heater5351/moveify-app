@@ -1,0 +1,57 @@
+{
+  "_meta": {
+    "description": "Patient-completed outcome measures (PROMs) for the in-clinic kiosk (Phase 4). Each PROM defines its items (or clinician-entered activities), a 0-N tappable scale, a deterministic `scoring` shape, and interpretation `bands`. Scoring is computed server-side (services/prom-scoring.js), never by the LLM. Seed ONLY license-safe instruments — many PROMs are copyrighted for electronic/commercial use. `license` records the basis per instrument; confirm before commercial go-live.",
+    "scoring": {
+      "single": "Score = the single item's value.",
+      "average": "Score = mean of the (clinician-entered) activity ratings (PSFS).",
+      "sum": "Score = sum of item values (e.g. LEFS).",
+      "percentage": "Score = sum / max possible × 100 (e.g. NDI/ODI)."
+    }
+  },
+  "proms": [
+    {
+      "key": "nprs",
+      "name": "Numeric Pain Rating Scale",
+      "shortName": "Pain (NPRS)",
+      "license": "Public domain.",
+      "higherIsBetter": false,
+      "scoring": "single",
+      "patientIntro": "Please rate your pain over the past week.",
+      "items": [
+        {
+          "key": "pain",
+          "text": "On average over the past week, how bad has your pain been?",
+          "scale": { "min": 0, "max": 10, "minLabel": "No pain", "maxLabel": "Worst pain imaginable" }
+        }
+      ],
+      "bands": [
+        { "max": 0, "label": "No pain" },
+        { "max": 3, "label": "Mild pain" },
+        { "max": 6, "label": "Moderate pain" },
+        { "max": 10, "label": "Severe pain" }
+      ]
+    },
+    {
+      "key": "psfs",
+      "name": "Patient-Specific Functional Scale",
+      "shortName": "Function (PSFS)",
+      "license": "Free for clinical use (Stratford et al. 1995).",
+      "higherIsBetter": true,
+      "scoring": "average",
+      "patientIntro": "For each activity, rate how able you are to do it today.",
+      "activities": {
+        "min": 1,
+        "max": 5,
+        "clinicianEntered": true,
+        "prompt": "Activity the patient finds difficult (e.g. walking 20 min, climbing stairs)",
+        "scale": { "min": 0, "max": 10, "minLabel": "Unable to perform", "maxLabel": "Able as before injury" }
+      },
+      "bands": [
+        { "max": 3, "label": "Severe limitation" },
+        { "max": 6, "label": "Moderate limitation" },
+        { "max": 8.9, "label": "Mild limitation" },
+        { "max": 10, "label": "Minimal or no limitation" }
+      ]
+    }
+  ]
+}

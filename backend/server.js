@@ -37,6 +37,7 @@ const scribeReassessmentRoutes = require('./routes/scribe-reassessment');
 const scribeDocumentRoutes = require('./routes/scribe-documents');
 const scribeReportRoutes = require('./routes/scribe-reports');
 const scribeMeasurementRoutes = require('./routes/scribe-measurements');
+const scribePromRoutes = require('./routes/scribe-proms');
 const { registerScribeTranscriptionWs } = require('./routes/scribe-transcription');
 
 // Import database init
@@ -172,6 +173,7 @@ app.use('/api/scribe/sessions', scribeReassessmentRoutes);
 app.use('/api/scribe/documents', scribeDocumentRoutes);
 app.use('/api/scribe', scribeReportRoutes);
 app.use('/api/scribe', scribeMeasurementRoutes);
+app.use('/api/scribe', scribePromRoutes);
 app.use('/api/scribe/preferences', scribePreferencesRoutes);
 registerScribeTranscriptionWs(app);
 

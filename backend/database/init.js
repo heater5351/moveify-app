@@ -919,6 +919,31 @@ async function initDatabase() {
     // total lives in `value` (graded), the item scores in `detail`. NULL otherwise.
     await db.query(`ALTER TABLE scribe_session_measurements ADD COLUMN IF NOT EXISTS detail JSONB`);
 
+    // Patient-completed outcome measures (PROMs — Phase 4). Raw item responses are
+    // patient self-report health data, so they are ENCRYPTED (AES-256-GCM, same as
+    // notes/transcripts). The derived score + band are stored plain so the note
+    // prompt and trend view can use them without decrypting per row.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS scribe_session_outcomes (
+        id SERIAL PRIMARY KEY,
+        session_id INTEGER NOT NULL REFERENCES scribe_sessions(id) ON DELETE CASCADE,
+        patient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        prom_key TEXT NOT NULL,
+        responses_enc TEXT NOT NULL,
+        score NUMERIC,
+        score_band TEXT,
+        cliniko_attachment_id TEXT,
+        completed_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(session_id, prom_key)
+      )
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_session_outcomes_session ON scribe_session_outcomes(session_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_session_outcomes_patient ON scribe_session_outcomes(patient_id, prom_key)`);
+
+    // Clinician kiosk-exit PIN (hashed). Gates leaving the patient-facing PROM kiosk
+    // while the iPad is signed in as the clinician. Additive.
+    await db.query(`ALTER TABLE clinician_preferences ADD COLUMN IF NOT EXISTS kiosk_pin_hash TEXT`);
+
     // Seed default SOAP template (exercise physiology)
     await db.query(`
       INSERT INTO soap_templates (name, discipline, system_prompt, is_default)

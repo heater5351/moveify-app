@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Loader2, X, AlertCircle, Delete, ArrowRight, ClipboardList } from 'lucide-react';
+import { Check, Loader2, X, AlertCircle, Delete, ArrowRight, ClipboardList, ClipboardCheck } from 'lucide-react';
 import {
   fetchAssessmentCatalog, fetchMeasurements, saveMeasurement, deleteMeasurement,
+  fetchPromCatalog, fetchSessionOutcomes, getKioskPinSet, setKioskPin,
   type AssessmentCatalogEntry, type CatalogMeasure, type Measurement, type MeasurementSide,
+  type PromCatalogEntry, type OutcomeResult,
 } from '../../utils/scribe-api';
 import InstrumentRunner from './InstrumentRunner';
+import PromKiosk from './PromKiosk';
 
 interface AssessmentPanelProps {
   sessionId: number | null;
@@ -38,10 +41,40 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
   const [focused, setFocused] = useState<FieldRef | null>(null);
   const [buffer, setBuffer] = useState('');
   const [runnerKey, setRunnerKey] = useState<string | null>(null);
+  // PROMs (patient-completed outcome measures)
+  const [proms, setProms] = useState<PromCatalogEntry[]>([]);
+  const [outcomes, setOutcomes] = useState<OutcomeResult[]>([]);
+  const [kioskProm, setKioskProm] = useState<PromCatalogEntry | null>(null);
+  const [pendingProm, setPendingProm] = useState<PromCatalogEntry | null>(null);
+  const [pinValue, setPinValue] = useState('');
+  const [pinError, setPinError] = useState('');
   const sessionIdRef = useRef<number | null>(sessionId);
   sessionIdRef.current = sessionId;
 
   useEffect(() => { fetchAssessmentCatalog().then(setCatalog).catch(() => setCatalog([])); }, []);
+  useEffect(() => { fetchPromCatalog().then(setProms).catch(() => setProms([])); }, []);
+  useEffect(() => {
+    if (!sessionId) return;
+    fetchSessionOutcomes(sessionId).then(setOutcomes).catch(() => {});
+  }, [sessionId]);
+
+  async function launchProm(p: PromCatalogEntry) {
+    try {
+      if (await getKioskPinSet()) setKioskProm(p);
+      else { setPendingProm(p); setPinValue(''); setPinError(''); }
+    } catch { setPendingProm(p); }
+  }
+  async function createPinAndLaunch() {
+    setPinError('');
+    try {
+      await setKioskPin(pinValue);
+      const p = pendingProm;
+      setPendingProm(null);
+      if (p) setKioskProm(p);
+    } catch (e) {
+      setPinError(e instanceof Error ? e.message : 'Failed to set PIN');
+    }
+  }
 
   useEffect(() => {
     if (!sessionId) return;
@@ -262,12 +295,51 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
         </div>
       )}
 
-      {readOnly && recordedCount === 0 && (
+      {/* Completed outcome-measure chips (both modes) */}
+      {outcomes.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3 shrink-0">
+          {outcomes.map(o => {
+            const p = proms.find(x => x.key === o.promKey);
+            return (
+              <span key={o.promKey} className="inline-flex items-center gap-1 text-xs bg-secondary-500/10 text-secondary-700 rounded-full px-2.5 py-1">
+                <ClipboardCheck className="w-3 h-3" /> {(p?.shortName || o.promKey)}: {o.score}{o.band ? ` (${o.band})` : ''}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {readOnly && recordedCount === 0 && outcomes.length === 0 && (
         <p className="text-xs text-gray-400">No measurements were recorded for this session.</p>
       )}
 
       {!readOnly && (
         <>
+          {/* Patient outcome measures — launch the kiosk */}
+          {proms.length > 0 && (
+            <div className="mb-4 shrink-0">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Patient Outcome Measures</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                {proms.map(p => {
+                  const done = outcomes.find(o => o.promKey === p.key);
+                  return (
+                    <button
+                      key={p.key}
+                      onClick={() => launchProm(p)}
+                      className="min-h-20 rounded-2xl px-4 py-3 border-2 border-gray-200 bg-white text-secondary-700 hover:border-primary-300 transition text-left flex flex-col justify-center active:scale-[0.98]"
+                    >
+                      <span className="text-base font-bold leading-tight flex items-center gap-1.5">
+                        {done ? <ClipboardCheck className="w-4 h-4 text-green-500 shrink-0" /> : <ClipboardList className="w-4 h-4 shrink-0 opacity-70" />}
+                        {p.shortName || p.name}
+                      </span>
+                      <span className="text-xs font-medium opacity-70 mt-0.5">{done ? `${done.score} (${done.band})` : 'Tap to hand to patient'}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Assessment picker — large cards grouped by category */}
           <div className="mb-4 shrink-0 space-y-4">
             {categories.map(cat => (
@@ -321,6 +393,37 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
           )}
 
           {!selected && <p className="text-xs text-gray-400 shrink-0">Pick an assessment to record values.</p>}
+
+          {/* Patient-facing PROM kiosk */}
+          {kioskProm && (
+            <PromKiosk
+              prom={kioskProm}
+              sessionId={sessionId}
+              ensureSession={ensureSession}
+              onComplete={(r) => setOutcomes(prev => [...prev.filter(o => o.promKey !== r.promKey), r])}
+              onExit={() => setKioskProm(null)}
+            />
+          )}
+
+          {/* First-use PIN setup before handing the iPad to a patient */}
+          {pendingProm && createPortal(
+            <div className="fixed inset-0 z-[80] bg-secondary-900/50 flex items-center justify-center px-6" onClick={() => setPendingProm(null)}>
+              <div className="bg-white rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+                <h3 className="text-base font-bold text-secondary-700 mb-1">Set a clinician PIN</h3>
+                <p className="text-xs text-gray-500 mb-4">Before handing the device to a patient, set a 4–6 digit PIN. You'll use it to exit the kiosk.</p>
+                <input
+                  value={pinValue}
+                  onChange={e => setPinValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric"
+                  placeholder="••••"
+                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-center text-2xl tracking-widest focus:outline-none focus:border-primary-400"
+                />
+                {pinError && <p className="text-xs text-red-500 mt-2">{pinError}</p>}
+                <button onClick={createPinAndLaunch} disabled={pinValue.length < 4} className="mt-4 w-full bg-primary-400 disabled:opacity-40 text-white py-3 rounded-xl font-semibold transition">Set PIN &amp; start</button>
+              </div>
+            </div>,
+            document.body,
+          )}
 
           {/* Guided runner for multi-item instruments (Berg, Mini-BEST) */}
           {runnerKey && (() => {

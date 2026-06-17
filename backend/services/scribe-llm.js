@@ -37,7 +37,7 @@ Use bullet points within each section. Use clinical terminology appropriate for 
  * so the instruction survives custom per-clinician system prompts. Later phases
  * (program diffs, in-session measurements, outcome scores) slot in as new blocks here.
  */
-function buildSoapUserMessage({ transcript, priorContext, programDiff, measurements }) {
+function buildSoapUserMessage({ transcript, priorContext, programDiff, measurements, outcomes }) {
   const blocks = [];
 
   if (priorContext && (priorContext.summary || priorContext.lastNote)) {
@@ -73,6 +73,14 @@ These assessment values were captured directly in the system during this session
 
 ${measurements.map(line => `- ${line}`).join('\n')}
 === END OBJECTIVE MEASUREMENTS ===`);
+  }
+
+  if (Array.isArray(outcomes) && outcomes.length > 0) {
+    blocks.push(`=== PATIENT-REPORTED OUTCOME MEASURES — EXACT ===
+The patient completed these validated outcome measures in clinic today; the scores below are deterministically calculated. Record them exactly in the Subjective/Assessment as appropriate (exact score and band — do not round or reinterpret). State the score and its band only; do not infer a diagnosis from them.
+
+${outcomes.map(line => `- ${line}`).join('\n')}
+=== END PATIENT-REPORTED OUTCOME MEASURES ===`);
   }
 
   if (Array.isArray(programDiff) && programDiff.length > 0) {

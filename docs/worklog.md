@@ -22,6 +22,29 @@ what to know now, links).
 
 ---
 
+## 2026-06-17 — Phase 4 (4a): patient-completed outcome measures (PROM kiosk)
+
+- **PromKiosk.tsx** — full-screen patient-facing questionnaire (one item per screen,
+  big 0–N tappable scale), launched from the Assessments view. PSFS has a clinician
+  setup step (enter the patient's activities) before handover. Exit is **PIN-gated**
+  (4–6 digit clinician PIN, scrypt-hashed in `clinician_preferences.kiosk_pin_hash`);
+  completion shows a hand-back screen that also requires the PIN. iPadOS Guided Access
+  is the documented second layer.
+- **Encrypted storage:** new `scribe_session_outcomes` table — raw responses are
+  patient self-report health data, so `responses_enc` is AES-256-GCM (like notes);
+  derived `score` + `score_band` stored plain for the note/trend. `prom_completed`
+  audit logs the PROM key only, never the responses.
+- **Deterministic scoring** (`services/prom-scoring.js`, server-authoritative, unit-
+  tested): shapes single/average/sum/percentage. Catalog `data/prom-catalog.json`
+  seeds **NPRS** (single, public domain) + **PSFS** (average of clinician-entered
+  activities, free). Score+band feed a new SOAP `PATIENT-REPORTED OUTCOME MEASURES`
+  block (`buildSoapUserMessage`).
+- Routes (`routes/scribe-proms.js`, clinician-only, `/api/scribe`): `GET /prom-catalog`,
+  session `POST`/`GET /outcomes`, `GET /patients/:id/outcomes`, kiosk-PIN set/verify.
+- **Deferred (4b):** PDF render → Cliniko attachment; LEFS/NDI/Örebro catalog expansion
+  (need sourcing + licensing — Mini-BEST/LEFS/etc. carry commercial-use caveats).
+  The scoring engine + runner pattern are shared with the Berg/Mini-BEST instruments.
+
 ## 2026-06-17 — Multi-item instruments: Berg + Mini-BESTest (guided runner)
 
 - Berg Balance Scale (14 items × 0–4) and Mini-BESTest (14 items × 0–2, 4 sections)
