@@ -17,7 +17,7 @@ export const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
     setError('');
 
     if (!email) {
-      setError('Please enter your email address');
+      setError('Please enter your email or login name');
       return;
     }
 
@@ -76,17 +76,18 @@ export const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
         ) : (
           <form onSubmit={handleSubmit}>
             <p className="text-gray-600 mb-4">
-              Enter your email address and we'll send you a link to reset your password.
+              Enter your email or login name and we'll send a reset link to your email.
             </p>
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
+                Email or login name
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                 <input
-                  type="email"
+                  type="text"
+                  autoComplete="username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-moveify-teal focus:border-transparent"

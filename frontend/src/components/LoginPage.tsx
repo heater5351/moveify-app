@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import type { Patient, UserRole, User } from '../types/index.ts';
-import { API_URL } from '../config';
+import { API_URL, toLoginIdentifier } from '../config';
 import { auth, setSessionPersistence, setCachedToken } from '../lib/firebase';
 import { getAuthHeaders } from '../utils/api';
 import { ForgotPasswordModal } from './modals/ForgotPasswordModal';
@@ -26,9 +26,11 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
       // Persistence — local (survives tab close) if rememberMe, else session-only
       await setSessionPersistence(rememberMe);
 
-      // Identity Platform sign-in. Seed the in-memory token cache directly
-      // from the signed-in user so the immediate /me call below has it.
-      const credential = await signInWithEmailAndPassword(auth, email, password);
+      // Identity Platform sign-in. The field accepts an email or a login name
+      // (shared-email patients) — toLoginIdentifier maps a bare name to its
+      // synthetic account email. Seed the in-memory token cache directly from
+      // the signed-in user so the immediate /me call below has it.
+      const credential = await signInWithEmailAndPassword(auth, toLoginIdentifier(email), password);
       const idToken = await credential.user.getIdToken();
       setCachedToken(idToken);
 
@@ -73,7 +75,7 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
     } catch (error: unknown) {
       const err = error as { code?: string; message?: string };
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-        setLoginError('Invalid email or password');
+        setLoginError('Invalid login or password');
       } else if (err.code === 'auth/too-many-requests') {
         setLoginError('Too many failed attempts. Please try again later.');
       } else if (err.code === 'auth/network-request-failed') {
@@ -102,10 +104,11 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Email
+              Email or login name
             </label>
             <input
-              type="email"
+              type="text"
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleLoginSubmit()}

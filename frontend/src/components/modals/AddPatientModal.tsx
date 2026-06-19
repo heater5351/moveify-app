@@ -53,6 +53,11 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
   const [invitationSent, setInvitationSent] = useState(false);
   const [expiresAt, setExpiresAt] = useState('');
   const [error, setError] = useState('');
+  // Shared-email (household) handling: the backend 409s when the email already
+  // belongs to another active patient; we confirm, then it creates a separate
+  // account with an auto-generated login name (returned as loginUsername).
+  const [sharedPrompt, setSharedPrompt] = useState<{ existingName: string } | null>(null);
+  const [generatedUsername, setGeneratedUsername] = useState<string | null>(null);
   const [dobDisplay, setDobDisplay] = useState(toDisplayDate(newPatient.dob));
   const [dobError, setDobError] = useState('');
 
@@ -107,7 +112,7 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
     setClinikoSearch('');
   };
 
-  const handleGenerateInvitation = async () => {
+  const handleGenerateInvitation = async (allowSharedEmail = false) => {
     setError('');
 
     if (mode === 'cliniko' && !selectedClinikoId) {
@@ -129,6 +134,7 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
         address: newPatient.address,
       };
       if (selectedClinikoId) body.clinikoPatientId = selectedClinikoId;
+      if (allowSharedEmail) body.allowSharedEmail = true;
 
       const response = await fetch(`${API_URL}/invitations/generate`, {
         method: 'POST',
@@ -138,9 +144,15 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
 
       const data = await response.json();
       if (response.ok) {
+        setSharedPrompt(null);
+        setGeneratedUsername(data.loginUsername || null);
         setInvitationSent(true);
         setExpiresAt(data.expiresAt);
         if (onSuccess) onSuccess();
+      } else if (response.status === 409 && data.emailShared) {
+        // Email already belongs to another patient — confirm it's a shared
+        // household email before creating a second (login-name) account.
+        setSharedPrompt({ existingName: data.existingName || 'another patient' });
       } else {
         setError(data.error || 'Failed to create invitation');
       }
@@ -150,6 +162,40 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
       setIsGenerating(false);
     }
   };
+
+  if (sharedPrompt) {
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl max-w-md w-full p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-xl font-bold font-display text-secondary-500">Shared email?</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4 text-sm text-amber-800 space-y-2">
+            <p><strong>{newPatient.email}</strong> already belongs to <strong>{sharedPrompt.existingName}</strong>.</p>
+            <p>
+              If {newPatient.name || 'this patient'} shares this email (e.g. a spouse), we'll create a separate
+              account that signs in with an auto-generated <strong>login name</strong> instead of the email.
+              {' '}{sharedPrompt.existingName} keeps signing in with the email.
+            </p>
+          </div>
+          <p className="text-xs text-slate-500 mb-5">If this was a mistake, cancel and use a different email address.</p>
+          <div className="flex gap-3">
+            <button onClick={() => setSharedPrompt(null)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+              Cancel
+            </button>
+            <button
+              onClick={() => handleGenerateInvitation(true)}
+              disabled={isGenerating}
+              className="flex-1 px-4 py-2 bg-moveify-teal text-white rounded-lg hover:bg-moveify-teal-dark font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {isGenerating ? 'Creating…' : 'Yes, create separate login'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (invitationSent) {
     return (
@@ -170,6 +216,13 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
             <p><strong>{newPatient.name}</strong> will receive a link to set their password and access their account.</p>
             <p>The link expires on <strong>{new Date(expiresAt).toLocaleDateString()}</strong>.</p>
           </div>
+          {generatedUsername && (
+            <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6 text-sm">
+              <p className="text-xs text-primary-600 uppercase tracking-wide font-semibold mb-1">Login name (shared email)</p>
+              <p className="text-base text-secondary-500 font-bold mb-1">{generatedUsername}</p>
+              <p className="text-primary-700/80 text-xs">They sign in with this login name, not the email. It's in their setup email — note it down for them too.</p>
+            </div>
+          )}
           <button onClick={onClose} className="w-full px-4 py-2 bg-primary-400 text-white rounded-lg hover:bg-primary-500 font-medium">
             Done
           </button>
@@ -345,7 +398,7 @@ export const AddPatientModal = ({ newPatient, onUpdate, onClose, onSuccess }: Ad
             Cancel
           </button>
           <button
-            onClick={handleGenerateInvitation}
+            onClick={() => handleGenerateInvitation()}
             disabled={isGenerating || (mode === 'manual' && (!newPatient.name || !newPatient.email)) || (mode === 'cliniko' && !selectedClinikoId)}
             className="flex-1 px-4 py-2 bg-moveify-teal text-white rounded-lg hover:bg-moveify-teal-dark font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
           >

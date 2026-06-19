@@ -23,12 +23,17 @@ async function verifyIdentityPlatformToken(token, { checkRevoked = true } = {}) 
     [decoded.uid]
   );
   if (result.rows.length === 0 && decoded.email) {
-    result = await db.query(
-      'SELECT id, role, email, is_admin FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1',
+    // Only trust the email fallback when it resolves to exactly one row — a
+    // shared contact email maps to multiple users, and synthetic login-name
+    // accounts (firebase_uid always set) never reach here, so a 0-or-many
+    // match means "can't safely identify" rather than "pick the first".
+    const byEmail = await db.query(
+      'SELECT id, role, email, is_admin FROM users WHERE LOWER(email) = LOWER($1)',
       [decoded.email]
     );
-    // Opportunistic backfill — link this user row to the IP uid for next time
-    if (result.rows.length > 0) {
+    if (byEmail.rows.length === 1) {
+      result = byEmail;
+      // Opportunistic backfill — link this user row to the IP uid for next time
       await db.query('UPDATE users SET firebase_uid = $1 WHERE id = $2 AND firebase_uid IS NULL', [decoded.uid, result.rows[0].id]);
     }
   }

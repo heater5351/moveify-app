@@ -7,13 +7,36 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const identityPlatform = require('../lib/identity-platform');
 const audit = require('../services/audit');
 const cliniko = require('../services/cliniko');
+const { toLoginEmail, slugifyName } = require('../lib/login-identity');
 
 const router = express.Router();
+
+// Generate a unique login name from a patient's name ("John Smith" →
+// "john-smith", "john-smith-2", …). Uses the transaction client so the
+// uniqueness check and the subsequent INSERT see a consistent view. The
+// partial unique index on LOWER(login_username) is the real guard; this loop
+// just picks a free-looking slug (a rare concurrent collision surfaces as a
+// unique-violation that rolls back the txn, and the clinician retries).
+async function generateLoginUsername(client, name) {
+  const base = slugifyName(name);
+  let candidate = base;
+  let n = 1;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const taken = await client.query(
+      `SELECT 1 FROM users WHERE LOWER(login_username) = $1 LIMIT 1`,
+      [candidate]
+    );
+    if (taken.rows.length === 0) return candidate;
+    n += 1;
+    candidate = `${base}-${n}`;
+  }
+}
 
 // Generate invitation for new patient (called by clinician)
 router.post('/generate', authenticate, requireRole('clinician'), async (req, res) => {
   try {
-    let { email, name, dob, phone, address, clinikoPatientId } = req.body;
+    let { email, name, dob, phone, address, clinikoPatientId, allowSharedEmail } = req.body;
 
     // If a Cliniko patient ID was provided, pull authoritative data from Cliniko
     if (clinikoPatientId) {
@@ -44,13 +67,41 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
-    // Check if user already exists
-    const existingUser = await db.getOne('SELECT id, password_hash FROM users WHERE email = $1', [email]);
-    if (existingUser && existingUser.password_hash !== null) {
-      return res.status(400).json({ error: 'User with this email already exists' });
+    const clinicianId = req.user.id;
+
+    // Look at every account already holding this contact email. Email is no
+    // longer a login key, so duplicates are allowed — but we distinguish:
+    //   • the SAME person being re-invited (same Cliniko patient) → reuse row
+    //   • a DIFFERENT person already active on this email → shared household;
+    //     require explicit confirmation, then give the new patient a login name
+    const existingRows = (await db.query(
+      `SELECT id, name, password_hash, firebase_uid, cliniko_patient_id, login_username
+         FROM users WHERE email = $1`,
+      [email]
+    )).rows;
+    const isActive = (u) => !!(u.firebase_uid || u.password_hash);
+
+    // The row representing THIS person, if they already exist
+    const samePersonRow = clinikoPatientId
+      ? existingRows.find((u) => String(u.cliniko_patient_id) === String(clinikoPatientId))
+      : existingRows.find((u) => !isActive(u) && !u.login_username); // manual: a plain pending row
+
+    // Any *other* person already holding this email with a live account
+    const otherActiveRow = existingRows.find((u) => isActive(u) && u !== samePersonRow);
+
+    if (otherActiveRow && !allowSharedEmail) {
+      // Caught at the clinician's invite step — let them confirm it's a shared
+      // household email (e.g. a spouse) before we create a second account.
+      return res.status(409).json({
+        emailShared: true,
+        existingName: otherActiveRow.name,
+        error: `This email already belongs to ${otherActiveRow.name}.`,
+      });
     }
 
-    const clinicianId = req.user.id;
+    // A second person on a shared email logs in with a generated login name
+    // (the first keeps their email). Brand-new emails never get one.
+    const needsLoginName = !!otherActiveRow;
 
     // Generate unique token
     const token = crypto.randomBytes(32).toString('hex');
@@ -61,22 +112,13 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
     // Use transaction to ensure token + user are created atomically
     const client = await db.getClient();
     let patientId;
+    let loginUsername = samePersonRow ? samePersonRow.login_username || null : null;
     try {
       await client.query('BEGIN');
 
-      // Invalidate any previous invitation tokens for this email
-      await client.query(`UPDATE invitation_tokens SET used = 1 WHERE email = $1 AND used = 0`, [email]);
-
-      // Save invitation (always patient role)
-      await client.query(`
-        INSERT INTO invitation_tokens (token, email, role, name, dob, phone, address, expires_at, clinician_id)
-        VALUES ($1, $2, 'patient', $3, $4, $5, $6, $7, $8)
-      `, [token, email, name, dob, phone, address, expiresAt, clinicianId]);
-
-      if (existingUser) {
-        // Resend: user row already exists with no password — just reuse it
-        patientId = existingUser.id;
-        // Update cliniko link if provided
+      if (samePersonRow) {
+        // Resend to the same person — reuse their row
+        patientId = samePersonRow.id;
         if (clinikoPatientId) {
           await client.query(
             `UPDATE users SET cliniko_patient_id = $1, cliniko_synced_at = NOW() WHERE id = $2`,
@@ -84,17 +126,37 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
           );
         }
       } else {
-        // New invite: create user with null password
+        // New account. A second person on a shared email gets a login name.
+        if (needsLoginName) {
+          loginUsername = await generateLoginUsername(client, name);
+        }
         const userResult = await client.query(`
           INSERT INTO users (email, password_hash, role, name, dob, phone, address,
-                             cliniko_patient_id, cliniko_synced_at)
-          VALUES ($1, NULL, 'patient', $2, $3, $4, $5, $6, $7)
+                             cliniko_patient_id, cliniko_synced_at, login_username)
+          VALUES ($1, NULL, 'patient', $2, $3, $4, $5, $6, $7, $8)
           RETURNING id
         `, [email, name, dob, phone, address,
             clinikoPatientId || null,
-            clinikoPatientId ? new Date().toISOString() : null]);
+            clinikoPatientId ? new Date().toISOString() : null,
+            loginUsername]);
         patientId = userResult.rows[0].id;
       }
+
+      // Invalidate this person's previous unused invitations (by user_id;
+      // legacy tokens predate user_id, so also clear null-user tokens matching
+      // this email — safe because a shared email's other party is already
+      // active and therefore has no pending token).
+      await client.query(
+        `UPDATE invitation_tokens SET used = 1
+           WHERE used = 0 AND (user_id = $1 OR (user_id IS NULL AND email = $2))`,
+        [patientId, email]
+      );
+
+      // Save invitation (always patient role), linked to the resolved user
+      await client.query(`
+        INSERT INTO invitation_tokens (token, email, role, name, dob, phone, address, expires_at, clinician_id, user_id)
+        VALUES ($1, $2, 'patient', $3, $4, $5, $6, $7, $8, $9)
+      `, [token, email, name, dob, phone, address, expiresAt, clinicianId, patientId]);
 
       await client.query('COMMIT');
     } catch (txError) {
@@ -108,22 +170,24 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const invitationUrl = `${baseUrl}/setup-password?token=${token}`;
 
-    // Send invitation email
+    // Send invitation email (names the login name when this is a shared-email
+    // second account, otherwise shows the login email as before)
     try {
-      await sendInvitationEmail(email, name, invitationUrl);
+      await sendInvitationEmail(email, name, invitationUrl, loginUsername);
     } catch (emailError) {
       console.error('Failed to send invitation email:', emailError);
       return res.status(500).json({ error: 'Invitation created but failed to send email. Please check email configuration.' });
     }
 
-    audit.log(req, 'patient_invite', 'patient', patientId, { email });
+    audit.log(req, 'patient_invite', 'patient', patientId, { email, loginUsername });
 
     res.json({
       message: 'Invitation created successfully',
       token,
       invitationUrl,
       expiresAt,
-      userId: patientId
+      userId: patientId,
+      loginUsername
     });
   } catch (error) {
     console.error('Generate invitation error:', error);
@@ -137,8 +201,10 @@ router.get('/validate/:token', async (req, res) => {
     const { token } = req.params;
 
     const invitation = await db.getOne(`
-      SELECT * FROM invitation_tokens
-      WHERE token = $1 AND used = 0 AND expires_at > NOW()
+      SELECT it.email, it.name, it.role, u.login_username
+        FROM invitation_tokens it
+        LEFT JOIN users u ON u.id = it.user_id
+       WHERE it.token = $1 AND it.used = 0 AND it.expires_at > NOW()
     `, [token]);
 
     if (!invitation) {
@@ -149,7 +215,8 @@ router.get('/validate/:token', async (req, res) => {
       valid: true,
       email: invitation.email,
       name: invitation.name,
-      role: invitation.role
+      role: invitation.role,
+      loginUsername: invitation.login_username || null
     });
   } catch (error) {
     console.error('Validate invitation error:', error);
@@ -189,17 +256,31 @@ router.post('/set-password', async (req, res) => {
       return res.status(400).json({ error: 'You must consent to health data collection to create an account' });
     }
 
-    // Look up the user row created at invite time
-    const user = await db.getOne(
-      'SELECT id, name FROM users WHERE email = $1 AND role = $2',
-      [invitation.email, invitation.role]
-    );
+    // Look up the user row. Prefer the token's user_id (unambiguous even when
+    // the contact email is shared). Fall back to email+role for legacy tokens
+    // minted before user_id existed — but only when it resolves to exactly one
+    // row, so a legacy invite whose email later became shared can never set a
+    // password on the wrong account (it fails closed → request a fresh invite).
+    let user;
+    if (invitation.user_id) {
+      user = await db.getOne('SELECT id, name, login_username FROM users WHERE id = $1', [invitation.user_id]);
+    } else {
+      const rows = (await db.query(
+        'SELECT id, name, login_username FROM users WHERE email = $1 AND role = $2',
+        [invitation.email, invitation.role]
+      )).rows;
+      user = rows.length === 1 ? rows[0] : null;
+    }
     if (!user) {
-      // Token was valid but user row missing — invitation issued without
-      // creating the row. Should not happen given the /generate transaction.
+      // Token was valid but the user row is missing or ambiguous. Should not
+      // happen for tokens minted with a user_id.
       return res.status(500).json({ error: 'User account not found' });
     }
     const uid = String(user.id);
+
+    // A shared-email patient authenticates against a synthetic login email
+    // ("<login-name>@login.moveifyapp.com"); everyone else uses their real one.
+    const ipEmail = user.login_username ? toLoginEmail(user.login_username) : invitation.email;
 
     // Create or update the Identity Platform user with the chosen password.
     // Idempotent: a resend that already created the IP user falls through
@@ -212,7 +293,7 @@ router.post('/set-password', async (req, res) => {
     try {
       await auth.createUser({
         uid,
-        email: invitation.email,
+        email: ipEmail,
         emailVerified: true,
         password,
         displayName: user.name || undefined,
@@ -226,7 +307,7 @@ router.post('/set-password', async (req, res) => {
         try {
           existing = await auth.getUser(uid);
         } catch {
-          existing = await auth.getUserByEmail(invitation.email);
+          existing = await auth.getUserByEmail(ipEmail);
         }
         await auth.updateUser(existing.uid, { password });
       } else {

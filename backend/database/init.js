@@ -9,7 +9,7 @@ async function initDatabase() {
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
-        email TEXT UNIQUE NOT NULL,
+        email TEXT NOT NULL,
         password_hash TEXT,
         role TEXT NOT NULL CHECK(role IN ('clinician', 'patient')),
         name TEXT NOT NULL,
@@ -511,6 +511,25 @@ async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_users_firebase_uid
       ON users(firebase_uid)
     `);
+
+    // --- Shared-email login (older patients sharing a spouse's email) --------
+    // Email is no longer a login identifier — identity is firebase_uid. We let
+    // two patients share a contact email and give the *second* one an
+    // auto-generated login name (e.g. "john-smith"), backed by a synthetic IP
+    // email "<username>@login.moveifyapp.com" (nothing is ever mailed there).
+    // So: drop the UNIQUE on email (relaxing — never invalidates existing rows,
+    // no table rewrite), keep a plain index for lookups, add login_username,
+    // and give invitation_tokens a user_id so set-password resolves the right
+    // row even when the contact email is shared.
+    await db.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_key`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
+    await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS login_username TEXT`);
+    await db.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_login_username
+      ON users(LOWER(login_username))
+      WHERE login_username IS NOT NULL
+    `);
+    await db.query(`ALTER TABLE invitation_tokens ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)`);
 
     console.log('🔄 Adding exercise filter columns...');
     await db.query(`

@@ -13,6 +13,7 @@ export const SetupPasswordPage = () => {
     email: string;
     name: string;
     role: string;
+    loginUsername: string | null;
   } | null>(null);
   const [validationError, setValidationError] = useState('');
 
@@ -45,7 +46,8 @@ export const SetupPasswordPage = () => {
           setInvitationData({
             email: data.email,
             name: data.name,
-            role: data.role
+            role: data.role,
+            loginUsername: data.loginUsername || null
           });
         } else {
           setValidationError(data.error || 'Invalid invitation');
@@ -139,6 +141,9 @@ export const SetupPasswordPage = () => {
           <h2 className="text-lg font-semibold font-display text-secondary-500 mb-2">You're all set!</h2>
           <p className="text-sm text-slate-500 mb-6">
             Your password has been created. You can now sign in to access your exercise programs.
+            {invitationData?.loginUsername && (
+              <> Remember, your login name is <strong className="text-secondary-500">{invitationData.loginUsername}</strong>.</>
+            )}
           </p>
           <button
             onClick={() => navigate('/')}
@@ -167,10 +172,20 @@ export const SetupPasswordPage = () => {
           <p className="text-sm text-slate-500 mt-1">Create a password to set up your account</p>
         </div>
 
-        <div className="bg-slate-50 rounded-lg px-4 py-3 mb-6">
-          <p className="text-xs text-slate-400 uppercase tracking-wider mb-0.5">Email</p>
-          <p className="text-sm text-slate-700 font-medium">{invitationData.email}</p>
-        </div>
+        {invitationData.loginUsername ? (
+          <div className="bg-slate-50 rounded-lg px-4 py-3 mb-6">
+            <p className="text-xs text-slate-400 uppercase tracking-wider mb-0.5">Your login name</p>
+            <p className="text-base text-secondary-500 font-bold">{invitationData.loginUsername}</p>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              Because your email is shared, you'll sign in with this login name instead of the email address. Keep it somewhere handy.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-slate-50 rounded-lg px-4 py-3 mb-6">
+            <p className="text-xs text-slate-400 uppercase tracking-wider mb-0.5">Email</p>
+            <p className="text-sm text-slate-700 font-medium">{invitationData.email}</p>
+          </div>
+        )}
 
         <div className="space-y-4">
           <div>

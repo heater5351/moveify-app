@@ -135,8 +135,23 @@ async function sendPasswordResetEmail(toEmail, resetUrl) {
   return sendEmail(toEmail, 'Reset your Moveify password', htmlBody, textBody);
 }
 
-async function sendInvitationEmail(toEmail, patientName, invitationUrl) {
+async function sendInvitationEmail(toEmail, patientName, invitationUrl, loginUsername = null) {
   const firstName = patientName.split(' ')[0];
+
+  // Households can share one email, so a second patient on the same address
+  // signs in with a login name instead of the email. Show whichever applies.
+  const credentialBlock = loginUsername
+    ? `
+    <div style="background-color: #f8fafc; border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+      <p style="margin: 0 0 4px 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Your login name</p>
+      <p style="margin: 0 0 8px 0; font-size: 16px; color: #132232; font-weight: 700;">${loginUsername}</p>
+      <p style="margin: 0; font-size: 12px; color: #64748b; line-height: 1.5;">Because this email is shared, sign in with this login name (not the email address). Keep it somewhere handy.</p>
+    </div>`
+    : `
+    <div style="background-color: #f8fafc; border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+      <p style="margin: 0 0 4px 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Your login email</p>
+      <p style="margin: 0; font-size: 14px; color: #334155; font-weight: 500;">${toEmail}</p>
+    </div>`;
 
   const htmlBody = wrapEmail(`
     <h2 style="margin: 0 0 12px 0; font-size: 20px; font-weight: 700; color: #132232;">Welcome to Moveify, ${firstName}</h2>
@@ -148,14 +163,14 @@ async function sendInvitationEmail(toEmail, patientName, invitationUrl) {
         <a href="${invitationUrl}" style="display: inline-block; background-color: #46c1c0; color: #ffffff; padding: 14px 40px; text-decoration: none; border-radius: 10px; font-size: 15px; font-weight: 600; letter-spacing: 0.2px;">Get started</a>
       </td></tr>
     </table>
-    <div style="background-color: #f8fafc; border-radius: 10px; padding: 16px; margin-bottom: 20px;">
-      <p style="margin: 0 0 4px 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Your login email</p>
-      <p style="margin: 0; font-size: 14px; color: #334155; font-weight: 500;">${toEmail}</p>
-    </div>
+    ${credentialBlock}
     <p style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.6;">This link expires in 7 days. If you weren't expecting this email, you can safely ignore it.</p>
   `);
 
-  const textBody = `Welcome to Moveify\n\nHi ${firstName},\n\nYour clinician has created a Moveify account for you to manage your exercise program.\n\nSet your password here: ${invitationUrl}\n\nYour email: ${toEmail}\n\nThis link expires in 7 days.`;
+  const credentialText = loginUsername
+    ? `Your login name: ${loginUsername}\n(This email is shared, so sign in with this login name, not the email.)`
+    : `Your email: ${toEmail}`;
+  const textBody = `Welcome to Moveify\n\nHi ${firstName},\n\nYour clinician has created a Moveify account for you to manage your exercise program.\n\nSet your password here: ${invitationUrl}\n\n${credentialText}\n\nThis link expires in 7 days.`;
 
   return sendEmail(toEmail, `${firstName}, set up your Moveify account`, htmlBody, textBody);
 }

@@ -22,6 +22,36 @@ what to know now, links).
 
 ---
 
+## 2026-06-19 — Shared-email login (spouses on one email/phone)
+
+- **Problem:** older patients often share an email (and phone) with a spouse, but
+  email was the login key — `users.email` had a `UNIQUE` constraint and Identity
+  Platform enforces unique account emails, so the second spouse couldn't be invited.
+- **Fix (reactive, low-blast-radius):** email is now treated as a **contact field,
+  not a login key** (identity is already `firebase_uid`). When an invite hits an
+  email that already belongs to an *active* patient, the clinician confirms it's a
+  shared household email; the **second** patient gets an auto-generated **login
+  name** (`john-smith`, `-2` on collision) backed by a synthetic IP account email
+  `<name>@login.moveifyapp.com` (nothing is mailed there). The first spouse keeps
+  logging in by email. **Patients who don't share an email are completely unchanged.**
+- **Schema migration** (`init.js`, additive + relaxing): dropped `users_email_key`
+  UNIQUE (kept a plain index), added `users.login_username` (partial-unique on
+  `LOWER(login_username)`), added `invitation_tokens.user_id` so set-password
+  resolves the right row when the email is shared.
+- **Login/reset:** the login + forgot-password fields now accept an email **or** a
+  login name (frontend appends the domain; `LOGIN_USERNAME_DOMAIN` mirrored in
+  `frontend/src/config.ts` ↔ `backend/lib/login-identity.js`). Reset links for a
+  login-name patient generate against the synthetic account but deliver to the real
+  shared inbox.
+- **Hardening:** the middleware email→user fallback and the legacy set-password
+  email fallback now resolve **only on an exact single match** (fail closed) so a
+  shared email can never mis-resolve a session or set a password on the wrong row.
+- Login error is now generic ("Invalid login or password"); 9 new helper/collision
+  tests; full suite 202 backend tests pass; frontend builds clean.
+- ⚠ Deploy note: verify on **staging first** that the prod `users` email UNIQUE
+  constraint is named `users_email_key` (standard for inline `UNIQUE`); if it isn't,
+  the `DROP CONSTRAINT IF EXISTS` no-ops and shared-email inserts would fail closed.
+
 ## 2026-06-17 — PROM library batch 2 (sourced from official forms)
 
 - Added **NDI**, **ODI**, **UEFI**, **Roland-Morris (RMDQ)**, **Örebro-SF** — catalog
