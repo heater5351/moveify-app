@@ -79,3 +79,9 @@ html, body {
 /* Hide scrollbar utility (used by horizontally scrollable mobile tab strips) */
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* On touch devices (iPad/phones), keep form controls at >=16px so Safari does
+   not auto-zoom the viewport when an input is focused. Desktop sizing is unchanged. */
+@media (pointer: coarse) {
+  input, textarea, select { font-size: 16px; }
+}

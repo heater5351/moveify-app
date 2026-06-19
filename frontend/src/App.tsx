@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, ClipboardList } from 'lucide-react';
 import { Routes, Route } from 'react-router-dom';
 import type { Patient, ProgramExercise, ProgramConfig, UserRole, NewPatient, CompletionData, User, ExerciseWeekPrescription } from './types/index.ts';
 import { LoginPage } from './components/LoginPage';
@@ -154,6 +154,8 @@ function App() {
   const [showBugReportModal, setShowBugReportModal] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [showAiProtocolModal, setShowAiProtocolModal] = useState(false);
+  // Program builder panel: side-by-side on desktop, collapsible/slide-over on tablet (iPad)
+  const [showBuilder, setShowBuilder] = useState(true);
 
   // Form states
   const [newPatient, setNewPatient] = useState<NewPatient>({
@@ -1313,11 +1315,41 @@ function App() {
           />
         </div>
       ) : currentPage === 'exercises' ? (
-        <div className="flex flex-1 overflow-hidden">
-          <div className="flex-1 flex flex-col overflow-hidden px-6 pt-7">
+        <div className="flex flex-1 overflow-hidden relative">
+          <div className="flex-1 min-w-0 flex flex-col overflow-hidden px-4 md:px-6 pt-7">
             <ExerciseLibrary onAddToProgram={handleAddToProgram} />
           </div>
-          <div className="w-96 border-l border-slate-200 bg-white overflow-y-auto shadow-sm">
+
+          {/* Reopen tab — shown when the builder is collapsed */}
+          {!showBuilder && (
+            <button
+              onClick={() => setShowBuilder(true)}
+              className="absolute top-4 right-4 z-20 flex items-center gap-2 bg-primary-400 hover:bg-primary-500 text-white px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium transition-colors"
+              title="Show program builder"
+            >
+              <ClipboardList size={16} />
+              <span>Program</span>
+              {programExercises.length > 0 && (
+                <span className="bg-white/25 rounded-full px-2 py-0.5 text-xs">{programExercises.length}</span>
+              )}
+            </button>
+          )}
+
+          {/* Backdrop — only on tablet/narrow widths when the builder overlays */}
+          {showBuilder && (
+            <div
+              className="lg:hidden fixed inset-0 bg-black/30 z-30"
+              onClick={() => setShowBuilder(false)}
+            />
+          )}
+
+          {/* Builder: in-flow side panel on lg+, slide-over drawer below lg */}
+          <div
+            className={`bg-white border-l border-slate-200 shadow-sm overflow-y-auto transition-transform
+              fixed inset-y-0 right-0 z-40 w-[min(24rem,90vw)]
+              lg:static lg:z-auto lg:w-96 lg:translate-x-0
+              ${showBuilder ? 'translate-x-0' : 'translate-x-full lg:hidden'}`}
+          >
             <ProgramBuilder
               programExercises={programExercises}
               programName={programName}
@@ -1335,6 +1367,7 @@ function App() {
               onToggleWarmup={handleToggleWarmup}
               onSaveAsTemplate={handleSaveAsTemplate}
               onLoadTemplate={() => setShowProgramTemplateModal(true)}
+              onCollapse={() => setShowBuilder(false)}
             />
           </div>
         </div>

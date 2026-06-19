@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Trash2, X, GripVertical, BarChart2, FolderOpen, Save, ChevronDown, ChevronUp, Flame } from 'lucide-react';
+import { Trash2, X, GripVertical, BarChart2, FolderOpen, Save, ChevronDown, ChevronUp, Flame, PanelRightClose } from 'lucide-react';
 import type { ProgramExercise, Patient } from '../types/index.ts';
 import { formatDuration, getExerciseType } from '../utils/duration.ts';
 import {
   DndContext,
   closestCenter,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -37,6 +38,7 @@ interface ProgramBuilderProps {
   onSaveAsTemplate?: () => void;
   onLoadTemplate?: () => void;
   onToggleWarmup?: (index: number) => void;
+  onCollapse?: () => void;
 }
 
 interface SortableExerciseProps {
@@ -332,13 +334,17 @@ export const ProgramBuilder = ({
   onAddExercise,
   onSaveAsTemplate,
   onLoadTemplate,
-  onToggleWarmup
+  onToggleWarmup,
+  onCollapse
 }: ProgramBuilderProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [warmupCollapsed, setWarmupCollapsed] = useState(false);
 
+  // Mouse: drag after an 8px move (precise). Touch: press-and-hold 200ms so a
+  // finger swipe scrolls the list instead of accidentally grabbing a card.
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -376,9 +382,21 @@ export const ProgramBuilder = ({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="px-5 py-4 border-b border-slate-100">
-        <h2 className="text-sm font-semibold font-display text-secondary-500 tracking-tight">Program Builder</h2>
-        <p className="text-xs text-slate-400 mt-0.5">{programExercises.length} exercise{programExercises.length !== 1 ? 's' : ''}</p>
+      <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold font-display text-secondary-500 tracking-tight">Program Builder</h2>
+          <p className="text-xs text-slate-400 mt-0.5">{programExercises.length} exercise{programExercises.length !== 1 ? 's' : ''}</p>
+        </div>
+        {onCollapse && (
+          <button
+            onClick={onCollapse}
+            className="flex-shrink-0 p-1.5 -mr-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            title="Hide program builder"
+            aria-label="Hide program builder"
+          >
+            <PanelRightClose size={18} />
+          </button>
+        )}
       </div>
 
       {/* Patient Banner */}
@@ -443,7 +461,7 @@ export const ProgramBuilder = ({
         {programExercises.length === 0 ? (
           <div className="text-center mt-12">
             <p className="text-slate-400 text-sm">No exercises added yet</p>
-            <p className="text-slate-300 text-xs mt-1">Drag exercises here or click + to add</p>
+            <p className="text-slate-300 text-xs mt-1">Tap the + on an exercise to add it (or drag it here)</p>
           </div>
         ) : (
           <div className="space-y-4">

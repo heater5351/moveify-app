@@ -539,7 +539,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
         {displayedCustom.length > 0 && (
           <div className="mb-8">
             <h3 className="text-lg font-semibold text-gray-700 mb-4">Your Custom Exercises</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+            <div className="grid gap-3 sm:gap-4 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
             {displayedCustom.map(exercise => {
                 return (
                   <div
@@ -584,7 +584,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
                           e.stopPropagation();
                           onAddToProgram([toProgramExercise(exercise)]);
                         }}
-                        className="absolute top-3 right-3 p-2 rounded-full transition-colors bg-white/90 text-gray-400 hover:text-moveify-teal"
+                        className="absolute top-3 right-3 p-2 rounded-full transition-colors bg-moveify-teal text-white shadow-sm hover:bg-moveify-teal-dark"
                         title="Add to program"
                       >
                         <Plus size={16} />
@@ -621,7 +621,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
             {isActivelyBrowsing ? 'Default Exercise Library' : 'Favorite Exercises'}
           </h3>
         )}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
           {displayedDefault.map(exercise => {
               return (
                 <div
@@ -666,7 +666,7 @@ export const ExerciseLibrary = ({ onAddToProgram }: ExerciseLibraryProps) => {
                         e.stopPropagation();
                         onAddToProgram([toProgramExercise(exercise)]);
                       }}
-                      className="absolute top-3 right-3 p-2 rounded-full transition-colors bg-white/90 text-gray-400 hover:text-moveify-teal"
+                      className="absolute top-3 right-3 p-2 rounded-full transition-colors bg-moveify-teal text-white shadow-sm hover:bg-moveify-teal-dark"
                       title="Add to program"
                     >
                       <Plus size={16} />
