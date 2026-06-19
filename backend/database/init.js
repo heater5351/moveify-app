@@ -529,7 +529,18 @@ async function initDatabase() {
       ON users(LOWER(login_username))
       WHERE login_username IS NOT NULL
     `);
-    await db.query(`ALTER TABLE invitation_tokens ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)`);
+    // user_id links a token to its exact user. ON DELETE CASCADE so deleting a
+    // patient (DELETE FROM users) doesn't trip the FK — matches how the other
+    // child tables (programs, completions, …) cascade. Drop + re-add makes the
+    // ON DELETE rule idempotent even if an earlier deploy created the FK with
+    // the default (NO ACTION) via the inline REFERENCES.
+    await db.query(`ALTER TABLE invitation_tokens ADD COLUMN IF NOT EXISTS user_id INTEGER`);
+    await db.query(`ALTER TABLE invitation_tokens DROP CONSTRAINT IF EXISTS invitation_tokens_user_id_fkey`);
+    await db.query(`
+      ALTER TABLE invitation_tokens
+      ADD CONSTRAINT invitation_tokens_user_id_fkey
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    `);
 
     console.log('🔄 Adding exercise filter columns...');
     await db.query(`
