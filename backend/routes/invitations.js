@@ -70,38 +70,41 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
     const clinicianId = req.user.id;
 
     // Look at every account already holding this contact email. Email is no
-    // longer a login key, so duplicates are allowed — but we distinguish:
-    //   • the SAME person being re-invited (same Cliniko patient) → reuse row
-    //   • a DIFFERENT person already active on this email → shared household;
-    //     require explicit confirmation, then give the new patient a login name
+    // longer a login key, so duplicates are allowed — but we distinguish the
+    // SAME person being re-invited (→ reuse their row) from a DIFFERENT person
+    // sharing the email (→ shared household). Same-person = same Cliniko
+    // patient when we have one, else same name. This is independent of whether
+    // the existing patient has finished setup — spouses are commonly invited
+    // back-to-back while both are still pending.
     const existingRows = (await db.query(
-      `SELECT id, name, password_hash, firebase_uid, cliniko_patient_id, login_username
+      `SELECT id, name, cliniko_patient_id, login_username
          FROM users WHERE email = $1`,
       [email]
     )).rows;
-    const isActive = (u) => !!(u.firebase_uid || u.password_hash);
+    const norm = (s) => (s || '').trim().toLowerCase();
+    const isSamePerson = (u) =>
+      (clinikoPatientId && u.cliniko_patient_id)
+        ? String(u.cliniko_patient_id) === String(clinikoPatientId)
+        : norm(u.name) === norm(name);
 
-    // The row representing THIS person, if they already exist
-    const samePersonRow = clinikoPatientId
-      ? existingRows.find((u) => String(u.cliniko_patient_id) === String(clinikoPatientId))
-      : existingRows.find((u) => !isActive(u) && !u.login_username); // manual: a plain pending row
+    // The row representing THIS person (re-invite), if any
+    const samePersonRow = existingRows.find(isSamePerson);
+    // A different person already holding this email → shared household
+    const otherRow = existingRows.find((u) => !isSamePerson(u));
 
-    // Any *other* person already holding this email with a live account
-    const otherActiveRow = existingRows.find((u) => isActive(u) && u !== samePersonRow);
-
-    if (otherActiveRow && !allowSharedEmail) {
+    if (otherRow && !allowSharedEmail) {
       // Caught at the clinician's invite step — let them confirm it's a shared
       // household email (e.g. a spouse) before we create a second account.
       return res.status(409).json({
         emailShared: true,
-        existingName: otherActiveRow.name,
-        error: `This email already belongs to ${otherActiveRow.name}.`,
+        existingName: otherRow.name,
+        error: `This email already belongs to ${otherRow.name}.`,
       });
     }
 
     // A second person on a shared email logs in with a generated login name
     // (the first keeps their email). Brand-new emails never get one.
-    const needsLoginName = !!otherActiveRow;
+    const needsLoginName = !!otherRow;
 
     // Generate unique token
     const token = crypto.randomBytes(32).toString('hex');
