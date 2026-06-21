@@ -95,6 +95,9 @@ export const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
                   autoFocus
                 />
               </div>
+              <p className="mt-2 text-xs text-gray-400">
+                Share an email with a family member? Enter the login name we gave you, not the email.
+              </p>
             </div>
 
             {error && (

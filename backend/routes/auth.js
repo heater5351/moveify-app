@@ -8,7 +8,7 @@ const { sendPasswordResetEmail } = require('../services/email');
 const { authenticate } = require('../middleware/auth');
 const identityPlatform = require('../lib/identity-platform');
 const audit = require('../services/audit');
-const { toLoginEmail } = require('../lib/login-identity');
+const { toLoginEmail, updateLoginEmail } = require('../lib/login-identity');
 
 const router = express.Router();
 
@@ -58,11 +58,26 @@ router.patch('/profile', authenticate, async (req, res) => {
     // households may legitimately share one. Only enforce uniqueness when the
     // user is actually *changing* to a new email — so a shared-email patient can
     // still edit their profile, while a typo'd duplicate is still caught.
-    const me = await db.getOne('SELECT email FROM users WHERE id = $1', [req.user.id]);
-    if ((me?.email || '').toLowerCase() !== email.trim().toLowerCase()) {
+    const me = await db.getOne('SELECT email, firebase_uid, login_username FROM users WHERE id = $1', [req.user.id]);
+    const emailChanged = (me?.email || '').toLowerCase() !== email.trim().toLowerCase();
+    if (emailChanged) {
       const existing = await db.getOne('SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id != $2', [email.trim(), req.user.id]);
       if (existing) {
         return res.status(400).json({ error: 'Email is already in use by another account' });
+      }
+      // Propagate the change to Identity Platform so email-login users can sign in
+      // with the new address (no-op for synthetic-login users / unset accounts).
+      // Done before the DB write so a collision leaves DB + IP consistent.
+      try {
+        await updateLoginEmail(identityPlatform.auth(), {
+          firebaseUid: me?.firebase_uid, loginUsername: me?.login_username, newEmail: email.trim(),
+        });
+      } catch (e) {
+        if (e.code === 'auth/email-already-exists') {
+          return res.status(400).json({ error: 'Email is already in use by another account' });
+        }
+        console.error('Failed to update login email on profile edit:', e.code || e.message);
+        return res.status(500).json({ error: 'Could not update login email. Please try again.' });
       }
     }
 

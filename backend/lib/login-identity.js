@@ -57,4 +57,25 @@ async function deleteLoginAccount(auth, { firebaseUid, loginUsername } = {}) {
   }
 }
 
-module.exports = { LOGIN_USERNAME_DOMAIN, toLoginEmail, slugifyName, deleteLoginAccount };
+// Keep a patient's Identity Platform login email in sync when their contact email
+// changes (profile edit / clinician patient edit). Without this, an email-login
+// patient whose address is changed could no longer sign in with the new one — the
+// IP account still held the old email. No-op for:
+//   • synthetic-login users (login_username set) — their IP email is the login
+//     name, NOT the contact email, so a contact change must not touch it;
+//   • users with no IP account yet (no firebase_uid) — set-password will use the
+//     current email when it creates the account.
+// Returns 'updated' | 'skipped'. Throws auth/email-already-exists (caller → 400)
+// and other auth errors so the caller can keep DB + IP consistent.
+async function updateLoginEmail(auth, { firebaseUid, loginUsername, newEmail } = {}) {
+  if (!auth || !firebaseUid || loginUsername) return 'skipped';
+  try {
+    await auth.updateUser(String(firebaseUid), { email: String(newEmail).trim(), emailVerified: true });
+    return 'updated';
+  } catch (err) {
+    if (err.code === 'auth/user-not-found') return 'skipped';
+    throw err;
+  }
+}
+
+module.exports = { LOGIN_USERNAME_DOMAIN, toLoginEmail, slugifyName, deleteLoginAccount, updateLoginEmail };

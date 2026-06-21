@@ -22,6 +22,20 @@ what to know now, links).
 
 ---
 
+## 2026-06-21 — Email-edit → Identity Platform sync + deterministic resend
+
+- **P2:** editing a patient's email (`PATCH /api/auth/profile`, `PUT /api/patients/:id`)
+  now propagates to the Identity Platform login email via new `login-identity.js`
+  `updateLoginEmail()`, so an email-login patient can sign in with the new address
+  (previously the IP account kept the old email). No-op for synthetic-login patients
+  (their IP email is the login name) and pre-setup rows. Done before the DB write; an
+  `email-already-exists` collision returns 400 so DB + IP stay consistent.
+- **P4:** Resend Invitation now passes the exact `resendUserId`, so it re-invites the
+  right row even when spouses on one email share a name (was name-heuristic only).
+  Added a shared-email hint on the login page + forgot-password modal ("use the login
+  name we gave you"). P3 (data-deletion clears `login_username`/IP account) already
+  shipped with the 2026-06-21 lifecycle entry below.
+
 ## 2026-06-21 — Shared-email login lifecycle hardening + isolated staging Firebase project
 
 - **Bug found:** the shared-email login names (2nd spouse on one email → synthetic

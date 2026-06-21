@@ -115,6 +115,9 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
               placeholder="you@example.com"
               className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 transition-all text-slate-900 placeholder:text-slate-400 bg-white text-sm"
             />
+            <p className="mt-1.5 text-xs text-slate-400">
+              Share an email with a family member? Sign in with the login name we gave you.
+            </p>
           </div>
 
           <div>
