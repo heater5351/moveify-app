@@ -92,7 +92,11 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
     // A different person already holding this email → shared household
     const otherRow = existingRows.find((u) => !isSamePerson(u));
 
-    if (otherRow && !allowSharedEmail) {
+    // A resend/re-invite of someone who already has a row (samePersonRow) never
+    // creates a new account, so the shared-household confirmation doesn't apply.
+    // Only gate it when this is a genuinely NEW person landing on an email that
+    // someone else already holds.
+    if (otherRow && !samePersonRow && !allowSharedEmail) {
       // Caught at the clinician's invite step — let them confirm it's a shared
       // household email (e.g. a spouse) before we create a second account.
       return res.status(409).json({
