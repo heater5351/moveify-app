@@ -8,6 +8,6 @@
     { "src": "/api/contact", "dest": "/api/contact.js" },
     { "src": "/api/refer", "dest": "/api/refer.js" },
     { "src": "/refer", "dest": "/tailwind css template/refer.html" },
-    { "src": "/(.*)", "dest": "/tailwind css template/$1" }
+    { "src": "/((?!_vercel/).*)", "dest": "/tailwind css template/$1" }
   ]
 }

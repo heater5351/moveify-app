@@ -91,6 +91,12 @@
 
     <!-- Cloudflare Turnstile (bot protection for the contact form) -->
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
+    <!-- Vercel Web Analytics (cookieless page views/visitors) -->
+    <script>
+      window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/insights/script.js"></script>
   </head>
   <body>
     <!-- Page loading -->
