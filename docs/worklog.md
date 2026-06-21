@@ -22,6 +22,26 @@ what to know now, links).
 
 ---
 
+## 2026-06-21 — Patient handout objective table sources from the Assessment tab
+
+- **Problem:** since the structured Assessment tab landed (scribe Phase 3), the
+  patient handout's objective-findings table was still built by an LLM extraction of
+  the **transcript** (`extractFindings`), so tap-captured values were ignored and
+  spoken numbers (less reliable) drove the table. The SOAP note already treated the
+  tapped values as authoritative; the handout did not.
+- **Fix:** `POST /handout/generate` now loads the session's `scribe_session_measurements`
+  and `generateHandout` renders them into the handout's `Test | Result | Interpretation`
+  rows via new `measurement-render.js` `renderMeasurementsForHandout` — deterministically
+  age/sex-grounded (same engine/verdicts as the SOAP block). When any structured
+  findings render, they **replace** the transcript extraction; with none, it falls
+  back to `extractFindings` (older sessions, or only special-test toggles captured).
+- **What to know now:** handout objective data = the Assessment tab, not the
+  transcript. Toggles (pass/fail special tests) are excluded from the table (numeric/
+  graded findings only). Narrative sections still come from the transcript. The handout
+  is generated before the SOAP note exists, so it reads the measurements directly (not
+  the note). Backend-only; the pipe-row format is unchanged so the table UI + docx are
+  untouched. Covered by `tests/measurement-render.test.mjs`.
+
 ## 2026-06-19 — Shared-email login (spouses on one email/phone)
 
 - **Problem:** older patients often share an email (and phone) with a spouse, but

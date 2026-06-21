@@ -5,6 +5,7 @@
  */
 const { BedrockRuntimeClient, ConverseCommand } = require('@aws-sdk/client-bedrock-runtime');
 const { interpret, buildInterpretation, matchTest, parseValue } = require('./normative-data');
+const { renderMeasurementsForHandout } = require('./measurement-render');
 
 const client = new BedrockRuntimeClient({ region: 'ap-southeast-2' });
 const MODEL_ID = 'deepseek.v3.2';
@@ -393,7 +394,7 @@ Rules:
 - No specific numbers or percentiles are needed in this paragraph.
 - No em dashes, asterisks, emojis, or markdown. Output only the paragraph.`;
 
-async function generateHandout(transcript, patientFirstName, assessmentDate, demographics = {}) {
+async function generateHandout(transcript, patientFirstName, assessmentDate, demographics = {}, measurementRows = []) {
   if (!transcript || transcript.trim().length < 10) {
     throw new Error('Transcript too short to generate a handout');
   }
@@ -423,7 +424,16 @@ async function generateHandout(transcript, patientFirstName, assessmentDate, dem
     };
   })();
 
-  const contextPromise = extractFindings(transcript, age, sex);
+  // Objective findings table. When the clinician captured structured assessments
+  // in-session (Assessment tab), those tapped values are authoritative — render
+  // them directly (deterministically graded, same as the SOAP note) and let them
+  // REPLACE the transcript-extracted table. Fall back to extracting from the
+  // transcript only when no renderable structured findings exist (e.g. an older
+  // session, or only special-test toggles were captured).
+  const structuredRows = renderMeasurementsForHandout(measurementRows, age, sex);
+  const contextPromise = structuredRows.length > 0
+    ? Promise.resolve(structuredRows.join('\n'))
+    : extractFindings(transcript, age, sex);
 
   const [sections, clinicalContext] = await Promise.all([sectionsPromise, contextPromise]);
 

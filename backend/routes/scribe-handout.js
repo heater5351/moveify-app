@@ -28,7 +28,22 @@ router.post('/:sessionId/handout/generate', async (req, res) => {
     // Pull demographics for normative-data grounding (age/sex). Never logged.
     const demographics = await getPatientDemographics(session.rows[0].patient_id);
 
-    const { sections, model } = await generateHandout(transcript, patientFirstName, assessmentDate, demographics);
+    // In-session structured measurements (tap-captured in the Assessment tab). When
+    // present, these authoritative values build the objective findings table instead
+    // of extracting it from the transcript. Best-effort — never block the handout.
+    let measurementRows = [];
+    try {
+      const rows = await db.query(
+        `SELECT assessment_key, measure_key, side, value, value2, unit
+         FROM scribe_session_measurements WHERE session_id = $1 ORDER BY id ASC`,
+        [req.params.sessionId]
+      );
+      measurementRows = rows.rows;
+    } catch (err) {
+      console.error('Handout measurement fetch failed (continuing without it):', err.message);
+    }
+
+    const { sections, model } = await generateHandout(transcript, patientFirstName, assessmentDate, demographics, measurementRows);
     const wordCount = transcript.split(/\s+/).length;
     audit.log(req, 'handout_generated', 'scribe_session', parseInt(req.params.sessionId), { wordCount, model });
 
