@@ -4,6 +4,7 @@
 // PHI policy: form contents go ONLY into the email — never logged. Logs carry
 // the reference ID + funding type only.
 const { google } = require('googleapis');
+const { originAllowed, verifyTurnstile, clientIp } = require('./_lib/antispam');
 
 const RATE_LIMIT = 5;
 const RATE_WINDOW = 60 * 60 * 1000; // 1 hour
@@ -218,7 +219,12 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+  // Reject forged cross-origin POSTs (bots hitting the endpoint directly).
+  if (!originAllowed(req)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const ip = clientIp(req);
   if (!rateLimit(ip)) {
     return res.status(429).json({ error: 'Too many requests. Please try again later.' });
   }
@@ -228,6 +234,12 @@ module.exports = async (req, res) => {
   // Honeypot — pretend success so bots don't adapt.
   if (str(p.website)) {
     return res.status(200).json({ success: true, referenceId: referenceId() });
+  }
+
+  // CAPTCHA — Cloudflare Turnstile. Fails closed once the secret is configured.
+  const turnstile = await verifyTurnstile(p['cf-turnstile-response'], ip);
+  if (!turnstile.ok) {
+    return res.status(403).json({ error: 'Verification failed. Please reload the page and try again.' });
   }
 
   // NDIA-managed participants can't be accepted (not NDIA-registered).

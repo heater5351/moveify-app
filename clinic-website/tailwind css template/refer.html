@@ -24,6 +24,8 @@
         .field-input:focus { outline: none; border-color: #46c1c0; box-shadow: 0 0 0 2px rgba(70,193,192,0.25); }
         .req::after { content: " *"; color: #dc2626; }
     </style>
+    <!-- Cloudflare Turnstile (bot protection for the referral form) -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body class="bg-gray-50 text-gray-800">
     <!-- Navbar — same markup as the homepage (main.css + main.js drive it).
@@ -417,6 +419,8 @@
             </fieldset>
 
             <div>
+                <!-- Cloudflare Turnstile widget (site key is public; secret lives in the TURNSTILE_SECRET_KEY Vercel env var) -->
+                <div class="cf-turnstile mb-4" data-sitekey="0x4AAAAAADonPPIoSFaNGMkT"></div>
                 <p id="formError" class="hidden mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-3"></p>
                 <button type="submit" id="submitBtn"
                     class="w-full sm:w-auto px-8 py-3 rounded-md bg-brand text-white font-semibold hover:bg-branddark disabled:opacity-50 disabled:cursor-not-allowed transition">
@@ -538,8 +542,10 @@
                 var attachments = [];
                 for (var i = 0; i < files.length; i++) attachments.push(await readFile(files[i]));
 
+                var turnstileEl = form.querySelector('[name="cf-turnstile-response"]');
                 var payload = {
                     website: document.getElementById('hp_website').value,
+                    'cf-turnstile-response': turnstileEl ? turnstileEl.value : '',
                     referrer: {
                         name: val('ref_name'), role: val('ref_role'), organisation: val('ref_org'),
                         providerNumber: val('ref_provider'), phone: val('ref_phone'), email: val('ref_email'),
@@ -593,6 +599,7 @@
 
                 if (!res.ok) {
                     showError(data.error || 'Something went wrong. Please try again, or email ryan@moveifyhealth.com.');
+                    if (window.turnstile) { try { window.turnstile.reset(); } catch (_) {} }
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Submit referral';
                     return;
@@ -607,6 +614,7 @@
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (ex) {
                 showError('Something went wrong. Please try again, or email ryan@moveifyhealth.com.');
+                if (window.turnstile) { try { window.turnstile.reset(); } catch (_) {} }
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit referral';
             }

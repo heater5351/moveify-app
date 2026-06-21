@@ -88,6 +88,9 @@
     <link rel="stylesheet" href="https://cdn.lineicons.com/4.0/lineicons.css" />
 
     <link rel="stylesheet" href="./assets/css/main.css" />
+
+    <!-- Cloudflare Turnstile (bot protection for the contact form) -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   </head>
   <body>
     <!-- Page loading -->
@@ -950,6 +953,10 @@
                 </div>
 
                 <form id="contactForm" action="/api/contact" method="POST" class="flex flex-col gap-6">
+                  <!-- Honeypot — hidden from humans, bots fill it -->
+                  <div class="hidden" aria-hidden="true">
+                    <label>Website<input type="text" name="website" id="hp_website" tabindex="-1" autocomplete="off" /></label>
+                  </div>
                   <div class="row">
                     <div class="col-12 md:col-6">
                       <input
@@ -988,6 +995,13 @@
                         class="block w-full px-5 py-3 rounded-md border border-solid border-alpha-light dark:border-alpha-dark text-inherit text-base focus:border-primary"
                         placeholder="Tell us about your health goals or concerns (optional)"
                       ></textarea>
+                    </div>
+
+                    <div class="col-12">
+                      <div class="w-full flex justify-center">
+                        <!-- Cloudflare Turnstile widget (site key is public; secret lives in the TURNSTILE_SECRET_KEY Vercel env var) -->
+                        <div class="cf-turnstile" data-sitekey="0x4AAAAAADonPPIoSFaNGMkT"></div>
+                      </div>
                     </div>
 
                     <div class="col-12">
@@ -1209,22 +1223,36 @@
       // Form submission handler
       const contactForm = document.getElementById('contactForm');
       if (contactForm) {
+        const contactLoadedAt = Date.now();
         contactForm.addEventListener('submit', async function(e) {
           e.preventDefault();
           const btn = this.querySelector('button[type="submit"]');
           const originalText = btn.textContent;
+
+          // Spam control: real users take longer than 3 seconds.
+          if (Date.now() - contactLoadedAt < 3000) {
+            alert('Please take a moment to review before submitting.');
+            return;
+          }
+
           btn.disabled = true;
           btn.textContent = 'Sending...';
           try {
+            const payload = Object.fromEntries(new FormData(this));
+            payload.elapsedMs = Date.now() - contactLoadedAt;
             const res = await fetch('/api/contact', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(Object.fromEntries(new FormData(this)))
+              body: JSON.stringify(payload)
             });
-            if (!res.ok) throw new Error();
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
+              throw new Error(data.error || '');
+            }
             this.innerHTML = '<div class="py-8 text-center"><p class="text-lg font-semibold text-accent">Thanks for reaching out!</p><p class="mt-2">We\'ll be in touch soon.</p></div>';
-          } catch {
-            alert('Something went wrong. Please email us directly at ryan@moveifyhealth.com.');
+          } catch (err) {
+            alert((err && err.message) || 'Something went wrong. Please email us directly at ryan@moveifyhealth.com.');
+            if (window.turnstile) { try { window.turnstile.reset(); } catch (_) {} }
             btn.disabled = false;
             btn.textContent = originalText;
           }
