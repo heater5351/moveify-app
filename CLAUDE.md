@@ -421,7 +421,7 @@ or via `POST /api/cliniko/link/:patientId`. Linked patients are then kept fresh 
 | `DATABASE_URL` | Yes (local) | — | PostgreSQL connection string (local dev) |
 | `INSTANCE_CONNECTION_NAME` | Yes (GCP) | — | Cloud SQL socket path (production) |
 | `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Yes (GCP) | — | Cloud SQL credentials (production) |
-| `FIREBASE_PROJECT_ID` | **Yes** | — | GCP Identity Platform project (`moveify-app`). Used by `firebase-admin` to verify ID tokens. |
+| `FIREBASE_PROJECT_ID` | **Yes** | — | GCP Identity Platform project. **Prod = `moveify-app`; staging = `moveify-staging`** (separate project — see Branches). Used by `firebase-admin` to verify ID tokens. If this is set but `FIREBASE_SERVICE_ACCOUNT_JSON`/split creds are absent, `lib/identity-platform.js` initializes **keyless via Application Default Credentials** (the Cloud Run runtime SA) against this project — used by staging, whose org policy forbids SA key files. |
 | `FIREBASE_CLIENT_EMAIL` | **Yes** | — | Identity Platform service-account email |
 | `FIREBASE_PRIVATE_KEY` | **Yes** | — | Identity Platform service-account private key (`\n`-escaped; deploy via `--env-vars-file` YAML) |
 | `JWT_SECRET` | No (removed) | — | **No longer read** — the legacy JWT path was removed in Phase 4 (2026-06-10). Safe to drop from Cloud Run env / Secret Manager binding. |
@@ -516,6 +516,7 @@ drifted badly (described custom-JWT auth long after the Identity Platform migrat
 ### Branches
 
 - **`dev`** — active development branch. Push here for staging. Vercel auto-deploys a preview URL; backend targets `moveify-backend-staging` + `moveify_staging` DB.
+  - **Staging auth is a separate Firebase project (`moveify-staging`), isolated from prod (2026-06-21).** Before this, staging + prod shared the `moveify-app` Identity Platform project, so staging logins/set-passwords/**deletes** mutated real patient accounts (and colliding integer `firebase_uid`s clobbered each other). The staging backend now auths **keyless via ADC** (its runtime SA holds `roles/firebaseauth.admin` on `moveify-staging`); the dev-branch Vercel **Preview** `VITE_FIREBASE_*` point at `moveify-staging`. Prod (`moveify-app`) and its Production-scope Vercel vars are untouched. Staging DB rows carry old-project `firebase_uid`s — they relink on first login via the email fallback, or just create fresh test patients.
 - **`main`** — production. Only merge `dev → main` when ready to release.
 
 **⚠ Default push target is `dev`. Never push directly to `main` unless explicitly asked.**

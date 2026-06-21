@@ -297,6 +297,10 @@ router.post('/set-password', async (req, res) => {
     if (!auth) {
       return res.status(500).json({ error: 'Authentication service unavailable' });
     }
+    // The uid the credential ends up under. Normally === uid, but when we reuse
+    // an existing IP account (see below) it's that account's actual uid, which
+    // we must mirror to the row so login resolves.
+    let effectiveUid = uid;
     try {
       await auth.createUser({
         uid,
@@ -308,30 +312,40 @@ router.post('/set-password', async (req, res) => {
       });
     } catch (ipError) {
       if (ipError.code === 'auth/uid-already-exists' || ipError.code === 'auth/email-already-exists') {
-        // Existing IP user — update its password instead. Look up by email
-        // in case uid mapping diverged historically.
+        // Existing IP account — reuse it and (re)set its credential. Two cases:
+        // a resend replay (same uid), or a synthetic login-name email left behind
+        // by a previously-deleted shared-email patient (DIFFERENT uid, because the
+        // freed slug got reused). Either way we write the account's ACTUAL uid
+        // back to the row below — otherwise the patient could set a password yet
+        // never log in (token uid wouldn't map to any users.firebase_uid).
         let existing;
         try {
           existing = await auth.getUser(uid);
         } catch {
           existing = await auth.getUserByEmail(ipEmail);
         }
-        await auth.updateUser(existing.uid, { password });
+        await auth.updateUser(existing.uid, {
+          password,
+          displayName: user.name || undefined,
+          emailVerified: true,
+          disabled: false,
+        });
+        effectiveUid = existing.uid;
       } else {
         console.error('IP createUser error during set-password:', ipError);
         return res.status(500).json({ error: 'Failed to set password' });
       }
     }
 
-    // Mirror the IP uid back to the local users row + consent for patients
+    // Mirror the effective IP uid back to the local users row + consent for patients
     if (invitation.role === 'patient') {
       await db.query(`
         UPDATE users
         SET firebase_uid = $1, health_data_consent = TRUE, health_data_consent_date = NOW(), consent_version = '1.0'
         WHERE id = $2
-      `, [uid, user.id]);
+      `, [effectiveUid, user.id]);
     } else {
-      await db.query(`UPDATE users SET firebase_uid = $1 WHERE id = $2`, [uid, user.id]);
+      await db.query(`UPDATE users SET firebase_uid = $1 WHERE id = $2`, [effectiveUid, user.id]);
     }
 
     // Audit log consent

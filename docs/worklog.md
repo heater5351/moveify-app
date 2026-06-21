@@ -22,6 +22,33 @@ what to know now, links).
 
 ---
 
+## 2026-06-21 — Shared-email login lifecycle hardening + isolated staging Firebase project
+
+- **Bug found:** the shared-email login names (2nd spouse on one email → synthetic
+  `<slug>@login.moveifyapp.com` account) could leave **orphaned Identity Platform
+  accounts** on patient delete (neither hard-delete nor data-deletion removed the IP
+  account or freed `login_username`). A later re-invite reusing the freed slug then
+  hit set-password's `email-already-exists` fallback, which wrote the freshly-derived
+  uid to `users.firebase_uid` instead of the **existing** account's uid → patient
+  could set a password but never log in.
+- **Fix (`0280a36`):** set-password now mirrors the *effective* IP uid; patient
+  hard-delete (`patients.js`) and data-deletion anonymization (`data-requests.js`)
+  best-effort delete the IP account + clear `login_username`/`firebase_uid` via new
+  `lib/login-identity.js` `deleteLoginAccount()`. Also fixed earlier: Resend
+  Invitation no longer 409s for a shared-email patient (`f23476a`, shipped prior).
+- **Staging Firebase split:** discovered staging + prod **shared one** Identity
+  Platform project (`moveify-app`) — so staging testing mutated real patient auth and
+  the new delete-cleanup would have deleted real accounts. Created a dedicated
+  **`moveify-staging`** project (Email/Password, authorized domains = Vercel preview +
+  localhost). Staging backend now inits **keyless via ADC** (`052e186` adds the
+  fallback to `lib/identity-platform.js`; runtime SA granted `roles/firebaseauth.admin`
+  on `moveify-staging`; org policy `iam.disableServiceAccountKeyCreation` forbids key
+  files). Dev-branch Vercel **Preview** `VITE_FIREBASE_*` repointed to `moveify-staging`.
+- **What to know now:** prod auth = `moveify-app` (unchanged, JSON-creds path); staging
+  auth = `moveify-staging` (ADC path). See the Branches note in `CLAUDE.md`. Leftover
+  test accounts remain in `moveify-app` but are inert (free tier; no DB row → 401) —
+  optional cleanup later via prod-DB `firebase_uid` cross-reference.
+
 ## 2026-06-21 — Patient handout objective table sources from the Assessment tab
 
 - **Problem:** since the structured Assessment tab landed (scribe Phase 3), the

@@ -31,4 +31,30 @@ function slugifyName(name) {
   );
 }
 
-module.exports = { LOGIN_USERNAME_DOMAIN, toLoginEmail, slugifyName };
+// Best-effort removal of a patient's Identity Platform credential when their
+// Moveify row goes away (hard delete or data-deletion anonymization). Leaving it
+// behind orphans the auth account — and for a shared-email login name, the
+// synthetic email "<name>@login.moveifyapp.com" would collide when the freed
+// slug is later reused, breaking the new patient's login. Prefer the exact
+// firebase_uid; fall back to the synthetic login-name email for rows whose uid
+// was never recorded (or diverged historically). Caller passes the IP auth
+// instance so this stays dependency-free; a missing account is not an error.
+async function deleteLoginAccount(auth, { firebaseUid, loginUsername } = {}) {
+  if (!auth) return;
+  try {
+    if (firebaseUid) {
+      await auth.deleteUser(String(firebaseUid));
+      return;
+    }
+    if (loginUsername) {
+      const existing = await auth.getUserByEmail(toLoginEmail(loginUsername)).catch(() => null);
+      if (existing) await auth.deleteUser(existing.uid);
+    }
+  } catch (err) {
+    // Already gone is fine; anything else propagates to the caller's best-effort
+    // handler (which logs without blocking the deletion).
+    if (err.code !== 'auth/user-not-found') throw err;
+  }
+}
+
+module.exports = { LOGIN_USERNAME_DOMAIN, toLoginEmail, slugifyName, deleteLoginAccount };

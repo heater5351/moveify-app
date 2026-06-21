@@ -5,6 +5,8 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const { requirePatientAccess, requireAdmin } = require('../middleware/ownership');
 const audit = require('../services/audit');
 const { resolveProgramWindow, computeAdherence } = require('../services/adherence');
+const identityPlatform = require('../lib/identity-platform');
+const { deleteLoginAccount } = require('../lib/login-identity');
 
 const router = express.Router();
 
@@ -587,7 +589,7 @@ router.delete('/:patientId', requireRole('clinician'), requireAdmin, async (req,
 
     // Check if patient exists
     const patient = await db.getOne(
-      `SELECT id, email, role FROM users WHERE id = $1 AND role = 'patient'`,
+      `SELECT id, email, role, firebase_uid, login_username FROM users WHERE id = $1 AND role = 'patient'`,
       [patientId]
     );
 
@@ -597,6 +599,18 @@ router.delete('/:patientId', requireRole('clinician'), requireAdmin, async (req,
 
     // Delete the user from database (cascades to clinician_patients, programs, etc.)
     await db.query(`DELETE FROM users WHERE id = $1 AND role = 'patient'`, [patientId]);
+
+    // Best-effort: drop the Identity Platform credential too, so a future
+    // re-invite (especially one reusing a freed shared-email login name) can't
+    // collide with an orphaned auth account. Never block the delete on this.
+    try {
+      await deleteLoginAccount(identityPlatform.auth(), {
+        firebaseUid: patient.firebase_uid,
+        loginUsername: patient.login_username,
+      });
+    } catch (authErr) {
+      console.error('Failed to remove Identity Platform account on patient delete:', authErr.code || authErr.message);
+    }
 
     audit.log(req, 'patient_delete', 'patient', parseInt(patientId), { email: patient.email });
 
