@@ -162,4 +162,151 @@ function renderMeasureRows(rows, age, sex) {
   return lines;
 }
 
-module.exports = { renderMeasurements };
+// ── Handout objective-findings rendering ─────────────────────────────────────
+// The handout's objective table uses a different shape to the SOAP block: a
+// "Test | Result | Interpretation" pipe row per finding (consumed by the handout
+// table + the docx parseOaRows). When the clinician captured structured
+// assessments in-session, those tapped values are authoritative and replace the
+// transcript-extracted table — this renders them into that pipe-row shape with the
+// same deterministic age/sex grounding the transcript path uses.
+
+// Mirrors scribe-llm's NEUTRAL_BASELINE: a known test that can't be graded for this
+// patient (no norm, or missing age/sex) is stated as a baseline, never praised.
+const HANDOUT_NEUTRAL_BASELINE = 'Recorded as a baseline; we track your change at reassessment.';
+
+function groundedInterp(measureKey, rawValue, age, sex) {
+  try {
+    const res = interpretByKey(measureKey, rawValue, age, sex);
+    return (res && buildInterpretation(res)) || null;
+  } catch { return null; }
+}
+
+// "Hip ROM" + "Flexion" → "Hip Flexion" for a table-assessment movement row.
+function jointPrefix(displayName) {
+  return String(displayName || '').replace(/\s*(ROM|Range of Motion)\s*$/i, '').trim();
+}
+
+// "Single-Leg Stance (eyes open)" → "Single-Leg Stance" for a per-side row.
+function baseName(displayName) {
+  return String(displayName || '').replace(/\s*\(.*?\)\s*$/, '').trim();
+}
+
+/**
+ * Render tap-captured measurements into the handout's "Test | Result | Interpretation"
+ * pipe rows — the same shape the transcript extraction produces. Authoritative and
+ * age/sex-grounded; replaces the transcript-derived objective table when in-session
+ * assessments exist.
+ *
+ * - toggles (pass/fail special tests) are omitted — the objective table is numeric/
+ *   graded findings only (matches the transcript-extraction rule).
+ * - bilateral tests WITH an age/sex norm split into one grounded row per side, with a
+ *   side-to-side asymmetry note on the weaker side.
+ * - ROM and other un-graded tests render one combined L/R row at a neutral baseline.
+ * - compound (BP) and instruments (Berg/Mini-BEST) render a single grounded row.
+ *
+ * @param {Array<{assessment_key, measure_key, side, value, value2, unit}>} rows
+ * @returns {string[]} pipe rows (empty if nothing renderable, e.g. toggles only)
+ */
+function renderMeasurementsForHandout(rows, age, sex) {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+
+  // Group by assessment::measure, first-seen (capture) order.
+  const order = [];
+  const groups = new Map();
+  for (const r of rows) {
+    const key = `${r.assessment_key}::${r.measure_key}`;
+    if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+    groups.get(key).push(r);
+  }
+
+  const out = [];
+  for (const key of order) {
+    const grp = groups.get(key);
+    const first = grp[0];
+    const cat = findMeasure(first.assessment_key, first.measure_key);
+    if (!cat) continue;
+    const { assessment, measure } = cat;
+    const mode = measure.input || 'keypad';
+    if (mode === 'toggle') continue; // numeric/graded findings only
+
+    const measureKey = first.measure_key;
+    const suffix = unitSuffix(first.unit);
+
+    if (mode === 'compound') {
+      const r = grp.find(x => x.value2 != null) || first;
+      const v = Number(r.value), d = Number(r.value2);
+      if (!Number.isFinite(v) || !Number.isFinite(d)) continue;
+      const raw = `${fmt(v)}/${fmt(d)}`;
+      out.push(`${assessment.displayName} | ${raw}${suffix} | ${groundedInterp(measureKey, raw, age, sex) || HANDOUT_NEUTRAL_BASELINE}`);
+      continue;
+    }
+
+    if (mode === 'instrument') {
+      const v = Number(first.value);
+      if (!Number.isFinite(v)) continue;
+      const max = assessment.instrument && assessment.instrument.maxScore;
+      const result = max ? `${fmt(v)}/${max}` : `${fmt(v)}${suffix}`;
+      out.push(`${assessment.displayName} | ${result} | ${groundedInterp(measureKey, v, age, sex) || HANDOUT_NEUTRAL_BASELINE}`);
+      continue;
+    }
+
+    // Numeric (keypad / presets). Collect sides.
+    let left = null, right = null, single = null;
+    for (const r of grp) {
+      const v = Number(r.value);
+      if (!Number.isFinite(v)) continue;
+      if (r.side === 'left') left = v; else if (r.side === 'right') right = v; else single = v;
+    }
+    const isTable = assessment.layout === 'table';
+
+    // Single (non-lateralised) value.
+    if (left == null && right == null) {
+      if (single == null) continue;
+      const name = isTable ? `${jointPrefix(assessment.displayName)} ${measure.label}` : assessment.displayName;
+      out.push(`${name} | ${fmt(single)}${suffix} | ${groundedInterp(measureKey, single, age, sex) || HANDOUT_NEUTRAL_BASELINE}`);
+      continue;
+    }
+
+    // Bilateral: graded tests → one row per side; un-graded (ROM/length) → combined row.
+    const lG = left != null ? groundedInterp(measureKey, left, age, sex) : null;
+    const rG = right != null ? groundedInterp(measureKey, right, age, sex) : null;
+
+    if ((lG || rG) && !isTable) {
+      const name = baseName(assessment.displayName);
+      const built = [];
+      if (right != null) built.push({ label: 'Right', val: right, interp: rG || HANDOUT_NEUTRAL_BASELINE });
+      if (left != null) built.push({ label: 'Left', val: left, interp: lG || HANDOUT_NEUTRAL_BASELINE });
+      if (left != null && right != null) {
+        const hi = Math.max(left, right), lo = Math.min(left, right);
+        if (hi > 0 && (hi - lo) / hi >= 0.10) {
+          const pct = Math.round((hi - lo) / hi * 100);
+          const stronger = right >= left ? 'right' : 'left';
+          const weaker = right >= left ? 'Left' : 'Right';
+          const row = built.find(b => b.label === weaker);
+          if (row) row.interp = `${row.interp} ${pct}% weaker than the ${stronger} side.`.trim();
+        }
+      }
+      for (const b of built) out.push(`${name} (${b.label}) | ${fmt(b.val)}${suffix} | ${b.interp}`);
+      continue;
+    }
+
+    // Un-graded bilateral → combined L/R row at a neutral baseline (+ asymmetry note).
+    const name = isTable ? `${jointPrefix(assessment.displayName)} ${measure.label}` : baseName(assessment.displayName);
+    const result = [left != null ? `L ${fmt(left)}` : null, right != null ? `R ${fmt(right)}` : null].filter(Boolean).join(' / ') + suffix;
+    let interp = HANDOUT_NEUTRAL_BASELINE;
+    if (left != null && right != null) {
+      const hi = Math.max(left, right), lo = Math.min(left, right);
+      const weaker = left < right ? 'left' : 'right';
+      if (lo >= 0 && hi > 0 && (hi - lo) / hi >= 0.10) {
+        interp = `${HANDOUT_NEUTRAL_BASELINE} ${Math.round((hi - lo) / hi * 100)}% less on the ${weaker} side.`;
+      } else if (Math.abs(left - right) >= 5) {
+        interp = `${HANDOUT_NEUTRAL_BASELINE} ${fmt(Math.abs(left - right))}${suffix} less on the ${weaker} side.`;
+      }
+    }
+    out.push(`${name} | ${result} | ${interp}`);
+  }
+
+  return out;
+}
+
+module.exports = { renderMeasurements, renderMeasurementsForHandout };
