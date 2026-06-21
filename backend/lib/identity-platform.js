@@ -36,7 +36,23 @@ function init() {
   }
 
   if (!serviceAccount) {
-    console.warn('Identity Platform not configured (no FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_* env vars) — IP token verification disabled, legacy JWT only');
+    // Keyless fallback: Application Default Credentials (the Cloud Run runtime
+    // service account) against an explicit project. Used where org policy forbids
+    // service-account key files — e.g. the dedicated staging auth project
+    // (moveify-staging), which has no key. Requires the runtime SA to hold
+    // roles/firebaseauth.admin on FIREBASE_PROJECT_ID's project. Prod is
+    // unaffected: its FIREBASE_SERVICE_ACCOUNT_JSON path is taken above.
+    const adcProjectId = process.env.FIREBASE_PROJECT_ID;
+    if (adcProjectId) {
+      admin.initializeApp({
+        credential: admin.credential.applicationDefault(),
+        projectId: adcProjectId,
+      });
+      enabled = true;
+      console.log(`Identity Platform Admin SDK initialized (ADC, project ${adcProjectId})`);
+      return true;
+    }
+    console.warn('Identity Platform not configured (no FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_* creds, or FIREBASE_PROJECT_ID) — IP token verification disabled');
     return false;
   }
 
