@@ -5,6 +5,8 @@ const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/ownership');
 const audit = require('../services/audit');
+const identityPlatform = require('../lib/identity-platform');
+const { deleteLoginAccount } = require('../lib/login-identity');
 
 const router = express.Router();
 
@@ -191,8 +193,8 @@ router.post('/:id/execute-deletion', requireAdmin, async (req, res) => {
 
     const userId = request.user_id;
 
-    // Get user info for audit before deletion
-    const user = await db.getOne('SELECT email, name FROM users WHERE id = $1', [userId]);
+    // Get user info for audit + auth cleanup before deletion
+    const user = await db.getOne('SELECT email, name, firebase_uid, login_username FROM users WHERE id = $1', [userId]);
 
     const client = await db.getClient();
     try {
@@ -209,7 +211,9 @@ router.post('/:id/execute-deletion', requireAdmin, async (req, res) => {
       );
       await client.query('DELETE FROM programs WHERE patient_id = $1', [userId]);
 
-      // Anonymize user record (keep for audit trail integrity)
+      // Anonymize user record (keep for audit trail integrity). Also clear the
+      // login identity: a freed login_username can be reused, and firebase_uid
+      // must not keep pointing at a now-anonymized row.
       await client.query(
         `UPDATE users SET
           name = 'Deleted User',
@@ -217,7 +221,9 @@ router.post('/:id/execute-deletion', requireAdmin, async (req, res) => {
           phone = NULL,
           dob = NULL,
           address = NULL,
-          password_hash = NULL
+          password_hash = NULL,
+          login_username = NULL,
+          firebase_uid = NULL
         WHERE id = $2`,
         [`deleted_${userId}@removed.local`, userId]
       );
@@ -234,6 +240,18 @@ router.post('/:id/execute-deletion', requireAdmin, async (req, res) => {
       throw err;
     } finally {
       client.release();
+    }
+
+    // Revoke the login credential — a deletion request means the person should
+    // no longer be able to authenticate, and this also frees any shared-email
+    // login name. Best-effort: the data is already deleted; never fail on this.
+    try {
+      await deleteLoginAccount(identityPlatform.auth(), {
+        firebaseUid: user?.firebase_uid,
+        loginUsername: user?.login_username,
+      });
+    } catch (authErr) {
+      console.error('Failed to remove Identity Platform account on data deletion:', authErr.code || authErr.message);
     }
 
     audit.log(req, 'data_deletion_executed', 'data_request', requestId, {
