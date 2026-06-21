@@ -36,7 +36,7 @@ async function generateLoginUsername(client, name) {
 // Generate invitation for new patient (called by clinician)
 router.post('/generate', authenticate, requireRole('clinician'), async (req, res) => {
   try {
-    let { email, name, dob, phone, address, clinikoPatientId, allowSharedEmail } = req.body;
+    let { email, name, dob, phone, address, clinikoPatientId, allowSharedEmail, resendUserId } = req.body;
 
     // If a Cliniko patient ID was provided, pull authoritative data from Cliniko
     if (clinikoPatientId) {
@@ -87,8 +87,13 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
         ? String(u.cliniko_patient_id) === String(clinikoPatientId)
         : norm(u.name) === norm(name);
 
-    // The row representing THIS person (re-invite), if any
-    const samePersonRow = existingRows.find(isSamePerson);
+    // The row representing THIS person (re-invite), if any. A Resend Invitation
+    // passes the exact patient id (resendUserId), making it deterministic even
+    // when spouses on one email share a name; otherwise fall back to same-person
+    // heuristics (Cliniko id when present, else name).
+    const samePersonRow =
+      (resendUserId && existingRows.find((u) => String(u.id) === String(resendUserId)))
+      || existingRows.find(isSamePerson);
     // A different person already holding this email → shared household
     const otherRow = existingRows.find((u) => !isSamePerson(u));
 

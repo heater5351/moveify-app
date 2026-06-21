@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 // Shared-email login identity: pure helpers (used by the invite/login/reset
 // flows) plus the username-collision suffixing that backs auto-generated login
 // names for a second patient sharing a spouse's email.
-const { slugifyName, toLoginEmail, LOGIN_USERNAME_DOMAIN, deleteLoginAccount } = await import('../lib/login-identity.js');
+const { slugifyName, toLoginEmail, LOGIN_USERNAME_DOMAIN, deleteLoginAccount, updateLoginEmail } = await import('../lib/login-identity.js');
 
 describe('slugifyName', () => {
   it('lowercases and hyphenates a normal name', () => {
@@ -123,5 +123,57 @@ describe('deleteLoginAccount', () => {
     const auth = fakeAuth();
     await deleteLoginAccount(auth, {});
     expect(auth.deleted).toEqual([]);
+  });
+});
+
+// Keeps the IP login email in sync when a contact email changes — but only for
+// real email-login users, never synthetic-login (login_username) ones.
+const fakeAuthUpdate = (opts = {}) => {
+  const updates = [];
+  return {
+    updates,
+    updateUser: async (uid, props) => {
+      if (opts.collide) { const e = new Error('dupe'); e.code = 'auth/email-already-exists'; throw e; }
+      if (opts.missing) { const e = new Error('gone'); e.code = 'auth/user-not-found'; throw e; }
+      updates.push({ uid, ...props });
+      return { uid, ...props };
+    },
+  };
+};
+
+describe('updateLoginEmail', () => {
+  it('updates the IP email for an email-login user', async () => {
+    const auth = fakeAuthUpdate();
+    const r = await updateLoginEmail(auth, { firebaseUid: 12, newEmail: 'new@x.com' });
+    expect(r).toBe('updated');
+    expect(auth.updates).toEqual([{ uid: '12', email: 'new@x.com', emailVerified: true }]);
+  });
+
+  it('skips synthetic-login users (login_username set) — their IP email is the login name', async () => {
+    const auth = fakeAuthUpdate();
+    const r = await updateLoginEmail(auth, { firebaseUid: 12, loginUsername: 'jane-smith', newEmail: 'new@x.com' });
+    expect(r).toBe('skipped');
+    expect(auth.updates).toEqual([]);
+  });
+
+  it('skips when there is no IP account yet (no firebaseUid)', async () => {
+    const auth = fakeAuthUpdate();
+    expect(await updateLoginEmail(auth, { firebaseUid: null, newEmail: 'new@x.com' })).toBe('skipped');
+    expect(auth.updates).toEqual([]);
+  });
+
+  it('no-ops when auth is unavailable', async () => {
+    expect(await updateLoginEmail(null, { firebaseUid: 12, newEmail: 'new@x.com' })).toBe('skipped');
+  });
+
+  it('treats a missing IP account as skipped (not an error)', async () => {
+    const auth = fakeAuthUpdate({ missing: true });
+    expect(await updateLoginEmail(auth, { firebaseUid: 99, newEmail: 'new@x.com' })).toBe('skipped');
+  });
+
+  it('propagates email-already-exists so the caller can 400', async () => {
+    const auth = fakeAuthUpdate({ collide: true });
+    await expect(updateLoginEmail(auth, { firebaseUid: 12, newEmail: 'taken@x.com' }))
+      .rejects.toMatchObject({ code: 'auth/email-already-exists' });
   });
 });

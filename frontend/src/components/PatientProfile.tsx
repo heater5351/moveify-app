@@ -178,6 +178,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
           dob: patient.dob,
           phone: patient.phone,
           address: patient.address,
+          resendUserId: patient.id, // deterministic re-invite (disambiguates same-named spouses)
         }),
       });
       if (res.ok) {

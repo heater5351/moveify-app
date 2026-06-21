@@ -6,7 +6,7 @@ const { requirePatientAccess, requireAdmin } = require('../middleware/ownership'
 const audit = require('../services/audit');
 const { resolveProgramWindow, computeAdherence } = require('../services/adherence');
 const identityPlatform = require('../lib/identity-platform');
-const { deleteLoginAccount } = require('../lib/login-identity');
+const { deleteLoginAccount, updateLoginEmail } = require('../lib/login-identity');
 
 const router = express.Router();
 
@@ -559,12 +559,30 @@ router.put('/:patientId', requireRole('clinician'), async (req, res) => {
     }
 
     const patient = await db.getOne(
-      `SELECT id FROM users WHERE id = $1 AND role = 'patient'`,
+      `SELECT id, email, firebase_uid, login_username FROM users WHERE id = $1 AND role = 'patient'`,
       [patientId]
     );
 
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    // Keep the Identity Platform login email in sync when the contact email
+    // changes, so an email-login patient can still sign in with the new address
+    // (no-op for synthetic-login patients / pre-setup rows). Before the DB write
+    // so a collision leaves DB + IP consistent.
+    if ((patient.email || '').toLowerCase() !== email.trim().toLowerCase()) {
+      try {
+        await updateLoginEmail(identityPlatform.auth(), {
+          firebaseUid: patient.firebase_uid, loginUsername: patient.login_username, newEmail: email.trim(),
+        });
+      } catch (e) {
+        if (e.code === 'auth/email-already-exists') {
+          return res.status(400).json({ error: 'That email is already used by another login account' });
+        }
+        console.error('Failed to update patient login email:', e.code || e.message);
+        return res.status(500).json({ error: 'Could not update login email. Please try again.' });
+      }
     }
 
     // sex omitted (undefined) → preserve existing; '' → clear; a value → set.
