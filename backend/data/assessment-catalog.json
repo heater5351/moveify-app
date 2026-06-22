@@ -501,6 +501,177 @@
       "measures": [
         { "key": "serratus_anterior_assessment", "label": "Result", "unit": "none", "min": 0, "max": 1, "step": 1, "input": "toggle", "options": [ { "value": 0, "label": "Normal control" }, { "value": 1, "label": "Winging / dyskinesis" } ] }
       ]
+    },
+    {
+      "key": "shoulder_dynamometry",
+      "displayName": "Shoulder Strength (HHD)",
+      "region": "Shoulder",
+      "category": "Strength (Dynamometry)",
+      "laterality": "bilateral",
+      "layout": "table",
+      "measures": [
+        { "key": "shoulder_flexion_dynamometry", "label": "Flexion", "unit": "kg", "min": 0, "max": 120, "step": 0.5, "input": "keypad" },
+        { "key": "shoulder_abduction_dynamometry", "label": "Abduction", "unit": "kg", "min": 0, "max": 120, "step": 0.5, "input": "keypad" },
+        { "key": "shoulder_external_rotation_dynamometry", "label": "External Rotation", "unit": "kg", "min": 0, "max": 120, "step": 0.5, "input": "keypad" },
+        { "key": "shoulder_internal_rotation_dynamometry", "label": "Internal Rotation", "unit": "kg", "min": 0, "max": 120, "step": 0.5, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "hip_dynamometry",
+      "displayName": "Hip Strength (HHD)",
+      "region": "Hip",
+      "category": "Strength (Dynamometry)",
+      "laterality": "bilateral",
+      "layout": "table",
+      "measures": [
+        { "key": "hip_flexion_dynamometry", "label": "Flexion", "unit": "kg", "min": 0, "max": 120, "step": 0.5, "input": "keypad" },
+        { "key": "hip_extension_dynamometry", "label": "Extension", "unit": "kg", "min": 0, "max": 120, "step": 0.5, "input": "keypad" },
+        { "key": "hip_abduction_dynamometry", "label": "Abduction", "unit": "kg", "min": 0, "max": 120, "step": 0.5, "input": "keypad" },
+        { "key": "hip_adduction_dynamometry", "label": "Adduction", "unit": "kg", "min": 0, "max": 120, "step": 0.5, "input": "keypad" },
+        { "key": "hip_external_rotation_dynamometry", "label": "External Rotation", "unit": "kg", "min": 0, "max": 120, "step": 0.5, "input": "keypad" },
+        { "key": "hip_internal_rotation_dynamometry", "label": "Internal Rotation", "unit": "kg", "min": 0, "max": 120, "step": 0.5, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "knee_dynamometry",
+      "displayName": "Knee Strength (HHD)",
+      "region": "Knee",
+      "category": "Strength (Dynamometry)",
+      "laterality": "bilateral",
+      "layout": "table",
+      "measures": [
+        { "key": "knee_flexion_dynamometry", "label": "Flexion", "unit": "kg", "min": 0, "max": 120, "step": 0.5, "input": "keypad" },
+        { "key": "knee_extension_dynamometry", "label": "Extension", "unit": "kg", "min": 0, "max": 120, "step": 0.5, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "shoulder_mmt",
+      "displayName": "Shoulder MMT (Oxford /5)",
+      "region": "Shoulder",
+      "category": "Manual Muscle Testing",
+      "laterality": "bilateral",
+      "layout": "table",
+      "measures": [
+        { "key": "shoulder_flexion_mmt", "label": "Flexion", "unit": "grade", "min": 0, "max": 5, "step": 1, "input": "presets", "presetStep": 1 },
+        { "key": "shoulder_abduction_mmt", "label": "Abduction", "unit": "grade", "min": 0, "max": 5, "step": 1, "input": "presets", "presetStep": 1 },
+        { "key": "shoulder_external_rotation_mmt", "label": "External Rotation", "unit": "grade", "min": 0, "max": 5, "step": 1, "input": "presets", "presetStep": 1 },
+        { "key": "shoulder_internal_rotation_mmt", "label": "Internal Rotation", "unit": "grade", "min": 0, "max": 5, "step": 1, "input": "presets", "presetStep": 1 }
+      ]
+    },
+    {
+      "key": "hip_mmt",
+      "displayName": "Hip MMT (Oxford /5)",
+      "region": "Hip",
+      "category": "Manual Muscle Testing",
+      "laterality": "bilateral",
+      "layout": "table",
+      "measures": [
+        { "key": "hip_flexion_mmt", "label": "Flexion", "unit": "grade", "min": 0, "max": 5, "step": 1, "input": "presets", "presetStep": 1 },
+        { "key": "hip_extension_mmt", "label": "Extension", "unit": "grade", "min": 0, "max": 5, "step": 1, "input": "presets", "presetStep": 1 },
+        { "key": "hip_abduction_mmt", "label": "Abduction", "unit": "grade", "min": 0, "max": 5, "step": 1, "input": "presets", "presetStep": 1 },
+        { "key": "hip_adduction_mmt", "label": "Adduction", "unit": "grade", "min": 0, "max": 5, "step": 1, "input": "presets", "presetStep": 1 }
+      ]
+    },
+    {
+      "key": "knee_mmt",
+      "displayName": "Knee MMT (Oxford /5)",
+      "region": "Knee",
+      "category": "Manual Muscle Testing",
+      "laterality": "bilateral",
+      "layout": "table",
+      "measures": [
+        { "key": "knee_flexion_mmt", "label": "Flexion", "unit": "grade", "min": 0, "max": 5, "step": 1, "input": "presets", "presetStep": 1 },
+        { "key": "knee_extension_mmt", "label": "Extension", "unit": "grade", "min": 0, "max": 5, "step": 1, "input": "presets", "presetStep": 1 }
+      ]
+    },
+    {
+      "key": "ankle_mmt",
+      "displayName": "Ankle MMT (Oxford /5)",
+      "region": "Ankle",
+      "category": "Manual Muscle Testing",
+      "laterality": "bilateral",
+      "layout": "table",
+      "measures": [
+        { "key": "ankle_dorsiflexion_mmt", "label": "Dorsiflexion", "unit": "grade", "min": 0, "max": 5, "step": 1, "input": "presets", "presetStep": 1 },
+        { "key": "ankle_plantarflexion_mmt", "label": "Plantarflexion", "unit": "grade", "min": 0, "max": 5, "step": 1, "input": "presets", "presetStep": 1 }
+      ]
+    },
+    {
+      "key": "acl_knee_exam",
+      "displayName": "ACL Knee Exam (MRSS Part A)",
+      "region": "Knee",
+      "category": "ACL Return to Sport",
+      "laterality": "single",
+      "measures": [
+        { "key": "acl_effusion_stroke", "label": "Effusion (stroke test)", "unit": "none", "min": 0, "max": 4, "step": 1, "input": "toggle", "options": [ { "value": 0, "label": "Zero (no wave)" }, { "value": 1, "label": "Trace" }, { "value": 2, "label": "1+ (large bulge)" }, { "value": 3, "label": "2+ (returns spontaneously)" }, { "value": 4, "label": "3+ (cannot move out)" } ] },
+        { "key": "acl_lachman", "label": "Lachman's", "unit": "none", "min": 0, "max": 2, "step": 1, "input": "toggle", "options": [ { "value": 0, "label": "Nil (no difference)" }, { "value": 1, "label": "Mild (0–5 mm)" }, { "value": 2, "label": "Moderate–severe (6 mm+)" } ] },
+        { "key": "acl_pivot_shift", "label": "Pivot shift", "unit": "none", "min": 0, "max": 3, "step": 1, "input": "toggle", "options": [ { "value": 0, "label": "Nil" }, { "value": 1, "label": "Grade I (glide)" }, { "value": 2, "label": "Grade II (clunk)" }, { "value": 3, "label": "Grade III–IV (gross)" } ] },
+        { "key": "acl_extension_deficit_pronehang", "label": "Extension deficit (prone hang)", "unit": "cm", "min": 0, "max": 15, "step": 0.5, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "acl_single_hop",
+      "displayName": "Single Hop for Distance",
+      "region": "Knee",
+      "category": "ACL Return to Sport",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "acl_single_hop", "label": "Distance", "unit": "cm", "min": 0, "max": 400, "step": 1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "acl_triple_crossover_hop",
+      "displayName": "Triple Crossover Hop",
+      "region": "Knee",
+      "category": "ACL Return to Sport",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "acl_triple_crossover_hop", "label": "Total distance", "unit": "cm", "min": 0, "max": 1200, "step": 1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "acl_single_leg_squat_fatigue",
+      "displayName": "Single-Leg Squats to Fatigue",
+      "region": "Knee",
+      "category": "ACL Return to Sport",
+      "laterality": "bilateral",
+      "measures": [
+        { "key": "acl_single_leg_squat_fatigue", "label": "Reps", "unit": "reps", "min": 0, "max": 60, "step": 1, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "sebt",
+      "displayName": "Star Excursion Balance (SEBT/Y-Balance)",
+      "region": "Lower limb",
+      "category": "ACL Return to Sport",
+      "laterality": "bilateral",
+      "layout": "table",
+      "measures": [
+        { "key": "sebt_anterior", "label": "Anterior", "unit": "cm", "min": 0, "max": 150, "step": 0.5, "input": "keypad" },
+        { "key": "sebt_posteromedial", "label": "Posteromedial", "unit": "cm", "min": 0, "max": 150, "step": 0.5, "input": "keypad" },
+        { "key": "sebt_posterolateral", "label": "Posterolateral", "unit": "cm", "min": 0, "max": 150, "step": 0.5, "input": "keypad" }
+      ]
+    },
+    {
+      "key": "less_landing",
+      "displayName": "Jump-Land (Abridged LESS)",
+      "region": "Lower limb",
+      "category": "ACL Return to Sport",
+      "laterality": "single",
+      "instrument": {
+        "maxScore": 25,
+        "attribution": "Abridged Landing Error Scoring System (Padua et al. 2009), MRSS adaptation. Each item scored 5 (no error) or 0 (error).",
+        "items": [
+          { "key": "knee_valgus_contact", "name": "Knee valgus at contact", "instruction": "Knees track over the feet with no inward collapse on landing.", "options": [ { "value": 5, "label": "No error — knees track over feet" }, { "value": 0, "label": "Error — inward (valgus) collapse" } ] },
+          { "key": "knee_flexion", "name": "Knee flexion >30°", "instruction": "Lands soft with knee flexion greater than 30°, not stiff-legged.", "options": [ { "value": 5, "label": "No error — soft, >30° flexion" }, { "value": 0, "label": "Error — stiff / <30° flexion" } ] },
+          { "key": "trunk_stability", "name": "Trunk stability at contact", "instruction": "Trunk stays upright with no lateral lean at contact.", "options": [ { "value": 5, "label": "No error — upright, stable" }, { "value": 0, "label": "Error — lateral lean / instability" } ] },
+          { "key": "foot_contact", "name": "Foot contact", "instruction": "Symmetrical foot contact with less than 30° toe-out.", "options": [ { "value": 5, "label": "No error — symmetrical, <30° toe-out" }, { "value": 0, "label": "Error — asymmetrical / >30° toe-out" } ] },
+          { "key": "overall_impression", "name": "Overall impression", "instruction": "Overall landing quality across the whole movement.", "options": [ { "value": 5, "label": "No error — good overall control" }, { "value": 0, "label": "Error — poor overall control" } ] }
+        ]
+      },
+      "measures": [
+        { "key": "less_landing", "label": "Total (/25)", "unit": "points", "min": 0, "max": 25, "step": 5, "input": "instrument" }
+      ]
     }
   ]
 }

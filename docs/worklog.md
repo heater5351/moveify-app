@@ -22,6 +22,37 @@ what to know now, links).
 
 ---
 
+## 2026-06-22 — Dynamometry, MMT & the Melbourne ACL Return-to-Sport Score (MRSS)
+
+- **Three new assessment families in the scribe Assessment panel**, all driven by
+  `data/assessment-catalog.json` + `data/normative-data.json` (the panel UI is
+  data-driven, so most of this is JSON, not code):
+  - **Joint isometric dynamometry** (HHD): `shoulder_dynamometry`, `hip_dynamometry`,
+    `knee_dynamometry` — keypad kg tables.
+  - **Manual Muscle Testing** (Oxford 0–5): `shoulder_mmt`/`hip_mmt`/`knee_mmt`/
+    `ankle_mmt` — presets 0–5 tables. New `grade` unit (renders with no suffix) added
+    to the unit maps in `measurement-render.js`, `normative-data.js`, `AssessmentPanel.tsx`.
+  - **MRSS components**: `acl_knee_exam` (effusion/Lachman/pivot toggles +
+    extension-deficit), hop tests, `sebt` table, `less_landing` (reuses the instrument
+    runner), and a new **IKDC** PROM in `prom-catalog.json` (percentage scoring, 18
+    items, sum/87×100 — ⚠ verify against the official sheet before go-live).
+  - All new measures graded **by symmetry/LSI + neutral baseline** (no fabricated
+    population norms) — registered as `type:"qualitative"` per the project stance.
+- **MRSS /100 scoring layer** (the only substantial new code):
+  `data/mrss-protocol.json` (component→measure map, Part A grade→points maps, LSI→points
+  table) + pure `services/mrss-scoring.js` + `services/mrss-docx.js` (programmatic via
+  the `docx` lib, no template) + `routes/scribe-mrss.js`
+  (`POST /api/scribe/sessions/:id/mrss/{generate,docx}`, clinician-only, **ephemeral** —
+  recomputed from stored components, no DB write/migration). Involved-limb + dominance
+  are scoring-time **parameters** (LSI = involved ÷ uninvolved × 100). Front end:
+  `MrssPanel.tsx`, launched from `ScribeReportsPage`.
+- **Multi-toggle render fix:** toggle renderers now include the measure label when an
+  assessment has >1 toggle (the ACL exam is the first such case) — `measurement-render.js`,
+  `measurement-series.js`, `AssessmentPanel.tsx`.
+- No schema change, no new env vars. Tests: `mrss-scoring.test.mjs` (LSI→points, Part
+  A/B/C, pass>95 worked example). Backend 233 tests green; the catalog↔norm alignment
+  test (`measurement-render.test.mjs`) is the guardrail enforcing a norm entry per measure.
+
 ## 2026-06-21 — Email-edit → Identity Platform sync + deterministic resend
 
 - **P2:** editing a patient's email (`PATCH /api/auth/profile`, `PUT /api/patients/:id`)

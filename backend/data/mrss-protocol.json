@@ -1,0 +1,50 @@
+{
+  "_meta": {
+    "description": "Config for the Melbourne ACL Return-to-Sport Score (MRSS) scoring layer (services/mrss-scoring.js). The MRSS is a thin scoring layer ON TOP of standalone catalog measures — this file maps each /100 component to the catalog assessment/measure that feeds it, the Part A grade→points maps, and the LSI→points conversion table. Source: Cooper, ACL Rehabilitation Guide 2.0 (vault 30-Areas/Clinical-Practice/Protocols/Melbourne ACL Return to Sport Score - Testing Protocol.md). Pass = total > 95 AND clinician-attested confidence + injury-prevention plan.",
+    "lsi": "LSI = involved ÷ uninvolved × 100. Points read from lsiToPoints using the dominant vs non-dominant column (the involved leg's dominance), tightest band first. SEBT uses the `ten` column (/10); single hop / triple hop / SL squats use the `five` column (/5). LESS is scored directly /25 (no LSI)."
+  },
+  "version": "Melbourne ACL RTS Score (Cooper ACL Rehab Guide 2.0)",
+  "passThreshold": 95,
+  "partA": {
+    "max": 25,
+    "components": [
+      { "key": "effusion", "label": "Effusion (stroke test)", "assessment": "acl_knee_exam", "measure": "acl_effusion_stroke", "type": "grade", "bands": [ { "maxValue": 0, "points": 5 }, { "maxValue": 99, "points": 0 } ] },
+      { "key": "lachman", "label": "Lachman's", "assessment": "acl_knee_exam", "measure": "acl_lachman", "type": "grade", "bands": [ { "maxValue": 0, "points": 5 }, { "maxValue": 1, "points": 3 }, { "maxValue": 99, "points": 0 } ] },
+      { "key": "pivot", "label": "Pivot shift", "assessment": "acl_knee_exam", "measure": "acl_pivot_shift", "type": "grade", "bands": [ { "maxValue": 0, "points": 5 }, { "maxValue": 1, "points": 3 }, { "maxValue": 2, "points": 1 }, { "maxValue": 99, "points": 0 } ] },
+      { "key": "flexion", "label": "Flexion deficit (vs other side)", "assessment": "knee_rom", "measure": "knee_flexion_rom", "type": "deficit", "direction": "higher_better", "bands": [ { "maxDeficit": 5, "points": 5 }, { "maxDeficit": 20, "points": 3 }, { "maxDeficit": 99999, "points": 0 } ] },
+      { "key": "extension", "label": "Extension deficit (prone hang)", "assessment": "acl_knee_exam", "measure": "acl_extension_deficit_pronehang", "type": "value", "bands": [ { "maxValue": 2, "points": 5 }, { "maxValue": 5, "points": 3 }, { "maxValue": 99999, "points": 0 } ] }
+    ]
+  },
+  "partB": {
+    "max": 25,
+    "prom": "ikdc",
+    "multiplier": 0.25,
+    "label": "IKDC Subjective (raw /100 × 0.25)"
+  },
+  "partC": {
+    "max": 50,
+    "components": [
+      { "key": "sebt", "label": "Balance — SEBT composite", "assessment": "sebt", "measures": ["sebt_anterior", "sebt_posteromedial", "sebt_posterolateral"], "type": "lsiComposite", "scale": "ten", "max": 10 },
+      { "key": "singleHop", "label": "Single hop for distance", "assessment": "acl_single_hop", "measure": "acl_single_hop", "type": "lsi", "scale": "five", "max": 5 },
+      { "key": "tripleHop", "label": "Triple crossover hop", "assessment": "acl_triple_crossover_hop", "measure": "acl_triple_crossover_hop", "type": "lsi", "scale": "five", "max": 5 },
+      { "key": "less", "label": "Jump-land (abridged LESS)", "assessment": "less_landing", "measure": "less_landing", "type": "direct", "max": 25 },
+      { "key": "squats", "label": "Single-leg squats to fatigue", "assessment": "acl_single_leg_squat_fatigue", "measure": "acl_single_leg_squat_fatigue", "type": "lsi", "scale": "five", "max": 5 }
+    ]
+  },
+  "lsiToPoints": {
+    "dominant": [
+      { "lo": 97, "hi": 105, "ten": 10, "five": 5 },
+      { "lo": 90, "hi": 110, "ten": 8, "five": 4 },
+      { "lo": 80, "hi": 120, "ten": 6, "five": 3 },
+      { "lo": 70, "hi": 130, "ten": 4, "five": 2 },
+      { "lo": 60, "hi": 140, "ten": 2, "five": 1 }
+    ],
+    "nonDominant": [
+      { "lo": 95, "hi": 103, "ten": 10, "five": 5 },
+      { "lo": 85, "hi": 110, "ten": 8, "five": 4 },
+      { "lo": 75, "hi": 120, "ten": 6, "five": 3 },
+      { "lo": 65, "hi": 130, "ten": 4, "five": 2 },
+      { "lo": 55, "hi": 140, "ten": 2, "five": 1 }
+    ]
+  }
+}

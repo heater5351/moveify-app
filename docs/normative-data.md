@@ -24,6 +24,9 @@
 - [6-Minute Walk Test (6MWT)](#6-minute-walk-test-6mwt)
 - [Gait Speed (Comfortable Walking Speed)](#gait-speed-comfortable-walking-speed)
 - [Five Times Sit-to-Stand (5×STS / FTSST)](#five-times-sit-to-stand-5sts--ftsst)
+- [Isometric Dynamometry (HHD) — symmetry/LSI only](#isometric-dynamometry-hhd--symmetrylsi-only) — shoulder, hip, knee
+- [Manual Muscle Testing (MMT, Oxford 0–5) — symmetry only](#manual-muscle-testing-mmt-oxford-05--symmetry-only) — shoulder, hip, knee, ankle
+- [ACL Return-to-Sport components (MRSS) — symmetry/LSI & exam findings](#acl-return-to-sport-components-mrss--symmetrylsi--exam-findings) — exam grades, hop tests, SEBT, LESS, IKDC
 
 ---
 
@@ -1371,3 +1374,103 @@ combined/age-based.
 ### Source links
 - [Five Times Sit to Stand — RehabMeasures](https://www.sralab.org/rehabilitation-measures/five-times-sit-stand-test)
 - [Bohannon 2006 5×STS — PubMed](https://pubmed.ncbi.nlm.nih.gov/17037663/)
+
+---
+
+# Isometric Dynamometry (HHD) — symmetry/LSI only
+
+## 1. What it measures
+**Maximal isometric strength** of a single joint action, measured with a hand-held
+(or fixed) dynamometer. Catalog assessments: `shoulder_dynamometry`,
+`hip_dynamometry`, `knee_dynamometry` (flexion/extension/abduction/adduction/
+rotation as applicable). **Units: kilograms (kg) of force**, captured per limb.
+
+## 2. Why no population norm is applied
+HHD absolute values are **strongly device-, position-, stabilisation- and
+tester-dependent** (make vs break test, belt-fixed vs hand-held, lever-arm
+normalisation). Published "norms" do not transfer across protocols, so applying a
+population band to a clinic reading would be **misleading**. By the project's
+grading stance (symmetry over fabricated norms), these are registered as
+`type: "qualitative"` in `normative-data.json` with no bands — single values report
+as a neutral baseline.
+
+## 3. How it is interpreted instead
+- **Limb Symmetry Index (LSI = involved ÷ uninvolved × 100).** A side-to-side gap
+  ≥ 10 % is flagged automatically by the render layer. ≥ 90 % LSI is the common
+  return-to-activity threshold; quadriceps (`knee_extension_dynamometry`) LSI is a
+  key ACL RTS gate (feeds the MRSS).
+- **Agonist:antagonist ratios** against the patient's own baseline (shoulder ER:IR,
+  hip add:abd, knee hamstring:quadriceps) — recorded for the clinician, not graded.
+- **Own change over time** — the Assessment trends tab computes the kg change
+  (≥ 3 kg counted as real, per `MIN_ABS_CHANGE`).
+
+## 4. References
+- Symmetry-based interpretation only — no population normative source applied.
+  Protocol-specific norms may be added later where a cited source matches the
+  clinic's exact testing method.
+
+---
+
+# Manual Muscle Testing (MMT, Oxford 0–5) — symmetry only
+
+## 1. What it measures
+Graded **manual muscle test** of a single muscle action on the **Oxford 0–5 scale**.
+Catalog assessments: `shoulder_mmt`, `hip_mmt`, `knee_mmt`, `ankle_mmt` (each a table
+of movements, captured per limb). **Unit: `grade` (0–5)**, rendered without a suffix.
+
+## 2. The Oxford scale
+| Grade | Meaning |
+|---|---|
+| 5 | Normal — full ROM against gravity with **maximal** resistance |
+| 4 | Full ROM against gravity with **moderate** resistance |
+| 3 | Full ROM against gravity, **no** resistance |
+| 2 | Full ROM with **gravity eliminated** |
+| 1 | **Flicker** / trace contraction, no movement |
+| 0 | No contraction |
+
+(v1 records integer grades only; half-grades 4+/4− are a possible later addition.)
+
+## 3. Why no population norm is applied
+MMT is an **ordinal, examiner-rated** scale with a ceiling at 5 (= normal) — there is
+no population distribution to grade against. Registered as `type: "qualitative"`;
+5/5 reports as a neutral baseline. Interpretation is **L/R symmetry** (a ≥ 10 %
+side gap is flagged) and the patient's **own change** over time. Inherently
+subjective above grade 3 — prefer dynamometry (kg) when a finer strength measure is
+needed.
+
+## 4. References
+- Oxford/MRC manual muscle grading (Medical Research Council). Symmetry/own-change
+  interpretation only — no population normative source applied.
+
+---
+
+# ACL Return-to-Sport components (MRSS) — symmetry/LSI & exam findings
+
+These are the individual inputs to the **Melbourne ACL Return-to-Sport Score
+(MRSS)**, built as standalone reusable assessments. None carries a population norm —
+the clinical verdict is **limb symmetry (LSI)**, an exam grade, or a landing/PROM
+score. The MRSS composite (/100, the LSI→points table, Part A/B/C weighting, pass
+> 95) is computed by the scoring layer (`services/mrss-scoring.js` +
+`data/mrss-protocol.json`), **not** by this normative engine. Source protocol:
+Cooper's *ACL Rehabilitation Guide 2.0* (vault `30-Areas/Clinical-Practice/Protocols/Melbourne ACL Return to Sport Score - Testing Protocol.md`).
+
+## Components & how each is interpreted
+- **Clinical exam (Part A)** — `acl_effusion_stroke` (stroke test grade),
+  `acl_lachman`, `acl_pivot_shift` (graded laxity/instability), and
+  `acl_extension_deficit_pronehang` (cm heel-height difference). Graded
+  *observations*, captured as exam findings; MRSS maps each grade to points.
+- **Functional, LSI-based (Part C)** — `acl_single_hop`, `acl_triple_crossover_hop`
+  (mean distance per leg), `acl_single_leg_squat_fatigue` (reps), and `sebt`
+  (anterior/posteromedial/posterolateral reaches → per-leg composite). Verdict =
+  `LSI = involved ÷ uninvolved × 100`; the standalone render flags a ≥ 10 % gap, and
+  MRSS converts LSI to points via the protocol's dominant/non-dominant table.
+- **Landing (Part C)** — `less_landing`: abridged 5-item LESS, total /25 (each item
+  5 = no error / 0 = error), scored server-side via the instrument engine.
+- **IKDC Subjective (Part B)** — patient-completed PROM (`prom-catalog.json` `ikdc`),
+  scored 0–100 (sum of 18 items ÷ 87 × 100); MRSS uses raw × 0.25. ⚠ Verify item
+  wording/scoring against the official IKDC 2000 sheet before go-live.
+
+## References
+- Reid A et al. 2007 (hop tests); Gribble PA et al. 2012 (SEBT); Padua DA et al.
+  2009 (LESS); Irrgang JJ et al. 2001 (IKDC). Interpretation is symmetry/exam/score
+  based — no population normative bands applied here.

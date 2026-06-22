@@ -444,3 +444,54 @@ export async function generateReport(
     clearTimeout(timer);
   }
 }
+
+// ── Melbourne ACL Return-to-Sport Score (MRSS) ───────────────────────────────
+
+export interface MrssPartAComponent {
+  key: string; label: string; value: number | null; points: number; max: number;
+  involved?: number | null; uninvolved?: number | null; deficit?: number | null;
+}
+export interface MrssPartCComponent {
+  key: string; label: string; type: 'lsi' | 'lsiComposite' | 'direct'; max: number; points: number;
+  value: number | null; involved: number | null; uninvolved: number | null; lsi: number | null;
+}
+export interface MrssResult {
+  version: string;
+  passThreshold: number;
+  involvedSide: 'left' | 'right';
+  involvedIsDominant: boolean;
+  partA: { max: number; points: number; components: MrssPartAComponent[] };
+  partB: { max: number; points: number; ikdcRaw: number | null; available: boolean };
+  partC: { max: number; points: number; components: MrssPartCComponent[] };
+  total: number;
+  scorePass: boolean;
+  missing: string[];
+  complete: boolean;
+}
+export interface MrssOpts { involvedSide: 'left' | 'right'; involvedIsDominant: boolean }
+
+export async function generateMrss(sessionId: number, opts: MrssOpts): Promise<MrssResult> {
+  const res = await apiFetch(`/sessions/${sessionId}/mrss/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(opts),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'MRSS scoring failed');
+  }
+  return res.json();
+}
+
+export async function fetchMrssDocx(sessionId: number, body: Record<string, unknown>): Promise<Blob> {
+  const res = await apiFetch(`/sessions/${sessionId}/mrss/docx`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'MRSS DOCX generation failed');
+  }
+  return res.blob();
+}

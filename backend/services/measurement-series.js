@@ -55,7 +55,8 @@ function buildSeries(rows, age, sex) {
 
     if (mode === 'toggle') {
       const opt = (cat.measure.options || []).find(o => o.value === Number(last.value));
-      series.push({ ...base, kind: 'toggle', displayName: cat.assessment.displayName, latestLabel: opt ? opt.label : String(last.value) });
+      const dn = cat.assessment.measures.length > 1 ? `${cat.assessment.displayName} — ${cat.measure.label}` : cat.assessment.displayName;
+      series.push({ ...base, kind: 'toggle', displayName: dn, latestLabel: opt ? opt.label : String(last.value) });
       continue;
     }
 

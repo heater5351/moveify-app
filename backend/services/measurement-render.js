@@ -15,7 +15,7 @@ const { findMeasure } = require('./assessment-catalog');
 
 const UNIT_SUFFIX = {
   degrees: '°', kg: ' kg', seconds: ' sec', reps: ' reps', cm: ' cm',
-  m_s: ' m/s', mmHg: ' mmHg', bpm: ' bpm', metres: ' m', points: ' points',
+  m_s: ' m/s', mmHg: ' mmHg', bpm: ' bpm', metres: ' m', points: ' points', grade: '',
 };
 function unitSuffix(u) { return UNIT_SUFFIX[u] != null ? UNIT_SUFFIX[u] : (u ? ` ${u}` : ''); }
 
@@ -125,7 +125,10 @@ function renderMeasureRows(rows, age, sex) {
       if (mode === 'toggle') {
         const opt = (cat.measure.options || []).find(o => o.value === value);
         const label = opt ? opt.label : String(value);
-        lines.push(`${cat.assessment.displayName}${sideLabel}: ${label}`);
+        // Multi-measure assessments (e.g. the ACL knee exam: effusion/Lachman/pivot)
+        // need the measure label to disambiguate; single-toggle ones don't.
+        const mLabel = cat.assessment.measures.length > 1 ? ` — ${cat.measure.label}` : '';
+        lines.push(`${cat.assessment.displayName}${mLabel}${sideLabel}: ${label}`);
         continue;
       }
 

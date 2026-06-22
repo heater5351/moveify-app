@@ -472,6 +472,41 @@
         { "key": "g9", "text": "To what extent are you able to carry out your everyday physical activities such as walking, climbing stairs, carrying groceries, or moving a chair?", "options": [ { "value": 5, "label": "Completely" }, { "value": 4, "label": "Mostly" }, { "value": 3, "label": "Moderately" }, { "value": 2, "label": "A little" }, { "value": 1, "label": "Not at all" } ] },
         { "key": "g10", "text": "In the past 7 days, how often have you been bothered by emotional problems such as feeling anxious, depressed or irritable?", "options": [ { "value": 5, "label": "Never" }, { "value": 4, "label": "Rarely" }, { "value": 3, "label": "Sometimes" }, { "value": 2, "label": "Often" }, { "value": 1, "label": "Always" } ] }
       ]
+    },
+    {
+      "key": "ikdc",
+      "name": "IKDC Subjective Knee Evaluation Form",
+      "shortName": "Knee (IKDC)",
+      "license": "Free for clinical use (Irrgang et al. 2001). ⚠ Item wording AUTHORED from the standard form — VERIFY against the official IKDC 2000 scoring sheet before go-live. Score = sum of 18 items (max 87) ÷ 87 × 100; valid only when ≥90% of items are answered.",
+      "higherIsBetter": true,
+      "scoring": "percentage",
+      "patientIntro": "These questions ask about the symptoms and function of your knee. Answer for your most affected (involved) knee.",
+      "items": [
+        { "key": "q1", "text": "What is the highest level of activity you can perform WITHOUT significant knee PAIN?", "options": [ { "value": 4, "label": "Very strenuous (jumping/pivoting — basketball, soccer)" }, { "value": 3, "label": "Strenuous (heavy physical work, skiing, tennis)" }, { "value": 2, "label": "Moderate (running, jogging)" }, { "value": 1, "label": "Light (walking, housework)" }, { "value": 0, "label": "Unable to perform any of the above due to knee pain" } ] },
+        { "key": "q2", "text": "During the past 4 weeks, how often have you had pain?", "reverse": true, "scale": { "min": 0, "max": 10, "minLabel": "Never", "maxLabel": "Constant" } },
+        { "key": "q3", "text": "If you have pain, how severe is it?", "reverse": true, "scale": { "min": 0, "max": 10, "minLabel": "No pain", "maxLabel": "Worst pain imaginable" } },
+        { "key": "q4", "text": "During the past 4 weeks, how stiff or swollen was your knee?", "options": [ { "value": 4, "label": "Not at all" }, { "value": 3, "label": "Mildly" }, { "value": 2, "label": "Moderately" }, { "value": 1, "label": "Very" }, { "value": 0, "label": "Extremely" } ] },
+        { "key": "q5", "text": "What is the highest level of activity you can perform WITHOUT significant SWELLING in your knee?", "options": [ { "value": 4, "label": "Very strenuous (jumping/pivoting — basketball, soccer)" }, { "value": 3, "label": "Strenuous (heavy physical work, skiing, tennis)" }, { "value": 2, "label": "Moderate (running, jogging)" }, { "value": 1, "label": "Light (walking, housework)" }, { "value": 0, "label": "Unable to perform any of the above due to swelling" } ] },
+        { "key": "q6", "text": "During the past 4 weeks, did your knee LOCK or CATCH?", "options": [ { "value": 1, "label": "No" }, { "value": 0, "label": "Yes" } ] },
+        { "key": "q7", "text": "What is the highest level of activity you can perform WITHOUT your knee GIVING WAY?", "options": [ { "value": 4, "label": "Very strenuous (jumping/pivoting — basketball, soccer)" }, { "value": 3, "label": "Strenuous (heavy physical work, skiing, tennis)" }, { "value": 2, "label": "Moderate (running, jogging)" }, { "value": 1, "label": "Light (walking, housework)" }, { "value": 0, "label": "Unable to perform any of the above due to giving way" } ] },
+        { "key": "q8", "text": "What is the highest level of activity you can participate in on a REGULAR basis?", "options": [ { "value": 4, "label": "Very strenuous (jumping/pivoting — basketball, soccer)" }, { "value": 3, "label": "Strenuous (heavy physical work, skiing, tennis)" }, { "value": 2, "label": "Moderate (running, jogging)" }, { "value": 1, "label": "Light (walking, housework)" }, { "value": 0, "label": "Unable to perform any of the above" } ] },
+        { "key": "q9a", "subscale": "function", "text": "How does your knee affect your ability to go UP stairs?", "options": [ { "value": 4, "label": "Not difficult at all" }, { "value": 3, "label": "Minimally difficult" }, { "value": 2, "label": "Moderately difficult" }, { "value": 1, "label": "Extremely difficult" }, { "value": 0, "label": "Unable to do" } ] },
+        { "key": "q9b", "subscale": "function", "text": "…to go DOWN stairs?", "options": [ { "value": 4, "label": "Not difficult at all" }, { "value": 3, "label": "Minimally difficult" }, { "value": 2, "label": "Moderately difficult" }, { "value": 1, "label": "Extremely difficult" }, { "value": 0, "label": "Unable to do" } ] },
+        { "key": "q9c", "subscale": "function", "text": "…to KNEEL on the front of your knee?", "options": [ { "value": 4, "label": "Not difficult at all" }, { "value": 3, "label": "Minimally difficult" }, { "value": 2, "label": "Moderately difficult" }, { "value": 1, "label": "Extremely difficult" }, { "value": 0, "label": "Unable to do" } ] },
+        { "key": "q9d", "subscale": "function", "text": "…to SQUAT?", "options": [ { "value": 4, "label": "Not difficult at all" }, { "value": 3, "label": "Minimally difficult" }, { "value": 2, "label": "Moderately difficult" }, { "value": 1, "label": "Extremely difficult" }, { "value": 0, "label": "Unable to do" } ] },
+        { "key": "q9e", "subscale": "function", "text": "…to SIT with your knee bent?", "options": [ { "value": 4, "label": "Not difficult at all" }, { "value": 3, "label": "Minimally difficult" }, { "value": 2, "label": "Moderately difficult" }, { "value": 1, "label": "Extremely difficult" }, { "value": 0, "label": "Unable to do" } ] },
+        { "key": "q9f", "subscale": "function", "text": "…to RISE from a chair?", "options": [ { "value": 4, "label": "Not difficult at all" }, { "value": 3, "label": "Minimally difficult" }, { "value": 2, "label": "Moderately difficult" }, { "value": 1, "label": "Extremely difficult" }, { "value": 0, "label": "Unable to do" } ] },
+        { "key": "q9g", "subscale": "function", "text": "…to RUN straight ahead?", "options": [ { "value": 4, "label": "Not difficult at all" }, { "value": 3, "label": "Minimally difficult" }, { "value": 2, "label": "Moderately difficult" }, { "value": 1, "label": "Extremely difficult" }, { "value": 0, "label": "Unable to do" } ] },
+        { "key": "q9h", "subscale": "function", "text": "…to JUMP and land on your involved leg?", "options": [ { "value": 4, "label": "Not difficult at all" }, { "value": 3, "label": "Minimally difficult" }, { "value": 2, "label": "Moderately difficult" }, { "value": 1, "label": "Extremely difficult" }, { "value": 0, "label": "Unable to do" } ] },
+        { "key": "q9i", "subscale": "function", "text": "…to STOP and START quickly?", "options": [ { "value": 4, "label": "Not difficult at all" }, { "value": 3, "label": "Minimally difficult" }, { "value": 2, "label": "Moderately difficult" }, { "value": 1, "label": "Extremely difficult" }, { "value": 0, "label": "Unable to do" } ] },
+        { "key": "q10", "text": "How would you rate the CURRENT function of your knee during your usual activities?", "scale": { "min": 0, "max": 10, "minLabel": "Cannot perform daily activities", "maxLabel": "No limitation" } }
+      ],
+      "bands": [
+        { "max": 40, "label": "Marked impairment" },
+        { "max": 60, "label": "Moderate impairment" },
+        { "max": 80, "label": "Mild impairment" },
+        { "max": 100, "label": "Minimal / normal knee function" }
+      ]
     }
   ]
 }

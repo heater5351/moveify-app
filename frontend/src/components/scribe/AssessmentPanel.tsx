@@ -22,7 +22,7 @@ interface FieldRef { measureKey: string; side: MeasurementSide; }
 
 const UNIT_LABEL: Record<string, string> = {
   degrees: '°', kg: 'kg', seconds: 'sec', reps: 'reps', cm: 'cm',
-  m_s: 'm/s', bpm: 'bpm', mmol_L: 'mmol/L', metres: 'm', points: 'pts', mmHg: 'mmHg',
+  m_s: 'm/s', bpm: 'bpm', mmol_L: 'mmol/L', metres: 'm', points: 'pts', mmHg: 'mmHg', grade: '',
 };
 function unitLabel(u: string) { return UNIT_LABEL[u] ?? u; }
 
@@ -206,7 +206,10 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
     const sideTag = row.side === 'left' ? ' L' : row.side === 'right' ? ' R' : '';
     if (md === 'toggle') {
       const opt = (m?.options ?? []).find(o => o.value === row.value);
-      return `${a?.displayName}${sideTag}: ${opt ? opt.label : row.value}`;
+      // Multi-toggle assessments (e.g. ACL knee exam) need the measure label to tell
+      // the toggles apart; single-toggle ones read fine on the assessment name alone.
+      const name = (a?.measures.length ?? 0) > 1 ? `${a?.displayName} ${m?.label}` : a?.displayName;
+      return `${name}${sideTag}: ${opt ? opt.label : row.value}`;
     }
     if (md === 'compound') {
       return `${a?.displayName}${sideTag}: ${fmtVal(row.value)}/${row.value2 != null ? fmtVal(row.value2) : '?'}`;
