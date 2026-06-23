@@ -653,17 +653,19 @@ const LETTER_META_SYSTEM_PROMPT = `You are extracting addressing details from a 
 - the referring / addressed GP's name (surname only, omit the title "Dr")
 - the medical practice or clinic name
 - the practice postal address (one line)
+- the practice email address
 - the patient's full name
 - the patient's date of birth
 
-Output EXACTLY these five lines with these exact labels. If a field is not present in the document, write the label with nothing after the colon. Do not guess or invent values.
+Output EXACTLY these six lines with these exact labels. If a field is not present in the document, write the label with nothing after the colon. Do not guess or invent values.
 GP: <surname>
 PRACTICE: <name>
 ADDRESS: <address>
+EMAIL: <practice email>
 PATIENT: <full name>
 DOB: <date of birth>
 
-Output only those five lines. No other text.`;
+Output only those six lines. No other text.`;
 
 /**
  * Pull addressing details (referring GP, practice, address, patient, DOB) from an
@@ -687,6 +689,7 @@ async function extractLetterMeta(text) {
       gpName: grab('GP'),
       practiceName: grab('PRACTICE'),
       practiceAddress: grab('ADDRESS'),
+      practiceEmail: grab('EMAIL'),
       patientName: grab('PATIENT'),
       dob: grab('DOB'),
     };

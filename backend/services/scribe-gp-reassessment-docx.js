@@ -1,10 +1,10 @@
 /**
  * GP Reassessment Report DOCX generation via docxtemplater.
  * Fills GP_Reassessment_Template.docx with the before/after comparison + the
- * GP-facing narrative. The template shares the initial-consult GP report's chrome
- * (header / navy section bands / signature box / footer — see
- * scripts/build_gp_reassessment_report.py + scripts/gp_report_kit.py), so the
- * clinician sign-off and footer are token-driven and supplied below.
+ * GP-facing narrative. The cover-letter prose and the clinician sign-off
+ * (Ryan Heath's name / qualifications / phone / email) are now baked directly
+ * into the template, so only the variable recipient/patient/result fields below
+ * are token-driven.
  */
 const Docxtemplater = require('docxtemplater');
 const PizZip = require('pizzip');
@@ -33,6 +33,11 @@ function parseComparisonRows(raw) {
     .filter(r => r.test);
 }
 
+// First given name, for the template's cover-letter line ("…following <first>'s reassessment").
+function firstName(full) {
+  return (clean(full).split(/\s+/)[0] || '');
+}
+
 async function generateGPReassessmentDocx(data) {
   const content = fs.readFileSync(TEMPLATE_PATH, 'binary');
   const zip = new PizZip(content);
@@ -51,32 +56,19 @@ async function generateGPReassessmentDocx(data) {
     nullGetter() { return ''; },
   });
 
-  const patient = clean(data.patientName) || 'the patient';
-  const defaultCoverLetter =
-    `Thank you for your ongoing care of ${patient}. Please find enclosed an Exercise Physiology reassessment report following their review` +
-    `${data.latestDate ? ` on ${data.latestDate}` : ''}.\n\n` +
-    `This report compares ${patient}'s current objective measures against their baseline assessment` +
-    `${data.baselineDate ? ` of ${data.baselineDate}` : ''}, and summarises their progress, the clinical interpretation of those changes, and recommendations for the next phase of care.\n\n` +
-    `I would be glad to discuss any aspect of this report. Thank you for the opportunity to be involved in ${patient}'s care.`;
-
   doc.render({
-    // Clinician — hardcoded (single clinician); mirrors scribe-docx.js so the
-    // GP report and GP reassessment letters carry an identical signature/footer.
-    clinician_full_name:      'Ryan Heath',
-    clinician_qualifications: 'BclinExPhys (Hons)',
-    clinician_profession:     'Accredited Exercise Physiologist',
-    clinician_phone:          '0435 524 991',
-    clinician_email:          'ryan@moveifyhealth.com',
-    clinician_abn:            '52 263 141 529',
     report_date:       data.reportDate || new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }),
     gp_name:           clean(data.gpName) || '[GP name]',
     practice_name:     clean(data.practiceName),
     practice_address:  clean(data.practiceAddress),
+    practice_email:    clean(data.practiceEmail),
     patient_full_name: clean(data.patientName),
+    patient_first_name: firstName(data.patientName),
     patient_dob:       clean(data.dob),
-    baseline_date:     data.baselineDate || '',
-    latest_date:       data.latestDate || '',
-    cover_letter:      clean(data.coverLetter) || defaultCoverLetter,
+    // Cover-letter date ("…reassessment on the …"); defaults to the reassessment date.
+    appointment_date:  data.appointmentDate || data.latestDate || '',
+    initial_assessment_date: data.baselineDate || '',
+    reassessment_date:       data.latestDate || '',
     executive_summary:       clean(data.executiveSummary),
     clinical_interpretation: clean(data.clinicalInterpretation),
     recommendations:         clean(data.recommendations),
