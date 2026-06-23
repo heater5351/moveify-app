@@ -1,8 +1,10 @@
 /**
  * GP Reassessment Report DOCX generation via docxtemplater.
  * Fills GP_Reassessment_Template.docx with the before/after comparison + the
- * GP-facing narrative. Mirrors scribe-reassessment-docx.js; clinician sign-off is
- * static in the template.
+ * GP-facing narrative. The template shares the initial-consult GP report's chrome
+ * (header / navy section bands / signature box / footer — see
+ * scripts/build_gp_reassessment_report.py + scripts/gp_report_kit.py), so the
+ * clinician sign-off and footer are token-driven and supplied below.
  */
 const Docxtemplater = require('docxtemplater');
 const PizZip = require('pizzip');
@@ -58,6 +60,14 @@ async function generateGPReassessmentDocx(data) {
     `I would be glad to discuss any aspect of this report. Thank you for the opportunity to be involved in ${patient}'s care.`;
 
   doc.render({
+    // Clinician — hardcoded (single clinician); mirrors scribe-docx.js so the
+    // GP report and GP reassessment letters carry an identical signature/footer.
+    clinician_full_name:      'Ryan Heath',
+    clinician_qualifications: 'BclinExPhys (Hons)',
+    clinician_profession:     'Accredited Exercise Physiologist',
+    clinician_phone:          '0435 524 991',
+    clinician_email:          'ryan@moveifyhealth.com',
+    clinician_abn:            '52 263 141 529',
     report_date:       data.reportDate || new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }),
     gp_name:           clean(data.gpName) || '[GP name]',
     practice_name:     clean(data.practiceName),
