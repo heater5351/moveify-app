@@ -39,6 +39,24 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // Local-dev mock for /api/reviews so the UI can be developed without the
+    // Google Places API key. Production uses api/reviews.js on Vercel.
+    if (req.method === 'GET' && req.url === '/api/reviews') {
+        const mock = {
+            businessName: 'Moveify Health Solutions',
+            rating: 5.0,
+            reviewCount: 3,
+            reviews: [
+                { author: 'Sample Patient', authorPhoto: null, rating: 5, relativeTime: '2 weeks ago', publishedAt: null, text: 'Excellent care and a genuinely personalised program. The mock review you see in local dev only — production pulls live Google reviews.', googleUrl: 'https://www.google.com/maps' },
+                { author: 'Another Client', authorPhoto: null, rating: 5, relativeTime: '1 month ago', publishedAt: null, text: 'Ryan took the time to understand my history and built a plan that actually fits my life. Highly recommend.', googleUrl: 'https://www.google.com/maps' },
+                { author: 'Local Dev User', authorPhoto: null, rating: 5, relativeTime: '3 months ago', publishedAt: null, text: 'This is mock data shown only when running the site locally without GOOGLE_PLACES_API_KEY set.', googleUrl: 'https://www.google.com/maps' },
+            ],
+        };
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(mock));
+        return;
+    }
+
     let filePath = req.url === '/' ? '/index.html' : req.url;
     let fullPath = path.join(__dirname, TEMPLATE_DIR, filePath);
 

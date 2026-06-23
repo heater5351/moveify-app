@@ -1,3 +1,8 @@
 node_modules/
 
 .vercel
+
+# Real secrets — never commit. Use .env.example as the template.
+.env
+.env.local
+!.env.example
