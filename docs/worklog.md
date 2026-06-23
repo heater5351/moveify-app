@@ -22,6 +22,21 @@ what to know now, links).
 
 ---
 
+## 2026-06-23 — Split CLAUDE.md into lean root + docs/ reference files (progressive disclosure)
+
+- **`CLAUDE.md` cut from 595 → 230 lines** (~61% smaller). Detail sections moved verbatim
+  into `docs/` reference files read on demand, keeping only what every session needs in the
+  root (security warnings, architecture, conventions, nav/state rules, commands, branches).
+- **New `docs/` files:** `billing-worker.md`, `agreement-automation.md`, `auth-security.md`,
+  `api-routes.md`, `database-schema.md`, `cliniko-sync.md`, `environment-variables.md`,
+  `exercise-naming.md`, `privacy-compliance.md`, `clinic-website.md`, `deployment-workflow.md`.
+- **Nothing rewritten** — content moved as-is; each root section replaced with a one-line
+  pointer + 1-sentence "when to read it". Cross-references between docs updated to new paths
+  (e.g. `database-schema.md` points to `docs/auth-security.md` for shared-email login).
+- Motivation: reduce per-turn context tokens (CLAUDE.md loads on every message). See the
+  "Keeping context fresh" rule — treat a contradiction between code and any of these docs
+  as a bug to fix, not to work around.
+
 ## 2026-06-23 — Multi-trial averaging + standardized positions for strength tests
 
 - **HHD and grip are noisy single-tap reads — added 2–3 trial capture + server-side
