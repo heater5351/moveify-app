@@ -101,7 +101,34 @@ export type Patient = {
   pendingSetup?: boolean;
   clinikoPatientId?: string | null;
   clinikoSyncedAt?: string | null;
+  // PMS-style enrichment (all optional; '' clears, omitted preserves on save)
+  title?: string;
+  preferredName?: string;
+  pronouns?: string;
+  occupation?: string;
+  emergencyContactName?: string;
+  emergencyContactRelationship?: string;
+  emergencyContactPhone?: string;
+  referralSource?: string;
+  referringGp?: string;
+  medicareNumber?: string;
+  privateHealthFund?: string;
+  privateHealthMemberNumber?: string;
+  dvaNumber?: string;
   assignedPrograms: AssignedProgram[];
+}
+
+// A file attached to a patient record (PMS Files section). Metadata only —
+// the bytes are streamed from GCS via the authenticated download endpoint.
+export type PatientFile = {
+  id: number;
+  filename: string;
+  contentType: string | null;
+  sizeBytes: number | null;
+  category: string | null;
+  description: string | null;
+  uploadedByName: string | null;
+  createdAt: string;
 }
 
 export type NewPatient = {

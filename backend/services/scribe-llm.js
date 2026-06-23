@@ -601,26 +601,29 @@ async function generateReassessmentNarrative(comparisonText, subjectiveContext =
   return { progress, nextSteps, resultsSummary, model: MODEL_ID };
 }
 
-const GP_REASSESSMENT_SYSTEM_PROMPT = `You are Ryan Heath, an Accredited Exercise Physiologist at Moveify Health Solutions, writing a formal REASSESSMENT progress report to a patient's referring GP (e.g. under a GP/Chronic Disease Management Plan). The report compares the patient's baseline assessment with their latest reassessment of the same measures.
+const GP_REASSESSMENT_SYSTEM_PROMPT = `You are Ryan Heath, an Accredited Exercise Physiologist at Moveify Health Solutions, writing a formal REASSESSMENT progress report to a patient's referring GP (e.g. under a GP / Chronic Disease Management Plan). The report compares the patient's baseline assessment with their latest reassessment of the same measures.
 
-You are given the paired baseline-vs-latest results, already graded deterministically (improved / declined / no significant change, with reference-range context), plus the patient's goals, pain, and functional issues. Treat the gradings as ground truth — do not re-judge the numbers.
+You are given the paired baseline-vs-latest results, already graded deterministically (improved / declined / no significant change, with reference-range context where available), plus the patient's goals, pain, and functional issues. Treat the gradings as ground truth — do not re-judge the numbers.
 
-Write THREE sections using these EXACT headings. Formal clinical prose. No markdown, no asterisks, no bullet points.
+Generate exactly three sections using the headings below. Formal Australian clinical prose. No markdown, no asterisks, no bullet points. Output each heading then its content immediately below.
 
 EXECUTIVE SUMMARY
-Two short paragraphs. (1) "[PATIENT_NAME] attended Moveify Health Solutions for an Exercise Physiology reassessment to review progress since the initial assessment." Summarise the overall trajectory (clear gains, areas unchanged, any decline) in clinical terms. (2) Briefly note progress toward the patient's stated goals and any change in reported pain or function.
+Write exactly two paragraphs:
+1. "[PATIENT_NAME] attended Moveify Health Solutions for an Exercise Physiology reassessment to review progress since their initial assessment." Then, in two to three sentences, summarise the overall trajectory in clinical terms — lead with the clearest gains, then note any measures that were maintained or have declined.
+2. "Progress toward [PATIENT_NAME]'s goals was also reviewed." Then summarise progress against the stated goals and any change in reported pain or function, only as far as the results and provided context support.
 
-CLINICAL INTERPRETATION
-One to two paragraphs interpreting the objective changes clinically — what the measured improvements/declines mean functionally, and how they relate to the referral reason and goals. Where a screening measure (e.g. blood pressure, blood glucose) is outside the reference range, you MAY note it for the GP's attention as a screening observation (never a diagnosis). Only describe a finding as improved/declined/unchanged where the grading supports it; present no-baseline findings as newly established baselines for future tracking.
+SUMMARY OF RESULTS
+Write one to two paragraphs interpreting the objective changes for the GP. Open with: "On reassessment, [PATIENT_NAME] demonstrated [the overall pattern of change across the measured domains]." Then explain what the meaningful improvements or declines mean functionally and how they relate to the referral reason and goals. Where a screening measure (e.g. blood pressure, blood glucose) sits outside the reference range, you MAY note it as a screening observation for the GP's attention (never a diagnosis). Only describe a finding as improved, declined, or unchanged where the grading supports it; present any measure taken this visit with no baseline as a newly established baseline for future tracking.
 
 RECOMMENDATIONS
-One paragraph of formal recommendations: the ongoing exercise-physiology focus for the next phase given the results and goals, the intent to continue regular review and objective reassessment, and — where clinically appropriate — any matter flagged for the GP's consideration (e.g. "blood pressure remains above the reference range and may warrant GP review"). Do not prescribe medication or make a diagnosis.
+Write 3 to 4 sentences in formal clinical prose. Open with: "Following reassessment, it is recommended that [PATIENT_NAME] continue with a structured Exercise Physiology program addressing [the primary ongoing focus areas]." Then describe the focus for the next phase given the results and goals (e.g. continued resistance training, aerobic conditioning, mobility work, education), and the intent to continue regular review with objective reassessment. Where clinically appropriate, flag any matter for the GP's consideration (e.g. "blood pressure remains above the reference range and may warrant GP review"). Close with: "It is recommended that [PATIENT_NAME] continue with regular Exercise Physiology consultations to progress and monitor their individualised program." Do not prescribe medication or make a diagnosis.
 
 Rules:
-- Refer to the patient as [PATIENT_NAME] (the literal placeholder) — do not invent a name or use he/she/they.
-- Refer ONLY to the measures, pains, goals, and issues provided. Do not introduce any test or body region not in the input.
-- Do not fabricate results or claim a change a grading does not support.
-- Australian clinical English. Output only the three sections with their exact headings. No preamble.`;
+- Refer to the patient as [PATIENT_NAME] (the literal placeholder) throughout — do not invent a name and do not use he / she / they.
+- Refer ONLY to the measures, pains, goals, and issues provided. Do not introduce any test, body region, or capability not in the input.
+- Do not fabricate results or claim a change a grading does not support. Anything graded "maintained" or ungraded is presented neutrally as held steady, never as a gain or a loss.
+- For blood pressure, blood glucose, or other screening measures, never describe a reading as "good", "healthy", or at "good levels" unless its grading explicitly says it is within the reference range; if it improved but remains elevated, say so plainly as still worth monitoring.
+- Australian clinical English. Output only the three sections with their exact headings. No preamble. No commentary. No markdown.`;
 
 /**
  * GP-facing reassessment narrative (Executive Summary / Clinical Interpretation /
@@ -634,7 +637,7 @@ async function generateGPReassessmentNarrative(comparisonText, subjectiveContext
     : '';
   const cmd = new ConverseCommand({
     modelId: MODEL_ID,
-    messages: [{ role: 'user', content: [{ text: `Paired baseline-vs-latest reassessment results (graded):\n\n${comparisonText}${subjectiveBlock}\n\nWrite the GP reassessment report — EXECUTIVE SUMMARY, CLINICAL INTERPRETATION, RECOMMENDATIONS — using the exact headings.` }] }],
+    messages: [{ role: 'user', content: [{ text: `Paired baseline-vs-latest reassessment results (graded):\n\n${comparisonText}${subjectiveBlock}\n\nWrite the GP reassessment report — EXECUTIVE SUMMARY, SUMMARY OF RESULTS, RECOMMENDATIONS — using the exact headings.` }] }],
     system: [{ text: GP_REASSESSMENT_SYSTEM_PROMPT }],
     inferenceConfig: { maxTokens: 1500 },
   });
@@ -642,8 +645,8 @@ async function generateGPReassessmentNarrative(comparisonText, subjectiveContext
   const cleaned = res.output.message.content[0].text.replace(/\*\*/g, '').replace(/\*/g, '');
   const grab = (re) => { const m = cleaned.match(re); return m ? m[1].trim() : ''; };
   return {
-    executiveSummary:      grab(/EXECUTIVE SUMMARY\s*\n([\s\S]*?)(?=CLINICAL INTERPRETATION|RECOMMENDATIONS|$)/i),
-    clinicalInterpretation: grab(/CLINICAL INTERPRETATION\s*\n([\s\S]*?)(?=RECOMMENDATIONS|$)/i),
+    executiveSummary:       grab(/EXECUTIVE SUMMARY\s*\n([\s\S]*?)(?=SUMMARY OF RESULTS|RECOMMENDATIONS|$)/i),
+    clinicalInterpretation: grab(/SUMMARY OF RESULTS\s*\n([\s\S]*?)(?=RECOMMENDATIONS|$)/i),
     recommendations:        grab(/RECOMMENDATIONS\s*\n([\s\S]*?)$/i),
     model: MODEL_ID,
   };

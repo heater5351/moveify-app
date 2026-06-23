@@ -1,11 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
-import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown, FileText, Mail, Link, RefreshCw, Search, ChevronRight, Activity } from 'lucide-react';
+import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown, FileText, Mail, Link, RefreshCw, Search, ChevronRight, Activity, ClipboardList, Folder } from 'lucide-react';
 import ScribeHistoryPage from './scribe/ScribeHistoryPage';
 import AssessmentTrends from './scribe/AssessmentTrends';
 import type { Patient, ClinicianFlag, BlockStatusResponse } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
+import { PatientFiles } from './PatientFiles';
 import { AssignEducationModal } from './modals/AssignEducationModal';
+
+// A single read-only label/value pair in the profile detail cards. Renders
+// nothing when there is no value, so optional enrichment fields stay hidden
+// until populated.
+const DetailField = ({ label, value, className }: { label: string; value?: string | null; className?: string }) => {
+  if (!value) return null;
+  return (
+    <div className={className}>
+      <p className="text-xs text-slate-400 mb-1">{label}</p>
+      <p className="text-sm font-medium text-slate-800 break-words">{value}</p>
+    </div>
+  );
+};
 import { API_URL } from '../config';
 import { getAuthHeaders } from '../utils/api';
 
@@ -24,7 +38,7 @@ interface PatientProfileProps {
 }
 
 export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram, onOpenNote, activeNoteSessionId, notesRefreshKey, onPatientSynced }: PatientProfileProps) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'assessments' | 'education' | 'notes'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'assessments' | 'education' | 'forms' | 'files' | 'notes'>('overview');
   const [showAssignEducationModal, setShowAssignEducationModal] = useState(false);
   const [educationModulesRefreshKey, setEducationModulesRefreshKey] = useState(0);
   const [flags, setFlags] = useState<ClinicianFlag[]>([]);
@@ -98,6 +112,13 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
         if (data.dob) updates.dob = data.dob;
         if (data.phone) updates.phone = data.phone;
         if (data.address) updates.address = data.address;
+        // Cliniko-owned enrichment fields (see services/cliniko-sync.js)
+        if (data.title) updates.title = data.title;
+        if (data.preferredName) updates.preferredName = data.preferredName;
+        if (data.occupation) updates.occupation = data.occupation;
+        if (data.medicareNumber) updates.medicareNumber = data.medicareNumber;
+        if (data.referralSource) updates.referralSource = data.referralSource;
+        if (data.dvaNumber) updates.dvaNumber = data.dvaNumber;
         onPatientSynced?.(updates);
       } else {
         setLinkMsg({ type: 'error', text: data.error || 'Failed to sync' });
@@ -339,6 +360,8 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
             { id: 'analytics', label: 'Progress Analytics', icon: <TrendingUp size={15} /> },
             { id: 'assessments', label: 'Assessments', icon: <Activity size={15} /> },
             { id: 'education', label: 'Education', icon: <BookOpen size={15} /> },
+            { id: 'forms', label: 'Forms', icon: <ClipboardList size={15} /> },
+            { id: 'files', label: 'Files', icon: <Folder size={15} /> },
             { id: 'notes', label: 'Progress Notes', icon: <FileText size={15} /> },
           ].map(({ id, label, icon }) => (
             <button
@@ -413,26 +436,58 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
           )}
 
           {/* Detail fields */}
-          <div className="bg-white rounded-xl ring-1 ring-slate-200 p-6">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Patient Details</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div>
-                <p className="text-xs text-slate-400 mb-1">Date of Birth</p>
-                <p className="text-sm font-medium text-slate-800">{patient.dob}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 mb-1">Age</p>
-                <p className="text-sm font-medium text-slate-800">{patient.age} years</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 mb-1">Date Added</p>
-                <p className="text-sm font-medium text-slate-800">{patient.dateAdded}</p>
-              </div>
-              <div className="md:col-span-2">
-                <p className="text-xs text-slate-400 mb-1">Address</p>
-                <p className="text-sm font-medium text-slate-800">{patient.address}</p>
+          <div className="bg-white rounded-xl ring-1 ring-slate-200 p-6 space-y-6">
+            {/* Personal */}
+            <div>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Patient Details</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+                <DetailField label="Title" value={patient.title} />
+                <DetailField label="Preferred Name" value={patient.preferredName} />
+                <DetailField label="Date of Birth" value={patient.dob} />
+                <DetailField label="Age" value={`${patient.age} years`} />
+                <DetailField label="Sex" value={patient.sex} />
+                <DetailField label="Pronouns" value={patient.pronouns} />
+                <DetailField label="Occupation" value={patient.occupation} />
+                <DetailField label="Date Added" value={patient.dateAdded} />
               </div>
             </div>
+
+            {/* Contact */}
+            <div className="pt-5 border-t border-slate-100">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Contact</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <DetailField label="Email" value={patient.email} />
+                <DetailField label="Phone" value={patient.phone} />
+                <DetailField label="Address" value={patient.address} className="md:col-span-3" />
+              </div>
+            </div>
+
+            {/* Emergency contact */}
+            {(patient.emergencyContactName || patient.emergencyContactRelationship || patient.emergencyContactPhone) && (
+              <div className="pt-5 border-t border-slate-100">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Emergency Contact</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+                  <DetailField label="Name" value={patient.emergencyContactName} />
+                  <DetailField label="Relationship" value={patient.emergencyContactRelationship} />
+                  <DetailField label="Phone" value={patient.emergencyContactPhone} />
+                </div>
+              </div>
+            )}
+
+            {/* Referral & funding */}
+            {(patient.referralSource || patient.referringGp || patient.medicareNumber || patient.dvaNumber || patient.privateHealthFund || patient.privateHealthMemberNumber) && (
+              <div className="pt-5 border-t border-slate-100">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Referral &amp; Funding</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+                  <DetailField label="Referral Source" value={patient.referralSource} />
+                  <DetailField label="Referring GP" value={patient.referringGp} />
+                  <DetailField label="Medicare" value={patient.medicareNumber} />
+                  <DetailField label="DVA" value={patient.dvaNumber} />
+                  <DetailField label="Health Fund" value={patient.privateHealthFund} />
+                  <DetailField label="Member No." value={patient.privateHealthMemberNumber} />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Programs */}
@@ -545,6 +600,24 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
               }}
             />
           </div>
+      ) : activeTab === 'forms' ? (
+        <div className="bg-white rounded-xl ring-1 ring-slate-200 p-10">
+          <div className="max-w-md mx-auto text-center">
+            <div className="w-14 h-14 bg-primary-50 rounded-full flex items-center justify-center border border-primary-100 mx-auto mb-4">
+              <ClipboardList className="text-primary-400" size={26} />
+            </div>
+            <h2 className="text-base font-semibold font-display text-secondary-500 mb-1.5">Patient forms</h2>
+            <p className="text-sm text-slate-500 leading-relaxed mb-5">
+              Send intake, consent, and screening forms for {patient.name.split(' ')[0]} to complete on their own device.
+              Submitted responses will appear here against their record.
+            </p>
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">
+              Coming soon
+            </span>
+          </div>
+        </div>
+      ) : activeTab === 'files' ? (
+        <PatientFiles patientId={patient.id} />
       ) : (
         <div>
           <div className="flex items-center justify-between mb-5">

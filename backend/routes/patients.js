@@ -41,6 +41,28 @@ function calculateAge(dob) {
   return age;
 }
 
+// Map the PMS-style enrichment columns (demographics + emergency contact +
+// referral/funding) from a users row to camelCase API fields. Spread into each
+// patient response shape. Missing columns (e.g. when a caller selects a narrower
+// row) degrade to '' rather than throwing.
+function enrichmentFields(p) {
+  return {
+    title: p.title || '',
+    preferredName: p.preferred_name || '',
+    pronouns: p.pronouns || '',
+    occupation: p.occupation || '',
+    emergencyContactName: p.emergency_contact_name || '',
+    emergencyContactRelationship: p.emergency_contact_relationship || '',
+    emergencyContactPhone: p.emergency_contact_phone || '',
+    referralSource: p.referral_source || '',
+    referringGp: p.referring_gp || '',
+    medicareNumber: p.medicare_number || '',
+    privateHealthFund: p.private_health_fund || '',
+    privateHealthMemberNumber: p.private_health_member_number || '',
+    dvaNumber: p.dva_number || '',
+  };
+}
+
 // Helper to format a patient with their programs (OPTIMIZED - reduces N+1 queries)
 async function formatPatientWithPrograms(patient) {
   const today = toLocalDateString(new Date());
@@ -64,6 +86,7 @@ async function formatPatientWithPrograms(patient) {
       dateAdded: patient.created_at,
       clinikoPatientId: patient.cliniko_patient_id || null,
       clinikoSyncedAt: patient.cliniko_synced_at || null,
+      ...enrichmentFields(patient),
       assignedPrograms: []
     };
   }
@@ -207,6 +230,7 @@ async function formatPatientWithPrograms(patient) {
     pendingSetup: patient.pending_setup === true,
     clinikoPatientId: patient.cliniko_patient_id || null,
     clinikoSyncedAt: patient.cliniko_synced_at || null,
+    ...enrichmentFields(patient),
     assignedPrograms: assignedPrograms
   };
 }
@@ -221,6 +245,10 @@ router.get('/', requireRole('clinician'), async (req, res) => {
     const patients = await db.getAll(`
       SELECT id, email, role, name, dob, sex, phone, address, created_at,
              cliniko_patient_id, cliniko_synced_at,
+             title, preferred_name, pronouns, occupation,
+             emergency_contact_name, emergency_contact_relationship, emergency_contact_phone,
+             referral_source, referring_gp, medicare_number,
+             private_health_fund, private_health_member_number, dva_number,
              (password_hash IS NULL AND firebase_uid IS NULL) AS pending_setup
       FROM users
       WHERE role = 'patient'
@@ -370,6 +398,7 @@ router.get('/', requireRole('clinician'), async (req, res) => {
       pendingSetup: patient.pending_setup === true,
       clinikoPatientId: patient.cliniko_patient_id || null,
       clinikoSyncedAt: patient.cliniko_synced_at || null,
+      ...enrichmentFields(patient),
       assignedPrograms: programsByPatient[patient.id] || []
     }));
 
@@ -528,6 +557,10 @@ router.get('/:patientId', requirePatientAccess, async (req, res) => {
     const patient = await db.getOne(`
       SELECT id, email, role, name, dob, sex, phone, address, created_at,
              cliniko_patient_id, cliniko_synced_at,
+             title, preferred_name, pronouns, occupation,
+             emergency_contact_name, emergency_contact_relationship, emergency_contact_phone,
+             referral_source, referring_gp, medicare_number,
+             private_health_fund, private_health_member_number, dva_number,
              (password_hash IS NULL AND firebase_uid IS NULL) AS pending_setup
       FROM users
       WHERE id = $1 AND role = 'patient'
@@ -552,7 +585,13 @@ router.get('/:patientId', requirePatientAccess, async (req, res) => {
 router.put('/:patientId', requireRole('clinician'), async (req, res) => {
   try {
     const { patientId } = req.params;
-    const { name, dob, email, phone, address, sex } = req.body;
+    const {
+      name, dob, email, phone, address, sex,
+      title, preferredName, pronouns, occupation,
+      emergencyContactName, emergencyContactRelationship, emergencyContactPhone,
+      referralSource, referringGp, medicareNumber,
+      privateHealthFund, privateHealthMemberNumber, dvaNumber,
+    } = req.body;
 
     if (!name || !dob || !email) {
       return res.status(400).json({ error: 'Name, date of birth, and email are required' });
@@ -585,13 +624,42 @@ router.put('/:patientId', requireRole('clinician'), async (req, res) => {
       }
     }
 
-    // sex omitted (undefined) → preserve existing; '' → clear; a value → set.
+    // Field omitted (undefined) → preserve existing via COALESCE; '' → clear;
+    // a value → set. Cliniko-owned fields (title/preferred_name/occupation/
+    // medicare/referral/dva/pronouns) may be re-overwritten on the next sync.
+    const u = (v) => (v === undefined ? null : v);                                    // preserve on undefined, '' clears
+    const clip = (v, max = 200) => (v === undefined ? null : String(v).slice(0, max)); // same + length-bound
     await db.query(
-      `UPDATE users SET name = $1, dob = $2, email = $3, phone = $4, address = $5, sex = COALESCE($6, sex) WHERE id = $7`,
-      [name, dob, email, phone || null, address || null, sex === undefined ? null : sex, patientId]
+      `UPDATE users SET
+         name = $1, dob = $2, email = $3, phone = $4, address = $5,
+         sex = COALESCE($6, sex),
+         title = COALESCE($7, title),
+         preferred_name = COALESCE($8, preferred_name),
+         pronouns = COALESCE($9, pronouns),
+         occupation = COALESCE($10, occupation),
+         emergency_contact_name = COALESCE($11, emergency_contact_name),
+         emergency_contact_relationship = COALESCE($12, emergency_contact_relationship),
+         emergency_contact_phone = COALESCE($13, emergency_contact_phone),
+         referral_source = COALESCE($14, referral_source),
+         referring_gp = COALESCE($15, referring_gp),
+         medicare_number = COALESCE($16, medicare_number),
+         private_health_fund = COALESCE($17, private_health_fund),
+         private_health_member_number = COALESCE($18, private_health_member_number),
+         dva_number = COALESCE($19, dva_number)
+       WHERE id = $20`,
+      [name, dob, email, phone || null, address || null, u(sex),
+       clip(title), clip(preferredName), clip(pronouns), clip(occupation),
+       clip(emergencyContactName), clip(emergencyContactRelationship), clip(emergencyContactPhone),
+       clip(referralSource, 300), clip(referringGp), clip(medicareNumber),
+       clip(privateHealthFund), clip(privateHealthMemberNumber), clip(dvaNumber),
+       patientId]
     );
 
-    audit.log(req, 'patient_update', 'patient', parseInt(patientId), { fields: ['name', 'dob', 'email', 'phone', 'address', 'sex'] });
+    audit.log(req, 'patient_update', 'patient', parseInt(patientId), {
+      fields: ['name', 'dob', 'email', 'phone', 'address', 'sex', 'title', 'preferredName',
+        'pronouns', 'occupation', 'emergencyContact', 'referralSource', 'referringGp',
+        'medicareNumber', 'privateHealth', 'dvaNumber'],
+    });
 
     res.json({ message: 'Patient updated' });
   } catch (error) {

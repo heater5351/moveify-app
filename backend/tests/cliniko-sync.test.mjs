@@ -20,6 +20,13 @@ const clinikoPatient = (overrides = {}) => ({
   city: 'Sydney',
   state: 'NSW',
   post_code: '2000',
+  // PMS-enrichment fields Cliniko owns (see buildPatientFields)
+  title: 'Ms',
+  preferred_first_name: 'Janey',
+  occupation: 'Teacher',
+  medicare: '1234567890',
+  referral_source: 'GP referral',
+  dva: 'DVA123',
   ...overrides,
 });
 
@@ -31,6 +38,12 @@ describe('buildPatientFields', () => {
       sex: 'Female',
       phone: '0400111222',
       address: '1 Main St, Sydney, NSW, 2000',
+      title: 'Ms',
+      preferredName: 'Janey',
+      occupation: 'Teacher',
+      medicareNumber: '1234567890',
+      referralSource: 'GP referral',
+      dvaNumber: 'DVA123',
     });
   });
 
@@ -47,6 +60,12 @@ describe('buildPatientFields', () => {
       sex: null,
       phone: null,
       address: null,
+      title: null,
+      preferredName: null,
+      occupation: null,
+      medicareNumber: null,
+      referralSource: null,
+      dvaNumber: null,
     });
   });
 
