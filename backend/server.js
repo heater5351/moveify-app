@@ -14,6 +14,7 @@ if (!process.env.CLINIKO_API_KEY || !process.env.CLINIKO_SUBDOMAIN) {
 const authRoutes = require('./routes/auth');
 const invitationRoutes = require('./routes/invitations');
 const patientRoutes = require('./routes/patients');
+const patientFileRoutes = require('./routes/patient-files');
 const programRoutes = require('./routes/programs');
 const checkInRoutes = require('./routes/check-ins');
 const exerciseRoutes = require('./routes/exercises');
@@ -143,6 +144,7 @@ app.use('/api', apiLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/invitations', invitationRoutes);
 app.use('/api/patients', patientRoutes);
+app.use('/api/patient-files', patientFileRoutes);
 app.use('/api/programs', programRoutes);
 app.use('/api/check-ins', checkInRoutes);
 app.use('/api/exercises', exerciseRoutes);

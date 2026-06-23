@@ -26,6 +26,7 @@
 | `AGREEMENT_AUTOMATION_ENABLED` | No | `false` | Feature flag for the service-agreement → Stripe sign-up flow. `'true'` enables `POST /api/agreements/generate` + `/:token/sign`. **Enabled in prod since 2026-06-02.** |
 | `BILLING_WORKER_URL` | No (agreement flow) | — | Base URL of `moveify-billing-worker`. Backend calls its `/admin/agreements/checkout-setup` to open the Stripe setup Checkout. |
 | `BILLING_ADMIN_TOKEN` | No (agreement flow) | — | `X-Admin-Token` for the worker admin call. Sources from the `billing_admin_token` Secret Manager secret. |
+| `PATIENT_FILES_BUCKET` | No (patient Files feature) | — | GCS bucket name for patient file attachments (PMS Files tab). Must be in **`australia-southeast1`** (data residency). Accessed via ADC = the Cloud Run runtime SA, which needs `roles/storage.objectAdmin` on the bucket. Downloads stream through the authenticated backend (no signed/public URLs). **If unset the Files feature degrades to a "storage not configured" state** — uploads disabled, no crash. Each environment (prod/staging) needs its own bucket. |
 
 ## Frontend (`frontend/.env`)
 

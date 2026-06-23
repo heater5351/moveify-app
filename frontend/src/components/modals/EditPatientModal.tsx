@@ -44,6 +44,9 @@ export const EditPatientModal = ({ patient, onUpdate, onSave, onDelete, onClose 
   const [dobDisplay, setDobDisplay] = useState(toDisplayDate(patient.dob));
   const [dobError, setDobError] = useState('');
 
+  const inputCls = "w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 outline-none";
+  const labelCls = "block text-xs font-medium text-slate-500 mb-1.5";
+
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl ring-1 ring-slate-200 max-w-2xl w-full max-h-[90vh] flex flex-col">
@@ -161,6 +164,157 @@ export const EditPatientModal = ({ patient, onUpdate, onSave, onDelete, onClose 
               onChange={(e) => onUpdate({ ...patient, address: e.target.value })}
               className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 outline-none"
             />
+          </div>
+
+          {/* Demographics */}
+          <div className="pt-4 border-t border-slate-100">
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Demographics</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Title</label>
+                <select
+                  value={patient.title || ''}
+                  onChange={(e) => onUpdate({ ...patient, title: e.target.value })}
+                  className={`${inputCls} bg-white`}
+                >
+                  <option value="">—</option>
+                  <option>Mr</option>
+                  <option>Mrs</option>
+                  <option>Ms</option>
+                  <option>Miss</option>
+                  <option>Mx</option>
+                  <option>Dr</option>
+                  <option>Prof</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Preferred name</label>
+                <input
+                  type="text"
+                  value={patient.preferredName || ''}
+                  onChange={(e) => onUpdate({ ...patient, preferredName: e.target.value })}
+                  placeholder="Known as…"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Pronouns</label>
+                <input
+                  type="text"
+                  value={patient.pronouns || ''}
+                  onChange={(e) => onUpdate({ ...patient, pronouns: e.target.value })}
+                  placeholder="e.g. she/her"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Occupation</label>
+                <input
+                  type="text"
+                  value={patient.occupation || ''}
+                  onChange={(e) => onUpdate({ ...patient, occupation: e.target.value })}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Emergency contact */}
+          <div className="pt-4 border-t border-slate-100">
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Emergency contact</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Name</label>
+                <input
+                  type="text"
+                  value={patient.emergencyContactName || ''}
+                  onChange={(e) => onUpdate({ ...patient, emergencyContactName: e.target.value })}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Relationship</label>
+                <input
+                  type="text"
+                  value={patient.emergencyContactRelationship || ''}
+                  onChange={(e) => onUpdate({ ...patient, emergencyContactRelationship: e.target.value })}
+                  placeholder="e.g. Spouse"
+                  className={inputCls}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Phone</label>
+                <input
+                  type="tel"
+                  value={patient.emergencyContactPhone || ''}
+                  onChange={(e) => onUpdate({ ...patient, emergencyContactPhone: e.target.value })}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Referral & funding */}
+          <div className="pt-4 border-t border-slate-100">
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Referral &amp; funding</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Referral source</label>
+                <input
+                  type="text"
+                  value={patient.referralSource || ''}
+                  onChange={(e) => onUpdate({ ...patient, referralSource: e.target.value })}
+                  placeholder="e.g. GP referral, word of mouth"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Referring GP</label>
+                <input
+                  type="text"
+                  value={patient.referringGp || ''}
+                  onChange={(e) => onUpdate({ ...patient, referringGp: e.target.value })}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Medicare number</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={patient.medicareNumber || ''}
+                  onChange={(e) => onUpdate({ ...patient, medicareNumber: e.target.value })}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>DVA number</label>
+                <input
+                  type="text"
+                  value={patient.dvaNumber || ''}
+                  onChange={(e) => onUpdate({ ...patient, dvaNumber: e.target.value })}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Private health fund</label>
+                <input
+                  type="text"
+                  value={patient.privateHealthFund || ''}
+                  onChange={(e) => onUpdate({ ...patient, privateHealthFund: e.target.value })}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Member number</label>
+                <input
+                  type="text"
+                  value={patient.privateHealthMemberNumber || ''}
+                  onChange={(e) => onUpdate({ ...patient, privateHealthMemberNumber: e.target.value })}
+                  className={inputCls}
+                />
+              </div>
+            </div>
           </div>
         </div>
 

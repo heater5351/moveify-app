@@ -492,6 +492,51 @@ async function initDatabase() {
       ADD COLUMN IF NOT EXISTS sex TEXT DEFAULT NULL
     `);
 
+    // --- Patient profile enrichment (PMS-style demographic + funding fields) ---
+    // All nullable/additive. Some are populated by the Cliniko sync where Cliniko
+    // exposes them (title, preferred_name, occupation, medicare_number,
+    // referral_source, dva_number, pronouns — see services/cliniko-sync.js); the
+    // rest (emergency contact, referring GP, private health) are Moveify-native
+    // and clinician-edited.
+    await db.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS title TEXT DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS preferred_name TEXT DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS pronouns TEXT DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS occupation TEXT DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS emergency_contact_name TEXT DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS emergency_contact_relationship TEXT DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS emergency_contact_phone TEXT DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS referral_source TEXT DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS referring_gp TEXT DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS medicare_number TEXT DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS private_health_fund TEXT DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS private_health_member_number TEXT DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS dva_number TEXT DEFAULT NULL
+    `);
+
+    // Patient file attachments (PMS Files section). The object bytes live in a
+    // GCS bucket in australia-southeast1 (data-residency); this table stores
+    // metadata + the storage object key only — never the file contents.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS patient_files (
+        id            SERIAL PRIMARY KEY,
+        patient_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        uploaded_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        filename      TEXT NOT NULL,
+        storage_key   TEXT NOT NULL,
+        content_type  TEXT,
+        size_bytes    BIGINT,
+        category      TEXT,
+        description   TEXT,
+        created_at    TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_patient_files_patient
+      ON patient_files(patient_id)
+    `);
+
     // Generic key/value store for app-level state (e.g. the incremental Cliniko
     // auto-sync cursor). Keep keys namespaced and values small.
     await db.query(`
