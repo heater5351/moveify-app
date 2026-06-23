@@ -62,7 +62,7 @@ async function fetchReviews(apiKey, placeId) {
   const resp = await fetch(url, {
     headers: {
       'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': 'displayName,rating,userRatingCount,reviews',
+      'X-Goog-FieldMask': 'displayName,rating,userRatingCount,reviews,googleMapsUri',
     },
   });
   if (!resp.ok) {
@@ -71,6 +71,7 @@ async function fetchReviews(apiKey, placeId) {
   const data = await resp.json();
   return {
     businessName: data.displayName?.text || '',
+    businessUrl: data.googleMapsUri || '',
     rating: typeof data.rating === 'number' ? data.rating : null,
     reviewCount: typeof data.userRatingCount === 'number' ? data.userRatingCount : 0,
     reviews: (data.reviews || []).map((r) => ({
@@ -80,7 +81,6 @@ async function fetchReviews(apiKey, placeId) {
       relativeTime: r.relativePublishTimeDescription || '',
       publishedAt: r.publishTime || null,
       text: r.originalText?.text || r.text?.text || '',
-      googleUrl: r.authorAttribution?.uri || null,
     })),
   };
 }
@@ -127,6 +127,7 @@ module.exports = async (req, res) => {
     }
     return res.status(200).json({
       businessName: '',
+      businessUrl: '',
       rating: null,
       reviewCount: 0,
       reviews: [],

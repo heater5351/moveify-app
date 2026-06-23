@@ -660,14 +660,10 @@
           </div>
 
           <div class="scroll-revealed max-w-[1100px] mx-auto">
-            <div class="swiper reviews-carousel">
-              <div class="swiper-wrapper" id="reviews-wrapper">
-                <!-- Slides injected by JS -->
-              </div>
-              <div class="swiper-button-next !text-accent"></div>
-              <div class="swiper-button-prev !text-accent"></div>
+            <div id="reviews-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <!-- Cards injected by JS -->
             </div>
-            <div class="text-center mt-10">
+            <div class="text-center mt-12">
               <a
                 id="reviews-google-link"
                 href="https://www.google.com/maps/search/Moveify+Health+Solutions+4+George+St+Williamstown+SA"
@@ -1082,10 +1078,13 @@
 
       <!-- Map section -->
       <section id="map" class="w-full h-[500px] overflow-hidden -mt-[12rem]">
-        <object
-          data="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d6543.456!2d138.888!3d-34.672!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6ab0c9b0b0b0b0b%3A0x0!2s4%20George%20St%2C%20Williamstown%20SA%205351!5e0!3m2!1sen!2sau!4v1"
+        <iframe
+          src="https://maps.google.com/maps?q=Moveify+Health+Solutions,+4+George+St,+Williamstown+SA+5351&z=16&output=embed"
           class="border-0 w-full h-full"
-        ></object>
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+          title="Moveify Health Solutions location map"
+        ></iframe>
       </section>
     </main>
 
@@ -1317,13 +1316,14 @@
         });
       }
 
-      // Reviews — fetch from /api/reviews and render into the Swiper carousel.
+      // Reviews — fetch from /api/reviews and render into a responsive grid.
       (async function loadReviews() {
-        const wrapper = document.getElementById('reviews-wrapper');
-        if (!wrapper) return;
+        const grid = document.getElementById('reviews-grid');
+        if (!grid) return;
         const loading = document.getElementById('reviews-loading');
         const empty = document.getElementById('reviews-empty');
         const summary = document.getElementById('reviews-summary');
+        const cta = document.getElementById('reviews-google-link');
 
         const esc = (s) => (s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         const safeUrl = (u) => { try { const url = new URL(u); return (url.protocol === 'https:' || url.protocol === 'http:') ? url.toString() : null; } catch { return null; } };
@@ -1351,40 +1351,32 @@
             if (summary) summary.classList.remove('hidden');
           }
 
-          wrapper.innerHTML = reviews.map((r) => {
+          // Use the canonical business URL from Google for the CTA.
+          const businessUrl = safeUrl(data.businessUrl);
+          if (businessUrl && cta) cta.href = businessUrl;
+
+          // Single review: centre it. Multiple: let the grid flow.
+          const single = reviews.length === 1;
+          grid.className = single
+            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 [&>*:first-child]:md:col-start-2 [&>*:first-child]:lg:col-start-2'
+            : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+
+          grid.innerHTML = reviews.map((r) => {
             const photo = safeUrl(r.authorPhoto);
-            const link = safeUrl(r.googleUrl);
             const photoEl = photo
               ? `<img src="${esc(photo)}" alt="" class="w-12 h-12 rounded-full object-cover" referrerpolicy="no-referrer" />`
               : `<div class="w-12 h-12 rounded-full bg-accent/15 text-accent flex items-center justify-center font-semibold text-lg">${esc(initials(r.author))}</div>`;
-            return `<div class="swiper-slide">
-              <div class="rounded-xl bg-body-light-1 dark:bg-primary-dark-2 p-7 shadow-card-1 h-full flex flex-col">
-                <div class="flex items-center gap-4 mb-4">${photoEl}
-                  <div>
-                    <p class="font-semibold text-body-light-12 dark:text-body-dark-12">${esc(r.author)}</p>
-                    <p class="text-xs text-body-light-10 dark:text-body-dark-10">${esc(r.relativeTime || '')}</p>
-                  </div>
+            return `<div class="rounded-xl bg-body-light-1 dark:bg-primary-dark-2 p-7 shadow-card-1 flex flex-col">
+              <div class="flex items-center gap-4 mb-4">${photoEl}
+                <div>
+                  <p class="font-semibold text-body-light-12 dark:text-body-dark-12">${esc(r.author)}</p>
+                  <p class="text-xs text-body-light-10 dark:text-body-dark-10">${esc(r.relativeTime || '')}</p>
                 </div>
-                <div class="mb-3 text-accent">${stars(r.rating)}</div>
-                <p class="text-body-light-11 dark:text-body-dark-11 leading-relaxed flex-grow">${esc(truncate(r.text, 280))}</p>
-                ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" class="mt-4 text-xs text-accent hover:underline">View on Google →</a>` : ''}
               </div>
+              <div class="mb-3 text-accent">${stars(r.rating)}</div>
+              <p class="text-body-light-11 dark:text-body-dark-11 leading-relaxed flex-grow">${esc(truncate(r.text, 320))}</p>
             </div>`;
           }).join('');
-
-          // Point the CTA at the real place URL if Google returned one.
-          const placeLink = safeUrl((data.reviews || [])[0]?.googleUrl);
-          if (placeLink) document.getElementById('reviews-google-link').href = placeLink;
-
-          new Swiper('.reviews-carousel', {
-            slidesPerView: 1,
-            spaceBetween: 30,
-            navigation: { nextEl: '.reviews-carousel .swiper-button-next', prevEl: '.reviews-carousel .swiper-button-prev' },
-            breakpoints: {
-              640: { slidesPerView: 2, spaceBetween: 30 },
-              1024: { slidesPerView: 3, spaceBetween: 30 },
-            },
-          });
         } catch (err) {
           if (loading) loading.classList.add('hidden');
           if (empty) empty.classList.remove('hidden');
