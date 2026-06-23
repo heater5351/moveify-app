@@ -22,6 +22,22 @@ what to know now, links).
 
 ---
 
+## 2026-06-23 — GP reassessment report: new hand-maintained template + tokens
+
+- **Replaced `backend/assets/GP_Reassessment_Template.docx`** with Ryan's hand-edited
+  version. The cover-letter prose and the clinician sign-off (name/quals/phone/email) are
+  now **baked into the template**, so those tokens (`cover_letter`, `clinician_*`) are gone.
+- **New tokens wired** in `services/scribe-gp-reassessment-docx.js`: `practice_email`,
+  `patient_first_name` (split from the full name), `appointment_date` (defaults to the
+  reassessment date), and `initial_assessment_date` / `reassessment_date` (rename of
+  `baseline_date` / `latest_date`).
+- **Frontend (`GPReassessmentPreview.tsx`):** added a Practice-email input; removed the
+  now-dead Cover-Letter textarea (prose lives in the template). `extractLetterMeta`
+  (`scribe-llm.js`) + the `meta` type now also pull the practice email from an uploaded
+  prior report.
+- **Know now:** the template is **maintained by hand** — edit `GP_Reassessment_Template.docx`
+  directly (don't run `scripts/build-gp-reassessment-template.js`; it's flagged SUPERSEDED).
+
 ## 2026-06-23 — Split CLAUDE.md into lean root + docs/ reference files (progressive disclosure)
 
 - **`CLAUDE.md` cut from 595 → 230 lines** (~61% smaller). Detail sections moved verbatim

@@ -1,6 +1,13 @@
 /**
  * One-off generator for backend/assets/GP_Reassessment_Template.docx.
  *
+ * ⚠ SUPERSEDED (2026-06-23): the live GP_Reassessment_Template.docx is now
+ * maintained by hand in Word/LibreOffice (cover-letter prose + clinician sign-off
+ * baked in; added practice_email / patient_first_name / appointment_date /
+ * initial_assessment_date / reassessment_date tokens). Do NOT run this script
+ * against the live file — it would overwrite the hand-edited template with the
+ * older programmatic layout. Kept for reference only.
+ *
  * The GP-facing companion to the patient reassessment handout: same before/after
  * comparison engine, but written clinician-to-GP and laid out as a formal referral
  * letter. Blends the reassessment handout's brand styling (handout-kit.js masthead,

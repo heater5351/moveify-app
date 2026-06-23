@@ -39,16 +39,6 @@ function mergeComparison(comparison: string, newFindings: string): string {
   return [comparison, ...extras].filter(Boolean).join('\n');
 }
 
-// Default transmittal cover-letter body (editable). Mirrors the server fallback.
-function defaultCover(patient: string, baselineDate: string, latestDate: string): string {
-  const p = patient || 'the patient';
-  return (
-    `Thank you for your ongoing care of ${p}. Please find enclosed an Exercise Physiology reassessment report following their review${latestDate ? ` on ${latestDate}` : ''}.\n\n` +
-    `This report compares ${p}'s current objective measures against their baseline assessment${baselineDate ? ` of ${baselineDate}` : ''}, and summarises their progress, the clinical interpretation of those changes, and recommendations for the next phase of care.\n\n` +
-    `I would be glad to discuss any aspect of this report. Thank you for the opportunity to be involved in ${p}'s care.`
-  );
-}
-
 const TEAL = '#46c1c0';
 
 export default function GPReassessmentPreview({
@@ -70,9 +60,9 @@ export default function GPReassessmentPreview({
   const [gpName, setGpName] = useState(m.gpName || '');
   const [practiceName, setPracticeName] = useState(m.practiceName || '');
   const [practiceAddress, setPracticeAddress] = useState(m.practiceAddress || '');
+  const [practiceEmail, setPracticeEmail] = useState(m.practiceEmail || '');
   const [patientNameField, setPatientNameField] = useState(patientName || m.patientName || '');
   const [dobField, setDobField] = useState(dob || m.dob || '');
-  const [coverLetter, setCoverLetter] = useState(() => defaultCover(patientName, baselineDate, latestDate));
 
   const [blob, setBlob] = useState<Blob | null>(null);
   const [rendering, setRendering] = useState(false);
@@ -94,10 +84,9 @@ export default function GPReassessmentPreview({
     try {
       const docx = await fetchReassessmentDocx(sessionId, {
         variant: 'gp',
-        gpName, practiceName, practiceAddress,
+        gpName, practiceName, practiceAddress, practiceEmail,
         patientName: patientNameField, dob: dobField,
         baselineDate, latestDate,
-        coverLetter,
         executiveSummary: execSummary,
         clinicalInterpretation: interpretation,
         recommendations,
@@ -116,7 +105,7 @@ export default function GPReassessmentPreview({
     } finally {
       setRendering(false);
     }
-  }, [sessionId, gpName, practiceName, practiceAddress, patientNameField, dobField, baselineDate, latestDate, coverLetter, execSummary, interpretation, recommendations, comparison]);
+  }, [sessionId, gpName, practiceName, practiceAddress, practiceEmail, patientNameField, dobField, baselineDate, latestDate, execSummary, interpretation, recommendations, comparison]);
 
   useEffect(() => {
     const t = setTimeout(generateAndRender, 700);
@@ -195,15 +184,11 @@ export default function GPReassessmentPreview({
             <input className={input} placeholder="GP surname (e.g. Patel)" value={gpName} onChange={e => setGpName(e.target.value)} />
             <input className={input} placeholder="Practice name" value={practiceName} onChange={e => setPracticeName(e.target.value)} />
             <input className={input} placeholder="Practice address" value={practiceAddress} onChange={e => setPracticeAddress(e.target.value)} />
+            <input className={input} placeholder="Practice email" value={practiceEmail} onChange={e => setPracticeEmail(e.target.value)} />
             <div className="flex gap-2">
               <input className={input} placeholder="Patient name" value={patientNameField} onChange={e => setPatientNameField(e.target.value)} />
               <input className={input} placeholder="DOB" value={dobField} onChange={e => setDobField(e.target.value)} />
             </div>
-          </div>
-
-          <div>
-            <p className={fieldLabel}>Cover Letter <span className="normal-case font-normal text-gray-400">(page 1)</span></p>
-            <textarea value={coverLetter} onChange={e => setCoverLetter(e.target.value)} rows={6} className={textarea} />
           </div>
 
           <div>
