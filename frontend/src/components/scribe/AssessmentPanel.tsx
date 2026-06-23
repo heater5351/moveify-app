@@ -40,8 +40,9 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
   const [status, setStatus] = useState<Record<string, SaveState>>({});
   const [focused, setFocused] = useState<FieldRef | null>(null);
   const [buffer, setBuffer] = useState('');
-  // In-progress attempts for the focused multi-trial measure (HHD/grip/hops/SEBT).
-  const [trials, setTrials] = useState<number[]>([]);
+  // In-progress attempts for the focused multi-trial measure (HHD/grip/hops/SEBT),
+  // kept per side so a bilateral test (grip) can alternate R-L-R-L in one picker.
+  const [trialsBySide, setTrialsBySide] = useState<Record<string, number[]>>({});
   const [runnerKey, setRunnerKey] = useState<string | null>(null);
   // PROMs (patient-completed outcome measures)
   const [proms, setProms] = useState<PromCatalogEntry[]>([]);
@@ -131,6 +132,13 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
     const d = recorded[valueKey(selected.key, measureKey, side)]?.detail as TrialDetail | undefined;
     return Array.isArray(d?.trials) ? d!.trials : [];
   }
+  // Load any already-saved trials for every side of a measure (so reopening shows them).
+  function loadTrialsBySide(m: CatalogMeasure): Record<string, number[]> {
+    if (!selected) return {};
+    const out: Record<string, number[]> = {};
+    for (const s of sidesOf(selected, m)) out[s] = loadTrialsFor(m.key, s);
+    return out;
+  }
 
   // Store an aggregate measure — the server recomputes mean/max from the raw trials.
   async function saveTrials(m: CatalogMeasure, side: MeasurementSide, trialArr: number[]) {
@@ -152,11 +160,17 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
     if (!selected || !focused) return;
     const m = selected.measures.find(x => x.key === focused.measureKey);
     if (!m) return;
-    // Multi-trial: store the accumulated attempts (+ the un-added buffer, if any).
+    // Multi-trial: save every side that has attempts; the un-added buffer (if any)
+    // goes to the currently active side.
     if (m.trials) {
-      const extra = buffer !== '' && Number.isFinite(Number(buffer)) ? [clampVal(m, Number(buffer))] : [];
-      const all = [...trials, ...extra];
-      if (all.length > 0) saveTrials(m, focused.side, all);
+      const byside: Record<string, number[]> = { ...trialsBySide };
+      if (buffer !== '' && Number.isFinite(Number(buffer))) {
+        byside[focused.side] = [...(byside[focused.side] ?? []), clampVal(m, Number(buffer))];
+      }
+      for (const s of sidesOf(selected, m)) {
+        const arr = byside[s] ?? [];
+        if (arr.length > 0) saveTrials(m, s as MeasurementSide, arr);
+      }
       return;
     }
     if (buffer === '') return;
@@ -178,17 +192,17 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
     setFocused(field);
     setBuffer('');
     const m = selected?.measures.find(x => x.key === field.measureKey);
-    setTrials(m?.trials ? loadTrialsFor(field.measureKey, field.side) : []);
+    setTrialsBySide(m?.trials ? loadTrialsBySide(m) : {});
   }
   function advanceFrom(field: FieldRef) {
-    if (!selected) { setFocused(null); setBuffer(''); setTrials([]); return; }
+    if (!selected) { setFocused(null); setBuffer(''); setTrialsBySide({}); return; }
     const order = fieldOrder(selected);
     const idx = order.findIndex(f => f.measureKey === field.measureKey && f.side === field.side);
     const next = order[idx + 1] ?? null;
     setFocused(next);
     setBuffer('');
     const m = next ? selected.measures.find(x => x.key === next.measureKey) : null;
-    setTrials(m?.trials ? loadTrialsFor(next.measureKey, next.side) : []);
+    setTrialsBySide(m?.trials ? loadTrialsBySide(m) : {});
   }
 
   async function clear(measureKey: string, side: MeasurementSide) {
@@ -211,16 +225,25 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
   const pressSlash = () => setBuffer(b => (mode === 'compound' && b !== '' && !b.includes('/') ? b + '/' : b));
   const pressBackspace = () => setBuffer(b => b.slice(0, -1));
   const pressNext = () => { if (!focused) return; commitFocused(); advanceFrom(focused); };
-  const pressDone = () => { commitFocused(); setFocused(null); setBuffer(''); setTrials([]); };
-  // Multi-trial: bank the current attempt, then keep entering until `trials` is full.
+  const pressDone = () => { commitFocused(); setFocused(null); setBuffer(''); setTrialsBySide({}); };
+  // Multi-trial: bank the current attempt to the active side, then (bilateral) auto-flip
+  // to the other side so grip/HHD alternate R-L-R-L without extra taps.
   const pressAddTrial = () => {
-    if (!focusedMeasure || buffer === '') return;
+    if (!focusedMeasure || !focused || !selected || buffer === '') return;
     const n = clampVal(focusedMeasure, Number(buffer));
-    if (!Number.isFinite(n) || trials.length >= (focusedMeasure.trials ?? 1)) return;
-    setTrials(t => [...t, n]);
+    const as = focused.side;
+    const cap = focusedMeasure.trials ?? 1;
+    if (!Number.isFinite(n) || (trialsBySide[as]?.length ?? 0) >= cap) return;
+    setTrialsBySide(t => ({ ...t, [as]: [...(t[as] ?? []), n] }));
     setBuffer('');
+    const sides = sidesOf(selected, focusedMeasure);
+    if (sides.length === 2) {
+      const otherSide: MeasurementSide = as === 'left' ? 'right' : 'left';
+      if ((trialsBySide[otherSide]?.length ?? 0) < cap) setFocused({ measureKey: focused.measureKey, side: otherSide });
+    }
   };
-  const removeTrial = (i: number) => setTrials(t => t.filter((_, idx) => idx !== i));
+  const removeTrial = (side: MeasurementSide, i: number) =>
+    setTrialsBySide(t => ({ ...t, [side]: (t[side] ?? []).filter((_, idx) => idx !== i) }));
 
   const pickPreset = (value: number) => {
     if (!focusedMeasure || !focused) return;
@@ -249,7 +272,7 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
     else if (mode !== 'toggle') bigDisplay = buffer !== '' ? buffer : (focusedRow ? fmtVal(focusedRow.value) : '');
   }
   const multiTrial = !!focusedMeasure?.trials;
-  const trialMean = multiTrial && trials.length ? aggregateOf(trials, focusedMeasure!.aggregate ?? 'mean') : null;
+  const trialSides: MeasurementSide[] = (multiTrial && selected && focusedMeasure) ? sidesOf(selected, focusedMeasure) : [];
 
   const recordedList = Object.values(recorded);
   const recordedCount = recordedList.length;
@@ -435,6 +458,7 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                     <button
                       key={a.key}
                       onClick={() => {
+                        setTrialsBySide({}); // clear any in-progress trials from a prior measure
                         if (a.instrument) { setRunnerKey(a.key); setSelectedKey(null); setFocused(null); }
                         else if (a.layout === 'table') {
                           // ROM table is the overview — show it first, tap a cell to enter.
@@ -446,6 +470,15 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                           setBuffer('');
                           const m = a.measures[0];
                           setFocused({ measureKey: m.key, side: sidesOf(a, m)[0] });
+                          // Preload any trials already saved for this measure's sides.
+                          if (m.trials) {
+                            const out: Record<string, number[]> = {};
+                            for (const s of sidesOf(a, m)) {
+                              const d = recorded[valueKey(a.key, m.key, s)]?.detail as TrialDetail | undefined;
+                              out[s] = Array.isArray(d?.trials) ? d!.trials : [];
+                            }
+                            setTrialsBySide(out);
+                          }
                         }
                       }}
                       className={`min-h-20 rounded-2xl px-4 py-3 border-2 transition text-left flex flex-col justify-center active:scale-[0.98] ${
@@ -608,7 +641,6 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                   {mode === 'presets' ? 'Tap a value'
                     : mode === 'toggle' ? 'Tap a result'
                     : mode === 'compound' ? 'Type systolic · / · diastolic'
-                    : multiTrial ? `Range ${focusedMeasure.min}–${focusedMeasure.max}${unitLabel(focusedMeasure.unit)} · enter each attempt, tap Add`
                     : `Range ${focusedMeasure.min}–${focusedMeasure.max}${unitLabel(focusedMeasure.unit)}`}
                 </p>
 
@@ -617,25 +649,41 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                 )}
 
                 {multiTrial && (
-                  <div className="mb-3">
-                    <div className="flex flex-wrap items-center gap-1.5 justify-center">
-                      {Array.from({ length: focusedMeasure.trials ?? 1 }).map((_, i) => (
+                  <div className="mb-3 space-y-1.5">
+                    {trialSides.map(side => {
+                      const arr = trialsBySide[side] ?? [];
+                      const mean = arr.length ? aggregateOf(arr, focusedMeasure.aggregate ?? 'mean') : null;
+                      const isActive = side === focused.side;
+                      const sideLabel = side === 'left' ? 'Left' : side === 'right' ? 'Right' : '';
+                      return (
                         <button
-                          key={i}
+                          key={side}
                           type="button"
-                          onClick={() => trials[i] != null && removeTrial(i)}
-                          className={`min-w-12 h-9 px-2 rounded-lg text-sm font-mono font-semibold border-2 transition ${
-                            trials[i] != null ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-dashed border-gray-200 text-gray-300'
-                          }`}
+                          onClick={() => setFocused({ measureKey: focused.measureKey, side })}
+                          className={`w-full flex items-center gap-2 rounded-xl border-2 px-2.5 py-1.5 transition ${isActive ? 'border-primary-400 bg-primary-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
                         >
-                          {trials[i] != null ? fmtVal(trials[i]) : `#${i + 1}`}
+                          {trialSides.length === 2 && (
+                            <span className={`text-xs font-bold w-9 shrink-0 text-left ${isActive ? 'text-primary-700' : 'text-gray-400'}`}>{sideLabel}</span>
+                          )}
+                          <span className="flex items-center gap-1 flex-1 flex-wrap">
+                            {Array.from({ length: focusedMeasure.trials ?? 1 }).map((_, i) => (
+                              <span
+                                key={i}
+                                onClick={e => { e.stopPropagation(); if (arr[i] != null) removeTrial(side, i); }}
+                                className={`min-w-9 h-7 px-1.5 inline-flex items-center justify-center rounded text-xs font-mono font-semibold border ${arr[i] != null ? 'border-primary-300 bg-white text-primary-700' : 'border-dashed border-gray-200 text-gray-300'}`}
+                              >
+                                {arr[i] != null ? fmtVal(arr[i]) : `#${i + 1}`}
+                              </span>
+                            ))}
+                          </span>
+                          <span className="text-[11px] text-gray-500 shrink-0 w-20 text-right">
+                            {mean != null && <>{focusedMeasure.aggregate === 'max' ? 'best ' : 'mean '}<span className="font-bold text-secondary-700">{fmtVal(mean)}{unitLabel(focusedMeasure.unit)}</span></>}
+                          </span>
                         </button>
-                      ))}
-                    </div>
-                    <p className="text-[11px] text-center mt-1.5 text-gray-500">
-                      {trials.length > 0
-                        ? <>{focusedMeasure.aggregate === 'max' ? 'Best' : 'Mean'} <span className="font-bold text-secondary-700">{fmtVal(trialMean ?? 0)}{unitLabel(focusedMeasure.unit)}</span> · tap a chip to remove</>
-                        : `${focusedMeasure.aggregate === 'max' ? 'Best' : 'Mean'} of up to ${focusedMeasure.trials} attempts`}
+                      );
+                    })}
+                    <p className="text-[11px] text-gray-400 text-center">
+                      Enter each attempt, tap Add{trialSides.length === 2 ? ' — sides alternate automatically. Tap a chip to remove.' : '. Tap a chip to remove.'}
                     </p>
                   </div>
                 )}
