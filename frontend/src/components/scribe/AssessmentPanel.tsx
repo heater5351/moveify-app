@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Loader2, X, AlertCircle, Delete, ArrowRight, ClipboardList, ClipboardCheck } from 'lucide-react';
+import { Check, Loader2, X, AlertCircle, Delete, ArrowRight, Plus, ClipboardList, ClipboardCheck } from 'lucide-react';
 import {
   fetchAssessmentCatalog, fetchMeasurements, saveMeasurement, deleteMeasurement,
   fetchPromCatalog, fetchSessionOutcomes, getKioskPinSet, setKioskPin,
   type AssessmentCatalogEntry, type CatalogMeasure, type Measurement, type MeasurementSide,
-  type PromCatalogEntry, type OutcomeResult,
+  type PromCatalogEntry, type OutcomeResult, type TrialDetail, type InstrumentDetail,
 } from '../../utils/scribe-api';
 import InstrumentRunner from './InstrumentRunner';
 import PromKiosk from './PromKiosk';
@@ -40,6 +40,8 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
   const [status, setStatus] = useState<Record<string, SaveState>>({});
   const [focused, setFocused] = useState<FieldRef | null>(null);
   const [buffer, setBuffer] = useState('');
+  // In-progress attempts for the focused multi-trial measure (HHD/grip/hops/SEBT).
+  const [trials, setTrials] = useState<number[]>([]);
   const [runnerKey, setRunnerKey] = useState<string | null>(null);
   // PROMs (patient-completed outcome measures)
   const [proms, setProms] = useState<PromCatalogEntry[]>([]);
@@ -120,10 +122,44 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
     }
   }
 
+  // ── Multi-trial helpers (HHD/grip → mean of 3, hops → mean of 2, SEBT → max of 3) ──
+  const clampVal = (m: CatalogMeasure, n: number) => Math.min(m.max, Math.max(m.min, n));
+  const aggregateOf = (vals: number[], method: 'mean' | 'max') =>
+    vals.length === 0 ? null : method === 'max' ? Math.max(...vals) : Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
+  function loadTrialsFor(measureKey: string, side: MeasurementSide): number[] {
+    if (!selected) return [];
+    const d = recorded[valueKey(selected.key, measureKey, side)]?.detail as TrialDetail | undefined;
+    return Array.isArray(d?.trials) ? d!.trials : [];
+  }
+
+  // Store an aggregate measure — the server recomputes mean/max from the raw trials.
+  async function saveTrials(m: CatalogMeasure, side: MeasurementSide, trialArr: number[]) {
+    if (!selected || trialArr.length === 0) return;
+    const k = valueKey(selected.key, m.key, side);
+    setStatus(st => ({ ...st, [k]: 'saving' }));
+    try {
+      const sid = sessionIdRef.current ?? (await ensureSession());
+      if (!sid) throw new Error('No session');
+      const saved = await saveMeasurement(sid, { assessmentKey: selected.key, measureKey: m.key, side, trials: trialArr });
+      setRecorded(r => ({ ...r, [k]: saved }));
+      setStatus(st => { const n = { ...st }; delete n[k]; return n; });
+    } catch {
+      setStatus(st => ({ ...st, [k]: 'error' }));
+    }
+  }
+
   function commitFocused() {
-    if (!selected || !focused || buffer === '') return;
+    if (!selected || !focused) return;
     const m = selected.measures.find(x => x.key === focused.measureKey);
     if (!m) return;
+    // Multi-trial: store the accumulated attempts (+ the un-added buffer, if any).
+    if (m.trials) {
+      const extra = buffer !== '' && Number.isFinite(Number(buffer)) ? [clampVal(m, Number(buffer))] : [];
+      const all = [...trials, ...extra];
+      if (all.length > 0) saveTrials(m, focused.side, all);
+      return;
+    }
+    if (buffer === '') return;
     if (inputMode(m) === 'compound') {
       const [s, d] = buffer.split('/');
       const sys = Number(s), dia = Number(d);
@@ -133,17 +169,26 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
       }
     } else {
       const n = Number(buffer);
-      if (Number.isFinite(n)) save(m, focused.side, Math.min(m.max, Math.max(m.min, n)));
+      if (Number.isFinite(n)) save(m, focused.side, clampVal(m, n));
     }
   }
 
-  function focusField(field: FieldRef) { commitFocused(); setFocused(field); setBuffer(''); }
+  function focusField(field: FieldRef) {
+    commitFocused();
+    setFocused(field);
+    setBuffer('');
+    const m = selected?.measures.find(x => x.key === field.measureKey);
+    setTrials(m?.trials ? loadTrialsFor(field.measureKey, field.side) : []);
+  }
   function advanceFrom(field: FieldRef) {
-    if (!selected) { setFocused(null); setBuffer(''); return; }
+    if (!selected) { setFocused(null); setBuffer(''); setTrials([]); return; }
     const order = fieldOrder(selected);
     const idx = order.findIndex(f => f.measureKey === field.measureKey && f.side === field.side);
-    setFocused(order[idx + 1] ?? null);
+    const next = order[idx + 1] ?? null;
+    setFocused(next);
     setBuffer('');
+    const m = next ? selected.measures.find(x => x.key === next.measureKey) : null;
+    setTrials(m?.trials ? loadTrialsFor(next.measureKey, next.side) : []);
   }
 
   async function clear(measureKey: string, side: MeasurementSide) {
@@ -166,7 +211,16 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
   const pressSlash = () => setBuffer(b => (mode === 'compound' && b !== '' && !b.includes('/') ? b + '/' : b));
   const pressBackspace = () => setBuffer(b => b.slice(0, -1));
   const pressNext = () => { if (!focused) return; commitFocused(); advanceFrom(focused); };
-  const pressDone = () => { commitFocused(); setFocused(null); setBuffer(''); };
+  const pressDone = () => { commitFocused(); setFocused(null); setBuffer(''); setTrials([]); };
+  // Multi-trial: bank the current attempt, then keep entering until `trials` is full.
+  const pressAddTrial = () => {
+    if (!focusedMeasure || buffer === '') return;
+    const n = clampVal(focusedMeasure, Number(buffer));
+    if (!Number.isFinite(n) || trials.length >= (focusedMeasure.trials ?? 1)) return;
+    setTrials(t => [...t, n]);
+    setBuffer('');
+  };
+  const removeTrial = (i: number) => setTrials(t => t.filter((_, idx) => idx !== i));
 
   const pickPreset = (value: number) => {
     if (!focusedMeasure || !focused) return;
@@ -194,6 +248,8 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
     if (mode === 'compound') bigDisplay = buffer !== '' ? buffer : (focusedRow ? `${fmtVal(focusedRow.value)}/${focusedRow.value2 != null ? fmtVal(focusedRow.value2) : ''}` : '');
     else if (mode !== 'toggle') bigDisplay = buffer !== '' ? buffer : (focusedRow ? fmtVal(focusedRow.value) : '');
   }
+  const multiTrial = !!focusedMeasure?.trials;
+  const trialMean = multiTrial && trials.length ? aggregateOf(trials, focusedMeasure!.aggregate ?? 'mean') : null;
 
   const recordedList = Object.values(recorded);
   const recordedCount = recordedList.length;
@@ -515,7 +571,7 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                 assessment={a}
                 sessionId={sessionId}
                 ensureSession={ensureSession}
-                initialDetail={existing?.detail ?? null}
+                initialDetail={(existing?.detail as InstrumentDetail | undefined) ?? null}
                 onClose={() => setRunnerKey(null)}
                 onSaved={(m) => setRecorded(r => ({ ...r, [valueKey(m.assessment_key, m.measure_key, m.side)]: m }))}
               />
@@ -552,8 +608,37 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                   {mode === 'presets' ? 'Tap a value'
                     : mode === 'toggle' ? 'Tap a result'
                     : mode === 'compound' ? 'Type systolic · / · diastolic'
+                    : multiTrial ? `Range ${focusedMeasure.min}–${focusedMeasure.max}${unitLabel(focusedMeasure.unit)} · enter each attempt, tap Add`
                     : `Range ${focusedMeasure.min}–${focusedMeasure.max}${unitLabel(focusedMeasure.unit)}`}
                 </p>
+
+                {focusedMeasure.instruction && (
+                  <p className="text-[11px] text-secondary-600 bg-gray-50 border border-gray-100 rounded-lg px-2.5 py-2 mb-3 leading-relaxed">{focusedMeasure.instruction}</p>
+                )}
+
+                {multiTrial && (
+                  <div className="mb-3">
+                    <div className="flex flex-wrap items-center gap-1.5 justify-center">
+                      {Array.from({ length: focusedMeasure.trials ?? 1 }).map((_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => trials[i] != null && removeTrial(i)}
+                          className={`min-w-12 h-9 px-2 rounded-lg text-sm font-mono font-semibold border-2 transition ${
+                            trials[i] != null ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-dashed border-gray-200 text-gray-300'
+                          }`}
+                        >
+                          {trials[i] != null ? fmtVal(trials[i]) : `#${i + 1}`}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-center mt-1.5 text-gray-500">
+                      {trials.length > 0
+                        ? <>{focusedMeasure.aggregate === 'max' ? 'Best' : 'Mean'} <span className="font-bold text-secondary-700">{fmtVal(trialMean ?? 0)}{unitLabel(focusedMeasure.unit)}</span> · tap a chip to remove</>
+                        : `${focusedMeasure.aggregate === 'max' ? 'Best' : 'Mean'} of up to ${focusedMeasure.trials} attempts`}
+                    </p>
+                  </div>
+                )}
 
                 {mode === 'toggle' ? (
                   <div className="grid grid-cols-1 gap-2.5">
@@ -601,7 +686,9 @@ export default function AssessmentPanel({ sessionId, readOnly = false, ensureSes
                     {keypadKey('4', () => pressDigit('4'))}
                     {keypadKey('5', () => pressDigit('5'))}
                     {keypadKey('6', () => pressDigit('6'))}
-                    {keypadKey(<span className="flex items-center gap-1 text-sm"><ArrowRight className="w-4 h-4" />Next</span>, pressNext, 'bg-secondary-500 text-white hover:bg-secondary-600 row-span-2')}
+                    {multiTrial
+                      ? keypadKey(<span className="flex items-center gap-1 text-sm"><Plus className="w-4 h-4" />Add</span>, pressAddTrial, 'bg-secondary-500 text-white hover:bg-secondary-600 row-span-2')
+                      : keypadKey(<span className="flex items-center gap-1 text-sm"><ArrowRight className="w-4 h-4" />Next</span>, pressNext, 'bg-secondary-500 text-white hover:bg-secondary-600 row-span-2')}
                     {keypadKey('1', () => pressDigit('1'))}
                     {keypadKey('2', () => pressDigit('2'))}
                     {keypadKey('3', () => pressDigit('3'))}

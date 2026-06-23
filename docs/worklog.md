@@ -22,6 +22,23 @@ what to know now, links).
 
 ---
 
+## 2026-06-23 — Multi-trial averaging + standardized positions for strength tests
+
+- **HHD and grip are noisy single-tap reads — added 2–3 trial capture + server-side
+  aggregation.** A measure can now carry `trials` (N attempts) + `aggregate`
+  (`mean`/`max`) in `data/assessment-catalog.json`. The capture picker
+  (`AssessmentPanel.tsx`) collects the attempts (Add button, running mean, tap-to-
+  remove); the **backend recomputes the aggregate** (`services/measurement-trials.js`,
+  never trusts the client), stores it in `value`, and keeps the raw trials in the
+  existing `detail` JSONB. Applied: HHD + grip → **mean of 3**, hops → mean of 2,
+  SEBT → **max of 3**. No schema change; default (no `trials`) = old single-tap.
+- **Standardized test positions.** Measures can carry an `instruction` string
+  (position / dynamometer placement / make-test) surfaced in the capture picker.
+  Authored for every HHD test, grip, the hops and SEBT (positions per Mentiplay/
+  ASHT-style protocols; flags belt-fixation for the strong lower-limb tests where
+  hand-held under-reads).
+- Tests: `measurement-trials.test.mjs`. Backend 238 green.
+
 ## 2026-06-22 — Dynamometry, MMT & the Melbourne ACL Return-to-Sport Score (MRSS)
 
 - **Three new assessment families in the scribe Assessment panel**, all driven by

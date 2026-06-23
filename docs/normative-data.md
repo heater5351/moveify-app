@@ -1404,6 +1404,13 @@ as a neutral baseline.
 - **Own change over time** — the Assessment trends tab computes the kg change
   (≥ 3 kg counted as real, per `MIN_ABS_CHANGE`).
 
+**Capture protocol (in-app):** each HHD test (and grip) records the **mean of 3
+attempts** — server-aggregated, raw trials kept in `detail` — and shows a
+**standardized position/placement prompt** in the capture picker. Use a make test
+(ramp to max over 3–5 s); **belt-fix the strong lower-limb tests** (knee extension,
+hip) because hand-held dynamometry under-reads when the muscle out-powers the
+examiner. The hop tests average 2 trials; SEBT takes the best of 3.
+
 ## 4. References
 - Symmetry-based interpretation only — no population normative source applied.
   Protocol-specific norms may be added later where a cited source matches the

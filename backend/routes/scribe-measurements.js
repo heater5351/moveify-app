@@ -3,6 +3,7 @@ const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { loadCatalog, findMeasure } = require('../services/assessment-catalog');
 const { scoreInstrument, validateDetail } = require('../services/instrument-scoring');
+const { aggregateTrials } = require('../services/measurement-trials');
 const { buildSeries } = require('../services/measurement-series');
 const { getPatientDemographics } = require('../services/scribe-demographics');
 const audit = require('../services/audit');
@@ -97,6 +98,20 @@ router.post('/sessions/:sessionId/measurements', async (req, res) => {
       if (err) return res.status(400).json({ error: err });
       num = scoreInstrument(inst.items, req.body.detail).total;
       storeDetail = req.body.detail;
+    } else if (measure.trials && Array.isArray(req.body.trials)) {
+      // Multi-trial numeric measure (HHD, grip, hops, SEBT): the client sends the raw
+      // attempts; the aggregate is computed HERE (never trusted from the client) and
+      // the raw trials are kept in detail. Mean/max per the measure's `aggregate`.
+      const trials = req.body.trials.map(Number);
+      const cap = Number(measure.trials) || 1;
+      if (trials.length < 1 || trials.length > cap) {
+        return res.status(400).json({ error: `Provide 1–${cap} trial values` });
+      }
+      if (trials.some(t => !Number.isFinite(t) || t < measure.min || t > measure.max)) {
+        return res.status(400).json({ error: 'Trial value out of range' });
+      }
+      num = aggregateTrials(trials, measure.aggregate || 'mean');
+      storeDetail = { trials, aggregate: measure.aggregate || 'mean' };
     } else {
       num = Number(value);
       if (!Number.isFinite(num)) return res.status(400).json({ error: 'Value must be a number' });

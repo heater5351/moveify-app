@@ -226,7 +226,16 @@ export interface CatalogMeasure {
   max2?: number;
   /** Options for a toggle (pass/fail) measure. */
   options?: { value: number; label: string }[];
+  /** Capture N attempts and aggregate them (HHD/grip → mean of 3, hops → mean of 2, SEBT → max of 3). */
+  trials?: number;
+  /** How multiple trials combine into the stored value. */
+  aggregate?: 'mean' | 'max';
+  /** Standardised position/placement prompt shown in the capture picker. */
+  instruction?: string;
 }
+
+/** Stored breakdown for a multi-trial measure: the raw attempts behind the aggregate. */
+export interface TrialDetail { trials: number[]; aggregate: 'mean' | 'max' }
 
 export interface InstrumentItemOption { value: number; label: string }
 export interface InstrumentItem {
@@ -271,7 +280,7 @@ export interface Measurement {
   value: number;
   value2: number | null;
   unit: string | null;
-  detail?: InstrumentDetail | null;
+  detail?: InstrumentDetail | TrialDetail | null;
   recorded_at: string;
 }
 
@@ -385,7 +394,7 @@ export async function fetchMeasurements(sessionId: number): Promise<Measurement[
 
 export async function saveMeasurement(
   sessionId: number,
-  body: { assessmentKey: string; measureKey: string; side: MeasurementSide; value: number; value2?: number | null },
+  body: { assessmentKey: string; measureKey: string; side: MeasurementSide; value?: number; value2?: number | null; trials?: number[] },
 ): Promise<Measurement> {
   const res = await apiFetch(`/sessions/${sessionId}/measurements`, {
     method: 'POST',
