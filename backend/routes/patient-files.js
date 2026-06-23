@@ -16,6 +16,17 @@ const fileStore = require('../lib/patient-file-store');
 const router = express.Router();
 router.use(authenticate, requireRole('clinician'));
 
+// Reject non-integer path params up front with a clean 400 (otherwise a value
+// like "abc" hits a Postgres integer-cast error and surfaces as a generic 500).
+router.param('patientId', (req, res, next, val) => {
+  if (!/^\d+$/.test(val)) return res.status(400).json({ error: 'Invalid patient id' });
+  next();
+});
+router.param('fileId', (req, res, next, val) => {
+  if (!/^\d+$/.test(val)) return res.status(400).json({ error: 'Invalid file id' });
+  next();
+});
+
 // In-memory only — bytes go straight to GCS, never to disk. 25 MB cap.
 const MAX_BYTES = 25 * 1024 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_BYTES } });

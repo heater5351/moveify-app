@@ -627,7 +627,8 @@ router.put('/:patientId', requireRole('clinician'), async (req, res) => {
     // Field omitted (undefined) → preserve existing via COALESCE; '' → clear;
     // a value → set. Cliniko-owned fields (title/preferred_name/occupation/
     // medicare/referral/dva/pronouns) may be re-overwritten on the next sync.
-    const u = (v) => (v === undefined ? null : v);
+    const u = (v) => (v === undefined ? null : v);                                    // preserve on undefined, '' clears
+    const clip = (v, max = 200) => (v === undefined ? null : String(v).slice(0, max)); // same + length-bound
     await db.query(
       `UPDATE users SET
          name = $1, dob = $2, email = $3, phone = $4, address = $5,
@@ -647,10 +648,10 @@ router.put('/:patientId', requireRole('clinician'), async (req, res) => {
          dva_number = COALESCE($19, dva_number)
        WHERE id = $20`,
       [name, dob, email, phone || null, address || null, u(sex),
-       u(title), u(preferredName), u(pronouns), u(occupation),
-       u(emergencyContactName), u(emergencyContactRelationship), u(emergencyContactPhone),
-       u(referralSource), u(referringGp), u(medicareNumber),
-       u(privateHealthFund), u(privateHealthMemberNumber), u(dvaNumber),
+       clip(title), clip(preferredName), clip(pronouns), clip(occupation),
+       clip(emergencyContactName), clip(emergencyContactRelationship), clip(emergencyContactPhone),
+       clip(referralSource, 300), clip(referringGp), clip(medicareNumber),
+       clip(privateHealthFund), clip(privateHealthMemberNumber), clip(dvaNumber),
        patientId]
     );
 
