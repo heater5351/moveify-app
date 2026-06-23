@@ -226,7 +226,16 @@ export interface CatalogMeasure {
   max2?: number;
   /** Options for a toggle (pass/fail) measure. */
   options?: { value: number; label: string }[];
+  /** Capture N attempts and aggregate them (HHD/grip → mean of 3, hops → mean of 2, SEBT → max of 3). */
+  trials?: number;
+  /** How multiple trials combine into the stored value. */
+  aggregate?: 'mean' | 'max';
+  /** Standardised position/placement prompt shown in the capture picker. */
+  instruction?: string;
 }
+
+/** Stored breakdown for a multi-trial measure: the raw attempts behind the aggregate. */
+export interface TrialDetail { trials: number[]; aggregate: 'mean' | 'max' }
 
 export interface InstrumentItemOption { value: number; label: string }
 export interface InstrumentItem {
@@ -271,7 +280,7 @@ export interface Measurement {
   value: number;
   value2: number | null;
   unit: string | null;
-  detail?: InstrumentDetail | null;
+  detail?: InstrumentDetail | TrialDetail | null;
   recorded_at: string;
 }
 
@@ -385,7 +394,7 @@ export async function fetchMeasurements(sessionId: number): Promise<Measurement[
 
 export async function saveMeasurement(
   sessionId: number,
-  body: { assessmentKey: string; measureKey: string; side: MeasurementSide; value: number; value2?: number | null },
+  body: { assessmentKey: string; measureKey: string; side: MeasurementSide; value?: number; value2?: number | null; trials?: number[] },
 ): Promise<Measurement> {
   const res = await apiFetch(`/sessions/${sessionId}/measurements`, {
     method: 'POST',
@@ -443,4 +452,55 @@ export async function generateReport(
   } finally {
     clearTimeout(timer);
   }
+}
+
+// ── Melbourne ACL Return-to-Sport Score (MRSS) ───────────────────────────────
+
+export interface MrssPartAComponent {
+  key: string; label: string; value: number | null; points: number; max: number;
+  involved?: number | null; uninvolved?: number | null; deficit?: number | null;
+}
+export interface MrssPartCComponent {
+  key: string; label: string; type: 'lsi' | 'lsiComposite' | 'direct'; max: number; points: number;
+  value: number | null; involved: number | null; uninvolved: number | null; lsi: number | null;
+}
+export interface MrssResult {
+  version: string;
+  passThreshold: number;
+  involvedSide: 'left' | 'right';
+  involvedIsDominant: boolean;
+  partA: { max: number; points: number; components: MrssPartAComponent[] };
+  partB: { max: number; points: number; ikdcRaw: number | null; available: boolean };
+  partC: { max: number; points: number; components: MrssPartCComponent[] };
+  total: number;
+  scorePass: boolean;
+  missing: string[];
+  complete: boolean;
+}
+export interface MrssOpts { involvedSide: 'left' | 'right'; involvedIsDominant: boolean }
+
+export async function generateMrss(sessionId: number, opts: MrssOpts): Promise<MrssResult> {
+  const res = await apiFetch(`/sessions/${sessionId}/mrss/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(opts),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'MRSS scoring failed');
+  }
+  return res.json();
+}
+
+export async function fetchMrssDocx(sessionId: number, body: Record<string, unknown>): Promise<Blob> {
+  const res = await apiFetch(`/sessions/${sessionId}/mrss/docx`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'MRSS DOCX generation failed');
+  }
+  return res.blob();
 }

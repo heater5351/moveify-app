@@ -22,6 +22,69 @@ what to know now, links).
 
 ---
 
+## 2026-06-23 — Split CLAUDE.md into lean root + docs/ reference files (progressive disclosure)
+
+- **`CLAUDE.md` cut from 595 → 230 lines** (~61% smaller). Detail sections moved verbatim
+  into `docs/` reference files read on demand, keeping only what every session needs in the
+  root (security warnings, architecture, conventions, nav/state rules, commands, branches).
+- **New `docs/` files:** `billing-worker.md`, `agreement-automation.md`, `auth-security.md`,
+  `api-routes.md`, `database-schema.md`, `cliniko-sync.md`, `environment-variables.md`,
+  `exercise-naming.md`, `privacy-compliance.md`, `clinic-website.md`, `deployment-workflow.md`.
+- **Nothing rewritten** — content moved as-is; each root section replaced with a one-line
+  pointer + 1-sentence "when to read it". Cross-references between docs updated to new paths
+  (e.g. `database-schema.md` points to `docs/auth-security.md` for shared-email login).
+- Motivation: reduce per-turn context tokens (CLAUDE.md loads on every message). See the
+  "Keeping context fresh" rule — treat a contradiction between code and any of these docs
+  as a bug to fix, not to work around.
+
+## 2026-06-23 — Multi-trial averaging + standardized positions for strength tests
+
+- **HHD and grip are noisy single-tap reads — added 2–3 trial capture + server-side
+  aggregation.** A measure can now carry `trials` (N attempts) + `aggregate`
+  (`mean`/`max`) in `data/assessment-catalog.json`. The capture picker
+  (`AssessmentPanel.tsx`) collects the attempts (Add button, running mean, tap-to-
+  remove); the **backend recomputes the aggregate** (`services/measurement-trials.js`,
+  never trusts the client), stores it in `value`, and keeps the raw trials in the
+  existing `detail` JSONB. Applied: HHD + grip → **mean of 3**, hops → mean of 2,
+  SEBT → **max of 3**. No schema change; default (no `trials`) = old single-tap.
+- **Standardized test positions.** Measures can carry an `instruction` string
+  (position / dynamometer placement / make-test) surfaced in the capture picker.
+  Authored for every HHD test, grip, the hops and SEBT (positions per Mentiplay/
+  ASHT-style protocols; flags belt-fixation for the strong lower-limb tests where
+  hand-held under-reads).
+- Tests: `measurement-trials.test.mjs`. Backend 238 green.
+
+## 2026-06-22 — Dynamometry, MMT & the Melbourne ACL Return-to-Sport Score (MRSS)
+
+- **Three new assessment families in the scribe Assessment panel**, all driven by
+  `data/assessment-catalog.json` + `data/normative-data.json` (the panel UI is
+  data-driven, so most of this is JSON, not code):
+  - **Joint isometric dynamometry** (HHD): `shoulder_dynamometry`, `hip_dynamometry`,
+    `knee_dynamometry` — keypad kg tables.
+  - **Manual Muscle Testing** (Oxford 0–5): `shoulder_mmt`/`hip_mmt`/`knee_mmt`/
+    `ankle_mmt` — presets 0–5 tables. New `grade` unit (renders with no suffix) added
+    to the unit maps in `measurement-render.js`, `normative-data.js`, `AssessmentPanel.tsx`.
+  - **MRSS components**: `acl_knee_exam` (effusion/Lachman/pivot toggles +
+    extension-deficit), hop tests, `sebt` table, `less_landing` (reuses the instrument
+    runner), and a new **IKDC** PROM in `prom-catalog.json` (percentage scoring, 18
+    items, sum/87×100 — ⚠ verify against the official sheet before go-live).
+  - All new measures graded **by symmetry/LSI + neutral baseline** (no fabricated
+    population norms) — registered as `type:"qualitative"` per the project stance.
+- **MRSS /100 scoring layer** (the only substantial new code):
+  `data/mrss-protocol.json` (component→measure map, Part A grade→points maps, LSI→points
+  table) + pure `services/mrss-scoring.js` + `services/mrss-docx.js` (programmatic via
+  the `docx` lib, no template) + `routes/scribe-mrss.js`
+  (`POST /api/scribe/sessions/:id/mrss/{generate,docx}`, clinician-only, **ephemeral** —
+  recomputed from stored components, no DB write/migration). Involved-limb + dominance
+  are scoring-time **parameters** (LSI = involved ÷ uninvolved × 100). Front end:
+  `MrssPanel.tsx`, launched from `ScribeReportsPage`.
+- **Multi-toggle render fix:** toggle renderers now include the measure label when an
+  assessment has >1 toggle (the ACL exam is the first such case) — `measurement-render.js`,
+  `measurement-series.js`, `AssessmentPanel.tsx`.
+- No schema change, no new env vars. Tests: `mrss-scoring.test.mjs` (LSI→points, Part
+  A/B/C, pass>95 worked example). Backend 233 tests green; the catalog↔norm alignment
+  test (`measurement-render.test.mjs`) is the guardrail enforcing a norm entry per measure.
+
 ## 2026-06-21 — Email-edit → Identity Platform sync + deterministic resend
 
 - **P2:** editing a patient's email (`PATCH /api/auth/profile`, `PUT /api/patients/:id`)

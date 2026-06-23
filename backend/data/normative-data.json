@@ -645,6 +645,286 @@
       "bands": [], "cutoffs": [], "caveats": ["method_dependent", "symmetry_not_norm"],
       "note": "CROM reference mean ~37 deg per side (Youdas). Interpret left/right symmetry and own baseline.",
       "sourceShort": "Youdas 1992"
+    },
+    "shoulder_flexion_dynamometry": {
+      "displayName": "Shoulder Flexion Strength (HHD)",
+      "aliases": ["shoulder flexion strength", "shoulder flexion dynamometry"],
+      "unit": "kg", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Hand-held dynamometry. No population norm applied — interpret by limb symmetry (LSI) and the patient's own change.",
+      "sourceShort": "symmetry/LSI only — no population norm applied"
+    },
+    "shoulder_abduction_dynamometry": {
+      "displayName": "Shoulder Abduction Strength (HHD)",
+      "aliases": ["shoulder abduction strength", "shoulder abduction dynamometry"],
+      "unit": "kg", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Hand-held dynamometry. No population norm applied — interpret by limb symmetry (LSI) and the patient's own change.",
+      "sourceShort": "symmetry/LSI only — no population norm applied"
+    },
+    "shoulder_external_rotation_dynamometry": {
+      "displayName": "Shoulder External Rotation Strength (HHD)",
+      "aliases": ["shoulder external rotation strength", "shoulder er strength", "shoulder external rotation dynamometry"],
+      "unit": "kg", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Hand-held dynamometry. No population norm applied — interpret by limb symmetry (LSI) and the ER:IR ratio against the patient's own baseline.",
+      "sourceShort": "symmetry/LSI only — no population norm applied"
+    },
+    "shoulder_internal_rotation_dynamometry": {
+      "displayName": "Shoulder Internal Rotation Strength (HHD)",
+      "aliases": ["shoulder internal rotation strength", "shoulder ir strength", "shoulder internal rotation dynamometry"],
+      "unit": "kg", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Hand-held dynamometry. No population norm applied — interpret by limb symmetry (LSI) and the ER:IR ratio against the patient's own baseline.",
+      "sourceShort": "symmetry/LSI only — no population norm applied"
+    },
+    "hip_flexion_dynamometry": {
+      "displayName": "Hip Flexion Strength (HHD)",
+      "aliases": ["hip flexion strength", "hip flexion dynamometry"],
+      "unit": "kg", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Hand-held dynamometry. No population norm applied — interpret by limb symmetry (LSI) and the patient's own change.",
+      "sourceShort": "symmetry/LSI only — no population norm applied"
+    },
+    "hip_extension_dynamometry": {
+      "displayName": "Hip Extension Strength (HHD)",
+      "aliases": ["hip extension strength", "hip extension dynamometry"],
+      "unit": "kg", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Hand-held dynamometry. No population norm applied — interpret by limb symmetry (LSI) and the patient's own change.",
+      "sourceShort": "symmetry/LSI only — no population norm applied"
+    },
+    "hip_abduction_dynamometry": {
+      "displayName": "Hip Abduction Strength (HHD)",
+      "aliases": ["hip abduction strength", "hip abduction dynamometry", "gluteus medius strength"],
+      "unit": "kg", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Hand-held dynamometry. No population norm applied — interpret by limb symmetry (LSI) and the patient's own change.",
+      "sourceShort": "symmetry/LSI only — no population norm applied"
+    },
+    "hip_adduction_dynamometry": {
+      "displayName": "Hip Adduction Strength (HHD)",
+      "aliases": ["hip adduction strength", "hip adduction dynamometry"],
+      "unit": "kg", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Hand-held dynamometry. No population norm applied — interpret by limb symmetry (LSI) and the adduction:abduction ratio against the patient's own baseline.",
+      "sourceShort": "symmetry/LSI only — no population norm applied"
+    },
+    "hip_external_rotation_dynamometry": {
+      "displayName": "Hip External Rotation Strength (HHD)",
+      "aliases": ["hip external rotation strength", "hip er strength", "hip external rotation dynamometry"],
+      "unit": "kg", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Hand-held dynamometry. No population norm applied — interpret by limb symmetry (LSI) and the patient's own change.",
+      "sourceShort": "symmetry/LSI only — no population norm applied"
+    },
+    "hip_internal_rotation_dynamometry": {
+      "displayName": "Hip Internal Rotation Strength (HHD)",
+      "aliases": ["hip internal rotation strength", "hip ir strength", "hip internal rotation dynamometry"],
+      "unit": "kg", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Hand-held dynamometry. No population norm applied — interpret by limb symmetry (LSI) and the patient's own change.",
+      "sourceShort": "symmetry/LSI only — no population norm applied"
+    },
+    "knee_flexion_dynamometry": {
+      "displayName": "Knee Flexion Strength (HHD)",
+      "aliases": ["knee flexion strength", "hamstring strength", "knee flexion dynamometry"],
+      "unit": "kg", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Hand-held dynamometry. No population norm applied — interpret by limb symmetry (LSI) and the hamstring:quadriceps ratio against the patient's own baseline.",
+      "sourceShort": "symmetry/LSI only — no population norm applied"
+    },
+    "knee_extension_dynamometry": {
+      "displayName": "Knee Extension Strength (HHD)",
+      "aliases": ["knee extension strength", "quadriceps strength", "quad strength", "knee extension dynamometry"],
+      "unit": "kg", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Hand-held dynamometry. No population norm applied — interpret by limb symmetry (LSI) and the patient's own change. Quadriceps LSI is a key ACL RTS gate.",
+      "sourceShort": "symmetry/LSI only — no population norm applied"
+    },
+    "shoulder_flexion_mmt": {
+      "displayName": "Shoulder Flexion MMT",
+      "aliases": ["shoulder flexion mmt", "shoulder flexion manual muscle test"],
+      "unit": "grade", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Oxford 0–5 manual muscle test. 5 = normal; no population norm — interpret by L/R symmetry and the patient's own change.",
+      "sourceShort": "Oxford MMT 0–5; symmetry only"
+    },
+    "shoulder_abduction_mmt": {
+      "displayName": "Shoulder Abduction MMT",
+      "aliases": ["shoulder abduction mmt", "shoulder abduction manual muscle test"],
+      "unit": "grade", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Oxford 0–5 manual muscle test. 5 = normal; no population norm — interpret by L/R symmetry and the patient's own change.",
+      "sourceShort": "Oxford MMT 0–5; symmetry only"
+    },
+    "shoulder_external_rotation_mmt": {
+      "displayName": "Shoulder External Rotation MMT",
+      "aliases": ["shoulder external rotation mmt", "shoulder er mmt"],
+      "unit": "grade", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Oxford 0–5 manual muscle test. 5 = normal; no population norm — interpret by L/R symmetry and the patient's own change.",
+      "sourceShort": "Oxford MMT 0–5; symmetry only"
+    },
+    "shoulder_internal_rotation_mmt": {
+      "displayName": "Shoulder Internal Rotation MMT",
+      "aliases": ["shoulder internal rotation mmt", "shoulder ir mmt"],
+      "unit": "grade", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Oxford 0–5 manual muscle test. 5 = normal; no population norm — interpret by L/R symmetry and the patient's own change.",
+      "sourceShort": "Oxford MMT 0–5; symmetry only"
+    },
+    "hip_flexion_mmt": {
+      "displayName": "Hip Flexion MMT",
+      "aliases": ["hip flexion mmt", "hip flexion manual muscle test"],
+      "unit": "grade", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Oxford 0–5 manual muscle test. 5 = normal; no population norm — interpret by L/R symmetry and the patient's own change.",
+      "sourceShort": "Oxford MMT 0–5; symmetry only"
+    },
+    "hip_extension_mmt": {
+      "displayName": "Hip Extension MMT",
+      "aliases": ["hip extension mmt", "hip extension manual muscle test", "gluteus maximus mmt"],
+      "unit": "grade", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Oxford 0–5 manual muscle test. 5 = normal; no population norm — interpret by L/R symmetry and the patient's own change.",
+      "sourceShort": "Oxford MMT 0–5; symmetry only"
+    },
+    "hip_abduction_mmt": {
+      "displayName": "Hip Abduction MMT",
+      "aliases": ["hip abduction mmt", "hip abduction manual muscle test", "gluteus medius mmt"],
+      "unit": "grade", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Oxford 0–5 manual muscle test. 5 = normal; no population norm — interpret by L/R symmetry and the patient's own change.",
+      "sourceShort": "Oxford MMT 0–5; symmetry only"
+    },
+    "hip_adduction_mmt": {
+      "displayName": "Hip Adduction MMT",
+      "aliases": ["hip adduction mmt", "hip adduction manual muscle test"],
+      "unit": "grade", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Oxford 0–5 manual muscle test. 5 = normal; no population norm — interpret by L/R symmetry and the patient's own change.",
+      "sourceShort": "Oxford MMT 0–5; symmetry only"
+    },
+    "knee_flexion_mmt": {
+      "displayName": "Knee Flexion MMT",
+      "aliases": ["knee flexion mmt", "hamstring mmt", "knee flexion manual muscle test"],
+      "unit": "grade", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Oxford 0–5 manual muscle test. 5 = normal; no population norm — interpret by L/R symmetry and the patient's own change.",
+      "sourceShort": "Oxford MMT 0–5; symmetry only"
+    },
+    "knee_extension_mmt": {
+      "displayName": "Knee Extension MMT",
+      "aliases": ["knee extension mmt", "quadriceps mmt", "knee extension manual muscle test"],
+      "unit": "grade", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Oxford 0–5 manual muscle test. 5 = normal; no population norm — interpret by L/R symmetry and the patient's own change.",
+      "sourceShort": "Oxford MMT 0–5; symmetry only"
+    },
+    "ankle_dorsiflexion_mmt": {
+      "displayName": "Ankle Dorsiflexion MMT",
+      "aliases": ["ankle dorsiflexion mmt", "tibialis anterior mmt"],
+      "unit": "grade", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Oxford 0–5 manual muscle test. 5 = normal; no population norm — interpret by L/R symmetry and the patient's own change.",
+      "sourceShort": "Oxford MMT 0–5; symmetry only"
+    },
+    "ankle_plantarflexion_mmt": {
+      "displayName": "Ankle Plantarflexion MMT",
+      "aliases": ["ankle plantarflexion mmt", "gastrocnemius mmt", "calf mmt"],
+      "unit": "grade", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": ["symmetry_not_norm"],
+      "note": "Oxford 0–5 manual muscle test. 5 = normal; no population norm — interpret by L/R symmetry and the patient's own change. For true plantarflexion strength prefer the single-leg calf-raise count.",
+      "sourceShort": "Oxford MMT 0–5; symmetry only"
+    },
+    "acl_effusion_stroke": {
+      "displayName": "Knee Effusion (stroke test)",
+      "aliases": ["knee effusion", "effusion stroke test", "knee swelling"],
+      "unit": "none", "direction": "none", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": [],
+      "note": "Graded observation (Zero/Trace/1+/2+/3+). No population norm — recorded as an exam finding; feeds MRSS Part A (Absent = 5, Present = 0).",
+      "sourceShort": "clinical exam (MRSS Part A)"
+    },
+    "acl_lachman": {
+      "displayName": "Lachman's Test",
+      "aliases": ["lachman", "lachman test", "anterior laxity"],
+      "unit": "none", "direction": "none", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": [],
+      "note": "Graded laxity vs the uninvolved side. No population norm — recorded as an exam finding; feeds MRSS Part A (Nil = 5, Mild = 3, Mod–severe = 0).",
+      "sourceShort": "clinical exam (MRSS Part A)"
+    },
+    "acl_pivot_shift": {
+      "displayName": "Pivot Shift Test",
+      "aliases": ["pivot shift", "pivot shift test", "rotational instability"],
+      "unit": "none", "direction": "none", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": [],
+      "note": "Graded rotational instability. No population norm — recorded as an exam finding; feeds MRSS Part A (Nil = 5, I = 3, II = 1, III–IV = 0).",
+      "sourceShort": "clinical exam (MRSS Part A)"
+    },
+    "acl_extension_deficit_pronehang": {
+      "displayName": "Knee Extension Deficit (prone hang)",
+      "aliases": ["extension deficit", "prone hang test", "knee extension deficit"],
+      "unit": "cm", "direction": "lower_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": [],
+      "note": "Heel-height difference vs the uninvolved side (~1 cm ≈ 1°). No population norm — feeds MRSS Part A (0–2 cm = 5, 2–5 cm = 3, 5 cm+ = 0).",
+      "sourceShort": "clinical exam (MRSS Part A)"
+    },
+    "acl_single_hop": {
+      "displayName": "Single Hop for Distance",
+      "aliases": ["single hop", "single hop for distance", "single leg hop"],
+      "unit": "cm", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": [],
+      "note": "Mean of 2 valid hops per leg. Interpreted by Limb Symmetry Index (LSI = involved ÷ uninvolved × 100); >90% is the Phase-3/MRSS goal. No absolute population norm.",
+      "sourceShort": "Reid 2007; symmetry/LSI"
+    },
+    "acl_triple_crossover_hop": {
+      "displayName": "Triple Crossover Hop",
+      "aliases": ["triple crossover hop", "crossover hop", "triple cross over hop"],
+      "unit": "cm", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": [],
+      "note": "Total distance over 3 crossing hops, mean of 2 attempts per leg. Interpreted by LSI; >90% is the Phase-3/MRSS goal. No absolute population norm.",
+      "sourceShort": "Reid 2007; symmetry/LSI"
+    },
+    "acl_single_leg_squat_fatigue": {
+      "displayName": "Single-Leg Squats to Fatigue",
+      "aliases": ["single leg squat to fatigue", "single leg squats to fatigue"],
+      "unit": "reps", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": [],
+      "note": "Max reps to fatigue at a 2-sec-up/2-sec-down tempo. Interpreted by LSI. No absolute population norm.",
+      "sourceShort": "MRSS Part C; symmetry/LSI"
+    },
+    "sebt_anterior": {
+      "displayName": "SEBT Anterior Reach",
+      "aliases": ["sebt anterior", "y-balance anterior", "star excursion anterior"],
+      "unit": "cm", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": [],
+      "note": "Max anterior reach (max of 3). Normalise/symmetry only — combined with the two posterior reaches into a per-leg composite for LSI. No absolute population norm applied.",
+      "sourceShort": "Gribble 2012; symmetry/LSI"
+    },
+    "sebt_posteromedial": {
+      "displayName": "SEBT Posteromedial Reach",
+      "aliases": ["sebt posteromedial", "y-balance posteromedial", "star excursion posteromedial"],
+      "unit": "cm", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": [],
+      "note": "Max posteromedial reach (max of 3). Combined into the per-leg SEBT composite for LSI. No absolute population norm applied.",
+      "sourceShort": "Gribble 2012; symmetry/LSI"
+    },
+    "sebt_posterolateral": {
+      "displayName": "SEBT Posterolateral Reach",
+      "aliases": ["sebt posterolateral", "y-balance posterolateral", "star excursion posterolateral"],
+      "unit": "cm", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": [],
+      "note": "Max posterolateral reach (max of 3). Combined into the per-leg SEBT composite for LSI. No absolute population norm applied.",
+      "sourceShort": "Gribble 2012; symmetry/LSI"
+    },
+    "less_landing": {
+      "displayName": "Jump-Land (Abridged LESS)",
+      "aliases": ["less", "landing error scoring system", "jump land", "abridged less"],
+      "unit": "points", "direction": "higher_better", "type": "qualitative",
+      "bands": [], "cutoffs": [], "caveats": [],
+      "note": "Abridged 5-item landing score, total /25 (each item 5 = no error, 0 = error). Higher = better landing mechanics; no population norm — feeds MRSS Part C directly.",
+      "sourceShort": "Padua 2009 (LESS); MRSS Part C"
     }
   }
 }

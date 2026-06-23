@@ -291,7 +291,7 @@ function interpretByKey(key, rawValue, age, sex) {
 // ── Reassessment comparison ──────────────────────────────────────────────────
 // Word for the unit in change phrasing ("up 3 reps"). Mirrors scribe-llm's
 // unitSuffix but returns a trailing-space-free word for inline prose.
-const UNIT_WORD = { reps: 'reps', seconds: 'sec', kg: 'kg', degrees: '°', cm: 'cm', metres: 'm', points: 'points', bpm: 'bpm', mmol_L: 'mmol/L', mmHg: 'mmHg', m_s: 'm/s' };
+const UNIT_WORD = { reps: 'reps', seconds: 'sec', kg: 'kg', degrees: '°', cm: 'cm', metres: 'm', points: 'points', bpm: 'bpm', mmol_L: 'mmol/L', mmHg: 'mmHg', m_s: 'm/s', grade: 'grade' };
 function unitWord(u) { return UNIT_WORD[u] || ''; }
 
 // Pick the single comparable scalar from a parsed value. Bilateral falls back to

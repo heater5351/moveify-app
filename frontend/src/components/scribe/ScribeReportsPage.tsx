@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { FileText, Users, TrendingUp, Stethoscope, Loader2, Search, ChevronRight, Upload, FileUp, X } from 'lucide-react';
+import { FileText, Users, TrendingUp, Stethoscope, Trophy, Loader2, Search, ChevronRight, Upload, FileUp, X } from 'lucide-react';
 import { apiFetch, generateReport, generateHandout, generateReassessment, extractDocumentText, downloadReportDocx } from '../../utils/scribe-api';
 import type { HandoutSections, HandoutGrounding, ReassessmentData } from '../../types';
 import HandoutPreview from './HandoutPreview';
 import ReassessmentPreview from './ReassessmentPreview';
 import GPReassessmentPreview from './GPReassessmentPreview';
+import MrssPanel from './MrssPanel';
 
-type TemplateType = 'cdmp' | 'handout' | 'reassessment' | 'gp-reassessment';
+type TemplateType = 'cdmp' | 'handout' | 'reassessment' | 'gp-reassessment' | 'mrss';
 
 interface SessionItem {
   id: number;
@@ -48,6 +49,12 @@ const TEMPLATES: {
     description: 'Clinician-to-GP progress letter comparing baseline vs latest results',
     requiresNote: false,
   },
+  {
+    type: 'mrss',
+    title: 'ACL Return-to-Sport (MRSS)',
+    description: "Score the Melbourne ACL RTS Score (/100) from this session's captured tests",
+    requiresNote: false,
+  },
 ];
 
 // Resolve a session's source text: live transcript first, then the saved SOAP
@@ -80,6 +87,7 @@ export default function ScribeReportsPage() {
   const [activeHandout, setActiveHandout] = useState<{ sections: HandoutSections; session: SessionItem; source: 'transcript' | 'note'; grounding?: HandoutGrounding } | null>(null);
   const [activeReassessment, setActiveReassessment] = useState<{ data: ReassessmentData; session: SessionItem; baseline: SessionItem | null } | null>(null);
   const [activeGPReassessment, setActiveGPReassessment] = useState<{ data: ReassessmentData; session: SessionItem; baseline: SessionItem | null } | null>(null);
+  const [activeMrss, setActiveMrss] = useState<{ session: SessionItem } | null>(null);
 
   // Reassessment variants need a baseline session selected before generating.
   const isReassessment = selectedTemplate === 'reassessment' || selectedTemplate === 'gp-reassessment';
@@ -126,6 +134,9 @@ export default function ScribeReportsPage() {
 
   async function handleGenerate() {
     if (!selectedTemplate || !selectedSession) return;
+    // MRSS opens its own panel — the score needs the involved-limb context the
+    // clinician picks there (it isn't a stored measurement), then scores on demand.
+    if (selectedTemplate === 'mrss') { setActiveMrss({ session: selectedSession }); return; }
     setGenerating(true);
     setGenError('');
     try {
@@ -220,7 +231,7 @@ export default function ScribeReportsPage() {
                 }`}
               >
                 <div className={`p-2 rounded-lg shrink-0 ${selectedTemplate === t.type ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-500'}`}>
-                  {t.type === 'cdmp' ? <FileText className="w-5 h-5" /> : t.type === 'reassessment' ? <TrendingUp className="w-5 h-5" /> : t.type === 'gp-reassessment' ? <Stethoscope className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+                  {t.type === 'cdmp' ? <FileText className="w-5 h-5" /> : t.type === 'reassessment' ? <TrendingUp className="w-5 h-5" /> : t.type === 'gp-reassessment' ? <Stethoscope className="w-5 h-5" /> : t.type === 'mrss' ? <Trophy className="w-5 h-5" /> : <Users className="w-5 h-5" />}
                 </div>
                 <div>
                   <p className={`text-sm font-semibold ${selectedTemplate === t.type ? 'text-primary-700' : 'text-secondary-700'}`}>{t.title}</p>
@@ -430,6 +441,17 @@ export default function ScribeReportsPage() {
           grounding={activeGPReassessment.data.grounding}
           onClose={() => setActiveGPReassessment(null)}
           onRegenerate={handleGenerate}
+        />
+      )}
+
+      {activeMrss && (
+        <MrssPanel
+          sessionId={activeMrss.session.id}
+          patientName={activeMrss.session.patientName}
+          assessmentDate={new Date(activeMrss.session.sessionDate).toLocaleDateString('en-AU', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+          })}
+          onClose={() => setActiveMrss(null)}
         />
       )}
     </>
