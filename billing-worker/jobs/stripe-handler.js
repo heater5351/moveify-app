@@ -275,10 +275,37 @@ function nameTokensAllMatch(stripeName, clinikoName) {
 }
 
 async function resolveClinikoPatient(customer, log) {
-  // 1) Trust explicit Stripe metadata first — it's the source-of-truth path.
-  if (customer.metadata?.cliniko_id) return customer.metadata.cliniko_id;
-
   const contacts = await getTab('Contacts');
+
+  // 1) Trust explicit Stripe metadata first — but validate it against the
+  // customer's name. A shared household email can leave the WRONG cliniko_id
+  // cached on a customer (see the Heath mislink, 2026-06): trusting it blindly
+  // books one spouse's DD onto the other's Xero contact. If the cached id points
+  // at a differently-named patient, ignore it, flag the conflict, and fall
+  // through to the email/name resolution below.
+  if (customer.metadata?.cliniko_id) {
+    const metaId = String(customer.metadata.cliniko_id);
+    const metaContact = contacts.find((c) => String(c.cliniko_id) === metaId);
+    if (!customer.name || !metaContact || nameTokensAllMatch(customer.name, metaContact.name)) {
+      return metaId;
+    }
+    log.warn(
+      { stripe_customer_id: customer.id, meta_cliniko_id: metaId, meta_name: metaContact.name },
+      'metadata.cliniko_id name mismatch — ignoring cached id and re-resolving by name'
+    );
+    await appendReconciliationFlag({
+      id: `stripe-metadata-name-mismatch:${customer.id}`,
+      type: 'stripe_metadata_name_mismatch',
+      entity_id: customer.id,
+      cliniko_state: metaId,
+      ledger_state: '',
+      diff: `Stripe customer "${customer.name}" carries metadata.cliniko_id for "${metaContact.name}" — likely shared-email mislink`,
+      resolved_at: '',
+      resolution: '',
+      notes: 'Resolver ignored the cached id and matched by name instead. Fix the Stripe customer email + metadata.cliniko_id.',
+      created_at: new Date().toISOString(),
+    });
+  }
   const email = (customer.email || '').toLowerCase().trim();
   const name = (customer.name || '').toLowerCase().trim();
 

@@ -22,6 +22,19 @@ what to know now, links).
 
 ---
 
+## 2026-06-24 — Stripe resolver validates metadata.cliniko_id (household mislink fix)
+
+- **What:** `resolveClinikoPatient` (billing-worker `jobs/stripe-handler.js`) no longer
+  blindly trusts `customer.metadata.cliniko_id`. It checks that id's contact name
+  token-matches the Stripe customer name; on mismatch it ignores the cached id,
+  re-resolves by name, and raises a `stripe_metadata_name_mismatch` reconciliation flag.
+- **Why:** a shared household email cached the wrong patient's id onto a Stripe customer,
+  so one spouse's monthly DD booked entirely onto the other's Xero contact (Heath, June).
+- **Also:** extracted pure `assertNumericClinikoId` in `services/stripe.js` and rewrote
+  `tests/stripe-guards.test.mjs` to test it directly — the old test reached
+  `stripe.customers.create()` and created LIVE customers when run with secrets.
+- **To know:** takes effect on the next **billing-worker redeploy** (currently deferred).
+
 ## 2026-06-24 — Shared contacts directory + GP-letter auto-fill
 
 - **What:** a clinic-wide **Contacts** directory (new top-level tab, `currentPage === 'contacts'`)

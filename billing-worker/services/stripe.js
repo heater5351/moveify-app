@@ -236,16 +236,22 @@ async function findSubscriptionsCoveringDate(clinikoId, patientEmail, patientNam
 // Always (re)writes the agreement metadata so the checkout.session.completed
 // handler can read tier/path/start_date back off the customer. Returns the
 // customer object.
-async function findOrCreateCustomer({ clinikoId, name, email, metadata = {} }) {
-  // Cliniko patient IDs are numeric. Hard-reject anything else BEFORE we touch
-  // Stripe — a crafted value (quotes, query operators) could otherwise alter the
-  // search-query interpolation below and mis-link the customer, i.e. attach a
-  // payment method to the wrong patient. Defence-in-depth with the backend's own
-  // numeric validation. Validated first so it's cheap and unit-testable.
+// Cliniko patient IDs are numeric. Hard-reject anything else BEFORE we touch
+// Stripe — a crafted value (quotes, query operators) could otherwise alter the
+// customer-search interpolation in findOrCreateCustomer and mis-link the customer
+// (attach a payment method to the wrong patient). Defence-in-depth with the
+// backend's own numeric validation. Exported as a pure function so the guard is
+// unit-tested directly, with no Stripe/secret access.
+function assertNumericClinikoId(clinikoId) {
   const safeId = String(clinikoId);
   if (!/^\d+$/.test(safeId)) {
     throw new Error('Invalid clinikoId — expected a numeric Cliniko patient id');
   }
+  return safeId;
+}
+
+async function findOrCreateCustomer({ clinikoId, name, email, metadata = {} }) {
+  const safeId = assertNumericClinikoId(clinikoId);
   const stripe = await getStripe();
   const merged = { cliniko_id: safeId, ...metadata };
 
@@ -479,6 +485,7 @@ module.exports = {
   findSubscriptionsCoveringDate,
   getSubscriptionProductName,
   getProductNameFromInvoice,
+  assertNumericClinikoId,
   findOrCreateCustomer,
   createSetupCheckoutSession,
   retrieveCheckoutSession,
