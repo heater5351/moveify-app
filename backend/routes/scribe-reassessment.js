@@ -7,6 +7,7 @@ const { generateReassessmentDocx } = require('../services/scribe-reassessment-do
 const { generateGPReassessmentDocx } = require('../services/scribe-gp-reassessment-docx');
 const { extractLetterMeta } = require('../services/scribe-llm');
 const { getPatientDemographics } = require('../services/scribe-demographics');
+const { contactToLetterMeta, mergeLetterMeta } = require('../services/contact-letter-meta');
 
 // Substitute the [PATIENT_NAME] placeholder used by the GP narrative (kept off the
 // wire to AWS) with the real name, server-side. Applies to the GP narrative fields.
@@ -23,6 +24,21 @@ async function patientName(patientId) {
     const r = await db.query('SELECT name FROM users WHERE id = $1', [patientId]);
     return r.rows[0] ? r.rows[0].name : '';
   } catch { return ''; }
+}
+
+// Fetch a patient's flagged report-recipient GP (from the shared contacts
+// directory) and map it to the GP letter's recipient block. Null if none set.
+async function getReportRecipientMeta(patientId) {
+  try {
+    const r = await db.query(
+      `SELECT c.name, c.organisation, c.address, c.email
+         FROM patient_contacts pc JOIN contacts c ON c.id = pc.contact_id
+        WHERE pc.patient_id = $1 AND pc.is_report_recipient
+        LIMIT 1`,
+      [patientId]
+    );
+    return contactToLetterMeta(r.rows[0] || null);
+  } catch { return null; }
 }
 const audit = require('../services/audit');
 
@@ -103,9 +119,15 @@ router.post('/:sessionId/reassessment/generate', async (req, res) => {
     if (audience === 'gp') {
       const name = await patientName(current.patient_id);
       Object.assign(result, fillName(result, name));
-      // Pre-fill the GP letter's recipient block from an uploaded previous report
-      // (referring GP, practice, address, patient, DOB) so the clinician needn't retype.
-      if (hasReport) result.meta = await extractLetterMeta(previousReportText.trim());
+      // Pre-fill the GP letter's recipient block. Base: the patient's flagged
+      // report-recipient GP from the contacts directory. If a previous report was
+      // uploaded, overlay any non-empty fields it yields (explicit upload wins).
+      const base = await getReportRecipientMeta(current.patient_id);
+      if (hasReport) {
+        result.meta = mergeLetterMeta(base, await extractLetterMeta(previousReportText.trim()));
+      } else if (base) {
+        result.meta = base;
+      }
     }
 
     audit.log(req, 'reassessment_generated', 'scribe_session', parseInt(req.params.sessionId), {

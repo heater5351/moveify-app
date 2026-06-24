@@ -51,11 +51,10 @@ function enrichmentFields(p) {
     preferredName: p.preferred_name || '',
     pronouns: p.pronouns || '',
     occupation: p.occupation || '',
-    emergencyContactName: p.emergency_contact_name || '',
-    emergencyContactRelationship: p.emergency_contact_relationship || '',
-    emergencyContactPhone: p.emergency_contact_phone || '',
+    // Emergency contact + referring GP moved to the shared contacts directory
+    // (patient_contacts links). The emergency_contact_* / referring_gp columns
+    // remain in the DB (deprecated) but are no longer surfaced or written.
     referralSource: p.referral_source || '',
-    referringGp: p.referring_gp || '',
     medicareNumber: p.medicare_number || '',
     privateHealthFund: p.private_health_fund || '',
     privateHealthMemberNumber: p.private_health_member_number || '',
@@ -588,8 +587,7 @@ router.put('/:patientId', requireRole('clinician'), async (req, res) => {
     const {
       name, dob, email, phone, address, sex,
       title, preferredName, pronouns, occupation,
-      emergencyContactName, emergencyContactRelationship, emergencyContactPhone,
-      referralSource, referringGp, medicareNumber,
+      referralSource, medicareNumber,
       privateHealthFund, privateHealthMemberNumber, dvaNumber,
     } = req.body;
 
@@ -637,27 +635,22 @@ router.put('/:patientId', requireRole('clinician'), async (req, res) => {
          preferred_name = COALESCE($8, preferred_name),
          pronouns = COALESCE($9, pronouns),
          occupation = COALESCE($10, occupation),
-         emergency_contact_name = COALESCE($11, emergency_contact_name),
-         emergency_contact_relationship = COALESCE($12, emergency_contact_relationship),
-         emergency_contact_phone = COALESCE($13, emergency_contact_phone),
-         referral_source = COALESCE($14, referral_source),
-         referring_gp = COALESCE($15, referring_gp),
-         medicare_number = COALESCE($16, medicare_number),
-         private_health_fund = COALESCE($17, private_health_fund),
-         private_health_member_number = COALESCE($18, private_health_member_number),
-         dva_number = COALESCE($19, dva_number)
-       WHERE id = $20`,
+         referral_source = COALESCE($11, referral_source),
+         medicare_number = COALESCE($12, medicare_number),
+         private_health_fund = COALESCE($13, private_health_fund),
+         private_health_member_number = COALESCE($14, private_health_member_number),
+         dva_number = COALESCE($15, dva_number)
+       WHERE id = $16`,
       [name, dob, email, phone || null, address || null, u(sex),
        clip(title), clip(preferredName), clip(pronouns), clip(occupation),
-       clip(emergencyContactName), clip(emergencyContactRelationship), clip(emergencyContactPhone),
-       clip(referralSource, 300), clip(referringGp), clip(medicareNumber),
+       clip(referralSource, 300), clip(medicareNumber),
        clip(privateHealthFund), clip(privateHealthMemberNumber), clip(dvaNumber),
        patientId]
     );
 
     audit.log(req, 'patient_update', 'patient', parseInt(patientId), {
       fields: ['name', 'dob', 'email', 'phone', 'address', 'sex', 'title', 'preferredName',
-        'pronouns', 'occupation', 'emergencyContact', 'referralSource', 'referringGp',
+        'pronouns', 'occupation', 'referralSource',
         'medicareNumber', 'privateHealth', 'dvaNumber'],
     });
 
@@ -665,6 +658,213 @@ router.put('/:patientId', requireRole('clinician'), async (req, res) => {
   } catch (error) {
     console.error('Update patient error:', error);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// --- Patient ↔ contacts links (shared contacts directory) -------------------
+// The directory itself lives in routes/contacts.js; these endpoints manage the
+// many-to-many patient_contacts links + per-patient context (relationship, the
+// report-recipient GP that drives the GP letter, emergency-contact flag).
+// Clinician-only. Never write contact details to logs (third-party PII).
+
+const CONTACT_TYPES = new Set(['gp', 'specialist', 'support_coordinator', 'guardian', 'other']);
+const clipStr = (v, max) => { const s = (v == null ? '' : String(v)).trim().slice(0, max); return s || null; };
+
+function mapContactRow(r) {
+  return {
+    id: r.contact_id,
+    contactType: r.contact_type,
+    title: r.title || '',
+    name: r.name,
+    organisation: r.organisation || '',
+    specialty: r.specialty || '',
+    phone: r.phone || '',
+    email: r.email || '',
+    address: r.address || '',
+    notes: r.notes || '',
+  };
+}
+function mapLinkRow(r) {
+  return {
+    linkId: r.link_id,
+    relationship: r.relationship || '',
+    isReportRecipient: r.is_report_recipient,
+    isEmergency: r.is_emergency,
+    contact: mapContactRow(r),
+  };
+}
+
+// GET /api/patients/:patientId/contacts — a patient's linked contacts.
+router.get('/:patientId/contacts', requireRole('clinician'), async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    if (!/^\d+$/.test(patientId)) return res.status(400).json({ error: 'Invalid patient id' });
+    const rows = await db.getAll(
+      `SELECT pc.id AS link_id, pc.relationship, pc.is_report_recipient, pc.is_emergency,
+              c.id AS contact_id, c.contact_type, c.title, c.name, c.organisation, c.specialty,
+              c.phone, c.email, c.address, c.notes
+         FROM patient_contacts pc
+         JOIN contacts c ON c.id = pc.contact_id
+        WHERE pc.patient_id = $1
+        ORDER BY pc.is_report_recipient DESC, c.name ASC`,
+      [patientId]
+    );
+    res.json({ contacts: rows.map(mapLinkRow) });
+  } catch (error) {
+    console.error('List patient contacts error:', error.message);
+    res.status(500).json({ error: 'Failed to load contacts' });
+  }
+});
+
+// POST /api/patients/:patientId/contacts — link a contact to a patient.
+// Body: { contactId } to link an existing directory contact, OR
+//       { contact: {name, contactType, ...} } to create-and-link a new one,
+//   plus { relationship, isReportRecipient, isEmergency }.
+router.post('/:patientId/contacts', requireRole('clinician'), async (req, res) => {
+  const client = await db.getClient();
+  try {
+    const { patientId } = req.params;
+    if (!/^\d+$/.test(patientId)) return res.status(400).json({ error: 'Invalid patient id' });
+    const { contactId, contact, relationship } = req.body;
+    const isReportRecipient = !!req.body.isReportRecipient;
+    const isEmergency = !!req.body.isEmergency;
+
+    const patient = await db.getOne(`SELECT id FROM users WHERE id = $1 AND role = 'patient'`, [patientId]);
+    if (!patient) return res.status(404).json({ error: 'Patient not found' });
+
+    await client.query('BEGIN');
+
+    let resolvedContactId = contactId;
+    if (!resolvedContactId) {
+      // Create-and-link a new directory contact.
+      const name = clipStr(contact && contact.name, 200);
+      if (!name) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Contact name is required' }); }
+      let type = clipStr(contact && contact.contactType, 40) || 'other';
+      if (!CONTACT_TYPES.has(type)) type = 'other';
+      const created = await client.query(
+        `INSERT INTO contacts (contact_type, title, name, organisation, specialty, phone, email, address, notes, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+        [type, clipStr(contact.title, 40), name, clipStr(contact.organisation, 200), clipStr(contact.specialty, 120),
+         clipStr(contact.phone, 60), clipStr(contact.email, 200), clipStr(contact.address, 300), clipStr(contact.notes, 2000),
+         req.user.id]
+      );
+      resolvedContactId = created.rows[0].id;
+      audit.log(req, 'contact_create', 'contact', resolvedContactId, { contactType: type, via: 'patient_link' });
+    } else if (!/^\d+$/.test(String(resolvedContactId))) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Invalid contact id' });
+    }
+
+    // At most one report recipient per patient — clear any prior one first so
+    // the partial-unique index never trips.
+    if (isReportRecipient) {
+      await client.query(
+        `UPDATE patient_contacts SET is_report_recipient = FALSE WHERE patient_id = $1 AND is_report_recipient`,
+        [patientId]
+      );
+    }
+
+    const link = await client.query(
+      `INSERT INTO patient_contacts (patient_id, contact_id, relationship, is_report_recipient, is_emergency)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (patient_id, contact_id)
+         DO UPDATE SET relationship = EXCLUDED.relationship,
+                       is_report_recipient = EXCLUDED.is_report_recipient,
+                       is_emergency = EXCLUDED.is_emergency
+       RETURNING id`,
+      [patientId, resolvedContactId, clipStr(relationship, 120), isReportRecipient, isEmergency]
+    );
+
+    await client.query('COMMIT');
+    audit.log(req, 'patient_contact_link', 'patient', parseInt(patientId), {
+      contactId: resolvedContactId, isReportRecipient, isEmergency,
+    });
+
+    const row = await db.getOne(
+      `SELECT pc.id AS link_id, pc.relationship, pc.is_report_recipient, pc.is_emergency,
+              c.id AS contact_id, c.contact_type, c.title, c.name, c.organisation, c.specialty,
+              c.phone, c.email, c.address, c.notes
+         FROM patient_contacts pc JOIN contacts c ON c.id = pc.contact_id
+        WHERE pc.id = $1`,
+      [link.rows[0].id]
+    );
+    res.status(201).json(mapLinkRow(row));
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Link patient contact error:', error.message);
+    res.status(500).json({ error: 'Failed to link contact' });
+  } finally {
+    client.release();
+  }
+});
+
+// PUT /api/patients/:patientId/contacts/:linkId — edit relationship/flags.
+router.put('/:patientId/contacts/:linkId', requireRole('clinician'), async (req, res) => {
+  const client = await db.getClient();
+  try {
+    const { patientId, linkId } = req.params;
+    if (!/^\d+$/.test(patientId) || !/^\d+$/.test(linkId)) return res.status(400).json({ error: 'Invalid id' });
+    const { relationship } = req.body;
+    const isReportRecipient = !!req.body.isReportRecipient;
+    const isEmergency = !!req.body.isEmergency;
+
+    await client.query('BEGIN');
+    const existing = await client.query(
+      `SELECT id FROM patient_contacts WHERE id = $1 AND patient_id = $2`, [linkId, patientId]
+    );
+    if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Contact link not found' });
+    }
+    if (isReportRecipient) {
+      await client.query(
+        `UPDATE patient_contacts SET is_report_recipient = FALSE
+          WHERE patient_id = $1 AND is_report_recipient AND id <> $2`,
+        [patientId, linkId]
+      );
+    }
+    await client.query(
+      `UPDATE patient_contacts SET relationship = $1, is_report_recipient = $2, is_emergency = $3 WHERE id = $4`,
+      [clipStr(relationship, 120), isReportRecipient, isEmergency, linkId]
+    );
+    await client.query('COMMIT');
+    audit.log(req, 'patient_contact_update', 'patient', parseInt(patientId), {
+      linkId: parseInt(linkId), isReportRecipient, isEmergency,
+    });
+
+    const row = await db.getOne(
+      `SELECT pc.id AS link_id, pc.relationship, pc.is_report_recipient, pc.is_emergency,
+              c.id AS contact_id, c.contact_type, c.title, c.name, c.organisation, c.specialty,
+              c.phone, c.email, c.address, c.notes
+         FROM patient_contacts pc JOIN contacts c ON c.id = pc.contact_id
+        WHERE pc.id = $1`,
+      [linkId]
+    );
+    res.json(mapLinkRow(row));
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Update patient contact error:', error.message);
+    res.status(500).json({ error: 'Failed to update contact link' });
+  } finally {
+    client.release();
+  }
+});
+
+// DELETE /api/patients/:patientId/contacts/:linkId — unlink (keeps the contact
+// in the directory; only removes this patient's association).
+router.delete('/:patientId/contacts/:linkId', requireRole('clinician'), async (req, res) => {
+  try {
+    const { patientId, linkId } = req.params;
+    if (!/^\d+$/.test(patientId) || !/^\d+$/.test(linkId)) return res.status(400).json({ error: 'Invalid id' });
+    const result = await db.run(
+      `DELETE FROM patient_contacts WHERE id = $1 AND patient_id = $2`, [linkId, patientId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Contact link not found' });
+    audit.log(req, 'patient_contact_unlink', 'patient', parseInt(patientId), { linkId: parseInt(linkId) });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Unlink patient contact error:', error.message);
+    res.status(500).json({ error: 'Failed to unlink contact' });
   }
 });
 

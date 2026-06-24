@@ -22,6 +22,35 @@ what to know now, links).
 
 ---
 
+## 2026-06-24 — Shared contacts directory + GP-letter auto-fill
+
+- **What:** a clinic-wide **Contacts** directory (new top-level tab, `currentPage === 'contacts'`)
+  of reusable contacts — GPs, specialists, NDIS support coordinators, parents/guardians — linked
+  **many-to-many** to patients. Supersedes the flat `emergency_contact_*` / `referring_gp` fields
+  added 2026-06-23 (kept nullable/deprecated, **not dropped**; no longer surfaced or written).
+- **Why:** contacts are inherently shared (one GP refers many patients) and one-to-many per
+  patient; flat columns forced re-typing and couldn't model NDIS coordinators. Also wires the GP
+  reassessment letter's recipient block to the patient's flagged **report-recipient** GP.
+- **Schema (additive, idempotent in `init.js`):** `contacts` (directory) + `patient_contacts`
+  (join: `relationship`, `is_report_recipient`, `is_emergency`, `UNIQUE(patient_id, contact_id)`)
+  with a **partial-unique index** `(patient_id) WHERE is_report_recipient` (one recipient GP per
+  patient). No drops.
+- **Backend:** `routes/contacts.js` (directory CRUD, clinician-only, audit-logged, never logs
+  PII); patient-link endpoints `GET/POST/PUT/DELETE /api/patients/:patientId/contacts` in
+  `patients.js` (report-recipient swap done in a tx to respect the partial-unique index). GP
+  auto-fill: `routes/scribe-reassessment.js` bases `result.meta` on the report-recipient GP,
+  overlaying any uploaded-report fields — precedence extracted to pure, unit-tested
+  `services/contact-letter-meta.js` (`backend/tests/contact-letter-meta.test.mjs`).
+- **Frontend:** Contacts tab + `ContactsDirectory.tsx` + `ContactModal.tsx`; per-patient
+  **Contacts tab** on the profile (`PatientContacts.tsx`); Overview emergency + referring-GP now
+  derive from links; flat fields removed from `EditPatientModal.tsx`. New `utils/contacts-api.ts`.
+- **Security:** new PHI/third-party-PII surface — clinician-only, parameterized queries, IDs
+  validated, link mutations scoped by `patient_id`, no contact PII in logs. Stays in
+  `australia-southeast1` Postgres.
+- **Deploy:** additive migration runs at backend boot. **`moveify-backend-staging` must be
+  redeployed** for the new endpoints + tables before the dev-branch Vercel preview works. No new
+  env vars. Built on `dev` (not yet on `main`/prod).
+
 ## 2026-06-23 — GP reassessment report: new hand-maintained template + tokens
 
 - **Replaced `backend/assets/GP_Reassessment_Template.docx`** with Ryan's hand-edited
