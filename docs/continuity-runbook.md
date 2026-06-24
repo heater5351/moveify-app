@@ -124,7 +124,9 @@ scripts/restore-drill.sh            # clone current state, verify, delete
 scripts/restore-drill.sh --pitr 2026-06-24T04:00:00Z   # also test the PITR path
 scripts/restore-drill.sh --keep     # leave clone up to smoke-test the app against it
 ```
-Record the date of the last successful drill here: **_____________** (untested as of 2026-06-24).
+Record the date of the last successful drill here: **2026-06-24** — clone came up
+`RUNNABLE` with all databases (`moveify`, `moveify_staging`, `billing`) reconstituted from
+backup, then auto-deleted; production untouched. Next due: ~2026-09.
 
 **Real recovery in an incident** (data loss / bad migration):
 1. **Do not** `backups restore` over production blindly. First clone to a new instance at a known-good
