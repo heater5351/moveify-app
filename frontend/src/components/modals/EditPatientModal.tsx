@@ -219,40 +219,9 @@ export const EditPatientModal = ({ patient, onUpdate, onSave, onDelete, onClose 
             </div>
           </div>
 
-          {/* Emergency contact */}
-          <div className="pt-4 border-t border-slate-100">
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Emergency contact</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className={labelCls}>Name</label>
-                <input
-                  type="text"
-                  value={patient.emergencyContactName || ''}
-                  onChange={(e) => onUpdate({ ...patient, emergencyContactName: e.target.value })}
-                  className={inputCls}
-                />
-              </div>
-              <div>
-                <label className={labelCls}>Relationship</label>
-                <input
-                  type="text"
-                  value={patient.emergencyContactRelationship || ''}
-                  onChange={(e) => onUpdate({ ...patient, emergencyContactRelationship: e.target.value })}
-                  placeholder="e.g. Spouse"
-                  className={inputCls}
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className={labelCls}>Phone</label>
-                <input
-                  type="tel"
-                  value={patient.emergencyContactPhone || ''}
-                  onChange={(e) => onUpdate({ ...patient, emergencyContactPhone: e.target.value })}
-                  className={inputCls}
-                />
-              </div>
-            </div>
-          </div>
+          {/* Emergency contacts, GPs, specialists and support coordinators are
+              managed in the shared Contacts directory (Contacts tab on the
+              patient profile), not here. */}
 
           {/* Referral & funding */}
           <div className="pt-4 border-t border-slate-100">
@@ -265,15 +234,6 @@ export const EditPatientModal = ({ patient, onUpdate, onSave, onDelete, onClose 
                   value={patient.referralSource || ''}
                   onChange={(e) => onUpdate({ ...patient, referralSource: e.target.value })}
                   placeholder="e.g. GP referral, word of mouth"
-                  className={inputCls}
-                />
-              </div>
-              <div>
-                <label className={labelCls}>Referring GP</label>
-                <input
-                  type="text"
-                  value={patient.referringGp || ''}
-                  onChange={(e) => onUpdate({ ...patient, referringGp: e.target.value })}
                   className={inputCls}
                 />
               </div>

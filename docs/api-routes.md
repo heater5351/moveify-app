@@ -15,6 +15,8 @@ All routes are prefixed with `/api`. Routes marked with a lock require authentic
 | `invitations.js` | `/api/invitations` | `POST /generate` | Clinician only |
 | `patients.js` | `/api/patients` | `GET /` (all patients), `GET /:id`, `DELETE /:id` | Clinician (DELETE = admin only) |
 | `patients.js` | `/api/patients` | `GET /adherence-summary?days=14` (Dashboard: one compact adherence row per active-program patient — completion %, days-since-activity, high-pain flag, status. Computed via `services/adherence.js`. **Registered before `/:patientId`.**) | Clinician only |
+| `patients.js` | `/api/patients` | `GET/POST/PUT/DELETE /:patientId/contacts[/:linkId]` — link/unlink directory contacts to a patient (`patient_contacts`). POST links an existing `{contactId}` or create-and-links `{contact:{…}}`, plus `{relationship, isReportRecipient, isEmergency}`. Setting `isReportRecipient` clears any prior one in a tx (partial-unique index). | Clinician only |
+| `contacts.js` | `/api/contacts` | `GET /?q=&type=` (directory search), `POST /`, `GET /:id` (+ linked patients), `PUT /:id`, `DELETE /:id` (cascades `patient_contacts`). Shared clinic-wide contacts directory; audit-logged; never logs PII. | Clinician only |
 | `programs.js` | `/api/programs` | `POST /patient/:patientId`, `PUT /:programId`, `DELETE /:programId`, `GET /:programId/revisions` | Clinician only |
 | `programs.js` | `/api/programs` | `PATCH /exercise/:exerciseId/complete` | Patient only (uses `req.user.id`) |
 | `programs.js` | `/api/programs` | `GET /patient/:patientId`, `GET /analytics/patient/:patientId` | Both roles + access check |

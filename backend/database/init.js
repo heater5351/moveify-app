@@ -537,6 +537,51 @@ async function initDatabase() {
       ON patient_files(patient_id)
     `);
 
+    // --- Shared contacts directory (PMS-style referrers/relationships) -------
+    // A clinic-wide directory of reusable contacts (GPs, specialists, NDIS
+    // support coordinators, parents/guardians, etc.) linked many-to-many to
+    // patients via patient_contacts. Supersedes the flat emergency_contact_* /
+    // referring_gp columns above (kept nullable/deprecated, not dropped). A
+    // patient's flagged report-recipient GP auto-fills the GP letter's recipient
+    // block. Contacts may hold third-party PII — clinician-only, audit-logged.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS contacts (
+        id            SERIAL PRIMARY KEY,
+        contact_type  TEXT NOT NULL DEFAULT 'other',
+        title         TEXT,
+        name          TEXT NOT NULL,
+        organisation  TEXT,
+        specialty     TEXT,
+        phone         TEXT,
+        email         TEXT,
+        address       TEXT,
+        notes         TEXT,
+        created_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at    TIMESTAMP DEFAULT NOW(),
+        updated_at    TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS patient_contacts (
+        id                  SERIAL PRIMARY KEY,
+        patient_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        contact_id          INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+        relationship        TEXT,
+        is_report_recipient BOOLEAN DEFAULT FALSE,
+        is_emergency        BOOLEAN DEFAULT FALSE,
+        created_at          TIMESTAMP DEFAULT NOW(),
+        UNIQUE (patient_id, contact_id)
+      )
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_patient_contacts_patient ON patient_contacts(patient_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_patient_contacts_contact ON patient_contacts(contact_id)`);
+    // At most one report-recipient GP per patient (drives the GP letter recipient block).
+    await db.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_contacts_one_recipient
+      ON patient_contacts(patient_id)
+      WHERE is_report_recipient
+    `);
+
     // Generic key/value store for app-level state (e.g. the incremental Cliniko
     // auto-sync cursor). Keep keys namespaced and values small.
     await db.query(`

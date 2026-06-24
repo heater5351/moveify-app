@@ -159,6 +159,7 @@ gcloud run services logs tail moveify-billing-worker --region australia-southeas
 - `'patients'` → PatientsPage
 - `'programs'` → PatientProfile (viewing a specific patient's programs)
 - `'education'` → EducationLibrary
+- `'contacts'` → ContactsDirectory (clinic-wide shared contacts directory — GPs, specialists, support coordinators, family; linked many-to-many to patients via `patient_contacts`. A patient's flagged report-recipient GP auto-fills the GP reassessment letter.)
 - `'analytics'` → ProgressAnalytics
 
 React Router is only used for public/unauthenticated routes: `/` (login), `/setup-password`, `/reset-password`, `/privacy-policy`.

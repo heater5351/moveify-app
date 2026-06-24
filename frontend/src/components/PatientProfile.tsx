@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { Edit, User, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown, FileText, Mail, Link, RefreshCw, Search, ChevronRight, Activity, ClipboardList, Folder } from 'lucide-react';
+import { Edit, User, Users, Trash2, PlusCircle, TrendingUp, BookOpen, AlertTriangle, CheckCircle, ChevronDown, FileText, Mail, Link, RefreshCw, Search, ChevronRight, Activity, ClipboardList, Folder } from 'lucide-react';
 import ScribeHistoryPage from './scribe/ScribeHistoryPage';
 import AssessmentTrends from './scribe/AssessmentTrends';
-import type { Patient, ClinicianFlag, BlockStatusResponse } from '../types/index.ts';
+import type { Patient, ClinicianFlag, BlockStatusResponse, PatientContactLink } from '../types/index.ts';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import { PatientEducationModules } from './PatientEducationModules';
 import { PatientFiles } from './PatientFiles';
+import { PatientContacts } from './PatientContacts';
 import { AssignEducationModal } from './modals/AssignEducationModal';
+import { getPatientContacts } from '../utils/contacts-api';
 
 // A single read-only label/value pair in the profile detail cards. Renders
 // nothing when there is no value, so optional enrichment fields stay hidden
@@ -38,7 +40,8 @@ interface PatientProfileProps {
 }
 
 export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditProgram, onDeleteProgram, onAddProgram, onOpenNote, activeNoteSessionId, notesRefreshKey, onPatientSynced }: PatientProfileProps) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'assessments' | 'education' | 'forms' | 'files' | 'notes'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'assessments' | 'education' | 'forms' | 'files' | 'contacts' | 'notes'>('overview');
+  const [patientContacts, setPatientContacts] = useState<PatientContactLink[]>([]);
   const [showAssignEducationModal, setShowAssignEducationModal] = useState(false);
   const [educationModulesRefreshKey, setEducationModulesRefreshKey] = useState(0);
   const [flags, setFlags] = useState<ClinicianFlag[]>([]);
@@ -149,6 +152,32 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
     };
     fetchFlags();
   }, [patient.id]);
+
+  // Linked contacts (shared contacts directory) — drives the Contacts tab and
+  // the Overview emergency-contact / referring-GP summary.
+  const reloadContacts = async () => {
+    try {
+      setPatientContacts(await getPatientContacts(patient.id));
+    } catch {
+      // Non-fatal — contacts are optional context.
+    }
+  };
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const links = await getPatientContacts(patient.id);
+        if (!cancelled) setPatientContacts(links);
+      } catch {
+        // Non-fatal.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [patient.id]);
+
+  const emergencyLinks = patientContacts.filter(l => l.isEmergency);
+  const reportRecipientLink = patientContacts.find(l => l.isReportRecipient);
+  const contactDisplayName = (l: PatientContactLink) => [l.contact.title, l.contact.name].filter(Boolean).join(' ');
 
   // Fetch block status for each program
   useEffect(() => {
@@ -362,6 +391,7 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
             { id: 'education', label: 'Education', icon: <BookOpen size={15} /> },
             { id: 'forms', label: 'Forms', icon: <ClipboardList size={15} /> },
             { id: 'files', label: 'Files', icon: <Folder size={15} /> },
+            { id: 'contacts', label: 'Contacts', icon: <Users size={15} /> },
             { id: 'notes', label: 'Progress Notes', icon: <FileText size={15} /> },
           ].map(({ id, label, icon }) => (
             <button
@@ -462,25 +492,29 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
               </div>
             </div>
 
-            {/* Emergency contact */}
-            {(patient.emergencyContactName || patient.emergencyContactRelationship || patient.emergencyContactPhone) && (
+            {/* Emergency contact (read-only summary; managed in the Contacts tab) */}
+            {emergencyLinks.length > 0 && (
               <div className="pt-5 border-t border-slate-100">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Emergency Contact</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-                  <DetailField label="Name" value={patient.emergencyContactName} />
-                  <DetailField label="Relationship" value={patient.emergencyContactRelationship} />
-                  <DetailField label="Phone" value={patient.emergencyContactPhone} />
+                <div className="space-y-4">
+                  {emergencyLinks.map(l => (
+                    <div key={l.linkId} className="grid grid-cols-2 md:grid-cols-3 gap-5">
+                      <DetailField label="Name" value={contactDisplayName(l)} />
+                      <DetailField label="Relationship" value={l.relationship} />
+                      <DetailField label="Phone" value={l.contact.phone} />
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
             {/* Referral & funding */}
-            {(patient.referralSource || patient.referringGp || patient.medicareNumber || patient.dvaNumber || patient.privateHealthFund || patient.privateHealthMemberNumber) && (
+            {(patient.referralSource || reportRecipientLink || patient.medicareNumber || patient.dvaNumber || patient.privateHealthFund || patient.privateHealthMemberNumber) && (
               <div className="pt-5 border-t border-slate-100">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Referral &amp; Funding</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
                   <DetailField label="Referral Source" value={patient.referralSource} />
-                  <DetailField label="Referring GP" value={patient.referringGp} />
+                  <DetailField label="Referring GP" value={reportRecipientLink ? contactDisplayName(reportRecipientLink) : undefined} />
                   <DetailField label="Medicare" value={patient.medicareNumber} />
                   <DetailField label="DVA" value={patient.dvaNumber} />
                   <DetailField label="Health Fund" value={patient.privateHealthFund} />
@@ -618,6 +652,8 @@ export const PatientProfile = ({ patient, onBack, onEdit, onViewProgram, onEditP
         </div>
       ) : activeTab === 'files' ? (
         <PatientFiles patientId={patient.id} />
+      ) : activeTab === 'contacts' ? (
+        <PatientContacts patientId={patient.id} contacts={patientContacts} onReload={reloadContacts} />
       ) : (
         <div>
           <div className="flex items-center justify-between mb-5">

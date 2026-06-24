@@ -106,10 +106,14 @@ export type Patient = {
   preferredName?: string;
   pronouns?: string;
   occupation?: string;
+  /** @deprecated Moved to the shared contacts directory (see PatientContactLink). No longer populated. */
   emergencyContactName?: string;
+  /** @deprecated Moved to the shared contacts directory. No longer populated. */
   emergencyContactRelationship?: string;
+  /** @deprecated Moved to the shared contacts directory. No longer populated. */
   emergencyContactPhone?: string;
   referralSource?: string;
+  /** @deprecated Moved to the shared contacts directory (report-recipient GP). No longer populated. */
   referringGp?: string;
   medicareNumber?: string;
   privateHealthFund?: string;
@@ -130,6 +134,38 @@ export type PatientFile = {
   uploadedByName: string | null;
   createdAt: string;
 }
+
+// Shared contacts directory (PMS-style referrers/relationships). A clinic-wide,
+// reusable contact (GP, specialist, NDIS support coordinator, parent/guardian…)
+// linked many-to-many to patients via PatientContactLink.
+export type ContactType = 'gp' | 'specialist' | 'support_coordinator' | 'guardian' | 'other';
+
+export type Contact = {
+  id: number;
+  contactType: ContactType;
+  title: string;
+  name: string;
+  organisation: string;
+  specialty: string;
+  phone: string;
+  email: string;
+  address: string;
+  notes: string;
+  /** Number of patients linked to this contact (directory list view only). */
+  patientCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+// A patient's link to a directory contact, with per-patient context. The
+// report-recipient GP auto-fills the GP reassessment letter's recipient block.
+export type PatientContactLink = {
+  linkId: number;
+  relationship: string;
+  isReportRecipient: boolean;
+  isEmergency: boolean;
+  contact: Contact;
+};
 
 export type NewPatient = {
   name: string;

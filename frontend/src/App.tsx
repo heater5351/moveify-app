@@ -12,6 +12,7 @@ import { PatientProfile } from './components/PatientProfile';
 import { PatientPortal } from './components/PatientPortal';
 import { ProgramBuilder } from './components/ProgramBuilder';
 import { EducationLibrary } from './components/EducationLibrary';
+import { ContactsDirectory } from './components/ContactsDirectory';
 import { AddPatientModal } from './components/modals/AddPatientModal';
 import { GenerateAgreementModal } from './components/modals/GenerateAgreementModal';
 import { AgreementPage, AgreementResultPage } from './components/AgreementPage';
@@ -789,11 +790,7 @@ function App() {
           preferredName: editingPatient.preferredName || '',
           pronouns: editingPatient.pronouns || '',
           occupation: editingPatient.occupation || '',
-          emergencyContactName: editingPatient.emergencyContactName || '',
-          emergencyContactRelationship: editingPatient.emergencyContactRelationship || '',
-          emergencyContactPhone: editingPatient.emergencyContactPhone || '',
           referralSource: editingPatient.referralSource || '',
-          referringGp: editingPatient.referringGp || '',
           medicareNumber: editingPatient.medicareNumber || '',
           privateHealthFund: editingPatient.privateHealthFund || '',
           privateHealthMemberNumber: editingPatient.privateHealthMemberNumber || '',
@@ -1172,6 +1169,16 @@ function App() {
                   Patients
                 </button>
                 <button
+                  onClick={() => { setCurrentPage('contacts'); setViewingPatient(null); }}
+                  className={`px-3 md:px-5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                    currentPage === 'contacts'
+                      ? 'border-moveify-teal text-white'
+                      : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/20'
+                  }`}
+                >
+                  Contacts
+                </button>
+                <button
                   onClick={() => setCurrentPage('education')}
                   className={`px-3 md:px-5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                     currentPage === 'education'
@@ -1394,6 +1401,10 @@ function App() {
       ) : currentPage === 'education' ? (
         <div className="flex-1 overflow-y-auto px-6 py-7">
           <EducationLibrary />
+        </div>
+      ) : currentPage === 'contacts' ? (
+        <div className="flex-1 overflow-y-auto px-6 py-7">
+          <ContactsDirectory onNotification={(message, type) => setNotification({ message, type })} />
         </div>
       ) : currentPage === 'dashboard' && !viewingPatient ? (
         <div className="flex-1 overflow-y-auto px-3 md:px-6 py-4 md:py-7">
