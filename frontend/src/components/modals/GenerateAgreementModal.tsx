@@ -32,7 +32,7 @@ const NDIS_MGMT = [
   { value: 'plan_managed', label: 'Plan-managed' },
   { value: 'self_managed', label: 'Self-managed' },
 ];
-const NDIS_RATE_CAP = 166.99;
+const NDIS_RATE_CAP = 161.99;
 // Funding periods (NDIS s33, from 19 May 2025). Only new/reassessed plans use them
 // (usually quarterly); rolled-over / pre-reform plans have the whole budget for the
 // term — so default to "none" and let the operator pick when periods actually apply.
@@ -46,7 +46,7 @@ const NDIS_FUNDING_PERIODS = [
 
 const emptyNdis = {
   ndisNumber: '', planStart: '', planEnd: '',
-  lineItem: '15_200_0126_1_3', rate: '166.99', managementType: 'plan_managed',
+  lineItem: '15_200_0126_1_3', rate: '161.99', managementType: 'plan_managed',
   delivery: 'In clinic', frequency: '1 × 60 min / week',
   fundingPeriod: 'none', fundingPeriodAmount: '',
   travelApplicable: 'no', nonFaceToFace: 'yes',

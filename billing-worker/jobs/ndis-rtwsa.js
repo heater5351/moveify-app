@@ -9,9 +9,9 @@ const { sendEmail } = require('../services/gmail');
 const { check, mark } = require('../lib/idempotency');
 const { logger } = require('../lib/logger');
 
-// NDIS rate: $166.99/hr, RTWSA EP102: $186.30 ex GST
+// NDIS rate: $161.99/hr, RTWSA EP102: $186.30 ex GST
 const RATES = {
-  ndis: { amount: 166.99, description: 'Exercise Physiology — NDIS', gst: false },
+  ndis: { amount: 161.99, description: 'Exercise Physiology — NDIS', gst: false },
   rtwsa: { amount: 186.30, description: 'Exercise Physiology — RTWSA EP102 (ex GST)', gst: false },
 };
 

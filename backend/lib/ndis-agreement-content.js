@@ -18,7 +18,7 @@
 //     dispute) — ndis.gov.au/media/2429.
 //   - Code of Conduct (8 elements): NDIS Quality & Safeguards Commission —
 //     ndiscommission.gov.au/rules-and-standards/ndis-code-conduct.
-//   - Line items, $166.99/hr cap, travel (therapy: 50% labour up to time caps,
+//   - Line items, $161.99/hr cap, travel (therapy: 50% labour up to time caps,
 //     $0.99/km non-labour) and non-face-to-face claiming: NDIS Pricing
 //     Arrangements & Price Limits 2025-26 + vault NDIS EP Billing Reference.
 // ⚠ Final clinical/legal wording still needs Ryan's sign-off before go-live
@@ -48,9 +48,10 @@ const NDIS_LINE_ITEMS = {
   },
 };
 
-// National price cap (MMM 1–5), 2025-26. Therapy supports have no per-state
-// variation. The operator-entered rate must not exceed this.
-const NDIS_RATE_CAP_CENTS = 16699;
+// National price cap (MMM 1–5). Therapy supports have no per-state variation.
+// The operator-entered rate must not exceed this. NDIA reduced the EP price
+// limit to $161.99/hr (down from $166.99). Re-check on the next pricing update.
+const NDIS_RATE_CAP_CENTS = 16199;
 
 // Travel rates (therapy, 2025-26): labour at 50% of the support rate; non-labour
 // at $0.99/km for a provider vehicle. Used for the indicative funding estimate.

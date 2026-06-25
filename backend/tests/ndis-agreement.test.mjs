@@ -14,7 +14,7 @@ const validDetails = {
   planStart: '2026-07-01',
   planEnd: '2027-06-30',
   lineItem: '15_200_0126_1_3',
-  rateCents: 16699,
+  rateCents: 16199,
   managementType: 'plan_managed',
   delivery: 'In clinic',
   frequency: '1 × 60 min / week',
@@ -30,8 +30,8 @@ describe('NDIS line items & caps', () => {
     expect(Object.keys(NDIS_LINE_ITEMS)).toHaveLength(2);
   });
 
-  it('caps the rate at $166.99/hr', () => {
-    expect(NDIS_RATE_CAP_CENTS).toBe(16699);
+  it('caps the rate at $161.99/hr', () => {
+    expect(NDIS_RATE_CAP_CENTS).toBe(16199);
   });
 
   it('excludes NDIA-managed from accepted management types', () => {
@@ -103,9 +103,9 @@ describe('buildNdisAgreement', () => {
     expect(text).toMatch(/up to 5 hours/);          // reporting framed as "up to"
     expect(text).toMatch(/50% of rate/);            // travel labour
     expect(text).toMatch(/200 km/);                 // travel distance
-    // 26h×166.99 + 5h×166.99 + 6h×83.50 (rounded 8350) + 200×0.99
-    // = 4341.74 + 834.95 + 501.00 + 198.00 = 5875.69
-    expect(text).toMatch(/\$5875\.69/);
+    // 26h×161.99 + 5h×161.99 + 6h×81.00 (rounded 8100) + 200×0.99
+    // = 4211.74 + 809.95 + 486.00 + 198.00 = 5705.69
+    expect(text).toMatch(/\$5705\.69/);
     expect(text).toMatch(/not a fixed charge/);
     expect(text).toMatch(/Unused estimates are not charged/);
   });
