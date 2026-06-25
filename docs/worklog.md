@@ -22,6 +22,20 @@ what to know now, links).
 
 ---
 
+## 2026-06-25 — NDIS EP price cap lowered to $161.99/hr
+
+- **What:** NDIA reduced the Exercise Physiology maximum price limit from $166.99 → **$161.99/hr**.
+  `NDIS_RATE_CAP_CENTS` is now `16199` in `backend/lib/ndis-agreement-content.js` (single source of
+  truth — the `/agreements/generate` route validation + its error message derive from it). Also updated
+  the frontend mirror + prefilled default in `GenerateAgreementModal.tsx` and the legacy `ndis-rtwsa.js` rate.
+- **Why:** new NDIS Pricing Arrangements price limit for Exercise Physiology.
+- **To know:** the agreement clause wording doesn't embed the dollar figure (it only states "does not
+  exceed the NDIS price limit"), so `NDIS_AGREEMENT_VERSION` was deliberately **not** bumped.
+- **Open follow-ups:** existing signed NDIS agreements locked at $166.99 may need re-issuing/amending for
+  claims on/after the effective date; vault "NDIS EP Billing Reference" still cites $166.99; billing-worker
+  not yet redeployed (its NDIS rate lives in the inert `ndis-rtwsa.js` job).
+- Shipped to prod 2026-06-25 (backend rev `moveify-backend-00112-2m8` + Vercel frontend).
+
 ## 2026-06-24 — Stripe resolver validates metadata.cliniko_id (household mislink fix)
 
 - **What:** `resolveClinikoPatient` (billing-worker `jobs/stripe-handler.js`) no longer
