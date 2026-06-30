@@ -22,6 +22,22 @@ what to know now, links).
 
 ---
 
+## 2026-06-30 — Decouple service agreement from payment (upfront path)
+
+- **What:** Service-agreement signing is now split from payment. Operator picks a **payment
+  method** at generate-time (`GenerateAgreementModal`): `Weekly DD` (current Stripe flow) or
+  `Upfront`. Upfront blocks sign as **signature-only** (no BECS/checkout, Part B dropped from the
+  doc) and write a **pending expected-payment** to the billing-worker's canonical ledger; the Tyro
+  CSV ingest reconciles a `PIF T1` / `PCL T2` reference + patient name against it (amount cross-check;
+  mismatch/ambiguity → `actions_required` flag, never silent-book). Upfront is block-only (standard
+  PIF / post-casual PCL); continuity stays DD, NDIS unchanged.
+- **Schema:** backend `service_agreements.payment_method TEXT NOT NULL DEFAULT 'dd'`; worker new
+  `expected_payments` table. Both additive (`IF NOT EXISTS`), no drops.
+- **New worker endpoint:** `POST /admin/agreements/expected-payment` (flag-gated, `X-Admin-Token`).
+  Canonical upfront price table duplicated in `backend/lib/agreement-template.js` (`UPFRONT_PRICES`)
+  and `billing-worker/lib/upfront-prices.js` — **sync invariant**, keep both with the vault doc.
+- **Still behind `AGREEMENT_AUTOMATION_ENABLED`.** On `dev`. See `docs/agreement-automation.md`.
+
 ## 2026-06-25 — NDIS EP price cap lowered to $161.99/hr
 
 - **What:** NDIA reduced the Exercise Physiology maximum price limit from $166.99 → **$161.99/hr**.

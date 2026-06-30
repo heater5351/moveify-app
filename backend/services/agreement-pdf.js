@@ -26,11 +26,13 @@ const RULE = '#E2E8F0';
  *
  * @returns {Promise<Buffer>}
  */
-function renderAgreementPdf({ patientName, tier, path, startDate, signedName, signedAt, signedIp, signature, agreement: prebuilt, signedCapacity, draft }) {
+function renderAgreementPdf({ patientName, tier, path, startDate, paymentMethod, signedName, signedAt, signedIp, signature, agreement: prebuilt, signedCapacity, draft }) {
   return new Promise((resolve, reject) => {
     try {
-      const agreement = prebuilt || buildAgreement({ tier, path, startDate });
+      const agreement = prebuilt || buildAgreement({ tier, path, startDate, paymentMethod });
       const isNdis = agreement && agreement.kind === 'ndis';
+      // Upfront private blocks have no Direct Debit mandate — adjust the footnote.
+      const isUpfront = agreement && agreement.paymentMethod === 'upfront';
       const doc = new PDFDocument({ size: 'A4', margin: 50 });
       const chunks = [];
       doc.on('data', (c) => chunks.push(c));
@@ -170,7 +172,9 @@ function renderAgreementPdf({ patientName, tier, path, startDate, signedName, si
         doc.fontSize(7.5).fillColor(SUB).text(
           isNdis
             ? 'This document records an electronic acceptance, including the signatory’s drawn signature, typed name, timestamp and IP address. Supports are claimed against the participant’s NDIS plan; there is no Direct Debit mandate.'
-            : 'This document records an electronic acceptance, including the signatory’s drawn signature and explicit Direct Debit authorisation. The bank-level Direct Debit mandate (BECS/card) was captured separately by our payment provider, Stripe.',
+            : isUpfront
+              ? 'This document records an electronic acceptance, including the signatory’s drawn signature, typed name, timestamp and IP address. The block fee is paid in full upfront; there is no Direct Debit mandate.'
+              : 'This document records an electronic acceptance, including the signatory’s drawn signature and explicit Direct Debit authorisation. The bank-level Direct Debit mandate (BECS/card) was captured separately by our payment provider, Stripe.',
         );
       }
 

@@ -65,6 +65,44 @@ function formatMoney(cents) {
   return Number.isInteger(dollars) ? `$${dollars}` : `$${dollars.toFixed(2)}`;
 }
 
+// ── Upfront (pay-in-full) block pricing, keyed `${path}:${tier}` ───────────────
+// Canonical figures from the vault doc "Decouple Agreement from Payment" (the
+// single source of truth). PIF = standard block paid in full (5% off the 6-week
+// total); PCL = post-casual lump (the full post-casual total, no discount).
+//   standard T1 = round($76.67×6 × 0.95) = $437   etc.
+//   post_casual T1 = $58×5 = $290                  etc.
+// ⚠ SYNC INVARIANT: this table is duplicated in the billing-worker
+// (lib/upfront-prices.js) for the Tyro reconciliation amount cross-check — keep
+// both in lockstep with the doc. Continuity has no upfront option (rolling only).
+const UPFRONT_PRICES = {
+  'standard:T1': 43700,
+  'standard:T2': 64600,
+  'standard:T3': 81700,
+  'post_casual:T1': 29000,
+  'post_casual:T2': 51000,
+  'post_casual:T3': 69000,
+};
+
+// Operator terminal reference for an upfront block: `PIF T1` (standard) /
+// `PCL T2` (post-casual). Keyed to the path; tier is appended verbatim.
+function upfrontRefCode(tier, path) {
+  const prefix = path === 'standard' ? 'PIF' : path === 'post_casual' ? 'PCL' : null;
+  if (!prefix) return null;
+  if (!UPFRONT_PRICES[planKey(tier, path)]) return null;
+  return `${prefix} ${String(tier).trim()}`;
+}
+
+// Upfront price in cents for a tier/path, or null if upfront is not offered.
+function upfrontPrice(tier, path) {
+  return UPFRONT_PRICES[planKey(tier, path)] || null;
+}
+
+// Short "Fees" summary line for an upfront block, or null if not applicable.
+function upfrontTermsSummary(tier, path) {
+  const cents = upfrontPrice(tier, path);
+  return cents ? `${formatMoney(cents)} paid in full upfront` : null;
+}
+
 // Human-readable labels for the tier/path the operator selected, shown to the
 // patient as a read-only summary. Keys mirror lib service-catalog plan keys on
 // the worker; kept here so the backend can render without a worker round-trip.
@@ -155,7 +193,11 @@ module.exports = {
   VALID_PATHS,
   STATEMENT_DESCRIPTOR,
   PLAN_BILLING,
+  UPFRONT_PRICES,
   formatMoney,
   tierLabel,
   billingTerms,
+  upfrontRefCode,
+  upfrontPrice,
+  upfrontTermsSummary,
 };

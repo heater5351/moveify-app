@@ -1184,6 +1184,12 @@ Output only the four sections with their exact headings. No preamble. No comment
     await db.query(`ALTER TABLE service_agreements DROP CONSTRAINT IF EXISTS service_agreements_path_check`);
     await db.query(`ALTER TABLE service_agreements ADD CONSTRAINT service_agreements_path_check CHECK (path IN ('standard', 'post_casual', 'continuity', 'ndis'))`);
 
+    // Decouple signing from payment. 'dd' = Direct Debit (current Stripe flow);
+    // 'upfront' = paid in full out-of-band (Tyro/manual), reconciled via the
+    // worker's expected_payments ledger. Additive, defaults to 'dd' so every
+    // existing row keeps its meaning.
+    await db.query(`ALTER TABLE service_agreements ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'dd'`);
+
     console.log('✅ Service agreements table initialized');
 
     console.log('✅ Database tables initialized');

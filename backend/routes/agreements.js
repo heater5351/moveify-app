@@ -21,6 +21,7 @@ const {
   AGREEMENT_VERSION,
   VALID_PATHS,
   tierLabel,
+  upfrontPrice,
 } = require('../lib/agreement-template');
 const { buildAgreement } = require('../lib/agreement-content');
 const {
@@ -53,7 +54,7 @@ async function clinikoNameEmail(clinikoPatientId) {
 
 // Mints + stores a tokenised agreement row, invalidating any earlier UNSIGNED
 // link for the same patient. Shared by the private + NDIS generate paths.
-async function mintAgreement({ req, clinikoPatientId, tier, path, kind, details, startDate, version }) {
+async function mintAgreement({ req, clinikoPatientId, tier, path, kind, details, startDate, version, paymentMethod = 'dd' }) {
   const existing = await db.getOne('SELECT id FROM users WHERE cliniko_patient_id = $1', [String(clinikoPatientId)]);
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
@@ -64,10 +65,10 @@ async function mintAgreement({ req, clinikoPatientId, tier, path, kind, details,
   );
   const row = await db.getOne(`
     INSERT INTO service_agreements
-      (patient_id, cliniko_patient_id, clinician_id, kind, tier, path, details, start_date, status, token, token_expires_at, agreement_version)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11)
+      (patient_id, cliniko_patient_id, clinician_id, kind, tier, path, details, start_date, status, token, token_expires_at, agreement_version, payment_method)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11, $12)
     RETURNING id
-  `, [existing?.id || null, String(clinikoPatientId), req.user.id, kind, tier, path, details ? JSON.stringify(details) : null, startDate || null, token, expiresAt, version]);
+  `, [existing?.id || null, String(clinikoPatientId), req.user.id, kind, tier, path, details ? JSON.stringify(details) : null, startDate || null, token, expiresAt, version, paymentMethod]);
   const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
   return { agreementId: row.id, token, link: `${baseUrl}/agreement?token=${token}`, expiresAt };
 }
@@ -161,6 +162,9 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
   if ((req.body || {}).kind === 'ndis') return generateNdis(req, res);
 
   const { clinikoPatientId, tier, path, startDate } = req.body || {};
+  // Payment method decouples signing from payment. 'dd' (default) = Direct Debit
+  // via Stripe; 'upfront' = paid in full out-of-band, offered on block paths only.
+  const paymentMethod = (req.body || {}).paymentMethod === 'upfront' ? 'upfront' : 'dd';
   if (!clinikoPatientId || !tier || !path) {
     return res.status(400).json({ error: 'clinikoPatientId, tier and path are required' });
   }
@@ -175,6 +179,12 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
   }
   if (!VALID_PATHS.includes(path)) return res.status(400).json({ error: 'Invalid path' });
   if (!tierLabel(tier, path)) return res.status(400).json({ error: 'Unknown tier/path combination' });
+  // Upfront is a block-only option (standard PIF / post-casual PCL). Continuity is
+  // rolling and has no lump price, so reject the combination rather than silently
+  // falling back — the operator should pick a valid pairing.
+  if (paymentMethod === 'upfront' && !upfrontPrice(tier, path)) {
+    return res.status(400).json({ error: 'Upfront payment is only available for block (standard / post-casual) programs' });
+  }
 
   try {
     // Link to an existing Moveify user if one is already mapped to this Cliniko id.
@@ -195,15 +205,15 @@ router.post('/generate', authenticate, requireRole('clinician'), async (req, res
 
     const row = await db.getOne(`
       INSERT INTO service_agreements
-        (patient_id, cliniko_patient_id, clinician_id, tier, path, start_date, status, token, token_expires_at, agreement_version)
-      VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9)
+        (patient_id, cliniko_patient_id, clinician_id, tier, path, start_date, status, token, token_expires_at, agreement_version, payment_method)
+      VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10)
       RETURNING id
-    `, [existing?.id || null, String(clinikoPatientId), req.user.id, tier, path, startDate || null, token, expiresAt, AGREEMENT_VERSION]);
+    `, [existing?.id || null, String(clinikoPatientId), req.user.id, tier, path, startDate || null, token, expiresAt, AGREEMENT_VERSION, paymentMethod]);
 
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const link = `${baseUrl}/agreement?token=${token}`;
-    audit.log(req, 'agreement_generate', 'service_agreement', row.id, { tier, path });
-    res.json({ link, token, expiresAt, agreementId: row.id });
+    audit.log(req, 'agreement_generate', 'service_agreement', row.id, { tier, path, paymentMethod });
+    res.json({ link, token, expiresAt, agreementId: row.id, paymentMethod });
   } catch (err) {
     console.error('Agreement generate error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -242,12 +252,14 @@ router.get('/validate/:token', async (req, res) => {
       patientName: name,
       tier: a.tier,
       path: a.path,
+      paymentMethod: a.payment_method,
       tierLabel: tierLabel(a.tier, a.path),
       startDate: a.start_date,
       agreementVersion: a.agreement_version,
-      // Full structured agreement (provider header, Part A clinical, Part B DDRSA)
-      // — mirrors the Cliniko service agreements. The sign page renders this.
-      agreement: buildAgreement({ tier: a.tier, path: a.path, startDate: a.start_date }),
+      // Full structured agreement (provider header, Part A clinical, Part B DDRSA
+      // for DD; Part A only for upfront) — mirrors the Cliniko service agreements.
+      // The sign page renders this.
+      agreement: buildAgreement({ tier: a.tier, path: a.path, startDate: a.start_date, paymentMethod: a.payment_method }),
     });
   } catch (err) {
     console.error('Agreement validate error:', err);
@@ -288,7 +300,7 @@ router.get('/:token/pdf', async (req, res) => {
       if (!agreement) return res.status(404).json({ error: 'Agreement could not be rendered' });
       pdf = await renderAgreementPdf({ ...common, agreement, signedCapacity: isSigned ? a.signed_capacity : undefined });
     } else {
-      pdf = await renderAgreementPdf({ ...common, tier: a.tier, path: a.path, startDate: a.start_date });
+      pdf = await renderAgreementPdf({ ...common, tier: a.tier, path: a.path, startDate: a.start_date, paymentMethod: a.payment_method });
     }
 
     const fname = `${a.kind === 'ndis' ? 'NDIS-' : ''}Service-Agreement${isSigned ? '-signed' : '-preview'}.pdf`;
@@ -372,26 +384,130 @@ async function signNdis(req, res) {
   }
 }
 
+// Upfront sign path — signature-only (no Stripe / Direct Debit). Records the
+// signature, stores the signed PDF in Cliniko, then writes a pending
+// expected-payment record to the billing-worker's canonical ledger so the
+// later Tyro CSV line reconciles against it. A worker-call failure reverts the
+// row to 'pending' so the same link can be retried.
+async function signUpfront(req, res) {
+  const { signedName, consent, signature } = req.body || {};
+  if (!signedName || consent !== true) {
+    return res.status(400).json({ error: 'A typed name and consent are required' });
+  }
+  const sigErr = validateSignature(signature);
+  if (sigErr) return res.status(400).json({ error: sigErr });
+
+  try {
+    // Atomically claim the pending agreement — defends against double-sign races.
+    // No dd_authorised for upfront — there is no Direct Debit mandate.
+    const a = await db.getOne(`
+      UPDATE service_agreements
+      SET status = 'signed', signed_name = $2, signed_at = NOW(), signed_ip = $3,
+          signed_signature = $4, updated_at = NOW()
+      WHERE token = $1 AND status = 'pending' AND token_expires_at > NOW()
+            AND kind != 'ndis' AND payment_method = 'upfront'
+      RETURNING *
+    `, [req.params.token, String(signedName).slice(0, 200), req.ip, signature]);
+    if (!a) return res.status(410).json({ error: 'This link is invalid, expired, or already used' });
+
+    const { name: patientName } = await clinikoNameEmail(a.cliniko_patient_id);
+
+    // Revert to 'pending' if the ledger write (below) fails, so the SAME link can
+    // be retried rather than dead-ending as 'signed' with no expected-payment.
+    const revertToPending = () => db.query(
+      `UPDATE service_agreements SET status = 'pending', updated_at = NOW() WHERE id = $1 AND status = 'signed'`,
+      [a.id]
+    ).catch((e) => console.error('Failed to revert agreement to pending:', e.message));
+
+    // Render + store the signed PDF in Cliniko — once. Best-effort: the signature
+    // is already the record, so a Cliniko blip must not block the ledger write.
+    if (!a.cliniko_attachment_id) {
+      try {
+        const pdf = await renderAgreementPdf({
+          patientName,
+          tier: a.tier,
+          path: a.path,
+          startDate: a.start_date,
+          paymentMethod: 'upfront',
+          signedName: a.signed_name,
+          signedAt: new Date(a.signed_at).toISOString(),
+          signedIp: a.signed_ip,
+          signature: a.signed_signature,
+        });
+        const att = await cliniko.uploadAttachment(
+          a.cliniko_patient_id,
+          pdf,
+          `Service Agreement ${new Date().toISOString().slice(0, 10)}.pdf`,
+          'application/pdf',
+          'Signed service agreement (Moveify)'
+        );
+        if (att?.id) {
+          await db.query('UPDATE service_agreements SET cliniko_attachment_id = $1, updated_at = NOW() WHERE id = $2', [String(att.id), a.id]);
+        }
+      } catch (pdfErr) {
+        console.error('Upfront agreement PDF upload failed (continuing to ledger):', pdfErr.message);
+      }
+    }
+
+    // Write the pending expected-payment record to the worker's canonical ledger.
+    const workerUrl = process.env.BILLING_WORKER_URL;
+    const adminToken = process.env.BILLING_ADMIN_TOKEN;
+    if (!workerUrl || !adminToken) {
+      console.error('BILLING_WORKER_URL / BILLING_ADMIN_TOKEN not configured');
+      await revertToPending();
+      return res.status(500).json({ error: 'Payment setup is temporarily unavailable' });
+    }
+    try {
+      const wr = await fetch(`${workerUrl.replace(/\/$/, '')}/admin/agreements/expected-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': adminToken },
+        body: JSON.stringify({
+          agreementId: String(a.id),
+          clinikoId: a.cliniko_patient_id,
+          name: patientName,
+          tier: a.tier,
+          path: a.path,
+        }),
+      });
+      if (!wr.ok) {
+        const body = await wr.text().catch(() => '');
+        throw new Error(`worker ${wr.status}: ${body.slice(0, 200)}`);
+      }
+    } catch (workerErr) {
+      console.error('expected-payment call failed:', workerErr.message);
+      await revertToPending();
+      return res.status(502).json({ error: 'Could not record your agreement. Please try again or contact the clinic.' });
+    }
+
+    audit.log(req, 'agreement_sign', 'service_agreement', a.id, { tier: a.tier, path: a.path, paymentMethod: 'upfront' });
+    res.json({ signed: true });
+  } catch (err) {
+    console.error('Upfront agreement sign error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 // POST /:token/sign — public. Records the signature, stores the PDF in Cliniko.
-// Private agreements then open a Stripe setup Checkout and return its URL; NDIS
-// agreements are signature-only and finish on signing.
+// DD private agreements then open a Stripe setup Checkout and return its URL;
+// NDIS + upfront agreements are signature-only and finish on signing.
 router.post('/:token/sign', async (req, res) => {
   if (!automationEnabled()) return res.status(503).json({ error: 'Agreement automation is disabled' });
 
-  // Peek the kind before claiming, so the right validation + flow applies.
-  let peekKind;
+  // Peek the kind + payment method before claiming, so the right validation +
+  // flow applies. NDIS and upfront are both signature-only (no Stripe leg).
+  let peek;
   try {
-    const peek = await db.getOne(
-      `SELECT kind FROM service_agreements WHERE token = $1 AND status = 'pending' AND token_expires_at > NOW()`,
+    peek = await db.getOne(
+      `SELECT kind, payment_method FROM service_agreements WHERE token = $1 AND status = 'pending' AND token_expires_at > NOW()`,
       [req.params.token]
     );
-    peekKind = peek ? peek.kind : null;
   } catch (e) {
     console.error('Agreement sign peek error:', e);
     return res.status(500).json({ error: 'Server error' });
   }
-  if (!peekKind) return res.status(410).json({ error: 'This link is invalid, expired, or already used' });
-  if (peekKind === 'ndis') return signNdis(req, res);
+  if (!peek) return res.status(410).json({ error: 'This link is invalid, expired, or already used' });
+  if (peek.kind === 'ndis') return signNdis(req, res);
+  if (peek.payment_method === 'upfront') return signUpfront(req, res);
 
   const { signedName, consent, signature, ddAuthorised } = req.body || {};
   if (!signedName || consent !== true) {

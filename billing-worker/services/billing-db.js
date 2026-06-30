@@ -23,6 +23,7 @@ const COLUMNS = {
   stripe_payments: ['stripe_event_id', 'stripe_invoice_id', 'stripe_subscription_id', 'cliniko_id', 'xero_contact_id', 'xero_overpayment_id', 'amount', 'currency', 'tier', 'paid_at', 'pp_invoice_id', 'pp_amount', 'created_at'],
   appointment_invoices: ['cliniko_appointment_id', 'cliniko_patient_id', 'service_name', 'appointment_date', 'appointment_status', 'casual_price', 'xero_invoice_id', 'xero_invoice_number', 'overpayment_allocated', 'gap_amount', 'created_at'],
   stripe_cliniko_links: ['stripe_customer_id', 'cliniko_id', 'match_method', 'linked_at'],
+  expected_payments: ['id', 'agreement_id', 'cliniko_id', 'patient_name', 'method', 'path', 'tier', 'ref_code', 'expected_amount_cents', 'status', 'matched_txn_id', 'flag_reason', 'created_at', 'matched_at'],
 };
 
 // Legacy Sheets-style tab names → table names (for getTab compatibility).
@@ -42,6 +43,7 @@ const TAB_TO_TABLE = {
   StripePayments: 'stripe_payments',
   AppointmentInvoices: 'appointment_invoices',
   StripeClinikoLinks: 'stripe_cliniko_links',
+  ExpectedPayments: 'expected_payments',
 };
 
 // Identifier safety: only allow whitelisted table names through dynamic SQL.
@@ -135,6 +137,39 @@ async function getAppointmentInvoiceByApptId(clinikoAppointmentId) {
 }
 async function appendActionRequired(data) { return appendRow('actions_required', 'id', data); }
 async function appendReconciliationFlag(data) { return appendRow('reconciliation_flags', 'id', data); }
+
+// Expected-payment ledger (upfront block agreements). Insert is idempotent on
+// id (exp:<agreement_id>) so a backend retry can't create a duplicate row.
+async function appendExpectedPayment(data) { return appendRow('expected_payments', 'id', data); }
+
+// Pending expected payments for a given `PIF T1` / `PCL T2` reference code.
+async function getPendingExpectedPayments({ refCode }) {
+  return getAll(
+    `SELECT id, agreement_id, cliniko_id, patient_name, method, path, tier,
+            ref_code, expected_amount_cents, status, matched_txn_id, flag_reason
+     FROM expected_payments
+     WHERE ref_code = $1 AND status = 'pending'`,
+    [String(refCode)]
+  );
+}
+
+async function markExpectedPaymentMatched(id, txnId) {
+  await query(
+    `UPDATE expected_payments
+     SET status = 'matched', matched_txn_id = $2, matched_at = NOW()
+     WHERE id = $1`,
+    [String(id), txnId == null ? null : String(txnId)]
+  );
+}
+
+async function markExpectedPaymentFlagged(id, reason) {
+  await query(
+    `UPDATE expected_payments
+     SET status = 'flagged', flag_reason = $2
+     WHERE id = $1`,
+    [String(id), reason == null ? null : String(reason)]
+  );
+}
 
 async function getWorkerState(key) {
   const row = await getOne('SELECT value FROM worker_state WHERE key = $1', [String(key)]);
@@ -310,6 +345,11 @@ module.exports = {
   appendAppointmentInvoice,
   getAppointmentInvoiceByApptId,
   appendReconciliationFlag,
+  // expected-payment ledger (upfront agreements)
+  appendExpectedPayment,
+  getPendingExpectedPayments,
+  markExpectedPaymentMatched,
+  markExpectedPaymentFlagged,
   // state
   getWorkerState,
   setWorkerState,

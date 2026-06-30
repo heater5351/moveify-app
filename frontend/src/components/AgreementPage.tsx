@@ -44,6 +44,7 @@ interface AgreementDetails {
   patientName: string;
   tier: string;
   path: string;
+  paymentMethod?: string;
   tierLabel: string | null;
   startDate: string | null;
   agreementVersion: string;
@@ -174,6 +175,10 @@ export const AgreementPage = () => {
   const [signedDone, setSignedDone] = useState(false);
 
   const isNdis = details?.kind === 'ndis';
+  // Upfront blocks decouple signing from payment: signature-only, no Direct Debit.
+  const isUpfront = details?.paymentMethod === 'upfront';
+  const signatureOnly = isNdis || isUpfront;
+  const requiresDd = !signatureOnly;
   const pdfUrl = token ? `${API_URL}/agreements/${encodeURIComponent(token)}/pdf` : '';
 
   const signedDate = new Date().toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -199,20 +204,22 @@ export const AgreementPage = () => {
     if (!signedName.trim()) { setSubmitError('Please type your full name to sign.'); return; }
     if (!signature) { setSubmitError('Please draw your signature in the box.'); return; }
     if (!consent) { setSubmitError('Please tick the box to confirm you have read the agreement.'); return; }
-    if (!isNdis && !ddAuthorised) { setSubmitError('Please confirm the Direct Debit authorisation.'); return; }
+    if (requiresDd && !ddAuthorised) { setSubmitError('Please confirm the Direct Debit authorisation.'); return; }
     if (isNdis && signingAsRep && !capacity.trim()) { setSubmitError('Please describe your authority to sign (e.g. plan nominee, guardian).'); return; }
     setSubmitting(true);
     try {
       const body = isNdis
         ? { signedName: signedName.trim(), consent: true, signature, signedCapacity: signingAsRep ? capacity.trim() : '' }
-        : { signedName: signedName.trim(), consent: true, signature, ddAuthorised: true };
+        : isUpfront
+          ? { signedName: signedName.trim(), consent: true, signature }
+          : { signedName: signedName.trim(), consent: true, signature, ddAuthorised: true };
       const res = await fetch(`${API_URL}/agreements/${encodeURIComponent(token)}/sign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (res.ok && isNdis && data.signed) {
+      if (res.ok && data.signed) {
         setSignedDone(true);
       } else if (res.ok && data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
@@ -254,8 +261,10 @@ export const AgreementPage = () => {
           <CheckCircle className="text-green-500 mx-auto mb-4" size={44} />
           <h1 className="text-xl font-bold font-display text-secondary-500 mb-2">Agreement signed</h1>
           <p className="text-slate-500 text-sm">
-            Thank you{details.patientName ? `, ${details.patientName.split(' ')[0]}` : ''}. Your NDIS Service Agreement is
-            signed and on file with Moveify Health Solutions.
+            Thank you{details.patientName ? `, ${details.patientName.split(' ')[0]}` : ''}.{' '}
+            {isUpfront
+              ? 'Your service agreement is signed and on file with Moveify Health Solutions. Please complete your upfront payment at the clinic.'
+              : 'Your NDIS Service Agreement is signed and on file with Moveify Health Solutions.'}
           </p>
           <a
             href={pdfUrl}
@@ -405,10 +414,12 @@ export const AgreementPage = () => {
               <span className="text-sm text-slate-600">
                 {isNdis
                   ? 'I have read and understood this NDIS Service Agreement, including the NDIS short-notice cancellation policy, and I consent to the collection and handling of health information in accordance with the Moveify Privacy Policy and Consent & Pre-Exercise Questionnaire.'
-                  : 'I have read and understood both Part A (Clinical Services) and Part B (Direct Debit Request Service Agreement), and I consent to the collection and handling of my health information in accordance with the Moveify Privacy Policy.'}
+                  : isUpfront
+                    ? 'I have read and understood Part A (Clinical Services) of this agreement, agree to pay the block fee in full upfront, and consent to the collection and handling of my health information in accordance with the Moveify Privacy Policy.'
+                    : 'I have read and understood both Part A (Clinical Services) and Part B (Direct Debit Request Service Agreement), and I consent to the collection and handling of my health information in accordance with the Moveify Privacy Policy.'}
               </span>
             </label>
-            {!isNdis && (
+            {requiresDd && (
               <label className="flex items-start gap-3 mt-4 cursor-pointer">
                 <input
                   type="checkbox"
@@ -429,18 +440,20 @@ export const AgreementPage = () => {
 
             <button
               onClick={handleSign}
-              disabled={submitting || !signedName.trim() || !signature || !consent || (!isNdis && !ddAuthorised)}
+              disabled={submitting || !signedName.trim() || !signature || !consent || (requiresDd && !ddAuthorised)}
               className="mt-6 w-full px-4 py-3 bg-primary-400 text-white rounded-lg hover:bg-primary-500 font-medium disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {submitting
-                ? <><Loader2 className="animate-spin" size={18} /> {isNdis ? 'Signing…' : 'Setting up…'}</>
-                : (isNdis ? 'Agree & sign' : 'Agree & continue to payment setup')}
+                ? <><Loader2 className="animate-spin" size={18} /> {signatureOnly ? 'Signing…' : 'Setting up…'}</>
+                : (signatureOnly ? 'Agree & sign' : 'Agree & continue to payment setup')}
             </button>
             <p className="text-xs text-slate-400 mt-3 text-center flex items-center justify-center gap-1.5">
               <ShieldCheck size={13} />
               {isNdis
                 ? ' Your signed agreement is stored securely with Moveify. No payment details are collected — supports are claimed against your NDIS plan.'
-                : ' You’ll next set up your Direct Debit (card or bank account) securely with Stripe. No payment is taken yet.'}
+                : isUpfront
+                  ? ' Your signed agreement is stored securely with Moveify. No card details are collected here — you’ll pay the block fee in full at the clinic.'
+                  : ' You’ll next set up your Direct Debit (card or bank account) securely with Stripe. No payment is taken yet.'}
             </p>
           </div>
         </div>

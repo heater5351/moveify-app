@@ -181,3 +181,27 @@ CREATE TABLE IF NOT EXISTS stripe_cliniko_links (
   linked_at            TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS stripe_cliniko_links_cliniko_idx ON stripe_cliniko_links (cliniko_id);
+
+-- Expected-payment ledger for upfront (out-of-band) block agreements. Written
+-- when the backend's upfront agreement is signed; the Tyro CSV ingest reconciles
+-- a `PIF T1` / `PCL T2` reference + patient name against the pending row, so an
+-- upfront payment becomes a deterministic match instead of an orphan. See
+-- jobs/ingest-tyro.js + lib/upfront-prices.js.
+CREATE TABLE IF NOT EXISTS expected_payments (
+  id                     TEXT PRIMARY KEY,   -- exp:<agreement_id>
+  agreement_id           TEXT,
+  cliniko_id             TEXT,
+  patient_name           TEXT,
+  method                 TEXT,               -- 'tyro_upfront'
+  path                   TEXT,
+  tier                   TEXT,
+  ref_code               TEXT,               -- 'PIF T1' / 'PCL T2'
+  expected_amount_cents  INTEGER,
+  status                 TEXT DEFAULT 'pending',  -- pending | matched | flagged
+  matched_txn_id         TEXT,
+  flag_reason            TEXT,
+  created_at             TIMESTAMPTZ,
+  matched_at             TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS expected_payments_refcode_status_idx
+  ON expected_payments (ref_code, status);

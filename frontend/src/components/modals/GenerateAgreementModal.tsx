@@ -23,6 +23,21 @@ const CONTINUITY_TIERS = [
   'Independent', 'Maintain', 'Evolve', 'Elite', 'Remote Weekly', 'Remote Fortnightly', 'App-Only',
 ].map((t) => ({ value: t, label: t }));
 
+type PaymentMethod = 'dd' | 'upfront';
+
+// Operator-facing upfront reference + amount, keyed `${programType}:${tier}`.
+// Mirrors the canonical table in backend/lib/agreement-template.js (UPFRONT_PRICES)
+// and the vault doc — shown so the front desk knows what to key at the Tyro
+// terminal. PIF = standard pay-in-full (5% off); PCL = post-casual lump.
+const UPFRONT_INFO: Record<string, { ref: string; amount: string }> = {
+  'block_standard:T1': { ref: 'PIF T1', amount: '$437' },
+  'block_standard:T2': { ref: 'PIF T2', amount: '$646' },
+  'block_standard:T3': { ref: 'PIF T3', amount: '$817' },
+  'block_post_casual:T1': { ref: 'PCL T1', amount: '$290' },
+  'block_post_casual:T2': { ref: 'PCL T2', amount: '$510' },
+  'block_post_casual:T3': { ref: 'PCL T3', amount: '$690' },
+};
+
 // NDIS line items + management types (mirror backend lib/ndis-agreement-content.js).
 const NDIS_LINE_ITEMS = [
   { value: '15_200_0126_1_3', label: 'Improved Daily Living — EP (15_200_0126_1_3)' },
@@ -234,6 +249,7 @@ export const GenerateAgreementModal = ({ onClose }: GenerateAgreementModalProps)
   const [programType, setProgramType] = useState<ProgramType>('block_standard');
   const [tier, setTier] = useState('T1');
   const [startDate, setStartDate] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('dd');
   const [ndis, setNdis] = useState(emptyNdis);
   const updNdis = (k: keyof typeof emptyNdis, v: string) => setNdis((s) => ({ ...s, [k]: v }));
 
@@ -242,11 +258,20 @@ export const GenerateAgreementModal = ({ onClose }: GenerateAgreementModalProps)
   const [link, setLink] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // Upfront is a block-only option; continuity/NDIS are always DD/no-payment.
+  const isBlock = programType === 'block_standard' || programType === 'block_post_casual';
+  const upfront = isBlock && paymentMethod === 'upfront' ? UPFRONT_INFO[`${programType}:${tier}`] : null;
+
   // Keep the tier selection valid when switching program type.
   useEffect(() => {
     const valid = programType === 'continuity' ? CONTINUITY_TIERS : BLOCK_TIERS;
     if (!valid.some((t) => t.value === tier)) setTier(valid[0].value);
   }, [programType]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset to Direct Debit when leaving the block paths (no upfront for continuity/NDIS).
+  useEffect(() => {
+    if (!isBlock) setPaymentMethod('dd');
+  }, [isBlock]);
 
   useEffect(() => {
     if (search.trim().length >= 2) {
@@ -279,7 +304,8 @@ export const GenerateAgreementModal = ({ onClose }: GenerateAgreementModalProps)
   const buildBody = (): Record<string, unknown> | null => {
     if (programType !== 'ndis') {
       const { tier: t, path } = resolvePathTier(programType, tier);
-      return { clinikoPatientId: selected!.id, tier: t, path, startDate: startDate || null };
+      const method: PaymentMethod = isBlock && paymentMethod === 'upfront' ? 'upfront' : 'dd';
+      return { clinikoPatientId: selected!.id, tier: t, path, startDate: startDate || null, paymentMethod: method };
     }
     const rate = parseFloat(ndis.rate);
     if (!ndis.planStart || !ndis.planEnd) { setError('Plan start and end dates are required.'); return null; }
@@ -358,6 +384,13 @@ export const GenerateAgreementModal = ({ onClose }: GenerateAgreementModalProps)
             </button>
           </div>
           <p className="text-xs text-slate-400 mt-3">The link expires in 14 days and can be used once.</p>
+          {upfront && (
+            <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-sm text-amber-800">
+              <strong>Upfront payment:</strong> after signing, take payment at the Tyro terminal with reference{' '}
+              <strong>{upfront.ref}</strong> ({upfront.amount}) and the patient&rsquo;s name in the name field — it will
+              reconcile automatically.
+            </div>
+          )}
           <button onClick={onClose} className="mt-6 w-full px-4 py-2 bg-primary-400 text-white rounded-lg hover:bg-primary-500 font-medium">Done</button>
         </div>
       </div>
@@ -462,6 +495,35 @@ export const GenerateAgreementModal = ({ onClose }: GenerateAgreementModalProps)
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                   />
                 </div>
+
+                {isBlock && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Payment method</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('dd')}
+                        className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium ${paymentMethod === 'dd' ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        Weekly Direct Debit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('upfront')}
+                        className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium ${paymentMethod === 'upfront' ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        Pay upfront
+                      </button>
+                    </div>
+                    {upfront && (
+                      <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-sm text-amber-800">
+                        No Direct Debit is set up. The patient signs, then pays in clinic. At the Tyro terminal, key the
+                        reference <strong>{upfront.ref}</strong> ({upfront.amount}) and enter the patient&rsquo;s name so the
+                        payment reconciles automatically.
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <NdisFields ndis={ndis} upd={updNdis} />

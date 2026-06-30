@@ -3,7 +3,42 @@
 const xero = require('../lib/xero');
 const idempotency = require('../lib/idempotency');
 const { logger } = require('../lib/logger');
-const { appendTyroIngest, appendActionRequired, findContactByMembership } = require('../services/billing-db');
+const {
+  appendTyroIngest,
+  appendActionRequired,
+  findContactByMembership,
+  getPendingExpectedPayments,
+  markExpectedPaymentMatched,
+  markExpectedPaymentFlagged,
+} = require('../services/billing-db');
+const { parseUpfrontRef } = require('../lib/upfront-prices');
+
+// Name compare for upfront reconciliation — lowercase, collapse whitespace, trim.
+// Matches on the typed patient/name field, NOT the cardholder (a partner/parent
+// may pay), per the agreement-decoupling spec.
+function normaliseName(s) {
+  return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// Pure decision for an upfront Tyro row. Given the row's reference + typed name +
+// charged amount and the pending expected-payments for that ref code, returns
+// what should happen — without any DB / Xero I/O (so it's unit-testable):
+//   { kind: 'none' }                        → not an upfront ref; normal handling
+//   { kind: 'ambiguous', candidates }       → 0 or >1 name matches; flag, don't book
+//   { kind: 'mismatch', exp, expectedCents} → name matches but amount differs; flag
+//   { kind: 'match', exp }                  → clean match; book + mark ledger matched
+function decideUpfront({ reference, name, amount, pending }) {
+  const ref = parseUpfrontRef(reference);
+  if (!ref) return { kind: 'none' };
+  const named = (pending || []).filter((p) => normaliseName(p.patient_name) === normaliseName(name));
+  if (named.length !== 1) return { kind: 'ambiguous', refCode: ref.refCode, candidates: named };
+  const exp = named[0];
+  const expectedCents = Number(exp.expected_amount_cents);
+  if (Math.round(Number(amount) * 100) !== expectedCents) {
+    return { kind: 'mismatch', refCode: ref.refCode, exp, expectedCents };
+  }
+  return { kind: 'match', refCode: ref.refCode, exp };
+}
 
 const UNALLOCATED_CONTACT_NAME = 'Unallocated Tyro Claim';
 let _unallocatedContactId = null;
@@ -113,8 +148,9 @@ async function ingestTyroCsv(csvText, log = logger) {
   const counts = {
     total: rows.length,
     processed: 0,
+    matched: 0,
     skipped: { notApproved: 0, zeroAmount: 0, duplicate: 0, paidElsewhere: 0 },
-    flagged: { duplicateContact: 0, unallocated: 0 },
+    flagged: { duplicateContact: 0, unallocated: 0, upfrontMismatch: 0, upfrontAmbiguous: 0 },
     paymentPending: 0,
   };
 
@@ -181,6 +217,57 @@ async function ingestTyroCsv(csvText, log = logger) {
     let unallocated = false;
     let candidateIds = '';
     const funderForLookup = row.funder || row.phi_funder || '';
+
+    // Upfront block reconciliation. A `PIF T1` / `PCL T2` reference means this
+    // swipe is the lump payment for an upfront agreement — it should match a
+    // pending expected-payment we wrote at signing. Match on the typed name
+    // field (not cardholder), cross-check the amount against the tier, and flag
+    // (never silently book) on mismatch/ambiguity. A clean match falls through
+    // to the normal Xero invoice + payment path with the resolved patient name.
+    const upfrontRef = parseUpfrontRef(row.invoice_reference);
+    if (upfrontRef) {
+      const pending = await getPendingExpectedPayments({ refCode: upfrontRef.refCode });
+      const decision = decideUpfront({ reference: row.invoice_reference, name: row.patient, amount, pending });
+      if (decision.kind === 'ambiguous') {
+        await appendActionRequired({
+          id: `upfront-ambiguous:${txnId}`,
+          type: 'upfront_unmatched',
+          cliniko_id: decision.candidates.map((p) => p.cliniko_id).filter(Boolean).join(','),
+          patient_name: patientName,
+          amount: row.amount_charged,
+          description: `Upfront Tyro ref ${upfrontRef.refCode} for "${patientName || '(no name)'}" matched ${decision.candidates.length} pending expected-payments. Resolve manually and book in Xero.`,
+          status: 'open',
+          created_at: new Date().toISOString(),
+          done_at: '',
+        });
+        counts.flagged.upfrontAmbiguous++;
+        log.warn({ txnId, refCode: upfrontRef.refCode, matches: decision.candidates.length }, 'Upfront Tyro row — no single name match, flagged');
+        continue;
+      }
+      if (decision.kind === 'mismatch') {
+        const { exp, expectedCents } = decision;
+        await markExpectedPaymentFlagged(exp.id, `amount $${amount} != expected $${(expectedCents / 100).toFixed(2)}`);
+        await appendActionRequired({
+          id: `upfront-mismatch:${txnId}`,
+          type: 'upfront_amount_mismatch',
+          cliniko_id: exp.cliniko_id || '',
+          patient_name: exp.patient_name || patientName,
+          amount: row.amount_charged,
+          description: `Upfront Tyro ref ${upfrontRef.refCode} for "${exp.patient_name}" charged $${amount} but tier expects $${(expectedCents / 100).toFixed(2)}. Review before booking.`,
+          status: 'open',
+          created_at: new Date().toISOString(),
+          done_at: '',
+        });
+        counts.flagged.upfrontMismatch++;
+        log.warn({ txnId, refCode: upfrontRef.refCode, amount, expectedCents }, 'Upfront Tyro row — amount mismatch, flagged');
+        continue;
+      }
+      // Clean match — book to the resolved patient, mark the ledger row matched.
+      patientName = decision.exp.patient_name || patientName;
+      await markExpectedPaymentMatched(decision.exp.id, txnId);
+      counts.matched++;
+      log.info({ txnId, refCode: upfrontRef.refCode, patient: patientName }, 'Upfront Tyro row matched expected-payment');
+    }
 
     if (!patientName) {
       const candidates = await findContactByMembership({
@@ -295,4 +382,4 @@ async function ingestTyroCsv(csvText, log = logger) {
   return counts;
 }
 
-module.exports = { ingestTyroCsv, parseTyroCsv };
+module.exports = { ingestTyroCsv, parseTyroCsv, decideUpfront };

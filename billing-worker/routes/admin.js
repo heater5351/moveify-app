@@ -13,6 +13,7 @@ const xero = require('../lib/xero');
 const { ingestTyroCsv } = require('../jobs/ingest-tyro');
 const stripeService = require('../services/stripe');
 const { lookupPlan, getPlanPriceId } = require('../lib/service-catalog');
+const { upfrontRefCode, upfrontPriceCents } = require('../lib/upfront-prices');
 
 // Admin routes are protected by a shared-secret token. The caller must send
 // X-Admin-Token: <value> matching the billing-admin-token secret.
@@ -169,6 +170,48 @@ router.post('/agreements/reconcile', express.json(), async (req, res) => {
     res.json({ ok: true, dryRun, ...summary });
   } catch (err) {
     log.error({ err: err.message }, 'agreements/reconcile failed');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Writes a pending expected-payment record for an upfront block agreement. Called
+// by the backend when an upfront agreement is signed. The Tyro CSV ingest later
+// reconciles a `PIF T1` / `PCL T2` reference + patient name against this row.
+router.post('/agreements/expected-payment', express.json(), async (req, res) => {
+  const log = withCorrelation(req);
+  if (process.env.AGREEMENT_AUTOMATION_ENABLED !== 'true') {
+    return res.status(503).json({ error: 'Agreement automation disabled' });
+  }
+  const { agreementId, clinikoId, name, tier, path } = req.body || {};
+  if (!agreementId || !tier || !path) {
+    return res.status(400).json({ error: 'agreementId, tier and path are required' });
+  }
+  if (clinikoId != null && !/^\d+$/.test(String(clinikoId))) {
+    return res.status(400).json({ error: 'clinikoId must be numeric' });
+  }
+  const refCode = upfrontRefCode(tier, path);
+  const amountCents = upfrontPriceCents(tier, path);
+  if (!refCode || !amountCents) {
+    return res.status(400).json({ error: `Upfront not available for tier='${tier}' path='${path}'` });
+  }
+  try {
+    await billingDb.appendExpectedPayment({
+      id: `exp:${agreementId}`,
+      agreement_id: String(agreementId),
+      cliniko_id: clinikoId != null ? String(clinikoId) : null,
+      patient_name: name ? String(name).trim() : null,
+      method: 'tyro_upfront',
+      path,
+      tier,
+      ref_code: refCode,
+      expected_amount_cents: amountCents,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    });
+    log.info({ agreement_id: agreementId, ref_code: refCode, amount_cents: amountCents }, 'Expected-payment ledger entry created');
+    res.json({ ok: true, refCode, expectedAmountCents: amountCents });
+  } catch (err) {
+    log.error({ err: err.message, agreement_id: agreementId }, 'expected-payment create failed');
     res.status(500).json({ error: err.message });
   }
 });

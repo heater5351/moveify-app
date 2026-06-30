@@ -22,6 +22,8 @@ const {
   billingTerms,
   formatMoney,
   PLAN_BILLING,
+  upfrontPrice,
+  upfrontTermsSummary,
 } = require('./agreement-template');
 
 // ── Provider / business identity (shown in the header of every agreement) ──────
@@ -381,7 +383,21 @@ function blockTermSection(c) {
 
 // ── Fees section (tier-specific, derived from billingTerms) ────────────────────
 
-function feesSection(tier, path) {
+function feesSection(tier, path, paymentMethod) {
+  // Upfront block: a single lump payment, no Direct Debit. Overrides the
+  // per-week DD wording entirely.
+  if (paymentMethod === 'upfront') {
+    const cents = upfrontPrice(tier, path);
+    if (!cents) return null;
+    return {
+      heading: 'Fees and Billing',
+      body: [
+        `This block is paid in full upfront — a single payment of ${formatMoney(cents)}. ` +
+        'No Direct Debit applies. Your program begins once payment is received. ' +
+        'The block ends automatically at the conclusion of its term and there are no recurring charges.',
+      ],
+    };
+  }
   const b = billingTerms(tier, path, null);
   const pb = PLAN_BILLING[planKey(tier, path)];
   if (!b || !pb) return null;
@@ -442,16 +458,21 @@ function partBSections(tier, path, startDate) {
 // ── Top-level builder ──────────────────────────────────────────────────────────
 
 // Returns the full structured agreement for a tier/path, or null if unknown.
-function buildAgreement({ tier, path, startDate } = {}) {
+// `paymentMethod` ('dd' | 'upfront', default 'dd') decouples signing from payment:
+// 'upfront' blocks pay a single lump out-of-band (Tyro/manual), so the document
+// omits Part B (the DDRSA) and uses lump-sum fee/consent copy.
+function buildAgreement({ tier, path, startDate, paymentMethod = 'dd' } = {}) {
   const c = getTierContent(tier, path);
   if (!c) return null;
+  // Upfront is only offered on the block paths; anything else falls back to DD.
+  const isUpfront = paymentMethod === 'upfront' && !!upfrontPrice(tier, path);
   const terms = billingTerms(tier, path, startDate);
 
   const partA = [];
   // 1. What's included
   partA.push({ heading: `${c.tierName} — What’s Included`, body: [c.intro], bullets: c.included });
   // 2. Fees
-  const fees = feesSection(tier, path);
+  const fees = feesSection(tier, path, isUpfront ? 'upfront' : 'dd');
   if (fees) partA.push(fees);
   // 3. Medicare / PHI
   const mp = medicarePhiSection(c);
@@ -471,26 +492,35 @@ function buildAgreement({ tier, path, startDate } = {}) {
   partA.push(PRIVACY_SECTION);
   partA.push(VARIATION_SECTION);
 
+  // Part B (the DDRSA) only applies to the Direct Debit path. Upfront blocks pay
+  // a lump out-of-band, so the document is Part A only with non-DD consent copy.
+  const parts = [{ key: 'A', title: 'Part A — Clinical Services', sections: partA }];
+  if (!isUpfront) {
+    parts.push({
+      key: 'B',
+      title: 'Part B — Direct Debit Authorisation',
+      intro: 'This section constitutes the Direct Debit Request Service Agreement (DDRSA) required under BECS operating rules. By signing this Agreement, you acknowledge and accept these direct debit terms.',
+      sections: partBSections(tier, path, startDate),
+    });
+  }
+
   return {
     version: AGREEMENT_VERSION,
     docTitle: c.docTitle,
     tier,
     path,
+    paymentMethod: isUpfront ? 'upfront' : 'dd',
     tierLabel: tierLabel(tier, path),
     startDate: startDate || null,
     provider: PROVIDER,
-    about: 'This Clinical Services & Billing Agreement sets out the terms under which Moveify Health Solutions will provide the services described below and collect payments. By signing, you confirm you have read and understood all terms.',
-    feesSummary: terms ? terms.summary : null,
-    parts: [
-      { key: 'A', title: 'Part A — Clinical Services', sections: partA },
-      {
-        key: 'B',
-        title: 'Part B — Direct Debit Authorisation',
-        intro: 'This section constitutes the Direct Debit Request Service Agreement (DDRSA) required under BECS operating rules. By signing this Agreement, you acknowledge and accept these direct debit terms.',
-        sections: partBSections(tier, path, startDate),
-      },
-    ],
-    signatureNote: 'By signing, you confirm that you have read and understood both Part A (Clinical Services) and Part B (Direct Debit Request Service Agreement), agree to be bound by all terms, and confirm that you are an account holder or authorised signatory on the nominated payment account.',
+    about: isUpfront
+      ? 'This Clinical Services Agreement sets out the terms under which Moveify Health Solutions will provide the services described below. Your block is paid in full upfront. By signing, you confirm you have read and understood all terms.'
+      : 'This Clinical Services & Billing Agreement sets out the terms under which Moveify Health Solutions will provide the services described below and collect payments. By signing, you confirm you have read and understood all terms.',
+    feesSummary: isUpfront ? upfrontTermsSummary(tier, path) : (terms ? terms.summary : null),
+    parts,
+    signatureNote: isUpfront
+      ? 'By signing, you confirm that you have read and understood Part A (Clinical Services), agree to be bound by all terms, and agree to pay the block fee in full upfront.'
+      : 'By signing, you confirm that you have read and understood both Part A (Clinical Services) and Part B (Direct Debit Request Service Agreement), agree to be bound by all terms, and confirm that you are an account holder or authorised signatory on the nominated payment account.',
   };
 }
 
