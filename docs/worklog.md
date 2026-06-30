@@ -36,7 +36,7 @@ what to know now, links).
 - **New worker endpoint:** `POST /admin/agreements/expected-payment` (flag-gated, `X-Admin-Token`).
   Canonical upfront price table duplicated in `backend/lib/agreement-template.js` (`UPFRONT_PRICES`)
   and `billing-worker/lib/upfront-prices.js` — **sync invariant**, keep both with the vault doc.
-- **Still behind `AGREEMENT_AUTOMATION_ENABLED`.** On `dev`. See `docs/agreement-automation.md`.
+- **LIVE in prod 2026-06-30** (dev→main ff `a8623a8`; backend `00113-nds`, worker `00179-pgh`). Behind `AGREEMENT_AUTOMATION_ENABLED` (already on in prod). See `docs/agreement-automation.md`.
 
 ## 2026-06-25 — NDIS EP price cap lowered to $161.99/hr
 
