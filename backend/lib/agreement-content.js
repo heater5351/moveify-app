@@ -369,13 +369,19 @@ function pauseCancelSection(c) {
   };
 }
 
-function blockTermSection(c) {
+function blockTermSection(c, paymentMethod) {
   if (c.family !== 'block') return null;
-  const debits = c.postCasual ? 'five weekly debits (following the credit of your casual program-design session)' : 'six weekly debits';
+  // Upfront blocks are paid as a single lump — no weekly debit language.
+  const termSentence = paymentMethod === 'upfront'
+    ? 'A treatment block is a fixed six-week commitment, paid in full upfront. The block ends automatically at the end of the six weeks — there is no rolling charge.'
+    : (() => {
+        const debits = c.postCasual ? 'five weekly debits (following the credit of your casual program-design session)' : 'six weekly debits';
+        return `A treatment block is a fixed six-week commitment billed over ${debits}. The block ends automatically after the final payment — there is no rolling charge.`;
+      })();
   return {
     heading: 'Block Term and What Happens Next',
     body: [
-      `A treatment block is a fixed six-week commitment billed over ${debits}. The block ends automatically after the final payment — there is no rolling charge.`,
+      termSentence,
       `At your week-6 reassessment we’ll discuss continuity options to keep your momentum (Independent, Maintain, Evolve, or Elite). If you need to pause or stop mid-block, contact ${SUPPORT_EMAIL} to discuss your options.`,
     ],
   };
@@ -392,9 +398,9 @@ function feesSection(tier, path, paymentMethod) {
     return {
       heading: 'Fees and Billing',
       body: [
-        `This block is paid in full upfront — a single payment of ${formatMoney(cents)}. ` +
-        'No Direct Debit applies. Your program begins once payment is received. ' +
-        'The block ends automatically at the conclusion of its term and there are no recurring charges.',
+        `This block is paid in full upfront — a single payment of ${formatMoney(cents)}, ` +
+        'with no recurring or scheduled payments. Your program begins once payment is received. ' +
+        'The block ends automatically at the conclusion of its term.',
       ],
     };
   }
@@ -485,7 +491,7 @@ function buildAgreement({ tier, path, startDate, paymentMethod = 'dd' } = {}) {
   // 6. Pause/cancel (continuity) or block term (block)
   const pc = pauseCancelSection(c);
   if (pc) partA.push(pc);
-  const bt = blockTermSection(c);
+  const bt = blockTermSection(c, isUpfront ? 'upfront' : 'dd');
   if (bt) partA.push(bt);
   // 7. Obligations, Privacy, Variation
   partA.push(obligationsSection(c));
